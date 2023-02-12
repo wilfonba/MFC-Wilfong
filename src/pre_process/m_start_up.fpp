@@ -103,7 +103,9 @@ contains
             rhoref, pref, bubbles, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, qbmm, &
-            sigR, sigV, dist_type, rhoRV, R0_type
+            sigR, sigV, dist_type, rhoRV, R0_type, &
+            k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
+            bf_x, bf_y, bf_z, locRef, presRef, bfIC
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -114,7 +116,8 @@ contains
         if (file_check) then
             open (1, FILE=trim(file_loc), FORM='formatted', &
                   STATUS='old', ACTION='read')
-            read (1, NML=user_inputs, iostat=iostatus)
+            !read (1, NML=user_inputs, iostat=iostatus)
+            read(1, NML=user_inputs)
             if (iostatus /= 0) then
                 print '(A)', 'Invalid line in pre_process.inp. It is '// &
                 'likely due to a datatype mismatch. Exiting ...'
@@ -125,6 +128,12 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_real) .or. &
+                (bf_z .ne. dflt_real)) then
+                bodyForces = .true.
+            endif
+
         else
             print '(A)', 'File pre_process.inp is missing. Exiting ...'
             call s_mpi_abort()

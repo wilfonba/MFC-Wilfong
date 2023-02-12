@@ -125,6 +125,20 @@ module m_global_parameters
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
 
+    logical :: bodyForces
+    logical :: bfIC
+    integer :: bf_x, bf_y, bf_z !< body force toggle in three directions
+    !< amplitude, frequency, and phase shift sinusoid in each direction
+    #:for dir in {'x', 'y', 'z'}
+        #:for param in {'k','w','p'}
+            real :: ${param}$_${dir}$
+        #:endfor
+    #:endfor
+    real(kind(0d0)), dimension(3) :: accel
+    real(kind(0d0)), dimension(3) :: locRef
+    real(kind(0d0)) :: presRef
+    real(kind(0d0)) :: gravPtl
+
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
@@ -425,6 +439,23 @@ contains
         num_mono = 1
 
         cu_tensor = .false.
+
+        bodyForces = .false.
+        bfIC = .false.
+        bf_x = dflt_int; bf_y = dflt_int; bf_z = dflt_int
+        !< amplitude, frequency, and phase shift sinusoid in each direction
+        #:for dir in {'x', 'y', 'z'}
+            #:for param in {'k','w','p'}
+                ${param}$_${dir}$ = dflt_real
+            #:endfor
+        #:endfor
+        
+        do i = 1, num_dims
+            accel(i) = dflt_real
+            locRef(i) = dflt_real
+        end do
+        gravPtl = dflt_real
+        presRef = dflt_real
 
         do j = 1, num_probes_max
             do i = 1, 3
@@ -1181,5 +1212,53 @@ contains
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(nb) = tmp*dphi/3.d0
     end subroutine s_simpson
+
+    subroutine s_compute_acceleration(t)
+        
+        real(kind(0d0)) :: t
+
+        if (m > 0) then
+            if (bf_x == 1) then
+                accel(1) = k_x*sin(w_x*t - p_x)
+            elseif (bf_x == 2) then !< analytic
+                accel(1) = 1
+            endif
+            if (n > 0) then
+                if (bf_y == 1) then
+                    accel(2) = k_y*sin(w_y*t - p_y)
+                elseif (bf_y == 2) then
+                    accel(2) = 1
+                end if
+                if (p > 0) then
+                    if (bf_z == 1) then
+                        accel(3) = k_z*sin(w_z*t - p_z)
+                    elseif (bf_z == 2) then
+                        accel(3) = 1
+                    end if
+                end if
+            end if
+        end if
+
+    end subroutine s_compute_acceleration
+
+    subroutine s_compute_gravitational_potential(t, i, j, k)
+
+        real(kind(0d0)) :: t
+        integer :: i, j, k !< cell indices
+
+        call s_compute_acceleration(t)
+
+        gravPtl = 0
+        if (m > 0) then
+            gravPtl = gravPtl + accel(1)*(x_cc(i) - locRef(1))
+            if (n > 0) then
+                gravPtl = gravPtl + accel(2)*(y_cc(j) - locRef(2))
+                if (p > 0) then
+                    gravPtl = gravPtl + accel(3)*(z_cc(k) - locRef(3))
+                end if
+            end if
+        end if
+
+    end subroutine s_compute_gravitational_potential
 
 end module m_global_parameters

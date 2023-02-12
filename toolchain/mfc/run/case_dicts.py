@@ -14,7 +14,7 @@ COMMON = [
 PRE_PROCESS = COMMON + [
     'old_grid', 'old_ic', 't_step_old', 'perturb_flow', 'perturb_flow_fluid',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
-    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV'
+    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', "bfIC", "presRef"
 ]
 
 for cmp in ["x", "y", "z"]:
@@ -26,6 +26,12 @@ for cmp in ["x", "y", "z"]:
 
     PRE_PROCESS.append(f"bc_{cmp}%beg")
     PRE_PROCESS.append(f"bc_{cmp}%end")
+
+    for param in ["bf", "k", "w", "p"]:
+        PRE_PROCESS.append(f"{param}_{cmp}")
+
+for dir in ["1","2","3"]:
+    PRE_PROCESS.append(f'locRef({dir})')
 
 for f_id in range(1, 10+1):
     PRE_PROCESS.append(f'fluid_rho({f_id})')
@@ -72,12 +78,18 @@ SIMULATION = COMMON + [
     'mixture_err', 'tvd_riemann_flux', 'tvd_rhs_flux', 'tvd_wave_speeds',
     'flux_lim', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
-    'num_integrals', 'cu_mpi', 'prim_vars_wrt'
+    'num_integrals', 'cu_mpi', 'prim_vars_wrt', "bfIC", "presRef"
 ]
 
 for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%beg')
     SIMULATION.append(f'bc_{cmp}%end')
+
+    for param in ["bf", "k", "w", "p"]:
+        SIMULATION.append(f"{param}_{cmp}")
+
+for dir in ["1","2","3"]:
+    SIMULATION.append(f'locRef({dir})')
 
 for wrt_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:

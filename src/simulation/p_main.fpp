@@ -247,6 +247,8 @@ program p_main
         print *, 'Computed derived vars'
 #endif
 
+        if (bodyForces) call s_compute_acceleration(mytime)
+
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
             call s_1st_order_tvd_rk(t_step, time_avg)

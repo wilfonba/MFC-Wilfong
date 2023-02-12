@@ -99,7 +99,8 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type
+            R0_type, bf_x, bf_y, bf_z, k_x, k_y, k_z, &
+            w_x, w_y, w_z, p_x, p_y, p_z, presRef, locRef, bfIC
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -110,7 +111,7 @@ contains
                   FORM='formatted', &
                   ACTION='read', &
                   STATUS='old')
-            read (1, NML=user_inputs, iostat=iostatus)
+            read (1, NML=user_inputs)
 
             if (iostatus /= 0) then
                 print '(A)', 'Invalid line in simulation.inp. It is '// &
@@ -132,6 +133,11 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_real) .or. &
+            (bf_z .ne. dflt_real)) then
+                bodyForces = .true.
+            endif
 
         else
             print '(A)', trim(file_path)//' is missing. Exiting ...'
