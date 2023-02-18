@@ -99,9 +99,7 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        call  MPI_BCAST(locRef, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-        call  MPI_BCAST(densRef, num_fluids_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
+        call  MPI_BCAST(locRef, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr) 
 
         #:for VAR in ['t_step_old', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
             & 't_step_start','t_step_stop','t_step_save','model_eqns',         &

@@ -247,7 +247,10 @@ program p_main
         print *, 'Computed derived vars'
 #endif
 
-        if (bodyForces) call s_compute_acceleration(mytime)
+        if (bodyForces) then 
+            call s_compute_acceleration(mytime)
+!$acc update device(accel)
+        end if
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then

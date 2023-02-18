@@ -514,11 +514,11 @@ contains
                         end do
                     end do
                 end do
+                !$acc end parallel loop
                 if (bodyForces) then
                     vL_rs_vf_x(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) + 1000*accel(1)*dx(j)/2
                     vR_rs_vf_x(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) - 1000*accel(1)*dx(j)/2
                 end if
-!$acc end parallel loop
             else if (weno_dir == 2) then
 !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
@@ -531,11 +531,11 @@ contains
                         end do
                     end do
                 end do
+                !$acc end parallel loop
                 if (bodyForces) then
                     vL_rs_vf_y(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) + 1000*accel(2)*dy(k)/2
                     vR_rs_vf_y(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) - 1000*accel(2)*dy(k)/2
                 end if
-!$acc end parallel loop
             else if (weno_dir == 3) then
 !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
@@ -548,7 +548,7 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             end if
 
         elseif (weno_order == 3) then

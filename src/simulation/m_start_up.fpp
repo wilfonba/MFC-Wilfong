@@ -100,8 +100,7 @@ contains
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
             R0_type, bf_x, bf_y, bf_z, k_x, k_y, k_z, &
-            w_x, w_y, w_z, p_x, p_y, p_z, presRef, locRef, bfIC, &
-            densRef
+            w_x, w_y, w_z, p_x, p_y, p_z, presRef, locRef, bfIC
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.

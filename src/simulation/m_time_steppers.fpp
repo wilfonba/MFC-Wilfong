@@ -216,14 +216,14 @@ contains
                 end do
             end do
         end do
+        !$acc end parallel loop
 
         if (bodyForces) then
-!$acc parallel loop collapse(3) gang vector default(present)              
+!$acc parallel loop collapse(3) gang vector default(present)  private(rhoL)            
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         rhoL = 0d0
-                        !$acc loop sequential
                         do i = 1, num_fluids
                             rhoL = rhoL + q_cons_ts(1)%vf(contxb+i-1)%sf(j,k,l)
                         end do
@@ -255,6 +255,7 @@ contains
                     end do
                 end do
             end do
+            !$acc end parallel loop
         end if
 
         !print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(102,0,0)
