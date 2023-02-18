@@ -499,8 +499,10 @@ contains
                     stop 'Invalid value of nb'
                 end if
 
-                print *, 'R0 weights: ', weight(:)
-                print *, 'R0 abscissas: ', R0(:)
+                if (proc_rank == 0) then
+                    print *, 'R0 weights: ', weight(:)
+                    print *, 'R0 abscissas: ', R0(:)
+                end if
 
                 if (.not. polytropic) then
                     call s_initialize_nonpoly

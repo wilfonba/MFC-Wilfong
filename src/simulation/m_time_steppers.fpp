@@ -217,6 +217,46 @@ contains
             end do
         end do
 
+        if (bodyForces) then
+!$acc parallel loop collapse(3) gang vector default(present)              
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rhoL = 0d0
+                        !$acc loop sequential
+                        do i = 1, num_fluids
+                            rhoL = rhoL + q_cons_ts(1)%vf(contxb+i-1)%sf(j,k,l)
+                        end do
+
+                        if (m > 0) then
+                            q_cons_ts(1)%vf(momxb)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(momxb)%sf(j, k, l) &
+                                + dt*rhoL*accel(1)
+                            q_cons_ts(1)%vf(E_idx)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(E_idx)%sf(j, k, l) &
+                                + dt*q_cons_ts(1)%vf(momxb)%sf(j,k,l)*rhoL*accel(1)
+                            if (n > 0) then
+                                q_cons_ts(1)%vf(momxb+1)%sf(j, k, l) = &
+                                    q_cons_ts(1)%vf(momxb+1)%sf(j, k, l) &
+                                    + dt*rhoL*accel(2)
+                                q_cons_ts(1)%vf(E_idx)%sf(j, k, l) = &
+                                    q_cons_ts(1)%vf(E_idx)%sf(j, k, l) &
+                                    + dt*q_cons_ts(1)%vf(momxb+1)%sf(j,k,l)*rhoL*accel(2)
+                                if (p > 0) then
+                                    q_cons_ts(1)%vf(momxe)%sf(j, k, l) = &
+                                        q_cons_ts(1)%vf(momxe)%sf(j, k, l) &
+                                        + dt*rhoL*accel(2)
+                                    q_cons_ts(1)%vf(E_idx)%sf(j, k, l) = &
+                                        q_cons_ts(1)%vf(E_idx)%sf(j, k, l) &
+                                        + dt*q_cons_ts(1)%vf(momxe)%sf(j,k,l)*rhoL*accel(3)
+                                end if
+                            end if
+                        end if
+                    end do
+                end do
+            end do
+        end if
+
         !print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(102,0,0)
         !print *, q_cons_ts(1)%vf(E_idx)%sf(102,0,0)
         !print *, q_cons_ts(1)%vf(adv_idx%end)%sf(102,0,0)

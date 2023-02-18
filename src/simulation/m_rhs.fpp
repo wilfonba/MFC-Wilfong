@@ -196,8 +196,6 @@ module m_rhs
     real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
 !$acc declare create(nbub)
 
-    real(kind(0d0)) :: rho, uDotPhi !< body force numbers
-
 contains
 
     !> The computation of parameters, the allocation of memory,
@@ -1740,42 +1738,6 @@ contains
             call nvtxEndRange
         end do
         ! END: Dimensional Splitting Loop =================================
-
-        if (bodyForces) then
-            do i = 0,n
-                do j = 0,m
-                    do k = 0,p
-                        call s_compute_gravitational_potential(myTime, i, j, k)
-
-                        rho = 0d0
-                        uDotPhi = 0d0
-                        do l = 1,num_fluids
-                            rho = rho + q_cons_vf(contxb + l - 1)%sf(i,j,k)
-                        end do
-                        
-                        if (n > 0) then
-                            rhs_vf(momxb)%sf(i,j,k) = rhs_vf(momxb)%sf(i,j,k) + &
-                                accel(1)*rho
-                            uDotPhi = uDotPhi + q_prim_vf(momxb)%sf(i,j,k)*accel(1)
-                            if (m > 0) then
-                                rhs_vf(momxb+1)%sf(i,j,k) = rhs_vf(momxb+1)%sf(i,j,k) + &
-                                    accel(2)*rho
-                                uDotPhi = uDotPhi + q_prim_vf(momxb+1)%sf(i,j,k)*accel(2)
-                                if (p > 0) then
-                                    rhs_vf(momxe)%sf(i,j,k) = rhs_vf(momxe)%sf(i,j,k) + &
-                                        accel(3)*rho
-                                    uDotPhi = uDotPhi + q_prim_vf(momxe)%sf(i,j,k)*accel(3)
-                                end if  
-                            end if
-                        end if
-                        
-                        rhs_vf(E_idx)%sf(i,j,k) = rhs_vf(E_idx)%sf(i,j,k) + &
-                            uDotPhi*rho
-
-                    end do
-                end do
-            end do
-        end if
 
         if (run_time_info .or. probe_wrt) then
 

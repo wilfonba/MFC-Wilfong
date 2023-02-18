@@ -136,8 +136,9 @@ module m_global_parameters
     #:endfor
     real(kind(0d0)), dimension(3) :: accel
     real(kind(0d0)), dimension(3) :: locRef
-    real(kind(0d0)) :: presRef
-    real(kind(0d0)) :: gravPtl
+    real(kind(0d0)), dimension(1:num_fluids_max) :: densRef
+    real(kind(0d0)) :: presRef, gravPtl, eRef, dc
+    real(kind(0d0)) :: gammaL, pi_infL, rhoL, densRefL
 
     integer :: cpu_start, cpu_end, cpu_rate
 
@@ -454,6 +455,11 @@ contains
             accel(i) = dflt_real
             locRef(i) = dflt_real
         end do
+
+        do i = 1, num_fluids
+            densRef(i) = dflt_real
+        end do
+        
         gravPtl = dflt_real
         presRef = dflt_real
 

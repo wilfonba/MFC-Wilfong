@@ -94,6 +94,15 @@ contains
 
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
+        #:for VAR in ['bf_x', 'bf_y', 'bf_z', 'k_x', 'k_y', 'k_z', 'w_x', 'w_y',&
+            & 'w_z', 'p_x', 'p_y', 'p_z']
+            call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+        #:endfor
+
+        call  MPI_BCAST(locRef, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+        call  MPI_BCAST(densRef, num_fluids_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+
+
         #:for VAR in ['t_step_old', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
             & 't_step_start','t_step_stop','t_step_save','model_eqns',         &
             & 'num_fluids','time_stepper', 'weno_vars', 'riemann_solver',      & 
@@ -110,7 +119,7 @@ contains
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err', &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',        &
             & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt', &
-            & 'prim_vars_wrt']
+            & 'prim_vars_wrt', 'bfIC', 'bodyForces']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
