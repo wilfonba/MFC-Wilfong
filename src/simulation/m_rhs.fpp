@@ -1739,6 +1739,47 @@ contains
         end do
         ! END: Dimensional Splitting Loop =================================
 
+        if (bodyForces) then
+!$acc parallel loop collapse(3) gang vector default(present)  private(rhoL)            
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rhoL = 0d0
+                        do i = 1, num_fluids
+                            rhoL = rhoL + q_cons_vf(contxb+i-1)%sf(j,k,l)
+                        end do
+                        if (m > 0) then
+                            rhs_vf(momxb)%sf(j, k, l) = &
+                                rhs_vf(momxb)%sf(j, k, l) &
+                                + rhoL*accel(1)
+                            rhs_vf(E_idx)%sf(j, k, l) = &
+                                rhs_vf(E_idx)%sf(j, k, l) &
+                                + q_prim_vf(momxb)%sf(j,k,l)*rhoL*accel(1)
+                            if (n > 0) then
+                                rhs_vf(momxb+1)%sf(j, k, l) = &
+                                    rhs_vf(momxb+1)%sf(j, k, l) &
+                                    + rhoL*accel(2)
+                                rhs_vf(E_idx)%sf(j, k, l) = &
+                                    rhs_vf(E_idx)%sf(j, k, l) &
+                                    + q_prim_vf(momxb+1)%sf(j,k,l)*rhoL*accel(2)
+                                if (p > 0) then
+                                    rhs_vf(momxe)%sf(j, k, l) = &
+                                        rhs_vf(momxe)%sf(j, k, l) &
+                                        + rhoL*accel(3)
+                                    rhs_vf(E_idx)%sf(j, k, l) = &
+                                        rhs_vf(E_idx)%sf(j, k, l) &
+                                        + q_prim_vf(momxe)%sf(j,k,l)*rhoL*accel(3)
+                                end if
+                            end if
+                        end if
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+        end if
+
+
+
         if (run_time_info .or. probe_wrt) then
 
             ix%beg = -buff_size; iy%beg = 0; iz%beg = 0

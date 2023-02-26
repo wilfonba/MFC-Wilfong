@@ -39,3 +39,6 @@ examples/*/simulation.sh
 examples/*/post_process.sh
 examples/*/fort.1
 examples/*/*.sh
+
+examples/bodyForcesBCCheck/*
+checkBCs.sh
