@@ -1220,18 +1220,21 @@ contains
         real(kind(0d0)) :: t
 
         if (m > 0) then
+            accel(1) = 0
             if (bf_x == 1) then
                 accel(1) = k_x*sin(w_x*t - p_x)
             elseif (bf_x == 2) then !< analytic
                 accel(1) = 1
             endif
             if (n > 0) then
+                accel(2) = 0
                 if (bf_y == 1) then
                     accel(2) = k_y*sin(w_y*t - p_y)
                 elseif (bf_y == 2) then
                     accel(2) = 1
                 end if
                 if (p > 0) then
+                    accel(3) = 0
                     if (bf_z == 1) then
                         accel(3) = k_z*sin(w_z*t - p_z)
                     elseif (bf_z == 2) then
