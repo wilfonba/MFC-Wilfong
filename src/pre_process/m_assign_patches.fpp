@@ -642,7 +642,7 @@ contains
         end do
 
         ! Pressure
-        if (bfIC) then
+        if (bfIC .and. y_cc(k) < locRef(2)) then
             call s_compute_gravitational_potential(0d0, j, k, l)
             q_prim_vf(E_idx)%sf(j,k,l) = presRef + &
                 gravPtl*1000

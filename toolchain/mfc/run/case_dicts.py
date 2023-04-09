@@ -40,7 +40,7 @@ for f_id in range(1, 10+1):
                       "mu_v", "k_v", "G"]:
         PRE_PROCESS.append(f"fluid_pp({f_id})%{attribute}")
 
-for p_id in range(1, 10+1):
+for p_id in range(1, 30+1):
     for attribute in ["geometry", "radius", "radii", "epsilon", "beta",
                       "normal", "smoothen", "smooth_patch_id", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",

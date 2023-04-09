@@ -14,7 +14,7 @@ module m_derived_types
     integer, parameter :: num_probes_max = 10 !<
     !! Maximum number of flow probes in the simulation
 
-    integer, parameter :: num_patches_max = 10
+    integer, parameter :: num_patches_max = 30
 
     !> Derived type adding the field position (fp) as an attribute
     type field_position
