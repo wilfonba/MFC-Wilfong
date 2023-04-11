@@ -541,6 +541,30 @@ contains
 
 !$acc update device(monopole, num_mono)
 
+#ifdef MFC_SIMULATION
+        if (bodyForces) then
+       ! Simulation is at least 2D
+            if (n > 0) then
+                ! Simulation is 3D
+                if (p > 0) then
+                    @:ALLOCATE (rho_sf(-buff_size:m + buff_size, &
+                                     -buff_size:n + buff_size, &
+                                     -buff_size:p + buff_size))
+                ! Simulation is 2D
+                else
+                    @:ALLOCATE (rho_sf(-buff_size:m + buff_size, &
+                                     -buff_size:n + buff_size, &
+                                     0:0))
+                end if
+            ! Simulation is 1D
+            else
+                @:ALLOCATE (rho_sf(-buff_size:m + buff_size, &
+                                 0:0, &
+                                 0:0))
+            end if
+        end if
+#endif
+
 #ifdef MFC_POST_PROCESS
         ! Allocating the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
@@ -1037,6 +1061,12 @@ contains
 
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
+#ifdef MFC_SIMULATION
+        if (bodyForces) then
+            @:DEALLOCATE(rho_sf)
+        end if
+#endif
+
 #ifdef MFC_POST_PROCESS
         deallocate(rho_sf, gamma_sf, pi_inf_sf)
 #endif
