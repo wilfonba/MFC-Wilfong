@@ -65,19 +65,21 @@ for binpath in {MFC::BINARIES}; do
 
     echo -e ":) Running $binpath:"
 
-    srun                                   \
-        --nodes={nodes}                    \
-        --ntasks-per-node {tasks_per_node} \
-        "$binpath"
-
-    #>
-    #> srun --mpi=pmix   \
-    #>      "$binpath"
-    #>
-    #> mpirun                            \
-    #>        -np {tasks_per_node*nodes} \
-    #>        "$binpath"
-    #>
+    if command -v srun > /dev/null 2>&1; then
+        srun                                   \
+            --nodes           {nodes}          \
+            --ntasks-per-node {tasks_per_node} \
+            {MFC::PROFILER} "$binpath"
+        
+        #>
+        #> srun --mpi=pmix \
+        #>      {MFC::PROFILER} "$binpath"
+    else
+        mpirun                         \
+            -np {tasks_per_node*nodes} \
+            {MFC::PROFILER} "$binpath"
+    
+    fi
 
 done
 

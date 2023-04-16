@@ -7,6 +7,9 @@
 !!      Currently, the available derived variables include the unadvected
 !!      volume fraction, specific heat ratio, liquid stiffness, speed of
 !!      sound, vorticity and the numerical Schlieren function.
+
+#:include 'inline_conversions.fpp'
+
 module m_derived_variables
 
     ! Dependencies =============================================================
@@ -15,12 +18,13 @@ module m_derived_variables
     use m_global_parameters     !< Global parameters for the code
 
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
+
+    use m_variables_conversion
     ! ==========================================================================
 
     implicit none
 
     private; public :: s_initialize_derived_variables_module, &
- s_compute_finite_difference_coefficients, &
  s_derive_specific_heat_ratio, &
  s_derive_liquid_stiffness, &
  s_derive_sound_speed, &
@@ -28,6 +32,7 @@ module m_derived_variables
  s_derive_vorticity_component, &
  s_derive_qm, &
  s_derive_numerical_schlieren_function, &
+ s_compute_speed_of_sound, &
  s_finalize_derived_variables_module
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: gm_rho_sf !<
@@ -109,78 +114,12 @@ contains
 
     end subroutine s_initialize_derived_variables_module ! --------------------
 
-    !> @name The purpose of this subroutine is to compute the finite-
-        !!      difference coefficients for the centered schemes utilized
-        !!      in computations of first order spatial derivatives in the
-        !!      s-coordinate direction. The s-coordinate direction refers
-        !!      to the x-, y- or z-coordinate direction, depending on the
-        !!      subroutine's inputs. Note that coefficients of up to 4th
-        !!      order accuracy are available.
-        !!  @param q Number of cells in the s-coordinate direction
-        !!  @param offset_s  Size of the ghost zone layer in the s-coordinate direction
-        !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
-        !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
-    subroutine s_compute_finite_difference_coefficients(q, offset_s, &
-                                                        s_cc, fd_coeff_s)
-
-        integer, intent(IN) :: q
-        type(int_bounds_info), intent(IN) :: offset_s
-
-        real(kind(0d0)), &
-            dimension(-buff_size:q + buff_size), &
-            intent(IN) :: s_cc
-
-        real(kind(0d0)), &
-            dimension(-fd_number:fd_number, -offset_s%beg:q + offset_s%end), &
-            intent(INOUT) :: fd_coeff_s
-
-        integer :: i !< Generic loop iterator
-
-        ! Computing the 1st order finite-difference coefficients
-        if (fd_order == 1) then
-            do i = -offset_s%beg, q + offset_s%end
-                fd_coeff_s(-1, i) = 0d0
-                fd_coeff_s(0, i) = -1d0/(s_cc(i + 1) - s_cc(i))
-                fd_coeff_s(1, i) = -fd_coeff_s(0, i)
-            end do
-
-            ! Computing the 2nd order finite-difference coefficients
-        elseif (fd_order == 2) then
-            do i = -offset_s%beg, q + offset_s%end
-                fd_coeff_s(-1, i) = -1d0/(s_cc(i + 1) - s_cc(i - 1))
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-            end do
-
-            ! Computing the 4th order finite-difference coefficients
-        else
-            do i = -offset_s%beg, q + offset_s%end
-                fd_coeff_s(-2, i) = 1d0/(s_cc(i - 2) - 8d0*s_cc(i - 1) &
-                                         - s_cc(i + 2) + 8d0*s_cc(i + 1))
-                fd_coeff_s(-1, i) = -8d0*fd_coeff_s(-2, i)
-                fd_coeff_s(0, i) = 0d0
-                fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
-                fd_coeff_s(2, i) = -fd_coeff_s(-2, i)
-            end do
-
-        end if
-
-    end subroutine s_compute_finite_difference_coefficients ! --------------
-
-
     !>  This subroutine receives as input the specific heat ratio
         !!      function, gamma_sf, and derives from it the specific heat
         !!      ratio. The latter is stored in the derived flow quantity
         !!      storage variable, q_sf.
-        !!  @param gamma_sf Specific heat ratio function
         !!  @param q_sf Specific heat ratio
-    subroutine s_derive_specific_heat_ratio(gamma_sf, q_sf) ! --------------
-
-        real(kind(0d0)), &
-            dimension(-buff_size:m + buff_size, &
-                      -buff_size:n + buff_size, &
-                      -buff_size*flg:(p + buff_size)*flg), &
-            intent(IN) :: gamma_sf
+    subroutine s_derive_specific_heat_ratio(q_sf) ! --------------
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -206,16 +145,8 @@ contains
         !!      pi_inf_sf, respectively. These are used to calculate the
         !!      values of the liquid stiffness, which are stored in the
         !!      derived flow quantity storage variable, q_sf.
-        !!  @param gamma_sf Specific heat ratio
-        !!  @param pi_inf_sf Liquid stiffness function
         !!  @param q_sf Liquid stiffness
-    subroutine s_derive_liquid_stiffness(gamma_sf, pi_inf_sf, q_sf) ! ------
-
-        real(kind(0d0)), &
-            dimension(-buff_size:m + buff_size, &
-                      -buff_size:n + buff_size, &
-                      -buff_size*flg:(p + buff_size)*flg), &
-            intent(IN) :: gamma_sf, pi_inf_sf
+    subroutine s_derive_liquid_stiffness(q_sf) ! ------
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -243,22 +174,12 @@ contains
         !!      the values of the speed of sound, which are stored in the
         !!      derived flow quantity storage variable, q_sf.
         !! @param q_prim_vf Primitive variables
-        !! @param rho_sf Density
-        !! @param gamma_sf Specific heat ratio function
-        !! @param pi_inf_sf Liquid stiffness function
         !! @param q_sf Speed of sound
-    subroutine s_derive_sound_speed(q_prim_vf, rho_sf, gamma_sf, & ! ------
-                                    pi_inf_sf, q_sf)
+    subroutine s_derive_sound_speed(q_prim_vf, q_sf)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf
-
-        real(kind(0d0)), &
-            dimension(-buff_size:m + buff_size, &
-                      -buff_size:n + buff_size, &
-                      -buff_size*flg:(p + buff_size)*flg), &
-            intent(IN) :: rho_sf, gamma_sf, pi_inf_sf
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &
@@ -419,22 +340,6 @@ contains
 
         integer :: i, j, k
 
-        ! Solve linear system using Intel MKL (Hooke)
-!               nrhs = 1
-!               lda = ndim
-!               ldb = ndim
-!
-!               CALL DGESV(ndim, nrhs, A, lda, ipiv, b, ldb, info)
-!
-!               DO i = 1, ndim
-!                   sol(i) = b(i)
-!               END DO
-!
-!               IF (info /= 0) THEN
-!                   PRINT '(A)', 'Trouble solving linear system'
-!                   CALL s_mpi_abort()
-!               END IF
-
         ! Solve linear system using own linear solver (Thomson/Darter/Comet/Stampede)
         ! Forward elimination
         do i = 1, ndim
@@ -570,14 +475,14 @@ contains
 
     end subroutine s_derive_vorticity_component ! --------------------------
 
-	!> This subroutine gets as inputs the primitive variables. From those
-		!!		inputs, it proceeds to calculate the value of the Q_M 
-		!!		function, which are subsequently stored in the derived flow
-		!!		quantity storage variable, q_sf.
-		!!	@param q_prim_vf Primitive variables
-		!!	@param q_sf Q_M
-	subroutine s_derive_qm(q_prim_vf,q_sf)
-		type(scalar_field), &
+    !> This subroutine gets as inputs the primitive variables. From those
+        !!      inputs, it proceeds to calculate the value of the Q_M 
+        !!      function, which are subsequently stored in the derived flow
+        !!      quantity storage variable, q_sf.
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_sf Q_M
+    subroutine s_derive_qm(q_prim_vf,q_sf)
+        type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf
 
@@ -590,71 +495,73 @@ contains
         real(kind(0d0)), &
             dimension(1:3, 1:3) :: q_jacobian_sf, S, S2, O, O2
 
-		real(kind(0d0)) :: trS, trS2, trO2, Q, IIS
+        real(kind(0d0)) :: trS, trS2, trO2, Q, IIS
         integer :: j, k, l, r, jj, kk !< Generic loop iterators
 
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
 
-					! Get velocity gradient tensor
+                    ! Get velocity gradient tensor
                     q_jacobian_sf(:, :) = 0d0
-					
+                    
                     do r = -fd_number, fd_number
-						do jj = 1, 3
-							! d()/dx
-							q_jacobian_sf(jj, 1) = &
-								q_jacobian_sf(jj, 1)+ &
-								fd_coeff_x(r, j)* &
-								q_prim_vf(mom_idx%beg+jj-1)%sf(r + j, k, l)
-							! d()/dy
-							q_jacobian_sf(jj, 2) = &
-								q_jacobian_sf(jj, 2)+ &
-								fd_coeff_y(r, k)* &
-								q_prim_vf(mom_idx%beg+jj-1)%sf(j, r + k, l)
-							! d()/dz
-							q_jacobian_sf(jj, 3) = &
-								q_jacobian_sf(jj, 3)+ &
-								fd_coeff_z(r, l)* &
-								q_prim_vf(mom_idx%beg+jj-1)%sf(j, k, r + l)
-						end do
-					end do
-					
-					! Decompose J into asymmetric matrix, S, and a skew-symmetric matrix, O
-					do jj = 1, 3
-						do kk = 1, 3
-							S(jj, kk) = 0.5D0* &
-							(q_jacobian_sf(jj, kk) + q_jacobian_sf(kk, jj))
-							O(jj, kk) = 0.5D0* &
-							(q_jacobian_sf(jj, kk) - q_jacobian_sf(kk, jj))
-						end do
-					end do
-					
-					! Compute S2 = S*S'
-					do jj = 1, 3
-						do kk = 1, 3
-							O2(jj, kk) = O(jj,1)*O(kk,1)+ &
-										 O(jj,2)*O(kk,2)+ &
-										 O(jj,3)*O(kk,3)
-							S2(jj, kk) = S(jj,1)*S(kk,1)+ &
-										 S(jj,2)*S(kk,2)+ &
-										 S(jj,3)*S(kk,3)
-						end do
-					end do
-					
-					! Compute Q
-					Q = 0.5*((O2(1,1)+O2(2,2)+O2(3,3))- &
-							 (S2(1,1)+S2(2,2)+S2(3,3)))
-					trS = S(1,1)+S(2,2)+S(3,3)
-					IIS = 0.5*((S(1,1)+S(2,2)+S(3,3))**2- &
-							   (S2(1,1)+S2(2,2)+S2(3,3)))
-					q_sf(j, k, l) = Q+IIS
+                        do jj = 1, 3
+                            ! d()/dx
+                            q_jacobian_sf(jj, 1) = &
+                                q_jacobian_sf(jj, 1)+ &
+                                fd_coeff_x(r, j)* &
+                                q_prim_vf(mom_idx%beg+jj-1)%sf(r + j, k, l)
+                            ! d()/dy
+                            q_jacobian_sf(jj, 2) = &
+                                q_jacobian_sf(jj, 2)+ &
+                                fd_coeff_y(r, k)* &
+                                q_prim_vf(mom_idx%beg+jj-1)%sf(j, r + k, l)
+                            ! d()/dz
+                            q_jacobian_sf(jj, 3) = &
+                                q_jacobian_sf(jj, 3)+ &
+                                fd_coeff_z(r, l)* &
+                                q_prim_vf(mom_idx%beg+jj-1)%sf(j, k, r + l)
+                        end do
+                    end do
+                    
+                    ! Decompose J into asymmetric matrix, S, and a skew-symmetric matrix, O
+                    do jj = 1, 3
+                        do kk = 1, 3
+                            S(jj, kk) = 0.5D0* &
+                            (q_jacobian_sf(jj, kk) + q_jacobian_sf(kk, jj))
+                            O(jj, kk) = 0.5D0* &
+                            (q_jacobian_sf(jj, kk) - q_jacobian_sf(kk, jj))
+                        end do
+                    end do
+                    
+                    ! Compute S2 = S*S'
+                    do jj = 1, 3
+                        do kk = 1, 3
+                            O2(jj, kk) = O(jj,1)*O(kk,1)+ &
+                                         O(jj,2)*O(kk,2)+ &
+                                         O(jj,3)*O(kk,3)
+                            S2(jj, kk) = S(jj,1)*S(kk,1)+ &
+                                         S(jj,2)*S(kk,2)+ &
+                                         S(jj,3)*S(kk,3)
+                        end do
+                    end do
+                    
+                    ! Compute Q
+                    Q = 0.5*((O2(1,1)+O2(2,2)+O2(3,3))- &
+                             (S2(1,1)+S2(2,2)+S2(3,3)))
+                    trS = S(1,1)+S(2,2)+S(3,3)
+                    IIS = 0.5*((S(1,1)+S(2,2)+S(3,3))**2- &
+                               (S2(1,1)+S2(2,2)+S2(3,3)))
+                    q_sf(j, k, l) = Q+IIS
 
                 end do
             end do
-        end do		
+        end do      
 
-	end subroutine s_derive_qm
+    end subroutine s_derive_qm
+
+    @:s_compute_speed_of_sound()
 
     !>  This subroutine gets as inputs the conservative variables
         !!      and density. From those inputs, it proceeds to calculate
@@ -662,19 +569,12 @@ contains
         !!      subsequently stored in the derived flow quantity storage
         !!      variable, q_sf.
         !!  @param q_cons_vf Conservative variables
-        !!  @param rho_sf Density
         !!  @param q_sf Numerical Schlieren function
-    subroutine s_derive_numerical_schlieren_function(q_cons_vf, rho_sf, q_sf)
+    subroutine s_derive_numerical_schlieren_function(q_cons_vf, q_sf)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_cons_vf
-
-        real(kind(0d0)), &
-            dimension(-buff_size:m + buff_size, &
-                      -buff_size:n + buff_size, &
-                      -buff_size*flg:(p + buff_size)*flg), &
-            intent(IN) :: rho_sf
 
         real(kind(0d0)), &
             dimension(-offset_x%beg:m + offset_x%end, &

@@ -2,6 +2,8 @@
 !! @file m_data_output.f90
 !! @brief Contains module m_data_output
 
+#:include 'inline_conversions.fpp'
+
 !> @brief This module takes care of writing the grid and initial condition
 !!              data files into the "0" time-step directory located in the folder
 !!              associated with the rank of the local processor, which is a sub-
@@ -14,6 +16,8 @@ module m_data_output
 
     use m_global_parameters     !< Global parameters for the code
 
+    use m_helper
+
     use m_mpi_proxy             !< Message passing interface (MPI) module proxy
 
 #ifdef MFC_MPI
@@ -23,6 +27,8 @@ module m_data_output
     use m_compile_specific
 
     use m_variables_conversion
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -70,6 +76,7 @@ contains
         logical :: file_exist !< checks if file exists
 
         character(LEN=15) :: FMT
+        character(LEN=3) :: status
 
         character(LEN= &
                   int(floor(log10(real(sys_size, kind(0d0))))) + 1) :: file_num !< Used to store
@@ -88,13 +95,22 @@ contains
         real(kind(0d0)) :: rho                          !< Temporary density
         real(kind(0d0)) :: pres                         !< Temporary pressure
 
+        real(kind(0d0)) :: nR3
+        real(kind(0d0)) :: ntmp
+
         t_step = 0
 
         ! Outputting the Locations of the Cell-boundaries ==================
 
+        if (old_grid) then
+            status = 'old'
+        else
+            status = 'new'
+        end if
+
         ! x-coordinate direction
         file_loc = trim(t_step_dir)//'/x_cb.dat'
-        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS='new')
+        open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
         write (1) x_cb(-1:m)
         close (1)
 
@@ -103,7 +119,7 @@ contains
             ! y-coordinate direction
             file_loc = trim(t_step_dir)//'/y_cb.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
-                  STATUS='new')
+                  STATUS=status)
             write (1) y_cb(-1:n)
             close (1)
 
@@ -111,7 +127,7 @@ contains
             if (p > 0) then
                 file_loc = trim(t_step_dir)//'/z_cb.dat'
                 open (1, FILE=trim(file_loc), FORM='unformatted', &
-                      STATUS='new')
+                      STATUS=status)
                 write (1) z_cb(-1:p)
                 close (1)
             end if
@@ -124,7 +140,7 @@ contains
             file_loc = trim(t_step_dir)//'/q_cons_vf'//trim(file_num) &
                        //'.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
-                  STATUS='new')
+                  STATUS=status)
             write (1) q_cons_vf(i)%sf
             close (1)
         end do
@@ -169,14 +185,18 @@ contains
                         else if (i == stress_idx%beg) then !tau_e
                             write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
                         else if (i == E_idx) then !p
-                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j, 0, 0), q_cons_vf(alf_idx)%sf(j, 0, 0), &
-                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, pi_inf, gamma, pres)
+                            call s_compute_pressure( &
+                                q_cons_vf(E_idx)%sf(j, 0, 0), &
+                                q_cons_vf(alf_idx)%sf(j, 0, 0), &
+                                0.5d0*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2.d0)/rho, &
+                                pi_inf, gamma, rho, pres)
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles) then
                             do k = 1, nb
                                 nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
                             end do
-                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub)
+                            
+                            call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
 
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
                         end if
@@ -267,7 +287,7 @@ contains
         call s_initialize_mpi_data(q_cons_vf)
 
         ! Open the file to write all flow variables
-        write (file_loc, '(A)') '0.dat'
+        write (file_loc, '(I0,A)') t_step_start, '.dat'
         file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
         inquire (FILE=trim(file_loc), EXIST=file_exist)
         if (file_exist .and. proc_rank == 0) then

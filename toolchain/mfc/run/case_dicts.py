@@ -12,7 +12,8 @@ COMMON = [
 
 
 PRE_PROCESS = COMMON + [
-    'old_grid', 'old_ic', 't_step_old', 'perturb_flow', 'perturb_flow_fluid',
+    'old_grid', 'old_ic', 't_step_old', 't_step_start', 'vel_profile',
+    'instability_wave', 'perturb_flow', 'perturb_flow_fluid',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
     'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV', "bfIC", "presRef"
 ]
@@ -71,12 +72,11 @@ for p_id in range(1, 30+1):
 
 SIMULATION = COMMON + [
     'run_time_info', 't_step_old', 't_tol', 'dt', 't_step_start',
-    't_step_stop', 't_step_save', 'time_stepper', 'weno_vars', 'weno_eps',
-    'char_decomp', 'mapped_weno', 'mp_weno', 'weno_avg', 'weno_Re_flux',
-    'riemann_solver', 'wave_speeds', 'avg_state', 'commute_err', 'split_err',
-    'alt_crv', 'alt_soundspeed', 'regularization', 'reg_eps', 'null_weights',
-    'mixture_err', 'tvd_riemann_flux', 'tvd_rhs_flux', 'tvd_wave_speeds',
-    'flux_lim', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
+    't_step_stop', 't_step_save', 'time_stepper', 'weno_eps',
+    'mapped_weno', 'mp_weno', 'weno_avg', 'weno_Re_flux',
+    'riemann_solver', 'wave_speeds', 'avg_state', 'prim_vars_wrt',
+    'alt_crv', 'alt_soundspeed', 'regularization', 'null_weights',
+    'mixture_err', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
     'num_integrals', 'cu_mpi', 'prim_vars_wrt', "bfIC", "presRef"
 ]
@@ -123,12 +123,12 @@ for f_id in range(1,10+1):
 
 POST_PROCESS = COMMON + [
     't_step_start', 't_step_stop', 't_step_save', 'alt_soundspeed',
-    'mixture_err', 'format', 'coarsen_silo', 'fourier_decomp',
+    'mixture_err', 'format', 'schlieren_wrt', 'schlieren_alpha', 'fd_order',
     'fourier_modes%beg', 'fourier_modes%end', 'alpha_rho_wrt', 'rho_wrt',
     'mom_wrt', 'vel_wrt', 'flux_lim', 'flux_wrt', 'E_wrt', 'pres_wrt',
     'alpha_wrt', 'kappa_wrt', 'gamma_wrt', 'heat_ratio_wrt', 'pi_inf_wrt',
     'pres_inf_wrt', 'cons_vars_wrt', 'prim_vars_wrt', 'c_wrt', 'omega_wrt',
-    'qm_wrt', 'schlieren_wrt', 'schlieren_alpha', 'fd_order'
+    'qm_wrt'
 ]
 
 for cmp_id in range(1,3+1):

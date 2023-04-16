@@ -1,4 +1,4 @@
-import os, hashlib, binascii, subprocess, dataclasses
+import os, typing, hashlib, binascii, subprocess, dataclasses
 
 from ..      import case, common
 from ..state import ARG
@@ -24,7 +24,6 @@ BASE_CFG = {
     'mpp_lim'                      : 'F',
     'mixture_err'                  : 'F',
     'time_stepper'                 : 3,
-    'weno_vars'                    : 2,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
     'mapped_weno'                  : 'F',
@@ -101,8 +100,8 @@ class TestCase(case.Case):
         self.ppn   = ppn if ppn is not None else 1
         super().__init__({**BASE_CFG.copy(), **mods})
 
-    def run(self) -> subprocess.CompletedProcess:
-        filepath          = f'"{self.get_dirpath()}/case.py"'
+    def run(self, filename: str, targets: typing.List[str]) -> subprocess.CompletedProcess:
+        filepath          = f'"{self.get_dirpath()}/{filename}.py"'
         tasks             = f"-n {self.ppn}"
         jobs              = f"-j {ARG('jobs')}"    if ARG("case_optimization")  else ""
         binary_option     = f"-b {ARG('binary')}"  if ARG("binary") is not None else ""
@@ -111,9 +110,9 @@ class TestCase(case.Case):
         mfc_script = ".\mfc.bat" if os.name == 'nt' else "./mfc.sh"
                 
         command: str = f'''\
-{mfc_script} run {filepath} {tasks} {binary_option} {case_optimization} \
-{jobs} -t pre_process simulation 2>&1\
-'''
+            {mfc_script} run {filepath} {tasks} {binary_option} {case_optimization} \
+            {jobs} -t {' '.join(targets)} 2>&1\
+            '''
 
         return subprocess.run(command, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, universal_newlines=True,
@@ -125,7 +124,7 @@ class TestCase(case.Case):
     def get_dirpath(self):
         return os.path.join(common.MFC_TESTDIR, self.get_uuid())
 
-    def create_directory(self):
+    def create_directory(self, filename: str):
         dirpath = self.get_dirpath()
 
         content = f"""\
@@ -138,7 +137,7 @@ print(json.dumps({self.gen_json_dict_str()}))
 
         common.create_directory(dirpath)
 
-        common.file_write(f"{dirpath}/case.py", content)
+        common.file_write(f"{dirpath}/{filename}.py", content)
 
     def __str__(self) -> str:
         return f"tests/[bold magenta]{self.get_uuid()}[/bold magenta]: {self.trace}"

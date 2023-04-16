@@ -20,16 +20,10 @@ module m_global_parameters
 
     ! Logistics ================================================================
     integer :: num_procs            !< Number of processors
-    integer, parameter :: num_stcls_min = 5    !< Mininum # of stencils
-    integer, parameter :: path_len = 400  !< Maximum path length
-    integer, parameter :: name_len = 50   !< Maximum name length
-    real(kind(0d0)), parameter :: dflt_real = -1d6 !< Default real value
-    integer, parameter :: dflt_int = -100 !< Default integer value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
     character(LEN=path_len) :: case_dir             !< Case folder location
     logical :: old_grid             !< Use existing grid data
     logical :: old_ic               !< Use existing IC data
-    integer :: t_step_old           !< Existing IC/grid folder
+    integer :: t_step_old, t_step_start           !< Existing IC/grid folder
     ! ==========================================================================
 
     ! Computational Domain Parameters ==========================================
@@ -117,6 +111,9 @@ module m_global_parameters
     logical :: parallel_io !< Format of the data files
     integer :: precision !< Precision of output files
 
+    logical :: vel_profile !< Set hypertangent streamwise velocity profile
+    logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
+
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
@@ -129,6 +126,7 @@ module m_global_parameters
 
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
+
 
 #ifdef MFC_MPI
 
@@ -172,7 +170,6 @@ module m_global_parameters
     logical :: bubbles
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
-    integer, parameter :: nnode = 4 !< Number of QBMM nodes
     real(kind(0d0)) :: sigR, sigV, rhoRV !< standard deviations in R/V
     !> @}
 
@@ -201,9 +198,6 @@ module m_global_parameters
 
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
-    ! Mathematical and Physical Constants ======================================
-    real(kind(0d0)), parameter :: pi = 3.141592653589793d0
-    ! ==========================================================================
 
 contains
 
@@ -219,6 +213,7 @@ contains
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int
+        t_step_start = dflt_int
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
@@ -266,6 +261,8 @@ contains
 
         parallel_io = .false.
         precision = 2
+        vel_profile = .false.
+        instability_wave = .false.
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
         perturb_sph = .false.
@@ -713,7 +710,8 @@ contains
 
         omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web
 
-            !!! thermal properties !!!
+        ! thermal properties --- 
+
         ! gas constants
         R_n = Ru/M_n
         R_v = Ru/M_v
@@ -857,51 +855,7 @@ contains
 #endif
 
     end subroutine s_finalize_global_parameters_module ! ----------------------
-
-    !> Computes the bubble number density n from the conservative variables
-        !! @param vftmp is the void fraction
-        !! @param nRtmp is the bubble number  density times the bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: nR3
-
-        call s_quad(nRtmp**3.d0, nR3)  !returns itself if NR0 = 1
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-        ! ntmp = 1d0
-
-    end subroutine s_comp_n_from_cons
-
-    !> Computes the bubble number density n from the primitive variables
-        !! @param vftmp is the void fraction
-        !! @param Rtmp is the  bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: R3
-
-        call s_quad(Rtmp**3.d0, R3)  !returns itself if NR0 = 1
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-        ! ntmp = 1d0
-
-    end subroutine s_comp_n_from_prim
-
-    !> Computes the quadrature for polydisperse bubble populations
-        !! @param func is the bubble dynamic variables for each bin
-        !! @param mom is the computed moment
-    subroutine s_quad(func, mom)
-
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func 
-        real(kind(0.d0)), intent(OUT) :: mom
-
-        mom = dot_product(weight, func)
-
-    end subroutine s_quad
-
+    
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson
 
@@ -948,12 +902,10 @@ contains
                 weight(ir) = tmp*2.d0*dphi/3.d0
             end if
         end do
-
         tmp = DEXP(-0.5d0*(phi(1)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(1) = tmp*dphi/3.d0
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(nb) = tmp*dphi/3.d0
-
     end subroutine s_simpson
 
     subroutine s_compute_acceleration(t)

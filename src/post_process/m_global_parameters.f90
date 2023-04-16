@@ -20,12 +20,6 @@ module m_global_parameters
     !> @name Logistics
     !> @{
     integer :: num_procs            !< Number of processors
-    integer, parameter :: num_stcls_min = 5    !< Mininum # of stencils
-    integer, parameter :: path_len = 400  !< Maximum path length
-    integer, parameter :: name_len = 50   !< Maximum name length
-    real(kind(0d0)), parameter :: dflt_real = -1d6 !< Default real value
-    integer, parameter :: dflt_int = -100 !< Default integer value
-    real(kind(0d0)), parameter :: sgm_eps = 1d-16 !< Segmentation tolerance
     character(LEN=path_len) :: case_dir             !< Case folder location
     !> @}
 
@@ -56,7 +50,7 @@ module m_global_parameters
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
     real(kind(0d0)), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
-    real(kind(0d0)), allocatable, dimension(:) :: coarse_x_cb, coarse_y_cb, coarse_z_cb
+    real(kind(0.0)), allocatable, dimension(:) :: x_cb_s, y_cb_s, z_cb_s
     !> @}
 
     !> @name Cell-center locations in the x-, y- and z-coordinate directions
@@ -146,11 +140,11 @@ module m_global_parameters
 
     ! ==========================================================================
 
+    real(kind(0d0)), allocatable, dimension(:) :: adv !< Advection variables
+
     ! Formatted Database File(s) Structure Parameters ==========================
 
     integer :: format !< Format of the database file(s)
-
-    logical :: coarsen_silo
 
     integer :: precision !< Floating point precision of the database file(s)
 
@@ -189,12 +183,6 @@ module m_global_parameters
     logical, dimension(3) :: omega_wrt
     logical :: qm_wrt
     logical :: schlieren_wrt
-    !> @}
-
-    !> @name Options for Fourier decomposition in the azimuthal direction if 3D
-    !! cylindrical coordinates are used
-    !> @{
-    logical :: fourier_decomp
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -246,10 +234,6 @@ module m_global_parameters
     integer :: strxb, strxe
     !> @}
 
-    ! Mathematical and Physical Constants ======================================
-    real(kind(0d0)), parameter :: pi = 3.141592653589793d0
-    ! ==========================================================================
-
 contains
 
     !> Assigns default values to user inputs prior to reading
@@ -299,8 +283,6 @@ contains
 
         precision = dflt_int
 
-        coarsen_silo = .false.
-
         alpha_rho_wrt = .false.
         rho_wrt = .false.
         mom_wrt = .false.
@@ -323,8 +305,6 @@ contains
         schlieren_wrt = .false.
 
         schlieren_alpha = dflt_real
-
-        fourier_decomp = .false.
 
         fd_order = dflt_int
 
@@ -466,6 +446,7 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
+            alf_idx = 1 ! dummy, cannot actually have a void fraction
 
         else if (model_eqns == 4) then
             cont_idx%beg = 1 ! one continuity equation
@@ -587,6 +568,17 @@ contains
             buff_size = buff_size + fd_number
         end if
 
+        ! Allocating single precision grid variables if needed
+        if (precision == 1) then
+            allocate (x_cb_s(-1 - offset_x%beg:m + offset_x%end))
+            if (n > 0) then 
+                allocate (y_cb_s(-1 - offset_x%beg:n + offset_x%end))
+                if (p > 0) then
+                    allocate (z_cb_s(-1 - offset_x%beg:m + offset_x%end)) 
+                end if
+            end if
+        end if
+
         ! Allocating the grid variables in the x-coordinate direction
         allocate (x_cb(-1 - offset_x%beg:m + offset_x%end))
         allocate (x_cc(-buff_size:m + buff_size))
@@ -614,13 +606,7 @@ contains
 
         end if
 
-        if (coarsen_silo) then
-            allocate (coarse_x_cb(-1 - offset_x%beg:(m/2) + offset_x%end))
-            if (n > 0) then
-                allocate (coarse_y_cb(-1 - offset_y%beg:(n/2) + offset_y%end))
-                if (p > 0) allocate (coarse_z_cb(-1 - offset_z%beg:(p/2) + offset_z%end))
-            end if
-        end if
+        allocate (adv(num_fluids))
 
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
@@ -647,16 +633,17 @@ contains
         real(kind(0.d0)), dimension(Nb) :: k_m0
         real(kind(0.d0)), dimension(Nb) :: rho_m0
         real(kind(0.d0)), dimension(Nb) :: x_vw
-        ! polytropic index used to compute isothermal natural frequency
-        real(kind(0.d0)), parameter :: k_poly = 1.d0
-        ! universal gas constant
-        real(kind(0.d0)), parameter :: Ru = 8314.d0
 
         ! liquid physical properties
         real(kind(0.d0)) :: mul0, ss, pv, gamma_v, M_v, mu_v
 
         ! gas physical properties
         real(kind(0.d0)) :: gamma_m, gamma_n, M_n, mu_n
+
+        ! polytropic index used to compute isothermal natural frequency
+        real(kind(0.d0)), parameter :: k_poly = 1.d0
+        ! universal gas constant
+        real(kind(0.d0)), parameter :: Ru = 8314.d0
 
         rhol0 = rhoref
         pl0 = pref
@@ -824,15 +811,9 @@ contains
 
         end if
 
-        if (coarsen_silo) then
-            deallocate (coarse_x_cb)
-            if (n > 0) then
-                deallocate (coarse_y_cb)
-                if (p > 0) deallocate (coarse_z_cb)
-            end if
-        end if
-
         deallocate (proc_coords)
+
+        deallocate (adv)
 
 #ifdef MFC_MPI
 
@@ -849,50 +830,6 @@ contains
 #endif
 
     end subroutine s_finalize_global_parameters_module ! -----------------
-
-    !> Computes the bubble number density n from the conservative variables
-        !! @param vftmp is the void fraction
-        !! @param nRtmp is the bubble number  density times the bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp)
-
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: nRtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: nR3
-
-        call s_quad(nRtmp**3, nR3)  !returns itself if NR0 = 1
-        ntmp = DSQRT((4.d0*pi/3.d0)*nR3/vftmp)
-
-    end subroutine s_comp_n_from_cons
-
-    !> Computes the bubble number density n from the primitive variables
-        !! @param vftmp is the void fraction
-        !! @param Rtmp is the  bubble radii
-        !! @param ntmp is the output number bubble density
-    subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp)
-
-        real(kind(0.d0)), intent(IN) :: vftmp
-        real(kind(0.d0)), dimension(nb), intent(IN) :: Rtmp
-        real(kind(0.d0)), intent(OUT) :: ntmp
-        real(kind(0.d0)) :: R3
-
-        call s_quad(Rtmp**3, R3)  !returns itself if NR0 = 1
-        ntmp = (3.d0/(4.d0*pi))*vftmp/R3
-
-    end subroutine s_comp_n_from_prim
-
-    !> Computes the quadrature for polydisperse bubble populations
-        !! @param func is the bubble dynamic variables for each bin
-        !! @param mom is the computed moment
-    subroutine s_quad(func, mom)
-
-        real(kind(0.d0)), dimension(nb), intent(IN) :: func
-        real(kind(0.d0)), intent(OUT) :: mom
-
-        mom = dot_product(weight, func)
-
-    end subroutine s_quad
 
     !> Computes the Simpson weights for quadrature
         !! @param Npt is the number of bins that represent the polydisperse bubble population

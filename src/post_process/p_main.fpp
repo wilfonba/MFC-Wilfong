@@ -33,6 +33,7 @@ program p_main
 
     use m_derived_variables     !< Procedures used to compute quantites derived
                                 !! from the conservative and primitive variables
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -45,12 +46,16 @@ program p_main
 
     !> @name Generic loop iterator
     !> @{
-    integer :: i, j, k
+    integer :: i, j, k, l
     !> @}
 
     real(kind(0d0)) :: total_volume !<
     !! Variable for the total volume of the second volume fraction
     !! to later on track the evolution of the radius of a bubble over time
+
+    real(kind(0d0)) :: pres
+    real(kind(0d0)) :: c
+    real(kind(0d0)) :: H 
 
     ! Initialization of the MPI environment
     call s_mpi_initialize()
@@ -96,10 +101,10 @@ program p_main
     ! Time-Marching Loop =======================================================
     do
         if (proc_rank == 0) then
-            print '(" ["I3"%]  Save "I8" of "I0" @ t_step = "I0"")',            &
-                  int(100*(real(t_step + 1)/(t_step_stop - t_step_start + 1))), &
-                  (t_step      - t_step_start)/t_step_save + 1,                 &
-                  (t_step_stop - t_step_start)/t_step_save + 1,                 &
+            print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")',                                &
+                  int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                  (t_step      - t_step_start)/t_step_save + 1,                                       &
+                  (t_step_stop - t_step_start)/t_step_save + 1,                                       &
                   t_step
         end if
 
@@ -125,20 +130,23 @@ program p_main
 
         ! Computing centered finite-difference coefficients in x-direction
         if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt) then
-            call s_compute_finite_difference_coefficients(m, offset_x, x_cc, &
-                                                          fd_coeff_x)
+            call s_compute_finite_difference_coefficients(m, x_cc, &
+                                                          fd_coeff_x, buff_size, &
+                                                          fd_number, fd_order, offset_x)
         end if
 
         ! Computing centered finite-difference coefficients in y-direction
         if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. (n > 0 .and. schlieren_wrt)) then
-            call s_compute_finite_difference_coefficients(n, offset_y, y_cc, &
-                                                          fd_coeff_y)
+            call s_compute_finite_difference_coefficients(n, y_cc, &
+                                                          fd_coeff_y, buff_size, &
+                                                          fd_number, fd_order, offset_y)
         end if
 
         ! Computing centered finite-difference coefficients in z-direction
         if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. (p > 0 .and. schlieren_wrt)) then
-            call s_compute_finite_difference_coefficients(p, offset_z, z_cc, &
-                                                          fd_coeff_z)
+            call s_compute_finite_difference_coefficients(p, z_cc, &
+                                                          fd_coeff_z, buff_size, &
+                                                          fd_number, fd_order, offset_z)
         end if
 
         ! Adding the partial densities to the formatted database file ----------
@@ -338,7 +346,7 @@ program p_main
         ! Adding the specific heat ratio to the formatted database file --------
         if (heat_ratio_wrt) then
 
-            call s_derive_specific_heat_ratio(gamma_sf, q_sf)
+            call s_derive_specific_heat_ratio(q_sf)
 
             write (varname, '(A)') 'heat_ratio'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -368,7 +376,7 @@ program p_main
         ! Adding the liquid stiffness to the formatted database file -----------
         if (pres_inf_wrt) then
 
-            call s_derive_liquid_stiffness(gamma_sf, pi_inf_sf, q_sf)
+            call s_derive_liquid_stiffness(q_sf)
 
             write (varname, '(A)') 'pres_inf'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -380,9 +388,26 @@ program p_main
 
         ! Adding the sound speed to the formatted database file ----------------
         if (c_wrt) then
+            do k = -offset_z%beg, p + offset_z%end
+                do j = -offset_y%beg, n + offset_y%end
+                    do i = -offset_x%beg, m + offset_x%end
+                        do l = 1, adv_idx%end - E_idx
+                            adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
+                        end do
 
-            call s_derive_sound_speed(q_prim_vf, rho_sf, gamma_sf, &
-                                      pi_inf_sf, q_sf)
+                        pres = q_prim_vf(E_idx)%sf(i, j, k)
+
+                        H = ((gamma_sf(i, j, k) + 1d0)*pres + &
+                        pi_inf_sf(i, j, k))/rho_sf(i, j, k)
+
+                        call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
+                            gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
+                            H, adv, 0d0, c)
+
+                        q_sf(i, j, k) = c
+                    end do
+                end do
+            end do
 
             write (varname, '(A)') 'c'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -421,20 +446,20 @@ program p_main
         ! ----------------------------------------------------------------------
 
         ! Adding Q_M to the formatted database file ------------------
-		if (p > 0 .and. qm_wrt) then
-			call s_derive_qm(q_prim_vf, q_sf)
+        if (p > 0 .and. qm_wrt) then
+            call s_derive_qm(q_prim_vf, q_sf)
 
-			write (varname, '(A)') 'qm'
-			call s_write_variable_to_formatted_database_file(varname, t_step)
+            write (varname, '(A)') 'qm'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
 
-			varname(:) = ' '
-		end if
+            varname(:) = ' '
+        end if
         ! ----------------------------------------------------------------------
 
         ! Adding numerical Schlieren function to formatted database file -------
         if (schlieren_wrt) then
 
-            call s_derive_numerical_schlieren_function(q_cons_vf, rho_sf, q_sf)
+            call s_derive_numerical_schlieren_function(q_cons_vf, q_sf)
 
             write (varname, '(A)') 'schlieren'
             call s_write_variable_to_formatted_database_file(varname, t_step)

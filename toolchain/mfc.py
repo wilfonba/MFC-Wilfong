@@ -2,7 +2,7 @@
 
 import signal, getpass, platform, itertools, dataclasses
 
-from mfc         import args, lock, build, bench, state
+from mfc         import args, lock, build, bench, state, count
 from mfc.state   import ARG
 from mfc.run     import run
 from mfc.test    import test
@@ -15,8 +15,8 @@ def __print_greeting():
     max_logo_line_length = max([ len(line) for line in MFC_LOGO_LINES ])
 
     host_line    = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]"
-    targets_line = f"[bold]--targets {format_list_to_string([ f'[magenta]{target}[/magenta]' for target in ARG('targets')], 'None')}[/bold]"
-    help_line    = "$ ./mfc.sh \[build, run, test, clean] --help"
+    targets_line = f"[bold]--targets {format_list_to_string(ARG('targets'), 'magenta', 'None')}[/bold]"
+    help_line    = "$ ./mfc.sh \[build, run, test, clean, count] --help"
 
     MFC_SIDEBAR_LINES = [
         "",
@@ -49,7 +49,7 @@ def __checks():
 
 def __run():    
     {"test":  test.test,   "run":   run.run,    "build": build.build,
-     "clean": build.clean, "bench": bench.bench
+     "clean": build.clean, "bench": bench.bench, "count": count.count
     }[ARG("command")]()
 
 

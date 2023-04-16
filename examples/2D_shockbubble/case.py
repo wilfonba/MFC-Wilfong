@@ -49,7 +49,6 @@ print(json.dumps({
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
-    'weno_vars'                    : 2,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
     'mapped_weno'                  : 'T',
@@ -63,7 +62,7 @@ print(json.dumps({
     'bc_x%end'                     : -6,
     'bc_y%beg'                     : -6,
     'bc_y%end'                     : -6,
-    # ===================================================   =======================
+    # ==========================================================================
 
     # Formatted Database Files Structure Parameters ============================
     'format'                       : 1,
