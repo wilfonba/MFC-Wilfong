@@ -63,7 +63,7 @@ contains
         #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
             & 'cyl_coord','adv_alphan','mpp_lim','hypoelasticity',             &
             & 'parallel_io', 'perturb_flow','perturb_sph', 'bubbles',          &
-            & 'polytropic', 'polydisperse', 'qbmm', 'bfIC', 'bodyForces']
+            & 'polytropic', 'polydisperse', 'qbmm', 'bfIC', 'bodyForces',      &
             & 'parallel_io', 'vel_profile', 'instability_wave', 'perturb_flow',&
             & 'perturb_sph','bubbles', 'polytropic', 'polydisperse', 'qbmm' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

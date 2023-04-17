@@ -127,10 +127,10 @@ module m_global_parameters
             real :: ${param}$_${dir}$
         #:endfor
     #:endfor
-    real(kind(0d0)), dimension(3) :: accel
+    real(kind(0d0)), dimension(3) :: accel_bf
     real(kind(0d0)), dimension(3) :: locRef
     real(kind(0d0)) :: presRef, gravPtl, rhoL
-!$acc declare create(presRef, gravPtl, k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, bf_x, bf_y, bf_z, bfIC, bodyForces, rhoL, accel)
+!$acc declare create(presRef, gravPtl, k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, bf_x, bf_y, bf_z, bfIC, bodyForces, rhoL, accel_bf)
 
     integer :: cpu_start, cpu_end, cpu_rate
 
@@ -437,7 +437,7 @@ contains
         #:endfor
         
         do i = 1, num_dims
-            accel(i) = dflt_real
+            accel_bf(i) = dflt_real
             locRef(i) = dflt_real
         end do
         rhoL = dflt_real
@@ -1111,25 +1111,25 @@ contains
         real(kind(0d0)) :: t
 
         if (m > 0) then
-            accel(1) = 0
+            accel_bf(1) = 0
             if (bf_x == 1) then
-                accel(1) = k_x*sin(w_x*t - p_x)
+                accel_bf(1) = k_x*sin(w_x*t - p_x)
             elseif (bf_x == 2) then !< analytic
-                accel(1) = 1
+                accel_bf(1) = 1
             endif
             if (n > 0) then
-                accel(2) = 0
+                accel_bf(2) = 0
                 if (bf_y == 1) then
-                    accel(2) = k_y*sin(w_y*t - p_y)
+                    accel_bf(2) = k_y*sin(w_y*t - p_y)
                 elseif (bf_y == 2) then
-                    accel(2) = 1
+                    accel_bf(2) = 9.81*20
                 end if
                 if (p > 0) then
-                    accel(3) = 0
+                    accel_bf(3) = 0
                     if (bf_z == 1) then
-                        accel(3) = k_z*sin(w_z*t - p_z)
+                        accel_bf(3) = k_z*sin(w_z*t - p_z)
                     elseif (bf_z == 2) then
-                        accel(3) = 1
+                        accel_bf(3) = 1
                     end if
                 end if
             end if
@@ -1146,11 +1146,11 @@ contains
 
         gravPtl = 0
         if (m > 0) then
-            gravPtl = gravPtl + accel(1)*(x_cc(i) - locRef(1))
+            gravPtl = gravPtl + accel_bf(1)*(x_cc(i) - locRef(1))
             if (n > 0) then
-                gravPtl = gravPtl + accel(2)*(y_cc(j) - locRef(2))
+                gravPtl = gravPtl + accel_bf(2)*(y_cc(j) - locRef(2))
                 if (p > 0) then
-                    gravPtl = gravPtl + accel(3)*(z_cc(k) - locRef(3))
+                    gravPtl = gravPtl + accel_bf(3)*(z_cc(k) - locRef(3))
                 end if
             end if
         end if

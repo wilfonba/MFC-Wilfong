@@ -1055,21 +1055,7 @@ contains
                     end do
                 end if
 
-                if (bf_x .ne. dflt_int) then
-!$acc parallel loop collapse(3) gang vector default(present)         
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                rhs_vf(momxb)%sf(j, k, l) = &
-                                    rhs_vf(momxb)%sf(j, k, l) &
-                                    + rho_sf(j,k,l)*accel(1)
-                                rhs_vf(E_idx)%sf(j, k, l) = &
-                                    rhs_vf(E_idx)%sf(j, k, l) &
-                                    + q_prim_vf(momxb)%sf(j,k,l)*rho_sf(j,k,l)*accel(1)
-                            end do
-                        end do
-                    end do
-                end if
+
 
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
@@ -1392,22 +1378,6 @@ contains
                     end if
                 end if
 
-                if (bf_y .ne. dflt_int) then
-!$acc parallel loop collapse(3) gang vector default(present)         
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m 
-                                rhs_vf(momxb+1)%sf(j, k, l) = &
-                                    rhs_vf(momxb+1)%sf(j, k, l) &
-                                    + rho_sf(j,k,l)*accel(2)
-                                rhs_vf(E_idx)%sf(j, k, l) = &
-                                    rhs_vf(E_idx)%sf(j, k, l) &
-                                    + q_prim_vf(momxb+1)%sf(j,k,l)*rho_sf(j,k,l)*accel(2)
-                            end do
-                        end do
-                    end do
-                end if
-
             elseif (id == 3) then
                 ! RHS Contribution in z-direction ===============================
 
@@ -1696,10 +1666,10 @@ contains
                             do j = 0, m
                                 rhs_vf(momxe)%sf(j, k, l) = &
                                     rhs_vf(momxe)%sf(j, k, l) &
-                                    + rho_sf(j,k,l)*accel(3)
+                                    + rho_sf(j,k,l)*accel_bf(3)
                                 rhs_vf(E_idx)%sf(j, k, l) = &
                                     rhs_vf(E_idx)%sf(j, k, l) &
-                                    + q_prim_vf(momxe)%sf(j,k,l)*rho_sf(j,k,l)*accel(3)
+                                    + q_prim_vf(momxe)%sf(j,k,l)*rho_sf(j,k,l)*accel_bf(3)
                             end do
                         end do
                     end do
@@ -1719,6 +1689,23 @@ contains
             call nvtxEndRange
         end do
         ! END: Dimensional Splitting Loop =================================
+
+
+        if (bf_y .ne. dflt_int) then
+!$acc parallel loop collapse(3) gang vector default(present)         
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m 
+                        rhs_vf(momxb+1)%sf(j, k, l) = &
+                            rhs_vf(momxb+1)%sf(j, k, l) &
+                            + rho_sf(j,k,l)*accel_bf(2)
+                        rhs_vf(E_idx)%sf(j, k, l) = &
+                            rhs_vf(E_idx)%sf(j, k, l) &
+                            + q_prim_qp%vf(E_idx)%sf(j,k,l)*rho_sf(j,k,l)*accel_bf(2)
+                    end do
+                end do
+            end do
+        end if
 
         if (run_time_info .or. probe_wrt) then
 

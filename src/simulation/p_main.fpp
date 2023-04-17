@@ -246,7 +246,7 @@ program p_main
 
         if (bodyForces) then 
             call s_compute_acceleration(mytime)
-!$acc update device(accel)
+!$acc update device(accel_bf)
         end if
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers

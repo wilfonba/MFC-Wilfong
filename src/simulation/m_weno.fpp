@@ -707,31 +707,6 @@ contains
             #:endfor
         end if
 
-!         if (bodyForces) then
-! !$acc parallel loop collapse(3) gang vector default(present) private(rhoL2)
-!             do l = is3%beg, is3%end
-!                 do k = is2%beg, is2%end
-!                     do j = is1%beg, is1%end
-!                         rhoL2 = 0d0
-!                         do i = 1, num_fluids
-!                             rhoL2 = rhoL2 + v_vf(contxb+i-1)%sf(j,k,l)
-!                         end do
-
-!                         if (weno_dir == 1) then
-!                             vL_rs_vf_x(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) - rhoL2*accel(1)*dx(j)/2
-!                             vR_rs_vf_x(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) + rhoL2*accel(1)*dx(j)/2
-!                         else if (weno_dir == 2) then
-!                             vL_rs_vf_y(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) - rhoL2*accel(2)*dy(k)/2
-!                             vR_rs_vf_y(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) + rhoL2*accel(2)*dy(k)/2
-!                         else if (weno_dir == 3) then
-!                             vL_rs_vf_z(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) - rhoL2*accel(3)*dz(l)/2
-!                             vR_rs_vf_z(j,k,l,E_idx) = v_vf(E_idx)%sf(j,k,l) + rhoL2*accel(3)*dz(l)/2
-!                         end if
-!                     end do
-!                 end do
-!             end do
-!         end if
-
     end subroutine s_weno
 
     !> The computation of parameters, the allocation of memory,
