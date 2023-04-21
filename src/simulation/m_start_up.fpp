@@ -103,8 +103,8 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type, bf_x, bf_y, bf_z, k_x, k_y, k_z, &
-            w_x, w_y, w_z, p_x, p_y, p_z, presRef, locRef, bfIC
+            R0_type, bf_x, bf_y, bf_z, bfIC, k_x, k_y, k_z, &
+            w_x, w_y, w_z, p_x, p_y, p_z, locref, presRef
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -115,7 +115,7 @@ contains
                   FORM='formatted', &
                   ACTION='read', &
                   STATUS='old')
-            read (1, NML=user_inputs)
+            read (1, NML=user_inputs, iostat=iostatus)
 
             if (iostatus /= 0) then
                 call s_mpi_abort('Invalid line in simulation.inp. It is '// &
@@ -138,10 +138,9 @@ contains
             p_glb = p
 
             if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_real) .or. &
-            (bf_z .ne. dflt_real)) then
+                (bf_z .ne. dflt_real)) then
                 bodyForces = .true.
             endif
-
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')

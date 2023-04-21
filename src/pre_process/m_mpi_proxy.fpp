@@ -50,7 +50,7 @@ contains
         #:endfor
 
         call  MPI_BCAST(locRef, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-        call  MPI_BCAST(presRef, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+        call  MPI_BCAST(presRef, 1  , MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in ['t_step_old', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
             & 'loops_x', 'loops_y', 'loops_z', 'model_eqns', 'num_fluids',     &

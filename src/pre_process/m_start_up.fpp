@@ -106,8 +106,8 @@ contains
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, qbmm, &
             sigR, sigV, dist_type, rhoRV, R0_type, &
-            k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
-            bf_x, bf_y, bf_z, locRef, presRef, bfIC
+            bf_x, bf_y, bf_z, k_x, k_y, k_z, w_x, w_y, w_z, &
+            p_x, p_y, p_z, locRef, presRef, bfIC
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -118,8 +118,7 @@ contains
         if (file_check) then
             open (1, FILE=trim(file_loc), FORM='formatted', &
                   STATUS='old', ACTION='read')
-            !read (1, NML=user_inputs, iostat=iostatus)
-            read(1, NML=user_inputs)
+            read (1, NML=user_inputs, iostat=iostatus)
             if (iostatus /= 0) then
                 call s_mpi_abort('Invalid line in pre_process.inp. It is '// &
                 'likely due to a datatype mismatch. Exiting ...')

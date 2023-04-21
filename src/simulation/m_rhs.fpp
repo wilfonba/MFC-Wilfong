@@ -1690,18 +1690,17 @@ contains
         end do
         ! END: Dimensional Splitting Loop =================================
 
-
         if (bf_y .ne. dflt_int) then
 !$acc parallel loop collapse(3) gang vector default(present)         
             do l = 0, p
                 do k = 0, n
-                    do j = 0, m 
+                    do j = 0, m
                         rhs_vf(momxb+1)%sf(j, k, l) = &
                             rhs_vf(momxb+1)%sf(j, k, l) &
                             + rho_sf(j,k,l)*accel_bf(2)
                         rhs_vf(E_idx)%sf(j, k, l) = &
                             rhs_vf(E_idx)%sf(j, k, l) &
-                            + q_prim_qp%vf(E_idx)%sf(j,k,l)*rho_sf(j,k,l)*accel_bf(2)
+                            + q_cons_qp%vf(momxb+1)%sf(j,k,l)*accel_bf(2)
                     end do
                 end do
             end do
