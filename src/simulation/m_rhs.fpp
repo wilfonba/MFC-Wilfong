@@ -44,6 +44,8 @@ module m_rhs
     use m_viscous
     
     use m_nvtx
+
+    use m_body_forces
     
     ! ==========================================================================
 
@@ -723,20 +725,7 @@ contains
                                             ix, iy, iz)
         call nvtxEndRange()
 
-        if (bodyForces) then
-!$acc parallel loop collapse(3) gang vector default(present)        
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        rho_sf(j,k,l) = 0d0
-                        do i = 1, num_fluids
-                            rho_sf(j,k,l) = rho_sf(j,k,l) + &
-                                q_prim_qp%vf(contxb+i-1)%sf(j,k,l)
-                        end do
-                    end do
-                end do
-            end do
-        end if
+        if (bodyForces) call s_compute_mixture_density(q_cons_qp%vf)
 
         ! Dimensional Splitting Loop =======================================
 
@@ -1658,53 +1647,29 @@ contains
                         end do
                     end if
                 end if
-
-                if (bf_z .ne. dflt_int) then
-!$acc parallel loop collapse(3) gang vector default(present)          
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                rhs_vf(momxe)%sf(j, k, l) = &
-                                    rhs_vf(momxe)%sf(j, k, l) &
-                                    + rho_sf(j,k,l)*accel_bf(3)
-                                rhs_vf(E_idx)%sf(j, k, l) = &
-                                    rhs_vf(E_idx)%sf(j, k, l) &
-                                    + q_prim_vf(momxe)%sf(j,k,l)*rho_sf(j,k,l)*accel_bf(3)
-                            end do
-                        end do
-                    end do
-                end if
-
             end if  ! id loop
+
+            call nvtxEndRange
+
+            ! RHS additions for body forces
+            call nvtxStartRange("RHS_Bodyforces")
+
+            if (bodyForces) then
+                call  s_compute_body_forces_rhs(id, q_prim_qp%vf, rhs_vf)
+            end if
+
             call nvtxEndRange
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
 
             if (hypoelasticity) then
-
                 call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
-
             end if
+            
             call nvtxEndRange
         end do
         ! END: Dimensional Splitting Loop =================================
-
-        if (bf_y .ne. dflt_int) then
-!$acc parallel loop collapse(3) gang vector default(present)         
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        rhs_vf(momxb+1)%sf(j, k, l) = &
-                            rhs_vf(momxb+1)%sf(j, k, l) &
-                            + rho_sf(j,k,l)*accel_bf(2)
-                        rhs_vf(E_idx)%sf(j, k, l) = &
-                            rhs_vf(E_idx)%sf(j, k, l) &
-                            + q_cons_qp%vf(momxb+1)%sf(j,k,l)*accel_bf(2)
-                    end do
-                end do
-            end do
-        end if
 
         if (run_time_info .or. probe_wrt) then
 

@@ -44,14 +44,6 @@ contains
         ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
-        #:for VAR in ['bf_x', 'bf_y', 'bf_z', 'k_x', 'k_y', 'k_z', 'w_x', 'w_y',&
-        & 'w_z', 'p_x', 'p_y', 'p_z']
-            call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-        #:endfor
-
-        call  MPI_BCAST(locRef, 3, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-        call  MPI_BCAST(presRef, 1  , MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-
         #:for VAR in ['t_step_old', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
             & 'loops_x', 'loops_y', 'loops_z', 'model_eqns', 'num_fluids',     &
             & 'weno_order', 'precision', 'perturb_flow_fluid', & 
@@ -63,9 +55,9 @@ contains
         #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
             & 'cyl_coord','adv_alphan','mpp_lim','hypoelasticity',             &
             & 'parallel_io', 'perturb_flow','perturb_sph', 'bubbles',          &
-            & 'polytropic', 'polydisperse', 'qbmm', 'bfIC', 'bodyForces',      &
+            & 'polytropic', 'polydisperse', 'qbmm', 'polydisperse', 'qbmm',    &
             & 'parallel_io', 'vel_profile', 'instability_wave', 'perturb_flow',&
-            & 'perturb_sph','bubbles', 'polytropic', 'polydisperse', 'qbmm' ]
+            & 'perturb_sph','bubbles', 'polytropic' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

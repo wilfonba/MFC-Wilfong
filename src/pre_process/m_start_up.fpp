@@ -105,9 +105,7 @@ contains
             rhoref, pref, bubbles, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, qbmm, &
-            sigR, sigV, dist_type, rhoRV, R0_type, &
-            bf_x, bf_y, bf_z, k_x, k_y, k_z, w_x, w_y, w_z, &
-            p_x, p_y, p_z, locRef, presRef, bfIC
+            sigR, sigV, dist_type, rhoRV, R0_type
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -128,11 +126,6 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
-
-            if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_real) .or. &
-                (bf_z .ne. dflt_real)) then
-                bodyForces = .true.
-            endif
 
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting ...')

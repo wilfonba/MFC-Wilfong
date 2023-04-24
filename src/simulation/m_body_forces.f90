@@ -1,0 +1,157 @@
+module m_body_forces
+
+    ! Dependencies =============================================================
+
+    use m_derived_types        !< Definitions of the derived types
+
+    use m_global_parameters    !< Definitions of the global parameters
+
+    use m_variables_conversion
+
+    ! ==========================================================================
+
+    implicit none
+
+    private; public :: s_compute_acceleration, &
+        s_compute_mixture_density, &
+        s_compute_body_forces_rhs
+
+contains
+
+    subroutine s_compute_acceleration(t)
+        
+        real(kind(0d0)) :: t
+
+        if (m > 0) then
+            accel_bf(1) = 0
+            if (bf_x == 1) then
+                accel_bf(1) = k_x*sin(w_x*t - p_x)
+            elseif (bf_x == 2) then !< analytic
+                accel_bf(1) = 1
+            endif
+            if (n > 0) then
+                accel_bf(2) = 0
+                if (bf_y == 1) then
+                    accel_bf(2) = k_y*sin(w_y*t - p_y)
+                elseif (bf_y == 2) then
+                    accel_bf(2) = 1
+                end if
+                if (p > 0) then
+                    accel_bf(3) = 0
+                    if (bf_z == 1) then
+                        accel_bf(3) = k_z*sin(w_z*t - p_z)
+                    elseif (bf_z == 2) then
+                        accel_bf(3) = 1
+                    end if
+                end if
+            end if
+        end if
+
+    end subroutine s_compute_acceleration
+
+    subroutine s_compute_mixture_density(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
+        integer :: i, j, k, l !< standard iterators
+
+!$acc parallel loop collapse(3) gang vector default(present)        
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rho_sf(j,k,l) = 0d0
+!$acc loop seq
+                    do i = 1, num_fluids
+                        rho_sf(j,k,l) = rho_sf(j,k,l) + &
+                            q_cons_vf(contxb+i-1)%sf(j,k,l)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_compute_mixture_density
+
+    subroutine s_compute_body_forces_rhs(idir, q_prim_vf, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
+        integer, intent(IN) :: idir
+        real(kind(0d0)) :: rhoF
+
+        integer :: i, j, k, l, q !< Loop variables
+
+        if (idir == 1 .and. bf_x .ne. dflt_int) then
+!$acc parallel loop collapse(3) gang vector default(present)  
+            do l = 0,p
+                do k = 0,n
+                    do j = 0,m
+                        rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
+                            rho_sf(j,k,l)*accel_bf(1)
+                        rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                            rho_sf(j,k,l)*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(1)
+                        ! Six equation model
+                        if (model_eqns == 3) then
+    !$acc loop seq
+                            do q = 1,num_fluids
+                                rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
+                                    q_prim_vf(advxb + q - 1)%sf(j,k,l)
+                                rhs_vf(intxb + q - 1)%sf(j,k,l) = &
+                                    rhs_vf(intxb + q - 1)%sf(j,k,l) + &
+                                    rhoF*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(1)
+                            end do
+                        end if
+                    end do
+                end do
+            end do
+        elseif (idir == 2 .and. bf_y .ne. dflt_int) then
+!$acc parallel loop collapse(3) gang vector default(present)  
+            do l = 0,p
+                do k = 0,n
+                    do j = 0,m
+                        rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
+                            rho_sf(j,k,l)*accel_bf(2)
+                        rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                            rho_sf(j,k,l)*q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
+                        ! Six equation model
+                        if (model_eqns == 3) then
+!$acc loop seq
+                            do q = 1,num_fluids
+                                rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
+                                    q_prim_vf(advxb + q - 1)%sf(j,k,l)
+                                rhs_vf(intxb + q - 1)%sf(j,k,l) = &
+                                    rhs_vf(intxb + q - 1)%sf(j,k,l) + &
+                                    rhoF*q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
+                            end do
+                        end if
+                    end do
+                end do
+            end do
+        elseif (idir == 3 .and. bf_z .ne. dflt_int) then
+!$acc parallel loop collapse(3) gang vector default(present)  
+            do l = 0,p
+                do k = 0,n
+                    do j = 0,m
+                        rhs_vf(momxe)%sf(j,k,l) = rhs_vf(momxe)%sf(j,k,l) + &
+                            rho_sf(j,k,l)*accel_bf(3)
+                        rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
+                            rho_sf(j,k,l)*q_prim_vf(momxe)%sf(j,k,l)*accel_bf(3)
+                        ! Six equation model
+                        if (model_eqns == 3) then
+!$acc loop seq
+                            do q = 1,num_fluids
+                                rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
+                                    q_prim_vf(advxb + q - 1)%sf(j,k,l)
+                                rhs_vf(intxb + q - 1)%sf(j,k,l) = &
+                                    rhs_vf(intxb + q - 1)%sf(j,k,l) + &
+                                    rhoF*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(3)
+                            end do
+                        end if
+                    end do
+                end do
+            end do
+        else
+            return
+        end if
+
+    end subroutine s_compute_body_forces_rhs
+
+end module m_body_forces

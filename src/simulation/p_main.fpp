@@ -59,6 +59,8 @@ program p_main
 #endif
 
     use m_nvtx
+
+    use m_body_forces
     ! ==========================================================================
 
     implicit none

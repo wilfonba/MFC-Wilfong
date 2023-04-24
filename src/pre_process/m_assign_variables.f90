@@ -693,16 +693,9 @@ contains
                 + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
         end if
 
-        ! Pressure
-        if (bfIC .and. y_cc(k) < locRef(2)) then
-            call s_compute_gravitational_potential(0d0, j, k, l)
-            q_prim_vf(E_idx)%sf(j,k,l) = presRef + &
-                gravPtl*1000
-        else
-            q_prim_vf(E_idx)%sf(j, k, l) = &
-                (eta*patch_icpp(patch_id)%pres &
-                + (1d0 - eta)*orig_prim_vf(E_idx))
-        endif
+        q_prim_vf(E_idx)%sf(j, k, l) = &
+            (eta*patch_icpp(patch_id)%pres &
+            + (1d0 - eta)*orig_prim_vf(E_idx))
 
         ! Elastic Shear Stress
         if (hypoelasticity) then
