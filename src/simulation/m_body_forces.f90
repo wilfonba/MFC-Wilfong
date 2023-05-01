@@ -1,5 +1,3 @@
-#:include 'macros.fpp'
-
 module m_body_forces
 
     ! Dependencies =============================================================
@@ -10,6 +8,9 @@ module m_body_forces
 
     use m_variables_conversion
 
+    use m_nvtx
+
+    use openacc
     ! ==========================================================================
 
     implicit none
@@ -51,20 +52,21 @@ contains
 
     end subroutine s_compute_acceleration
 
-    subroutine s_compute_mixture_density(q_cons_vf)
+    subroutine s_compute_mixture_density(q_cons_vf, rhoM)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
+        real(kind(0d0)), dimension(0:m,0:n,0:p) :: rhoM
         integer :: i, j, k, l !< standard iterators
 
-!$acc parallel loop collapse(3) gang vector default(present)        
+        !$acc parallel loop collapse(3) gang vector default(present)      
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    rho_sf(j,k,l) = 0d0
-!!$acc loop seq
+                    rhoM(j,k,l) = 0d0
+                    !$acc loop seq
                     do i = 1, num_fluids
-                        rho_sf(j,k,l) = rho_sf(j,k,l) + &
-                            q_cons_vf(contxb+i-1)%sf(j,k,l)
+                        rhoM(j,k,l) = rhoM(j,k,l) + &
+                            q_cons_vf(i)%sf(j,k,l) 
                     end do
                 end do
             end do
@@ -72,17 +74,15 @@ contains
 
     end subroutine s_compute_mixture_density
 
-    subroutine s_compute_body_forces_rhs(idir, q_cons_vf, rhs_vf)
+    subroutine s_compute_body_forces_rhs(idir, q_cons_vf, rhs_vf, rhoM)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
+        real(kind(0d0)), dimension(0:m,0:n,0:p) :: rhoM
         integer, intent(IN) :: idir
         real(kind(0d0)) :: rhoF
 
         integer :: i, j, k, l, q !< Loop variables
-
-        call s_compute_acceleration(mytime)
-!$acc update device(accel_bf)
 
         if (idir == 1 .and. bf_x .ne. dflt_int) then
 !$acc parallel loop collapse(3) gang vector default(present)  
@@ -90,7 +90,7 @@ contains
                 do k = 0,n
                     do j = 0,m
                         rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
-                            rho_sf(j,k,l)*accel_bf(1)
+                            rhoM(j,k,l)*accel_bf(1)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
                             q_cons_vf(momxb)%sf(j,k,l)*accel_bf(1)
                         ! Six equation model
@@ -108,12 +108,12 @@ contains
                 end do
             end do
         elseif (idir == 2 .and. bf_y .ne. dflt_int) then
-!$acc parallel loop collapse(3) gang vector default(present)  
+!$acc parallel loop collapse(3) gang vector default(present) private(rhoF)
             do l = 0,p
                 do k = 0,n
                     do j = 0,m
                         rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
-                            (1000 - rho_sf(j,k,l))*accel_bf(2)
+                            (1d3 - rhoM(j,k,l))*accel_bf(2)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
                             q_cons_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
                         ! Six equation model
@@ -136,7 +136,7 @@ contains
                 do k = 0,n
                     do j = 0,m
                         rhs_vf(momxe)%sf(j,k,l) = rhs_vf(momxe)%sf(j,k,l) + &
-                            rho_sf(j,k,l)*accel_bf(3)
+                            rhoM(j,k,l)*accel_bf(3)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
                             q_cons_vf(momxe)%sf(j,k,l)*accel_bf(3)
                         ! Six equation model

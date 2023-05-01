@@ -93,6 +93,7 @@ module m_variables_conversion
     !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
+    real(kind(0d0)), allocatable, dimension(:, :, :), public :: rhoM
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function   
 
@@ -574,23 +575,24 @@ contains
 !$acc update device(monopole, num_mono)
 
 #ifdef MFC_SIMULATION
+
         if (bodyForces) then
        ! Simulation is at least 2D
             if (n > 0) then
                 ! Simulation is 3D
                 if (p > 0) then
-                    @:ALLOCATE (rho_sf(-buff_size:m + buff_size, &
+                    @:ALLOCATE (rhoM(-buff_size:m + buff_size, &
                                      -buff_size:n + buff_size, &
                                      -buff_size:p + buff_size))
                 ! Simulation is 2D
                 else
-                    @:ALLOCATE (rho_sf(-buff_size:m + buff_size, &
+                    @:ALLOCATE (rhoM(-buff_size:m + buff_size, &
                                      -buff_size:n + buff_size, &
                                      0:0))
                 end if
             ! Simulation is 1D
             else
-                @:ALLOCATE (rho_sf(-buff_size:m + buff_size, &
+                @:ALLOCATE (rhoM(-buff_size:m + buff_size, &
                                  0:0, &
                                  0:0))
             end if
@@ -1091,7 +1093,7 @@ contains
         ! liquid stiffness function
 #ifdef MFC_SIMULATION
         if (bodyForces) then
-            @:DEALLOCATE(rho_sf)
+            @:DEALLOCATE(rhoM)
         end if
 #endif
 

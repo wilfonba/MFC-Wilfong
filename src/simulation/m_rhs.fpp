@@ -725,8 +725,14 @@ contains
                                             ix, iy, iz)
         call nvtxEndRange()
 
-        call nvtxStartRange("Mixture Density Calculation")
-        if (bodyForces) call s_compute_mixture_density(q_cons_qp%vf(1:sys_size))
+        call nvtxStartRange("RHS-BodyForces")
+
+        if (bodyForces) then
+            call s_compute_mixture_density(q_cons_qp%vf(1:sys_size), rhoM)
+            call s_compute_acceleration(mytime)
+            !$acc update device(accel_bf)
+        end if
+
         call nvtxEndRange
         ! Dimensional Splitting Loop =======================================
 
@@ -1653,10 +1659,10 @@ contains
             call nvtxEndRange
 
             ! RHS additions for body forces
-            call nvtxStartRange("RHS_Bodyforces")
+            call nvtxStartRange("RHS-BodyForces")
 
             if (bodyForces) then
-                call  s_compute_body_forces_rhs(id, q_cons_qp%vf(1:sys_size), rhs_vf)
+                call  s_compute_body_forces_rhs(id, q_cons_qp%vf(1:sys_size), rhs_vf, rhoM)
             end if
 
             call nvtxEndRange
