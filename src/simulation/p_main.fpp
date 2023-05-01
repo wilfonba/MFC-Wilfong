@@ -149,6 +149,8 @@ program p_main
 
     if (qbmm) call s_initialize_qbmm_module()
 
+    if (bodyForces) call s_initialize_body_forces_module()
+
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
 #endif
@@ -336,6 +338,7 @@ program p_main
             !         end do
             !     end do
             ! end do
+            !$acc conopare(q_cons_ts(1)%vf(momxb+1)%sf(:,:,:))
             call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
             !  call nvtxEndRange
             call cpu_time(finish)
@@ -375,6 +378,8 @@ program p_main
     if (any(Re_size > 0)) then
         call s_finalize_viscous_module()
     end if
+
+    if (bodyForces) call s_finalize_body_forces_module()
 
     ! Terminating MPI execution environment
     call s_mpi_finalize()

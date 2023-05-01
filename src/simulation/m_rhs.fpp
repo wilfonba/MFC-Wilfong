@@ -728,7 +728,7 @@ contains
         call nvtxStartRange("RHS-BodyForces")
 
         if (bodyForces) then
-            call s_compute_mixture_density(q_cons_qp%vf(1:sys_size), rhoM)
+            call s_compute_mixture_density(q_cons_qp%vf(1:sys_size))
             call s_compute_acceleration(mytime)
             !$acc update device(accel_bf)
         end if
@@ -1662,7 +1662,7 @@ contains
             call nvtxStartRange("RHS-BodyForces")
 
             if (bodyForces) then
-                call  s_compute_body_forces_rhs(id, q_cons_qp%vf(1:sys_size), rhs_vf, rhoM)
+                call  s_compute_body_forces_rhs(id, q_prim_qp%vf(1:sys_size), rhs_vf)
             end if
 
             call nvtxEndRange
@@ -1675,6 +1675,7 @@ contains
             end if
             
             call nvtxEndRange
+
         end do
         ! END: Dimensional Splitting Loop =================================
 

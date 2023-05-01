@@ -93,7 +93,6 @@ module m_variables_conversion
     !$acc declare create(is1b, is2b, is3b, is1e, is2e, is3e)
 
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: rho_sf !< Scalar density function
-    real(kind(0d0)), allocatable, dimension(:, :, :), public :: rhoM
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: gamma_sf !< Scalar sp. heat ratio function
     real(kind(0d0)), allocatable, dimension(:, :, :), public :: pi_inf_sf !< Scalar liquid stiffness function   
 
@@ -573,31 +572,6 @@ contains
 !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
 !$acc update device(monopole, num_mono)
-
-#ifdef MFC_SIMULATION
-
-        if (bodyForces) then
-       ! Simulation is at least 2D
-            if (n > 0) then
-                ! Simulation is 3D
-                if (p > 0) then
-                    @:ALLOCATE (rhoM(-buff_size:m + buff_size, &
-                                     -buff_size:n + buff_size, &
-                                     -buff_size:p + buff_size))
-                ! Simulation is 2D
-                else
-                    @:ALLOCATE (rhoM(-buff_size:m + buff_size, &
-                                     -buff_size:n + buff_size, &
-                                     0:0))
-                end if
-            ! Simulation is 1D
-            else
-                @:ALLOCATE (rhoM(-buff_size:m + buff_size, &
-                                 0:0, &
-                                 0:0))
-            end if
-        end if
-#endif
 
 #ifdef MFC_POST_PROCESS
         ! Allocating the density, the specific heat ratio function and the
@@ -1091,12 +1065,6 @@ contains
 
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
-#ifdef MFC_SIMULATION
-        if (bodyForces) then
-            @:DEALLOCATE(rhoM)
-        end if
-#endif
-
 #ifdef MFC_POST_PROCESS
         deallocate(rho_sf, gamma_sf, pi_inf_sf)
 #endif
