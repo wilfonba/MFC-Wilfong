@@ -324,21 +324,20 @@ program p_main
         if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
 
             call cpu_time(start)
-            !  call nvtxStartRange("I/O")
-            ! do i = 1, sys_size
-            !     !$acc update host(q_cons_ts(1)%vf(i)%sf)
-            !     do l = 0, p
-            !         do k = 0, n
-            !             do j = 0, m
-            !                 if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-            !                     print *, j, k, l, proc_rank, t_step, m, n, p
-            !                     STOP "Error"
-            !                 end if
-            !             end do
-            !         end do
-            !     end do
-            ! end do
-            !$acc conopare(q_cons_ts(1)%vf(momxb+1)%sf(:,:,:))
+             call nvtxStartRange("I/O")
+            do i = 1, sys_size
+                !$acc update host(q_cons_ts(1)%vf(i)%sf)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                                print *, j, k, l, proc_rank, t_step, m, n, p
+                                STOP "Error"
+                            end if
+                        end do
+                    end do
+                end do
+            end do
             call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
             !  call nvtxEndRange
             call cpu_time(finish)

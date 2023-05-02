@@ -730,7 +730,6 @@ contains
         if (bodyForces) then
             call s_compute_mixture_density(q_cons_qp%vf(1:sys_size))
             call s_compute_acceleration(mytime)
-            !$acc update device(accel_bf)
         end if
 
         call nvtxEndRange

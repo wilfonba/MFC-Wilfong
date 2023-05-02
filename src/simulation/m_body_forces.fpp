@@ -24,7 +24,9 @@ module m_body_forces
         s_finalize_body_forces_module
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: rhoM
-    !$acc declare create(rhoM)
+    real(kind(0d0)) :: rhoF
+
+    !$acc declare create(rhoM, rhoF)
 
 contains
 
@@ -34,14 +36,20 @@ contains
         if (n > 0) then
             ! Simulation is 3D
             if (p > 0) then
-                @:ALLOCATE (rhoM(0:m, 0:n, 0:p))
+                @:ALLOCATE (rhoM(-buff_size:buff_size + m, &
+                            -buff_size:buff_size + n, &
+                            -buff_size:buff_size + p))
             ! Simulation is 2D
             else
-                @:ALLOCATE (rhoM(0:m, 0:n, 0:0))
+                @:ALLOCATE (rhoM(-buff_size:buff_size + m, &
+                            -buff_size:buff_size + n, &
+                            0:0))
             end if
         ! Simulation is 1D
         else
-            @:ALLOCATE (rhoM(0:m, 0:0, 0:0))
+            @:ALLOCATE (rhoM(-buff_size:buff_size + m, &
+                        0:0, &
+                        0:0))
         end if
 
     end subroutine s_initialize_body_forces_module
@@ -75,6 +83,8 @@ contains
             end if
         end if
 
+        !$acc update device(accel_bf)
+
     end subroutine s_compute_acceleration
 
     subroutine s_compute_mixture_density(q_prim_vf)
@@ -82,12 +92,19 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         integer :: i, j, k, l !< standard iterators
 
-        !$acc parallel loop collapse(3) gang vector default(present)      
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     rhoM(j,k,l) = 0d0
-                    !$acc loop seq
+                end do
+            end do
+        end do
+
+        !$acc parallel loop collapse(4) gang vector default(present)  
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
                     do i = 1, num_fluids
                         rhoM(j,k,l) = rhoM(j,k,l) + &
                             q_prim_vf(contxb + i - 1)%sf(j,k,l) 
@@ -103,12 +120,12 @@ contains
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
         integer, intent(IN) :: idir
-        real(kind(0d0)) :: rhoF
 
         integer :: i, j, k, l, q !< Loop variables
 
         if (idir == 1 .and. bf_x .ne. dflt_int) then
-!$acc parallel loop collapse(3) gang vector default(present)  
+
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0,p
                 do k = 0,n
                     do j = 0,m
@@ -116,22 +133,31 @@ contains
                             rhoM(j,k,l)*accel_bf(1)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
                             q_prim_vf(momxb)%sf(j,k,l)*accel_bf(1)
-                        ! Six equation model
-    !                     if (model_eqns == 3) then
-    ! !$acc loop seq
-    !                         do q = 1,num_fluids
-    !                             rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
-    !                                 q_prim_vf(advxb + q - 1)%sf(j,k,l)
-    !                             rhs_vf(intxb + q - 1)%sf(j,k,l) = &
-    !                                 rhs_vf(intxb + q - 1)%sf(j,k,l) + &
-    !                                 rhoF*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(1)
-    !                         end do
-    !                     end if
                     end do
                 end do
             end do
+
+            ! Six equation model
+            if (model_eqns == 3) then
+                !$acc parallel loop collapse(4) gang vector default(present) private(rhoF)
+                do l = 0,p
+                    do k = 0,n
+                        do j = 0,m 
+                            do q = 1,num_fluids
+                                rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
+                                    q_prim_vf(advxb + q - 1)%sf(j,k,l)
+                                rhs_vf(intxb + q - 1)%sf(j,k,l) = &
+                                    rhs_vf(intxb + q - 1)%sf(j,k,l) + &
+                                    rhoF*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(1)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
         elseif (idir == 2 .and. bf_y .ne. dflt_int) then
-!$acc parallel loop collapse(3) gang vector default(present) private(rhoF)
+
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0,p
                 do k = 0,n
                     do j = 0,m
@@ -139,22 +165,31 @@ contains
                             (1d3 - rhoM(j,k,l))*accel_bf(2)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
                             q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
-                        ! Six equation model
-!                         if (model_eqns == 3) then
-! !$acc loop seq
-!                             do q = 1,num_fluids
-!                                 rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
-!                                     q_prim_vf(advxb + q - 1)%sf(j,k,l)
-!                                 rhs_vf(intxb + q - 1)%sf(j,k,l) = &
-!                                     rhs_vf(intxb + q - 1)%sf(j,k,l) + &
-!                                     rhoF*q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
-!                             end do
-!                         end if
                     end do
                 end do
             end do
+
+            ! Six equation model
+            if (model_eqns == 3) then
+                !$acc parallel loop collapse(4) gang vector default(present) private(rhoF)
+                do l = 0,p
+                    do k = 0,n
+                        do j = 0,m          
+                            do q = 1,num_fluids
+                                rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
+                                    q_prim_vf(advxb + q - 1)%sf(j,k,l)
+                                rhs_vf(intxb + q - 1)%sf(j,k,l) = &
+                                    rhs_vf(intxb + q - 1)%sf(j,k,l) + &
+                                    rhoF*q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
         elseif (idir == 3 .and. bf_z .ne. dflt_int) then
-!$acc parallel loop collapse(3) gang vector default(present)  
+
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0,p
                 do k = 0,n
                     do j = 0,m
@@ -162,22 +197,27 @@ contains
                             rhoM(j,k,l)*accel_bf(3)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
                             q_prim_vf(momxe)%sf(j,k,l)*accel_bf(3)
-                        ! Six equation model
-!                         if (model_eqns == 3) then
-! !$acc loop seq
-!                             do q = 1,num_fluids
-!                                 rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
-!                                     q_prim_vf(advxb + q - 1)%sf(j,k,l)
-!                                 rhs_vf(intxb + q - 1)%sf(j,k,l) = &
-!                                     rhs_vf(intxb + q - 1)%sf(j,k,l) + &
-!                                     rhoF*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(3)
-!                             end do
-!                         end if
                     end do
                 end do
             end do
-        else
-            return
+            
+            ! Six equation model
+            if (model_eqns == 3) then
+                !$acc parallel loop collapse(4) gang vector default(present) private(rhoF)
+                do l = 0,p
+                    do k = 0,n
+                        do j = 0,m
+                            do q = 1,num_fluids
+                                rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
+                                    q_prim_vf(advxb + q - 1)%sf(j,k,l)
+                                rhs_vf(intxb + q - 1)%sf(j,k,l) = &
+                                    rhs_vf(intxb + q - 1)%sf(j,k,l) + &
+                                    rhoF*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(3)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
         end if
 
     end subroutine s_compute_body_forces_rhs
