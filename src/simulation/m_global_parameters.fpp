@@ -126,6 +126,7 @@ module m_global_parameters
             real :: ${param}$_${dir}$
         #:endfor
     #:endfor
+    real(kind(0d0)) :: densRef
     real(kind(0d0)), dimension(3) :: accel_bf
 !$acc declare create(accel_bf)
 

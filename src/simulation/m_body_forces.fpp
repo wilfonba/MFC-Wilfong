@@ -130,7 +130,7 @@ contains
                 do k = 0,n
                     do j = 0,m
                         rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
-                            rhoM(j,k,l)*accel_bf(1)
+                            (densRef - rhoM(j,k,l))*accel_bf(1)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
                             rhoM(j,k,l)*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(1)
                     end do
@@ -162,15 +162,15 @@ contains
                 do k = 0,n
                     do j = 0,m
                         rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
-                            (1.0d3 - rhoM(j,k,l))*accel_bf(2)
+                            (densRef - rhoM(j,k,l))*accel_bf(2)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
-                            rhoM(j,k,l)*q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
+                            (densRef - rhoM(j,k,l))*q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
                     end do
                 end do
             end do
 
             ! Six equation model
-            if (model_eqns == 3) then
+            if (model_eqns == 5) then
                 !$acc parallel loop collapse(4) gang vector default(present) private(rhoF)
                 do l = 0,p
                     do k = 0,n
@@ -178,6 +178,7 @@ contains
                             do q = 1,num_fluids
                                 rhoF = q_prim_vf(contxb + q - 1)%sf(j,k,l)/&
                                     q_prim_vf(advxb + q - 1)%sf(j,k,l)
+                                print*, rhoF
                                 rhs_vf(intxb + q - 1)%sf(j,k,l) = &
                                     rhs_vf(intxb + q - 1)%sf(j,k,l) + &
                                     rhoF*q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
@@ -194,7 +195,7 @@ contains
                 do k = 0,n
                     do j = 0,m
                         rhs_vf(momxe)%sf(j,k,l) = rhs_vf(momxe)%sf(j,k,l) + &
-                            rhoM(j,k,l)*accel_bf(3)
+                            (densRef - rhoM(j,k,l))*accel_bf(3)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
                             rhoM(j,k,l)*q_prim_vf(momxe)%sf(j,k,l)*accel_bf(3)
                     end do

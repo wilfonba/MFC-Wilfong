@@ -95,7 +95,7 @@ contains
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in ['bf_x', 'bf_y', 'bf_z', 'k_x', 'k_y', 'k_z', 'w_x', 'w_y',&
-            & 'w_z', 'p_x', 'p_y', 'p_z']
+            & 'w_z', 'p_x', 'p_y', 'p_z', 'densRef']
             call MPI_BCAST(${VAR}$, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
