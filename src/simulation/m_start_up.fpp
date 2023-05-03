@@ -103,7 +103,7 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type
+            R0_type, sigma
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -422,7 +422,7 @@ contains
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             ! Read the data for each variable
-            if (bubbles .or. hypoelasticity) then
+            if (bubbles .or. hypoelasticity .or. sigma .ne. 0) then
 
                 do i = 1, sys_size!adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)

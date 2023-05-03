@@ -103,6 +103,7 @@ module m_global_parameters
     integer :: alf_idx                             !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                          !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx            !< Indices of elastic stresses
+    integer :: c_idx                               !< Index for the surfact tension color function
     !> @}
 
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
@@ -183,6 +184,7 @@ module m_global_parameters
     logical, dimension(3) :: omega_wrt
     logical :: qm_wrt
     logical :: schlieren_wrt
+    logical :: cf_wrt
     !> @}
 
     real(kind(0d0)), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -222,6 +224,11 @@ module m_global_parameters
     real(kind(0d0)), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
     real(kind(0d0)) :: poly_sigma
+    !> @}
+
+    !< @name Surfact tension modeling variables
+    !> @{
+    real(kind(0d0)) :: sigma
     !> @}
 
     !> @name Index variables used for m_variables_conversion
@@ -303,6 +310,7 @@ contains
         omega_wrt = .false.
 		qm_wrt = .false.
         schlieren_wrt = .false.
+        cf_wrt = .false.
 
         schlieren_alpha = dflt_real
 
@@ -318,6 +326,9 @@ contains
         nb = dflt_int
         polydisperse = .false.
         poly_sigma = dflt_real
+
+        ! surfact tension modelig
+        sigma = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 
@@ -446,6 +457,12 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
+
+            if (sigma .ne. dflt_real) then
+                c_idx = sys_size + 1
+                sys_size = c_idx
+            end if
+
             alf_idx = 1 ! dummy, cannot actually have a void fraction
 
         else if (model_eqns == 4) then

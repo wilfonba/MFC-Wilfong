@@ -309,7 +309,7 @@ contains
         NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
         ! Write the data for each variable
-        if (bubbles) then
+        if (bubbles .or. sigma .ne. 0) then
             do i = 1, sys_size! adv_idx%end
                 var_MOK = int(i, MPI_OFFSET_KIND)
 

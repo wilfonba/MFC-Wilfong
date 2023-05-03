@@ -150,6 +150,12 @@ contains
             end do
         end if
 
+        if (sigma .ne. 0) then
+            @:ALLOCATE(q_prim_vf(c_idx)%sf(ix_t%beg:ix_t%end, &
+                                       iy_t%beg:iy_t%end, &
+                                       iz_t%beg:iz_t%end))
+        end if
+
         ! Allocating the cell-average RHS variables
         @:ALLOCATE(rhs_vf(1:sys_size))
 
