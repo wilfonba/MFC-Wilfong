@@ -59,6 +59,8 @@ program p_main
 #endif
 
     use m_nvtx
+
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -157,6 +159,9 @@ program p_main
     if (any(Re_size > 0)) then
         call s_initialize_viscous_module()
     end if
+    if (sigma .ne. dflt_real) then
+        call s_initialize_surface_tension_module()
+    end if
     call s_initialize_rhs_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
@@ -252,6 +257,8 @@ program p_main
         elseif (time_stepper == 3) then
             call s_3rd_order_tvd_rk(t_step, time_avg)
         end if
+
+        call s_get_surface_tension(q_prim_vf, q_cons_ts(1)%vf)
 
         ! Time-stepping loop controls
 
@@ -373,6 +380,9 @@ program p_main
 
     if (any(Re_size > 0)) then
         call s_finalize_viscous_module()
+    end if
+    if (sigma .ne. dflt_real) then
+        call s_finalize_surface_tension_module()
     end if
 
     ! Terminating MPI execution environment

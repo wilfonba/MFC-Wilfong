@@ -1045,6 +1045,11 @@ contains
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
 
+                                    if (sigma .ne. dflt_real) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                    end if
+
                                     ! Compute right solution state
                                 else if (s_R <= 0d0) then
                                     p_Star = pres_R
@@ -1071,6 +1076,11 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
+
+                                    if (sigma .ne. dflt_real) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qL_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
+                                    end if
 
                                     ! Compute left star solution state
                                 else if (s_S >= 0d0) then
@@ -1105,6 +1115,11 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
+
+                                    if (sigma .ne. dflt_real) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                    end if
 
                                     ! Compute right star solution state
                                 else
@@ -1143,6 +1158,11 @@ contains
                                     end do
 
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
+
+                                    if (sigma .ne. dflt_real) then
+                                        flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                            qL_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
+                                    end if
 
                                 end if
 
