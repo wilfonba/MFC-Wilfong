@@ -52,7 +52,8 @@ module m_rhs
     private; public :: s_initialize_rhs_module, &
  s_compute_rhs, &
  s_pressure_relaxation_procedure, &
- s_finalize_rhs_module
+ s_finalize_rhs_module, &
+ s_reconstruct_cell_boundary_values
 
 
     type(vector_field) :: q_cons_qp !<
@@ -230,6 +231,10 @@ contains
                 q_cons_qp%vf(l)%sf
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
+
+        q_prim_qp%vf(c_idx)%sf => &
+            q_cons_qp%vf(c_idx)%sf
+        !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
 
         ! ==================================================================
 
@@ -1656,6 +1661,10 @@ contains
             call nvtxEndRange
         end do
         ! END: Dimensional Splitting Loop =================================
+
+        if (sigma .ne. dflt_real) then
+            iv%beg = 1; iv%end = num_dims + 1
+        end if
 
         if (run_time_info .or. probe_wrt) then
 
