@@ -542,7 +542,7 @@ contains
                     flux_src_n(i)%vf(l)%sf => &
                         flux_src_n(1)%vf(l)%sf
 
-                    !$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
+                    !$acc enter data attach(flux_n(i)%vf(l)%sf, flux_src_n(i)%vf(l)%sf)
                 end do
 
             end if
@@ -668,6 +668,7 @@ contains
             end do
         end do
 
+
         call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers()
         call nvtxEndRange
@@ -745,7 +746,7 @@ contains
             ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
             ! ===============================================================
             ! Reconstructing Primitive/Conservative Variables ===============
-            
+
             if (all(Re_size == 0)) then
                     iv%beg = 1; iv%end = sys_size
                 !call nvtxStartRange("RHS-WENO")
@@ -840,7 +841,6 @@ contains
 
             ! ===============================================================
 
-
             if (alt_soundspeed) then
 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
@@ -866,12 +866,15 @@ contains
             end if
 
             call nvtxStartRange("RHS_Flux_Add")
-            if (id == 1) then
 
+            
+            if (id == 1) then
+                
                 if (bc_x%beg <= -5) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
+
 
                 if (bc_x%end <= -5) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
@@ -1668,6 +1671,7 @@ contains
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
+
 
             if (hypoelasticity) then
                 call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
