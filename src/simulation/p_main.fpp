@@ -258,8 +258,6 @@ program p_main
             call s_3rd_order_tvd_rk(t_step, time_avg)
         end if
 
-        call s_get_surface_tension(q_prim_vf, q_cons_ts(1)%vf)
-
         ! Time-stepping loop controls
 
         if (t_step == t_step_stop) then

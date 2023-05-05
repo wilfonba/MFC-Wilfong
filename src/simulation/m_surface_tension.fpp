@@ -158,7 +158,7 @@ contains
                     q_cons_vf(E_idx)%sf(j,k,l) = q_prim_vf(E_idx)%sf(j,k,l) - &
                         dt/dx(j) * (sigma*gR_x(j,k,l,num_dims+1)*q_prim_vf(momxb)%sf(j,k,l) + &
                         OmegaR(1,1)*q_prim_vf(momxb)%sf(j,k,l) + &
-                        OmegaR(1,2)*q_prim_vf(momxb+1)%sf(j,k,l)) ! + &
+                        OmegaR(1,2)*q_prim_vf(momxb+1)%sf(j,k,l)) + &
                         !OmegaR(1,3)*q_prim_vf(momxe)%sf(j,k,l)) + &
                         dt/dx(j) * (sigma*gL_x(j,k,l,num_dims+1)*q_prim_vf(momxb)%sf(j,k,l) + &
                         OmegaL(1,1)*q_prim_vf(momxb)%sf(j,k,l) + &
@@ -181,7 +181,7 @@ contains
                         q_cons_vf(E_idx)%sf(j,k,l) = q_prim_vf(E_idx)%sf(j,k,l) - &
                             dt/dy(k) * (sigma*gR_y(j,k,l,num_dims+1)*q_prim_vf(momxb + 1)%sf(j,k,l) + &
                             OmegaR(2,1)*q_prim_vf(momxb)%sf(j,k,l) + &
-                            OmegaR(2,2)*q_prim_vf(momxb+1)%sf(j,k,l)) ! + &
+                            OmegaR(2,2)*q_prim_vf(momxb+1)%sf(j,k,l)) + &
                             !OmegaR(2,3)*q_prim_vf(momxe)%sf(j,k,l)) + &
                             dt/dy(k) * (sigma*gL_y(j,k,l,num_dims+1)*q_prim_vf(momxb + 1)%sf(j,k,l) + &
                             OmegaL(2,1)*q_prim_vf(momxb)%sf(j,k,l) + &
@@ -226,21 +226,21 @@ contains
         #:for S in ['L','R']
         Omega${S}$(1,1) = -sigma*(g${S}$(j,k,l,num_dims+1) - &
                             g${S}$(j, k, l, 1) * g${S}$(j, k, l, 1) / &
-                            g${S}$(j, k, l, num_dims+1))
+                            max(g${S}$(j, k, l, num_dims+1),1e-16))
         if (m > 0) then
             Omega${S}$(1,2) = -sigma*(g${S}$(j, k, l, 1) * g${S}$(j, k, l, 2) / &
-                                g${S}$(j, k, l, num_dims + 1))
+                                max(g${S}$(j, k, l, num_dims + 1),1e-16))
             Omega${S}$(2,2) = -sigma*(g${S}$(j,k,l,num_dims+1) - &
                                 g${S}$(j, k, l, 2) * g${S}$(j, k, l, 2) / &
-                                g${S}$(j, k, l, num_dims+1))
+                                max(g${S}$(j, k, l, num_dims+1),1e-16))
             if (p > 0) then
                 Omega${S}$(1,3) = -sigma*(g${S}$(j, k, l, 1) * g${S}$(j, k, l, 3) / &
-                                    g${S}$(j, k, l, num_dims + 1))
+                                    max(g${S}$(j, k, l, num_dims + 1),1e-16))
                 Omega${S}$(2,3) = -sigma*(g${S}$(j, k, l, 2) * g${S}$(j, k, l, 3) / &
-                                    g${S}$(j, k, l, num_dims + 1))
+                                    max(g${S}$(j, k, l, num_dims + 1),1e-16))
                 Omega${S}$(3,3) = -sigma*(g${S}$(j,k,l,num_dims+1) - &
                                     g${S}$(j, k, l, 3) * g${S}$(j, k, l, 3) / &
-                                    g${S}$(j, k, l, num_dims+1))
+                                    max(g${S}$(j, k, l, num_dims+1),1e-16))
             end if
         end if
         #:endfor

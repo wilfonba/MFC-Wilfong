@@ -28,6 +28,8 @@ module m_time_steppers
     use m_fftw
 
     use m_nvtx
+
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none

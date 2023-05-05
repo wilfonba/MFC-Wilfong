@@ -911,6 +911,11 @@ contains
                                     do i = 1, num_fluids
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
+
+                                    if (sigma .ne. dflt_real) then
+                                        qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) = max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, c_idx))
+                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))
+                                    end if
                                 end if
 
                                 !$acc loop seq
