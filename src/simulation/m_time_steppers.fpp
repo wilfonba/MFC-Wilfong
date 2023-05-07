@@ -421,6 +421,11 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
+        if (sigma .ne. dflt_real) then
+            call s_get_surface_tension(q_cons_ts(2)%vf, q_prim_vf)
+            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        end if
+
         call nvtxEndRange
 
         call cpu_time(finish)

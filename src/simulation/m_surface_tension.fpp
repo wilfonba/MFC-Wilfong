@@ -22,17 +22,18 @@ module m_surface_tension
 
     type(vector_field) :: c_divs
     type(scalar_field) :: gm
-    type(int_bounds_info) :: iv
 
     real(kind(0d0)), allocatable, dimension(:, :) :: OmegaL, OmegaR
+    !$acc declare create(c_divs, gm, omegaL, omegaR)
 
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
-    real(kind(0d0)) :: gmL, gmR, w1L, w1R, w2L, w2R, w3L, w3R
+    !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 
-    !> @name Indical bounds in the x-, y- and z-directions
-    !> @{
+    real(kind(0d0)) :: gmL, gmR, w1L, w1R, w2L, w2R, w3L, w3R
+    !$acc declare create(gmL, gmR, w1L, w1R, w2L, w2R, w3L, w3R)
+
     type(int_bounds_info) :: ix, iy, iz
-    !> @}
+    !$acc declare create(ix, iy, iz)
 
     integer :: j, k, l  
 
@@ -71,7 +72,7 @@ contains
 
     end subroutine s_initialize_surface_tension_module
 
-    subroutine s_get_surface_tension(q_prim_vf, q_cons_vf)
+    subroutine s_get_surface_tension(q_cons_vf, q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
@@ -125,6 +126,7 @@ contains
         end if
 
         ! Cell centered gradient magnitude
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -146,6 +148,7 @@ contains
         end do
 
         ! < x-direction
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -169,6 +172,7 @@ contains
         end do    
         
         if (m > 0) then
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -223,6 +227,7 @@ contains
         integer :: j, k, l
         real(kind(0d0)), dimension(ix%beg:,iy%beg:,iz%beg:,:) :: gL, gR
 
+        !$acc routine seq
         #:for S in ['L','R']
         Omega${S}$(1,1) = -sigma*(g${S}$(j,k,l,num_dims+1) - &
                             g${S}$(j, k, l, 1) * g${S}$(j, k, l, 1) / &

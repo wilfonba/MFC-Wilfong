@@ -295,6 +295,7 @@ module m_global_parameters
     !> @name Surface tension parameters
     !> @{
     real(kind(0d0)) :: sigma
+    !$acc declare create(sigma)
     !> @}
 
     integer :: momxb, momxe

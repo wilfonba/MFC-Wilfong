@@ -136,6 +136,8 @@ contains
             n_glb = n
             p_glb = p
 
+            !$acc update device(sigma)
+
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
         end if
