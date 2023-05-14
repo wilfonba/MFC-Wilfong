@@ -35,7 +35,7 @@ module m_surface_tension
     type(int_bounds_info) :: ix, iy, iz
     !$acc declare create(ix, iy, iz)
 
-    integer :: j, k, l  
+    integer :: j, k, l, q  
 
 contains
 
@@ -131,10 +131,10 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs%vf(num_dims + 1)%sf(j,k,l) = 0d0
-                    do m = 1, num_dims
+                    do q = 1, num_dims
                         c_divs%vf(num_dims + 1)%sf(j,k,l) = &
                             c_divs%vf(num_dims + 1)%sf(j,k,l) + &
-                            c_divs%vf(m)%sf(j,k,l)**2
+                            c_divs%vf(q)%sf(j,k,l)**2d0
                     end do
                     c_divs%vf(num_dims + 1)%sf(j,k,l) = &
                         sqrt(c_divs%vf(num_dims + 1)%sf(j,k,l))
@@ -143,8 +143,8 @@ contains
         end do
 
         ! Reconstruct gradient at cell boundaries
-        do m = 1, num_dims
-            call s_reconstruct_cell_boundary_values(c_divs%vf(1:num_dims), gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, m)
+        do q = 1, num_dims
+            call s_reconstruct_cell_boundary_values(c_divs%vf(1:num_dims), gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, q)
         end do
 
         ! < x-direction
@@ -153,10 +153,10 @@ contains
             do k = 0, n
                 do j = 0, m
                     call s_compute_capillary_stress_tensors(gL_x, gR_x, j, k, l)
-                    do m = 1,num_dims
-                        q_cons_vf(momxb + m - 1)%sf(j,k,l) = &
-                            q_prim_vf(momxb + m - 1)%sf(j,k,l) - dt/dx(j) * &
-                            (OmegaR(1,m) - OmegaL(1,m))
+                    do q = 1,num_dims
+                        q_cons_vf(momxb + q - 1)%sf(j,k,l) = &
+                            q_prim_vf(momxb + q - 1)%sf(j,k,l) - dt/dx(j) * &
+                            (OmegaR(1,q) - OmegaL(1,q))
                     end do
                     q_cons_vf(E_idx)%sf(j,k,l) = q_prim_vf(E_idx)%sf(j,k,l) - &
                         dt/dx(j) * (sigma*gR_x(j,k,l,num_dims+1)*q_prim_vf(momxb)%sf(j,k,l) + &
@@ -177,10 +177,10 @@ contains
                 do k = 0, n
                     do j = 0, m
                         call s_compute_capillary_stress_tensors(gL_y, gR_y, j, k, l)
-                        do m = 1,num_dims
-                            q_cons_vf(momxb + m - 1)%sf(j,k,l) = &
-                                q_prim_vf(momxb + m - 1)%sf(j,k,l) - dt/dy(j) * &
-                                (OmegaR(2,m) - OmegaL(2,m))
+                        do q = 1,num_dims
+                            q_cons_vf(momxb + q - 1)%sf(j,k,l) = &
+                                q_prim_vf(momxb + q - 1)%sf(j,k,l) - dt/dy(j) * &
+                                (OmegaR(2,q) - OmegaL(2,q))
                         end do
                         q_cons_vf(E_idx)%sf(j,k,l) = q_prim_vf(E_idx)%sf(j,k,l) - &
                             dt/dy(k) * (sigma*gR_y(j,k,l,num_dims+1)*q_prim_vf(momxb + 1)%sf(j,k,l) + &
@@ -201,10 +201,10 @@ contains
         !         do k = 0, n
         !             do j = 0, m
         !                 call s_compute_capillary_stress_tensors(gL_z, gR_z, j, k, l)
-        !                 do m = 1,num_dims
-        !                     q_cons_vf(momxb + m - 1)%sf(j,k,l) = &
-        !                         q_prim_vf(momxb + m - 1)%sf(j,k,l) - dt/dz(l) * &
-        !                         (OmegaR(3,m) - OmegaL(3,m))
+        !                 do q = 1,num_dims
+        !                     q_cons_vf(momxb + q - 1)%sf(j,k,l) = &
+        !                         q_prim_vf(momxb + q - 1)%sf(j,k,l) - dt/dz(l) * &
+        !                         (OmegaR(3,q) - OmegaL(3,q))
         !                 end do
         !                 q_cons_vf(E_idx)%sf(j,k,l) = q_prim_vf(E_idx)%sf(j,k,l) - &
         !                     dt/dz(l) * (sigma*gR_z(j,k,l,num_dims+1)*q_prim_vf(momxe)%sf(j,k,l) + &
