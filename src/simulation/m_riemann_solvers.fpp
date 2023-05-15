@@ -32,6 +32,8 @@ module m_riemann_solvers
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_bubbles              !< To get the bubble wall pressure function
+
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -2158,12 +2160,18 @@ contains
             end if
         end if
 
+        if (sigma .ne. dflt_real) then
+            call s_compute_capilary_source_flux(norm_dir, q_prim_vf, & 
+                                                vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
+                                                flux_rsx_vf, flux_rsy_vf, flux_rsz_vf, &
+                                                isx, isy, isz)
+        end if
+
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
                                        flux_gsrc_vf, &
                                        norm_dir, ix, iy, iz)
 
     end subroutine s_hllc_riemann_solver
-
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any

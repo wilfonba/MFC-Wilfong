@@ -715,7 +715,7 @@ contains
         end if
 
         if (sigma .ne. dflt_real) then
-            q_prim_vf(c_idx)%sf(j,k,l) = patch_id - 1
+            q_prim_vf(c_idx)%sf(j,k,l) = eta*(patch_id - 1) + (1d0 - eta)*orig_prim_vf(i)
         end if
 
         ! Updating the patch identities bookkeeping variable

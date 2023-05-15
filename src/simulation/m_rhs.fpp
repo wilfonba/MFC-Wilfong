@@ -45,6 +45,7 @@ module m_rhs
     
     use m_nvtx
     
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -52,8 +53,7 @@ module m_rhs
     private; public :: s_initialize_rhs_module, &
  s_compute_rhs, &
  s_pressure_relaxation_procedure, &
- s_finalize_rhs_module, &
- s_reconstruct_cell_boundary_values
+ s_finalize_rhs_module
 
 
     type(vector_field) :: q_cons_qp !<
@@ -728,6 +728,10 @@ contains
                                             dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                                             ix, iy, iz)
         call nvtxEndRange()
+
+        call nvtxStartRange("Surface_Tensions")
+        if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf)
+        call nvtxEndRange
         
         ! Dimensional Splitting Loop =======================================
 
@@ -1655,8 +1659,6 @@ contains
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
-
-
             if (hypoelasticity) then
 
                 call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
@@ -1666,10 +1668,6 @@ contains
 
         end do
         ! END: Dimensional Splitting Loop =================================
-
-        if (sigma .ne. dflt_real) then
-            iv%beg = 1; iv%end = num_dims + 1
-        end if
 
         if (run_time_info .or. probe_wrt) then
 

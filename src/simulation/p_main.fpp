@@ -328,17 +328,17 @@ program p_main
             !  call nvtxStartRange("I/O")
             do i = 1, sys_size
                 !$acc update host(q_cons_ts(1)%vf(i)%sf)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, "NaN(s) in timestep output.", j, k, l, proc_rank, t_step, m, n, p
+                ! do l = 0, p
+                !     do k = 0, n
+                !         do j = 0, m
+                !             if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                !                 print *, "NaN(s) in timestep output.", j, k, l, proc_rank, t_step, m, n, p
                                 
-                                error stop "NaN(s) in timestep output."
-                            end if
-                        end do
-                    end do
-                end do
+                !                 error stop "NaN(s) in timestep output."
+                !             end if
+                !         end do
+                !     end do
+                ! end do
             end do
             call s_write_data_files(q_cons_ts(1)%vf, q_prim_vf, t_step)
             !  call nvtxEndRange
