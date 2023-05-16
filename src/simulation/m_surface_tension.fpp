@@ -26,7 +26,7 @@ module m_surface_tension
     type(vector_field) :: c_divs
 
     real(kind(0d0)), allocatable, dimension(:, :) :: OmegaL, OmegaR
-    !$acc declare create(c_divs, OmegaL)
+    !$acc declare create(c_divs, OmegaL, OmegaR)
 
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
