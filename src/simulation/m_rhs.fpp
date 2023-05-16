@@ -729,7 +729,7 @@ contains
         call nvtxStartRange("RHS-BodyForces")
 
         if (bodyForces) then
-            call s_compute_mixture_density(q_cons_vf(1:sys_size))
+            call s_compute_mixture_density(q_cons_qp%vf)
             call s_compute_acceleration(mytime)
         end if
 
@@ -1664,14 +1664,13 @@ contains
             call nvtxStartRange("RHS-BodyForces")
 
             if (bodyForces) then
-                call  s_compute_body_forces_rhs(id, q_prim_qp%vf(1:sys_size), rhs_vf)
+                call  s_compute_body_forces_rhs(id, q_prim_qp%vf, q_cons_qp%vf, rhs_vf)
             end if
 
             call nvtxEndRange
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
-
 
             if (hypoelasticity) then
                 call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
