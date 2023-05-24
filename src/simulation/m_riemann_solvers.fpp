@@ -215,6 +215,14 @@ module m_riemann_solvers
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
 
+    ! Additional variables for applying a flux limiter
+    real(kind(0d0)) :: flux_lim_func
+    real(kind(0d0)) :: lo_s_L, lo_s_R, lo_s_S
+    real(kind(0d0)) :: lo_s_M, lo_s_P
+    real(kind(0d0)) :: tvd_s_M, tvd_s_P
+    real(kind(0d0)) :: lo_xi_M, lo_xi_P
+    real(kind(0d0)) :: tvd_xi_M, tvd_xi_P
+
 contains
 
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, & ! -------
@@ -864,6 +872,10 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
+
+                                if (tvd_riemann_flux) then
+                                    call s_compute_flux_limiter(j,k,l,flux_lim_func,norm_dir)
+                                endif
 
                                 vel_L_rms = 0d0; vel_R_rms = 0d0
 
@@ -4121,5 +4133,61 @@ contains
         end if
 
     end subroutine s_finalize_riemann_solvers_module ! ---------------------
+
+    SUBROUTINE s_compute_flux_limiter(j,k,l,flux_lim_func,norm_dir) ! ------
+        ! Description: This subroutine computes the flux limiter function value
+        !       at the cell boundary
+
+            INTEGER, INTENT(IN) :: j,k,l,norm_dir
+            REAL(KIND(0d0)), INTENT(OUT) :: flux_lim_func
+            REAL(KIND(0d0)) :: top, bottom, slope
+
+            IF (q_prim_rs_vf(cont_idx%end+norm_dir)%sf(j,k,l) >= 0d0) THEN
+                  top = q_prim_rs_vf(adv_idx%beg)%sf( j ,k,l) - &
+                    q_prim_rs_vf(adv_idx%beg)%sf(j-1,k,l)
+                   bottom = q_prim_rs_vf(adv_idx%beg)%sf(j+1,k,l) - &
+                    q_prim_rs_vf(adv_idx%beg)%sf( j ,k,l)
+            ELSE
+                  top = q_prim_rs_vf(adv_idx%beg)%sf(j+2,k,l) - &
+                    q_prim_rs_vf(adv_idx%beg)%sf(j+1,k,l)
+                   bottom = q_prim_rs_vf(adv_idx%beg)%sf(j+1,k,l) - &
+                    q_prim_rs_vf(adv_idx%beg)%sf( j ,k,l)
+            END IF
+        
+            ! Limit the flux limiter to only be applied where the change in
+            ! volume fraction is greater than machine precision so that 
+            ! insignificant fluctuations do not trip the limiter
+!           IF (ABS(top) < sgm_eps) top = 0d0
+!           IF (ABS(bottom) < sgm_eps) bottom = 0d0
+            IF (ABS(top) < 1d-8) top = 0d0
+            IF (ABS(bottom) < 1d-8) bottom = 0d0
+
+            ! If top = bottom, then cell boundary is in a smooth region of
+            ! the flow and the high order flux should be used. Also ensures
+            ! that areas of no change in volume fraction (0/0) use the high
+            ! order flux
+            IF (top == bottom) THEN
+                slope = 1d0
+            ELSE
+                slope = (top*bottom)/MAX(bottom**2d0,sgm_eps)
+            END IF
+
+            ! Flux limiter function
+            IF (flux_lim == 1) THEN ! MINMOD (MM)
+                flux_lim_func = MAX(0d0,MIN(1d0,slope))
+            ELSEIF (flux_lim == 2) THEN ! MUSCL (MC)
+                flux_lim_func = MAX(0d0,MIN(2d0*slope,5d-1*(1d0+slope),2d0))
+            ELSEIF (flux_lim == 3) THEN ! OSPRE (OP)
+                flux_lim_func = (15d-1*(slope**2d0+slope))/(slope**2d0+slope+1d0)
+            ELSEIF (flux_lim == 4) THEN ! SUPERBEE (SB)
+                flux_lim_func = MAX(0d0,MIN(1d0,2d0*slope),MIN(slope,2d0))
+            ELSEIF (flux_lim == 5) THEN ! SWEBY (SW) (beta = 1.5)
+                flux_lim_func = MAX(0d0,MIN(15d-1*slope,1d0),MIN(slope,15d-1))
+            ELSEIF (flux_lim == 6) THEN ! VAN ALBADA (VA)
+                flux_lim_func = (slope**2d0+slope)/(slope**2d0+1d0)
+            ELSEIF (flux_lim == 7) THEN ! VAN LEER (VL)
+                flux_lim_func = (ABS(slope) + slope)/(1d0 + ABS(slope))
+            END IF
+        END SUBROUTINE s_compute_flux_limiter ! --------------------------------
 
 end module m_riemann_solvers

@@ -117,6 +117,9 @@ module m_global_parameters
     logical :: mixture_err    !< Mixture properties correction
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
+    logical :: tvd_riemann_flux
+
+    integer :: flux_lim
 
     integer :: cpu_start, cpu_end, cpu_rate
 
