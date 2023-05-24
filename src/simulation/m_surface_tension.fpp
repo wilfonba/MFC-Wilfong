@@ -14,6 +14,8 @@ module m_surface_tension
     use m_variables_conversion
 
     use m_weno
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -25,8 +27,8 @@ module m_surface_tension
 
     type(vector_field) :: c_divs
 
-    real(kind(0d0)), allocatable, dimension(:, :) :: OmegaL, OmegaR
-    !$acc declare create(c_divs, OmegaL, OmegaR)
+    real(kind(0d0)), allocatable, dimension(:, :) :: Omega
+    !$acc declare create(c_divs, Omega)
 
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
@@ -58,51 +60,60 @@ contains
         @:ALLOCATE(gR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
 
         if (m > 0) then
-            @:ALLOCATE(gL_y(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
-            @:ALLOCATE(gR_y(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
-        elseif (p > 0) then
-            @:ALLOCATE(gL_z(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
-            @:ALLOCATE(gR_z(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
+            @:ALLOCATE(gL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
+            @:ALLOCATE(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
+            if (p > 0) then
+                @:ALLOCATE(gL_z(iz%beg:iz%end, iy%beg:iy%end, ix%beg:ix%end, num_dims + 1))
+                @:ALLOCATE(gR_z(iz%beg:iz%end, iy%beg:iy%end, ix%beg:ix%end, num_dims + 1))
+            end if
         endif
 
-        @:ALLOCATE(OmegaL(1:num_dims, 1:num_dims), OmegaR(1:num_dims, 1:num_dims))
+        @:ALLOCATE(Omega(1:num_dims, 1:num_dims))
 
     end subroutine s_initialize_surface_tension_module
 
-    subroutine s_compute_capilary_source_flux(id, q_prim_vf, &
+    subroutine s_compute_capilary_source_flux(q_prim_vf, &
                                               vSrc_rsx, vSrc_rsy, vSrc_rsz, &
-                                              flux_vf_x, flux_vf_y, flux_vf_z, &
-                                              isx, isy, isz)
+                                              flux_src_vf, &
+                                              id, isx, isy, isz)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(:,:,:,:) :: vSrc_rsx, vSrc_rsy, vSrc_rsz
-        real(kind(0d0)), dimension(:,:,:,:) :: flux_vf_x, flux_vf_y, flux_vf_z
+        real(kind(0d0)), dimension(startx:,starty:,startz:,1:) :: vSrc_rsx, vSrc_rsy, vSrc_rsz
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(INOUT) :: flux_src_vf
         type(int_bounds_info) :: isx, isy, isz
         integer :: id
 
         real(kind(0d0)) :: e0L, e0R
 
         if (id == 1) then
-            !$acc parallel loop collapse(3) gang vector default(present) private(OmegaL, OmegaR)
+            dir_idx = (/1, 2, 3/)
+        elseif (id == 2) then
+            dir_idx = (/2, 1, 3/)
+        else
+            dir_idx = (/3, 1, 2/)
+        end if
+
+        if (id == 1) then
+
+            !$acc parallel loop collapse(3) gang vector default(present) private(Omega)
             do l = isz%beg, isz%end
-                do k = isz%beg, isz%end
-                    do j = isz%beg, isz%end
-                        call s_compute_capilary_stress_tensors(gL_x, gR_x, j, k, l)
+                do k = isy%beg, isy%end
+                    do j = isx%beg, isx%end
+                        call s_compute_capilary_stress_tensors(gL_x, j, k, l)
 
                         do i = 1, num_dims
-                            flux_vf_x(j,k,l,momxb + i - 1) = &
-                                flux_vf_x(j,k,l,momxb + i - 1) + OmegaL(1,i)
+                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1,i)
+
+                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                                Omega(1,i)*vSrc_rsx(j,k,l,i)
                         end do
 
-
-                        e0L = sigma*gL_x(j,k,l,num_dims + 1)
-                        flux_vf_x(j,k,l,E_idx) = flux_vf_x(j,k,l,E_idx) + &
+                        e0L = sigma*gL_x(j,k,l,num_dims+1)
+                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
                             e0L * vSrc_rsx(j,k,l,1)
-
-                        do i = 1, num_dims
-                            flux_vf_x(j,k,l,E_idx) = flux_vf_x(j,k,l,E_idx) + &
-                                OmegaL(1,i)*vSrc_rsx(j,k,l,i)
-                        end do
 
                     end do
                 end do
@@ -110,26 +121,23 @@ contains
 
         elseif (id == 2) then
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(OmegaL, OmegaR)
+            !$acc parallel loop collapse(3) gang vector default(present) private(Omega)
             do l = isz%beg, isz%end
-                do k = isz%beg, isz%end
-                    do j = isz%beg, isz%end
-                        call s_compute_capilary_stress_tensors(gL_y, gR_y, j, k, l)
+                do k = isy%beg, isy%end
+                    do j = isx%beg, isx%end
+                        call s_compute_capilary_stress_tensors(gL_y, k, j, l)
 
                         do i = 1, num_dims
-                            flux_vf_y(j,k,l,momxb + i - 1) = &
-                                flux_vf_y(j,k,l,momxb + i - 1) + OmegaL(2,i)
+                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2,i)
+
+                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                                Omega(2,i)*vSrc_rsy(k, j, l, i)
                         end do
 
-
-                        e0L = sigma*gL_x(j,k,l,num_dims+1)
-                        flux_vf_x(j,k,l,E_idx) = flux_vf_x(j,k,l,E_idx) + &
-                            e0L * vSrc_rsx(j,k,l,2)
-
-                        do i = 1, num_dims
-                            flux_vf_x(j,k,l,E_idx) = flux_vf_x(j,k,l,E_idx) + &
-                                OmegaL(2,i)*vSrc_rsx(j,k,l,i)
-                        end do
+                        e0L = sigma*gL_y(k, j, l,num_dims+1)
+                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                            e0L * vSrc_rsy(k, j, l, 2)
 
                     end do
                 end do
@@ -137,26 +145,23 @@ contains
 
         elseif (id == 3) then
 
-            !$acc parallel loop collapse(3) gang vector default(present) private(OmegaL, OmegaR)
+            !$acc parallel loop collapse(3) gang vector default(present) private(Omega)
             do l = isz%beg, isz%end
-                do k = isz%beg, isz%end
-                    do j = isz%beg, isz%end
-                        call s_compute_capilary_stress_tensors(gL_y, gR_y, j, k, l)
+                do k = isy%beg, isy%end
+                    do j = isx%beg, isx%end
+                        call s_compute_capilary_stress_tensors(gL_z, j, k, l)
 
                         do i = 1, num_dims
-                            flux_vf_y(j,k,l,momxb + i - 1) = &
-                                flux_vf_y(j,k,l,momxb + i - 1) + OmegaL(3,i)
+                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3,i)
+
+                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                                Omega(3,i)*vSrc_rsz(j,k,l,i)
                         end do
 
-
-                        e0L = sigma*gL_x(j,k,l,num_dims+1)
-                        flux_vf_x(j,k,l,E_idx) = flux_vf_x(j,k,l,E_idx) + &
-                            e0L * vSrc_rsx(j,k,l,3)
-
-                        do i = 1, num_dims
-                            flux_vf_x(j,k,l,E_idx) = flux_vf_x(j,k,l,E_idx) + &
-                                OmegaL(3,i)*vSrc_rsx(j,k,l,i)
-                        end do
+                        e0L = sigma*gL_z(j,k,l,num_dims+1)
+                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                            e0L * vSrc_rsz(j,k,l,3)
 
                     end do
                 end do
@@ -166,15 +171,16 @@ contains
 
     end subroutine s_compute_capilary_source_flux
 
-    subroutine s_get_capilary(q_prim_vf)
+    subroutine s_get_capilary(q_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(int_bounds_info) :: ix, iy, iz
 
         ! compute gradient components
         !$acc parallel loop collapse(3) gang vector default(present)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = iz%beg, iz%end
+            do k = iy%beg, iy%end
+                do j = ix%beg, ix%end
                     c_divs%vf(1)%sf(j, k, l) = &
                         (q_prim_vf(c_idx)%sf(j - 2, k, l) &
                         - 8d0*q_prim_vf(c_idx)%sf(j - 1, k, l) &
@@ -184,12 +190,13 @@ contains
                 end do
             end do
         end do
+
         ! 2D
         if (m > 0) then
             !$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
+            do l = iz%beg, iz%end
+                do k = iy%beg, iy%end
+                    do j = ix%beg, ix%end
                         c_divs%vf(2)%sf(j, k, l) = &
                             (q_prim_vf(c_idx)%sf(j, k - 2, l) &
                             - 8d0*q_prim_vf(c_idx)%sf(j, k - 1, l) &
@@ -202,9 +209,9 @@ contains
             ! 3D
             if (p > 0) then
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
+                do l = iz%beg, iz%end
+                    do k = iy%beg, iy%end
+                        do j = ix%beg, ix%end
                             c_divs%vf(3)%sf(j, k, l) = &
                                 (q_prim_vf(c_idx)%sf(j, k, l - 2) &
                                 - 8d0*q_prim_vf(c_idx)%sf(j, k, l - 1) &
@@ -225,84 +232,87 @@ contains
         end do
 
         ! Compute gradient magnitude at cell boundaries
-        #:for FACE in ['L','R']
         !$acc parallel loop collapse(3) gang vector default(present)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    g${FACE}$_x(j, k, l, num_dims+1) = 0d0
+        do l = iz%beg, iz%end
+            do k = iy%beg, iy%end
+                do j = ix%beg, ix%end
+                    gL_x(j, k, l, num_dims+1) = 0d0
                     do i = 1, num_dims
-                        g${FACE}$_x(j, k, l, num_dims+1) = &
-                            g${FACE}$_x(j, k, l, num_dims+1) + &
-                            g${FACE}$_x(j, k, l, i)**2d0
+                        gL_x(j, k, l, num_dims+1) = &
+                            gL_x(j, k, l, num_dims+1) + &
+                            gL_x(j, k, l, i)**2d0
                     end do
-                    g${FACE}$_x(j, k, l, num_dims+1) = sqrt(g${FACE}$_x(j, k, l, num_dims+1))
+                    gL_x(j, k, l, num_dims+1) = sqrt(gL_x(j, k, l, num_dims+1))
                 end do
             end do
         end do
         if (m > 0) then
             !$acc parallel loop collapse(3) gang vector default(present)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        g${FACE}$_y(j, k, l, num_dims+1) = 0d0
+            do l = iz%beg, iz%end
+                do k = iy%beg, iy%end
+                    do j = ix%beg, ix%end
+                        gL_y(k, j, l, num_dims+1) = 0d0
                         do i = 1, num_dims
-                            g${FACE}$_y(j, k, l, num_dims+1) = &
-                                g${FACE}$_y(j, k, l, num_dims+1) + &
-                                g${FACE}$_y(j, k, l, i)**2d0
+                            gL_y(k, j, l, num_dims+1) = &
+                                gL_y(k, j, l, num_dims+1) + &
+                                gL_y(k, j, l, i)**2d0
                         end do
-                        g${FACE}$_y(j, k, l, num_dims+1) = sqrt(g${FACE}$_y(j, k, l, num_dims+1))
+                        gL_y(k, j, l, num_dims+1) = sqrt(gL_y(k, j, l, num_dims+1))
                     end do
                 end do
             end do
             if (p > 0) then
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            g${FACE}$_z(j, k, l, num_dims+1) = 0d0
+                do l = iz%beg, iz%end
+                    do k = iy%beg, iy%end
+                        do j = ix%beg, ix%end
+                            gL_z(l, k, j, num_dims+1) = 0d0
                             do i = 1, num_dims
-                                g${FACE}$_z(j, k, l, num_dims+1) = &
-                                    g${FACE}$_z(j, k, l, num_dims+1) + &
-                                    g${FACE}$_z(j, k, l, i)**2d0
+                                gL_z(l, k, j, num_dims+1) = &
+                                    gL_z(l, k, j, num_dims+1) + &
+                                    gL_z(l, k, j, i)**2d0
                             end do
-                            g${FACE}$_z(j, k, l, num_dims+1) = sqrt(g${FACE}$_z(j, k, l, num_dims+1))
+                            gL_z(l, k, j, num_dims+1) = sqrt(gL_z(l, k, j, num_dims+1))
                         end do
                     end do
                 end do
             end if
         end if
-        #:endfor
 
     end subroutine s_get_capilary
 
-    subroutine s_compute_capilary_stress_tensors(gL, gR, j, k, l)
+    subroutine s_compute_capilary_stress_tensors(gL, j, k, l)
 
         integer :: j, k, l
-        real(kind(0d0)), dimension(ix%beg:,iy%beg:,iz%beg:,:) :: gL, gR
+        real(kind(0d0)), dimension(startx:,starty:,startz:,:) :: gL
 
         !$acc routine seq
-        #:for S in ['L','R']
-        Omega${S}$(1,1) = -sigma*(g${S}$(j,k,l,num_dims+1) - &
-                            g${S}$(j, k, l, 1) * g${S}$(j, k, l, 1) / &
-                            max(g${S}$(j, k, l, num_dims+1),1e-16))
+        Omega(1,1) = -sigma*(gL(j,k,l,2)**2) / &
+                        max(gL(j,k,l,num_dims+1),sgm_eps)
         if (m > 0) then
-            Omega${S}$(1,2) = -sigma*(g${S}$(j, k, l, 1) * g${S}$(j, k, l, 2) / &
-                                max(g${S}$(j, k, l, num_dims + 1),1e-16))
-            Omega${S}$(2,2) = -sigma*(g${S}$(j,k,l,num_dims+1) - &
-                                g${S}$(j, k, l, 2) * g${S}$(j, k, l, 2) / &
-                                max(g${S}$(j, k, l, num_dims+1),1e-16))
+            Omega(1,2) = sigma*gL(j, k, l, 1) * gL(j, k, l, 2) / &
+                                max(gL(j, k, l, num_dims + 1),sgm_eps)
+            Omega(2,1) = Omega(1,2)
+            
+            Omega(2,2) = -sigma*(gL(j,k,l,1)**2) / &
+                            max(gL(j,k,l,num_dims+1),sgm_eps)
             if (p > 0) then
-                Omega${S}$(1,3) = -sigma*(g${S}$(j, k, l, 1) * g${S}$(j, k, l, 3) / &
-                                    max(g${S}$(j, k, l, num_dims + 1),1e-16))
-                Omega${S}$(2,3) = -sigma*(g${S}$(j, k, l, 2) * g${S}$(j, k, l, 3) / &
-                                    max(g${S}$(j, k, l, num_dims + 1),1e-16))
-                Omega${S}$(3,3) = -sigma*(g${S}$(j,k,l,num_dims+1) - &
-                                    g${S}$(j, k, l, 3) * g${S}$(j, k, l, 3) / &
-                                    max(g${S}$(j, k, l, num_dims+1),1e-16))
+                Omega(1,3) = sigma*(gL(j, k, l, 1) * gL(j, k, l, 3) / &
+                                    max(gL(j, k, l, num_dims + 1),sgm_eps))
+                Omega(3,1) = Omega(1,3)
+
+                Omega(2,3) = sigma*gL(j, k, l, 2) * gL(j, k, l, 3) / &
+                                    max(gL(j, k, l, num_dims + 1),sgm_eps)
+                Omega(3,2) = Omega(2,3)
+
+                Omega(3,3) = -sigma*(gL(j, k, l, 1)**2 - gL(j, k, l, 2)**2) / &
+                                    max(gL(j, k, l, num_dims+1),sgm_eps)
+                Omega(1,1) = -sigma*(gL(j, k, l, 2)**2 - gL(j, k, l, 3)**2) / &
+                                    max(gL(j, k, l, num_dims+1), sgm_eps)
+                Omega(2,2) = -sigma*(gL(j, k, l, 1)**2 - gL(j, k, l, 3)**2) / &
+                                    max(gL(j, k, l, num_dims+1),sgm_eps) 
             end if
         end if
-        #:endfor
 
     end subroutine s_compute_capilary_stress_tensors
 
@@ -378,8 +388,14 @@ contains
 
         @:DEALLOCATE(c_divs%vf)
 
-        @:DEALLOCATE(OmegaL, OmegaR)
-        @:DEALLOCATE(gL_x, gL_y, gL_z, gR_x, gR_y, gR_z)
+        @:DEALLOCATE(Omega)
+        @:DEALLOCATE(gL_x, gR_x)
+        if (n > 0) then
+            @:DEALLOCATE(gL_y, gR_y)
+            if (p > 0) then
+                @:DEALLOCATE(gL_z, gR_z)
+            end if
+        end if
 
     end subroutine s_finalize_surface_tension_module
 

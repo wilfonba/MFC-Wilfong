@@ -503,7 +503,7 @@ contains
                             & iz%beg:iz%end))
                 end do
 
-                if (any(Re_size > 0)) then
+                if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     do l = mom_idx%beg, E_idx
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
@@ -730,7 +730,7 @@ contains
         call nvtxEndRange()
 
         call nvtxStartRange("Surface_Tensions")
-        if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf)
+        if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf, ix, iy, iz)
         call nvtxEndRange
         
         ! Dimensional Splitting Loop =======================================
@@ -1035,7 +1035,7 @@ contains
                     end do
                 end if
 
-                if (any(Re_size > 0)) then
+                if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 0, n
@@ -1050,7 +1050,7 @@ contains
                             end do
                         end do
                     end do
-                end if
+                endif
 
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
@@ -1259,7 +1259,7 @@ contains
                     end do
                 end if
 
-                if (any(Re_size > 0)) then
+                if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -13))) then
                         if (p > 0) then
                             call s_compute_viscous_stress_tensor(q_prim_qp%vf, &
@@ -1618,7 +1618,7 @@ contains
                     end do
                 end if
 
-                if (any(Re_size > 0)) then
+                if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 0, n

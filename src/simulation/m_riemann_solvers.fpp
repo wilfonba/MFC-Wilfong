@@ -2161,10 +2161,13 @@ contains
         end if
 
         if (sigma .ne. dflt_real) then
-            call s_compute_capilary_source_flux(norm_dir, q_prim_vf, & 
-                                                vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
-                                                flux_rsx_vf, flux_rsy_vf, flux_rsz_vf, &
-                                                isx, isy, isz)
+            call s_compute_capilary_source_flux( &
+                q_prim_vf, & 
+                vel_src_rsx_vf, &
+                vel_src_rsy_vf, &
+                vel_src_rsz_vf, &
+                flux_src_vf, &
+                norm_dir, ix, iy, iz)
         end if
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
@@ -2732,7 +2735,7 @@ contains
 
         if (norm_dir == 1) then
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
 
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
@@ -2765,7 +2768,7 @@ contains
             ! Reshaping Inputted Data in y-direction ===========================
         elseif (norm_dir == 2) then
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
@@ -2796,7 +2799,7 @@ contains
             ! Reshaping Inputted Data in z-direction ===========================
         else
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end

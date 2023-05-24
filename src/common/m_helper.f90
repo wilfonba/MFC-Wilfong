@@ -16,7 +16,8 @@ module m_helper
     private; public :: s_compute_finite_difference_coefficients, &
         s_comp_n_from_prim, &
         s_comp_n_from_cons, &
-        s_int_to_str
+        s_int_to_str, &
+        s_print_2D_array
 
 contains
 
@@ -121,6 +122,33 @@ contains
         integer,intent(in) :: i
         write(res,'(I0)') i
         res = trim(res)
+    end subroutine
+
+    subroutine s_print_2D_array(A, div)
+
+        real(kind(0d0)), dimension(:,:) :: A
+        integer :: i, j
+        integer :: m, n
+        real :: c
+        real, optional :: div
+
+        m = size(A,1)
+        n = size(A,2)
+
+        if (present(div)) then 
+            c = div
+        else
+            c = 1
+        endif
+        
+        do i = 1,m
+            do j = 1,n
+                write(*,fmt="(F12.4)",advance="no") A(i,j)/c
+            end do
+            write(*, fmt="(A1)") " "
+        end do
+        write(*, fmt="(A1)") " "
+
     end subroutine
 
 end module m_helper
