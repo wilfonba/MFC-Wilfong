@@ -35,6 +35,43 @@
 
 #:enddef roe_avg
 
+#:def lo_arithmetic_avg()
+
+    lo_rho_avg = 5d-1*(lo_rho_L + lo_rho_R)
+    lo_vel_avg_rms = 0d0
+    !$acc loop seq
+    do i = 1, num_dims
+        lo_vel_avg_rms = lo_vel_avg_rms + (5d-1*(lo_vel_L(i) + lo_vel_R(i)))**2d0
+    end do
+
+    lo_H_avg = 5d-1*(lo_H_L + lo_H_R)
+    lo_gamma_avg = 5d-1*(lo_gamma_L + lo_gamma_R)
+
+#:enddef lo_arithmetic_avg
+
+
+#:def lo_roe_avg()
+    lo_rho_avg = sqrt(lo_rho_L*lo_rho_R)
+    lo_vel_avg_rms = 0d0
+    !$acc loop seq
+    do i = 1, num_dims
+        lo_vel_avg_rms = lo_vel_avg_rms + (sqrt(lo_rho_L)*lo_vel_L(i) + sqrt(lo_rho_R)*lo_vel_R(i))**2d0/ &
+                      (sqrt(lo_rho_L) + sqrt(lo_rho_R))**2d0
+    end do
+
+    lo_H_avg = (sqrt(lo_rho_L)*lo_H_L + sqrt(lo_rho_R)*lo_H_R)/ &
+            (sqrt(lo_rho_L) + sqrt(lo_rho_R))
+
+    lo_gamma_avg = (sqrt(lo_rho_L)*lo_gamma_L + sqrt(lo_rho_R)*lo_gamma_R)/ &
+                (sqrt(lo_rho_L) + sqrt(lo_rho_R))
+
+    lo_rho_avg = sqrt(lo_rho_L*lo_rho_R)
+    lo_vel_avg_rms = (sqrt(lo_rho_L)*lo_vel_L(1) + sqrt(lo_rho_R)*lo_vel_R(1))**2d0/ &
+                  (sqrt(lo_rho_L) + sqrt(lo_rho_R))**2d0
+
+#:enddef lo_roe_avg
+
+
 #:def compute_average_state()
 
 if (avg_state == 1) then
@@ -46,4 +83,17 @@ if (avg_state == 2) then
 end if
 
 #:enddef compute_average_state
+
+
+#:def lo_compute_average_state()
+
+if (avg_state == 1) then
+    @:lo_roe_avg()
+end if
+
+if (avg_state == 2) then
+    @:lo_arithmetic_avg()
+end if
+
+#:enddef lo_compute_average_state
 

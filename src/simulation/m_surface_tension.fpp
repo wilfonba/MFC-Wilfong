@@ -125,19 +125,19 @@ contains
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
-                        call s_compute_capilary_stress_tensors(gL_y, k, j, l)
+                        call s_compute_capilary_stress_tensors(gL_y, j, k, l)
 
                         do i = 1, num_dims
                             flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2,i)
 
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(2,i)*vSrc_rsy(k, j, l, i)
+                                Omega(2,i)*vSrc_rsy(j, k, l, i)
                         end do
 
-                        e0L = sigma*gL_y(k, j, l,num_dims+1)
+                        e0L = sigma*gL_y(j, k, l,num_dims+1)
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            e0L * vSrc_rsy(k, j, l, 2)
+                            e0L * vSrc_rsy(j, k, l, 2)
 
                     end do
                 end do
@@ -251,13 +251,13 @@ contains
             do l = iz%beg, iz%end
                 do k = iy%beg, iy%end
                     do j = ix%beg, ix%end
-                        gL_y(k, j, l, num_dims+1) = 0d0
+                        gL_y(j, k, l, num_dims+1) = 0d0
                         do i = 1, num_dims
-                            gL_y(k, j, l, num_dims+1) = &
-                                gL_y(k, j, l, num_dims+1) + &
-                                gL_y(k, j, l, i)**2d0
+                            gL_y(j, k, l, num_dims+1) = &
+                                gL_y(j, k, l, num_dims+1) + &
+                                gL_y(j, k, l, i)**2d0
                         end do
-                        gL_y(k, j, l, num_dims+1) = sqrt(gL_y(k, j, l, num_dims+1))
+                        gL_y(j, k, l, num_dims+1) = sqrt(gL_y(j, k, l, num_dims+1))
                     end do
                 end do
             end do
@@ -293,7 +293,7 @@ contains
             Omega(1,2) = sigma*gL(j, k, l, 1) * gL(j, k, l, 2) / &
                                 max(gL(j, k, l, num_dims + 1),sgm_eps)
             Omega(2,1) = Omega(1,2)
-            
+
             Omega(2,2) = -sigma*(gL(j,k,l,1)**2) / &
                             max(gL(j,k,l,num_dims+1),sgm_eps)
             if (p > 0) then
@@ -305,11 +305,11 @@ contains
                                     max(gL(j, k, l, num_dims + 1),sgm_eps)
                 Omega(3,2) = Omega(2,3)
 
-                Omega(3,3) = -sigma*(gL(j, k, l, 1)**2 - gL(j, k, l, 2)**2) / &
+                Omega(3,3) = -sigma*(gL(j, k, l, 1)**2 + gL(j, k, l, 2)**2) / &
                                     max(gL(j, k, l, num_dims+1),sgm_eps)
-                Omega(1,1) = -sigma*(gL(j, k, l, 2)**2 - gL(j, k, l, 3)**2) / &
+                Omega(1,1) = -sigma*(gL(j, k, l, 2)**2 + gL(j, k, l, 3)**2) / &
                                     max(gL(j, k, l, num_dims+1), sgm_eps)
-                Omega(2,2) = -sigma*(gL(j, k, l, 1)**2 - gL(j, k, l, 3)**2) / &
+                Omega(2,2) = -sigma*(gL(j, k, l, 1)**2 + gL(j, k, l, 3)**2) / &
                                     max(gL(j, k, l, num_dims+1),sgm_eps) 
             end if
         end if
