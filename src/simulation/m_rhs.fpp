@@ -232,9 +232,11 @@ contains
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
 
-        q_prim_qp%vf(c_idx)%sf => &
-            q_cons_qp%vf(c_idx)%sf
-        !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
+        if (sigma .ne. dflt_real) then
+            q_prim_qp%vf(c_idx)%sf => &
+                q_cons_qp%vf(c_idx)%sf
+            !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
+        end if
 
         ! ==================================================================
 
@@ -846,7 +848,7 @@ contains
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
             call nvtxEndRange
-
+            
             ! ===============================================================
 
             if (alt_soundspeed) then
