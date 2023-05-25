@@ -121,6 +121,18 @@ module m_global_parameters
 
     integer :: flux_lim
 
+    logical :: bodyForces
+    integer :: bf_x, bf_y, bf_z !< body force toggle in three directions
+    !< amplitude, frequency, and phase shift sinusoid in each direction
+    #:for dir in {'x', 'y', 'z'}
+        #:for param in {'k','w','p'}
+            real :: ${param}$_${dir}$
+        #:endfor
+    #:endfor
+    real(kind(0d0)) :: densRef
+    real(kind(0d0)), dimension(3) :: accel_bf
+!$acc declare create(accel_bf)
+
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
@@ -422,6 +434,19 @@ contains
         sigma = dflt_real
 
         cu_tensor = .false.
+
+        bodyForces = .false.
+        bf_x = dflt_int; bf_y = dflt_int; bf_z = dflt_int
+        !< amplitude, frequency, and phase shift sinusoid in each direction
+        #:for dir in {'x', 'y', 'z'}
+            #:for param in {'k','w','p'}
+                ${param}$_${dir}$ = dflt_real
+            #:endfor
+        #:endfor
+        
+        do i = 1, num_dims
+            accel_bf(i) = dflt_real
+        end do
 
         do j = 1, num_probes_max
             do i = 1, 3

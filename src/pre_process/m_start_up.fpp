@@ -126,6 +126,7 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting ...')
         end if

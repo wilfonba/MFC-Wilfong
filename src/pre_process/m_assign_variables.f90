@@ -328,7 +328,7 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
                     end if
 
-                    if (j == 0 .and. k == 0 .and. l == 0) then
+                    if (j == 0 .and. k == 0 .and. l == 0 .and. proc_rank == 0) then
                         print *, 'moments @ (0,0,0): ', &
                             q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l), &
                             q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l), &
@@ -749,10 +749,9 @@ contains
                 + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
         end if
 
-        ! Pressure
         q_prim_vf(E_idx)%sf(j, k, l) = &
             (eta*patch_icpp(patch_id)%pres &
-             + (1d0 - eta)*orig_prim_vf(E_idx))
+            + (1d0 - eta)*orig_prim_vf(E_idx))
 
         ! Elastic Shear Stress
         if (hypoelasticity) then

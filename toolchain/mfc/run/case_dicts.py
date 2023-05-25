@@ -15,7 +15,7 @@ PRE_PROCESS = COMMON + [
     'old_grid', 'old_ic', 't_step_old', 't_step_start', 'vel_profile',
     'instability_wave', 'perturb_flow', 'perturb_flow_fluid',
     'perturb_sph', 'perturb_sph_fluid', 'fluid_rho', 'num_patches', 'qbmm',
-    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV'
+    'dist_type', 'R0_type', 'sigR', 'sigV', 'rhoRV',
 ]
 
 for cmp in ["x", "y", "z"]:
@@ -28,6 +28,7 @@ for cmp in ["x", "y", "z"]:
     PRE_PROCESS.append(f"bc_{cmp}%beg")
     PRE_PROCESS.append(f"bc_{cmp}%end")
 
+
 for f_id in range(1, 10+1):
     PRE_PROCESS.append(f'fluid_rho({f_id})')
 
@@ -35,7 +36,7 @@ for f_id in range(1, 10+1):
                       "mu_v", "k_v", "G"]:
         PRE_PROCESS.append(f"fluid_pp({f_id})%{attribute}")
 
-for p_id in range(1, 10+1):
+for p_id in range(1, 30+1):
     for attribute in ["geometry", "radius", "radii", "epsilon", "beta",
                       "normal", "smoothen", "smooth_patch_id", "alpha_rho",
                       "smooth_coeff", "rho", "vel", "pres", "alpha", "gamma",
@@ -78,6 +79,9 @@ SIMULATION = COMMON + [
 for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%beg')
     SIMULATION.append(f'bc_{cmp}%end')
+
+    for param in ["bf", "k", "w", "p"]:
+        SIMULATION.append(f"{param}_{cmp}")
 
 for wrt_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:

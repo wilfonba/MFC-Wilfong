@@ -45,6 +45,10 @@ contains
 
         L(advxe) = L(1)
 
+        ! if (bodyForces) then
+        !     L(advxe) = L(advxe) - 2*rho*c*accel_bf(dir_idx(1))
+        ! end if
+
     end subroutine s_compute_slip_wall_L ! ---------------------------------
 
     !>  The L variables for the nonreflecting subsonic buffer CBC

@@ -511,7 +511,7 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             else if (weno_dir == 2) then
 !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
@@ -524,7 +524,7 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             else if (weno_dir == 3) then
 !$acc parallel loop collapse(4) default(present)
                 do i = 1, ubound(v_vf, 1)
@@ -537,7 +537,7 @@ contains
                         end do
                     end do
                 end do
-!$acc end parallel loop
+                !$acc end parallel loop
             end if
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]

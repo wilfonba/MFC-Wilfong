@@ -61,6 +61,8 @@ program p_main
     use m_nvtx
 
     use m_surface_tension
+    
+    use m_body_forces
     ! ==========================================================================
 
     implicit none
@@ -148,6 +150,8 @@ program p_main
     if(bubbles) call s_initialize_bubbles_module()
 
     if (qbmm) call s_initialize_qbmm_module()
+
+    if (bodyForces) call s_initialize_body_forces_module()
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     call acc_present_dump()
@@ -325,7 +329,7 @@ program p_main
         if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
 
             call cpu_time(start)
-            !  call nvtxStartRange("I/O")
+             call nvtxStartRange("I/O")
             do i = 1, sys_size
                  !$acc update host(q_cons_ts(1)%vf(i)%sf)
                  do l = 0, p
@@ -333,7 +337,6 @@ program p_main
                          do j = 0, m
                              if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
                                  print *, "NaN(s) in timestep output.", j, k, l, proc_rank, t_step, m, n, p
-                                 
                                  error stop "NaN(s) in timestep output."
                              end if
                          end do
@@ -382,6 +385,8 @@ program p_main
     if (sigma .ne. dflt_real) then
         call s_finalize_surface_tension_module()
     end if
+
+    if (bodyForces) call s_finalize_body_forces_module()
 
     ! Terminating MPI execution environment
     call s_mpi_finalize()

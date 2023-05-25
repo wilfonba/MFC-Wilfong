@@ -218,6 +218,7 @@ contains
                 end do
             end do
         end do
+        !$acc end parallel loop
 
         !print *, q_cons_ts(1)%vf(cont_idx%beg)%sf(102,0,0)
         !print *, q_cons_ts(1)%vf(E_idx)%sf(102,0,0)

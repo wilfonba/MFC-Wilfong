@@ -118,6 +118,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran:-minline>
+            #-gpu=autocompare
         )
     endif()
     

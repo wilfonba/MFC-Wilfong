@@ -44,6 +44,8 @@ module m_rhs
     use m_viscous
     
     use m_nvtx
+
+    use m_body_forces
     
     use m_surface_tension
     ! ==========================================================================
@@ -593,7 +595,7 @@ contains
         if (model_eqns == 1) then        ! Gamma/pi_inf model
             s_convert_to_mixture_variables => &
                 s_convert_mixture_to_mixture_variables
-        else if (bubbles) then          ! Volume fraction for bubbles
+        elseif (bubbles) then          ! Volume fraction for bubbles
             s_convert_to_mixture_variables => &
                 s_convert_species_to_mixture_variables_bubbles
         else                            ! Volume fraction model
@@ -735,6 +737,14 @@ contains
         if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf, ix, iy, iz)
         call nvtxEndRange
         
+        call nvtxStartRange("RHS-BodyForces")
+
+        if (bodyForces) then
+            call s_compute_mixture_density(q_cons_qp%vf)
+            call s_compute_acceleration(mytime)
+        end if
+
+        call nvtxEndRange
         ! Dimensional Splitting Loop =======================================
 
         do id = 1, num_dims
@@ -880,13 +890,13 @@ contains
             
             if (id == 1) then
                 
-                if (bc_x%beg <= -5) then
+                if (bc_x%beg <= -5 .and. bc_x%beg >= -12) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
 
 
-                if (bc_x%end <= -5) then
+                if (bc_x%end <= -5 .and. bc_x%end >= -12) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
@@ -935,7 +945,7 @@ contains
                                         end do
                                     end do
                                 end do
-                            else if ((j == advxb) .and. (bubbles .neqv. .true.)) then
+                            elseif ((j == advxb) .and. (bubbles .neqv. .true.)) then
                                 !$acc parallel loop collapse(3) gang vector default(present)
                                 do q = 0, p
                                     do l = 0, n
@@ -1063,16 +1073,18 @@ contains
                     end do
                 endif
 
+
+
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
                 ! Applying the Riemann fluxes
 
-                if (bc_y%beg <= -5 .and. bc_y%beg /= -13) then
+                if (bc_y%beg <= -5 .and. bc_y%beg /= -13 .and. bc_y%beg >= -12) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
 
-                if (bc_y%end <= -5) then
+                if (bc_y%end <= -5 .and. bc_y%end >= -12) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
@@ -1138,7 +1150,7 @@ contains
                                         end do
                                     end do
                                 end if
-                            else if ((j == advxb) .and. (bubbles .neqv. .true.)) then
+                            elseif ((j == advxb) .and. (bubbles .neqv. .true.)) then
                                 !$acc parallel loop collapse(3) gang vector default(present)
                                 do l = 0, p
                                     do k = 0, n
@@ -1389,12 +1401,12 @@ contains
 
                 ! Applying the Riemann fluxes
 
-                if (bc_z%beg <= -5) then
+                if (bc_z%beg <= -5 .and. bc_z%beg >= -12) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
 
-                if (bc_z%end <= -5) then
+                if (bc_z%end <= -5 .and. bc_z%end >= -12) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
@@ -1446,7 +1458,7 @@ contains
                                             end do
                                         end do
                                     end do
-                                else if ((j == advxb) .and. (bubbles .neqv. .true.)) then
+                                elseif ((j == advxb) .and. (bubbles .neqv. .true.)) then
                                     !$acc parallel loop collapse(3) gang vector default(present)
                                     do k = 0, p
                                         do q = 0, n
@@ -1540,7 +1552,7 @@ contains
                                             end do
                                         end do
                                     end do
-                                else if ((j == advxb) .and. (bubbles .neqv. .true.)) then
+                                elseif ((j == advxb) .and. (bubbles .neqv. .true.)) then
                                     !$acc parallel loop collapse(3) gang vector default(present)
                                     do k = 0, p
                                         do q = 0, n
@@ -1664,17 +1676,26 @@ contains
                         end do
                     end if
                 end if
-
             end if  ! id loop
+
+            call nvtxEndRange
+
+            ! RHS additions for body forces
+            call nvtxStartRange("RHS-BodyForces")
+
+            if (bodyForces) then
+                call  s_compute_body_forces_rhs(id, q_prim_qp%vf, q_cons_qp%vf, rhs_vf)
+            end if
+
             call nvtxEndRange
 
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
+            
             if (hypoelasticity) then
-
                 call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
-
             end if
+            
             call nvtxEndRange
 
         end do
@@ -1880,7 +1901,7 @@ contains
                                 gamma = gamma + alpha(i)*gammas(i)
                                 pi_inf = pi_inf + alpha(i)*pi_infs(i)
                             end do
-                        else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                        elseif ((model_eqns == 2) .and. (num_fluids > 2)) then
                             !$acc loop seq
                             do i = 1, num_fluids - 1
                                 rho = rho + alpha_rho(i)
@@ -1969,7 +1990,43 @@ contains
 
         ! Population of Buffers in x-direction =============================
 
-        if (bc_x%beg <= -3) then         ! Ghost-cell extrap. BC at beginning
+        if (bc_x%beg == -14) then ! Slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            if (i == momxb) then
+                                q_cons_qp%vf(i)%sf(-j,k,l) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(-j, k, l) = &
+                                    q_cons_qp%vf(i)%sf(0, k, l)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_x%beg == -15) then ! no slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            if (i >= momxb .and. i <= momxe) then
+                                q_cons_qp%vf(i)%sf(-j,k,l) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(-j, k, l) = &
+                                    q_cons_qp%vf(i)%sf(0, k, l)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_x%beg <= -3) then         ! Ghost-cell extrap. BC at beginning
 
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -2028,7 +2085,43 @@ contains
 
         end if
 
-        if (bc_x%end <= -3) then         ! Ghost-cell extrap. BC at end
+        if (bc_x%end == -14) then ! Slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            if (i == momxb) then
+                                q_cons_qp%vf(i)%sf(m+j,k,l) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(m+j, k, l) = &
+                                    q_cons_qp%vf(i)%sf(m, k, l)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_x%end == -15) then ! no slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            if (i >= momxb .and. i <= momxe) then
+                                q_cons_qp%vf(i)%sf(m+j,k,l) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(m+j, k, l) = &
+                                    q_cons_qp%vf(i)%sf(m, k, l)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_x%end <= -3) then         ! Ghost-cell extrap. BC at end
 
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
@@ -2096,6 +2189,42 @@ contains
         if (n == 0) then
 
             return
+
+        elseif (bc_y%beg == -14) then ! slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            if (i == momxb + 1) then
+                                q_cons_qp%vf(i)%sf(l, -j, k) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(l, -j, k) = &
+                                    q_cons_qp%vf(i)%sf(l, 0, k)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_y%beg == -15) then ! no-slip wal
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            if (i >= momxb .and. i <= momxe) then
+                                q_cons_qp%vf(i)%sf(l, -j, k) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(l, -j, k) = &
+                                    q_cons_qp%vf(i)%sf(l, 0, k)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
 
         elseif (bc_y%beg <= -3 .and. bc_y%beg /= -13) then     ! Ghost-cell extrap. BC at beginning
 
@@ -2201,7 +2330,43 @@ contains
 
         end if
 
-        if (bc_y%end <= -3) then         ! Ghost-cell extrap. BC at end
+        if (bc_y%end == -14) then ! slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            if (i == momxb + 1) then
+                                q_cons_qp%vf(i)%sf(l, n + j, k) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(l, n + j, k) = &
+                                    q_cons_qp%vf(i)%sf(l, n, k)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_y%end == -15) then ! no-slip wal
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            if (i >= momxb .and. i <= momxe) then
+                                q_cons_qp%vf(i)%sf(l, n + j, k) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(l, n + j, k) = &
+                                    q_cons_qp%vf(i)%sf(l, n, k)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_y%end <= -3) then         ! Ghost-cell extrap. BC at end
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
                 do k = 0, p
@@ -2267,6 +2432,42 @@ contains
 
             return
 
+        elseif (bc_z%beg == -14) then ! slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            if (i == momxe) then
+                                q_cons_qp%vf(i)%sf(k, l, -j) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(k, l, -j) = &
+                                    q_cons_qp%vf(i)%sf(k, l, 0)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_z%beg == -15) then ! no-slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            if (i >= momxb .and. i <= momxe) then
+                                q_cons_qp%vf(i)%sf(k, l, -j) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(k, l, -j) = &
+                                    q_cons_qp%vf(i)%sf(k, l, 0)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
         elseif (bc_z%beg <= -3) then     ! Ghost-cell extrap. BC at beginning
 
             !$acc parallel loop collapse(4) gang vector default(present)
@@ -2325,7 +2526,43 @@ contains
 
         end if
 
-        if (bc_z%end <= -3) then         ! Ghost-cell extrap. BC at end
+        if (bc_z%end == -14) then ! slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            if (i == momxe) then
+                                q_cons_qp%vf(i)%sf(k, l, p+j) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(k, l, p+j) = &
+                                    q_cons_qp%vf(i)%sf(k, l, p)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_z%end == -15) then ! no-slip wall
+
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            if (i >= momxb .and. i <= momxe) then
+                                q_cons_qp%vf(i)%sf(k, l, p+j) = 0d0
+                            else
+                                q_cons_qp%vf(i)%sf(k, l, p+j) = &
+                                    q_cons_qp%vf(i)%sf(k, l, p)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+
+        elseif (bc_z%end <= -3) then         ! Ghost-cell extrap. BC at end
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size
                 do j = 1, buff_size

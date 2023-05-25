@@ -54,12 +54,13 @@ contains
 
         #:for VAR in [ 'old_grid','old_ic','stretch_x','stretch_y','stretch_z',&
             & 'cyl_coord','adv_alphan','mpp_lim','hypoelasticity',             &
+            & 'parallel_io', 'perturb_flow','perturb_sph', 'bubbles',          &
+            & 'polytropic', 'polydisperse', 'qbmm', 'polydisperse', 'qbmm',    &
             & 'parallel_io', 'vel_profile', 'instability_wave', 'perturb_flow',&
-            & 'perturb_sph','bubbles', 'polytropic', 'polydisperse', 'qbmm' ]
+            & 'perturb_sph','bubbles', 'polytropic' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-
 
         #:for VAR in [ 'x_domain%beg', 'x_domain%end', 'y_domain%beg',         &
             & 'y_domain%end', 'z_domain%beg', 'z_domain%end', 'a_x', 'a_y',    &

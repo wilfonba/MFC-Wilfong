@@ -104,6 +104,8 @@ contains
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
             R0_type, sigma, flux_lim, tvd_riemann_flux
+            bf_x, bf_y, bf_z, k_x, k_y, k_z, &
+            w_x, w_y, w_z, p_x, p_y, p_z, densRef
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -137,6 +139,11 @@ contains
             p_glb = p
 
             !$acc update device(sigma)
+            
+            if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_real) .or. &
+                (bf_z .ne. dflt_real)) then
+                bodyForces = .true.
+            endif
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
