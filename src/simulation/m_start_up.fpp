@@ -103,7 +103,7 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type, sigma, flux_lim, tvd_riemann_flux
+            R0_type, sigma, flux_lim, tvd_riemann_flux, &
             bf_x, bf_y, bf_z, k_x, k_y, k_z, &
             w_x, w_y, w_z, p_x, p_y, p_z, densRef
 
@@ -139,7 +139,7 @@ contains
             p_glb = p
 
             !$acc update device(sigma)
-            
+
             if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_real) .or. &
                 (bf_z .ne. dflt_real)) then
                 bodyForces = .true.

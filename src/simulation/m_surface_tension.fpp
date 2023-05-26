@@ -63,8 +63,8 @@ contains
             @:ALLOCATE(gL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
             @:ALLOCATE(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
             if (p > 0) then
-                @:ALLOCATE(gL_z(iz%beg:iz%end, iy%beg:iy%end, ix%beg:ix%end, num_dims + 1))
-                @:ALLOCATE(gR_z(iz%beg:iz%end, iy%beg:iy%end, ix%beg:ix%end, num_dims + 1))
+                @:ALLOCATE(gL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
+                @:ALLOCATE(gR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
             end if
         endif
 
@@ -85,15 +85,6 @@ contains
         type(int_bounds_info) :: isx, isy, isz
         integer :: id
 
-        real(kind(0d0)) :: e0L, e0R
-
-        if (id == 1) then
-            dir_idx = (/1, 2, 3/)
-        elseif (id == 2) then
-            dir_idx = (/2, 1, 3/)
-        else
-            dir_idx = (/3, 1, 2/)
-        end if
 
         if (id == 1) then
 
@@ -111,10 +102,6 @@ contains
                                 Omega(1,i)*vSrc_rsx(j,k,l,i)
                         end do
 
-                        e0L = sigma*gL_x(j,k,l,num_dims+1)
-                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            e0L * vSrc_rsx(j,k,l,1)
-
                     end do
                 end do
             end do
@@ -125,19 +112,15 @@ contains
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
-                        call s_compute_capilary_stress_tensors(gL_y, j, k, l)
+                        call s_compute_capilary_stress_tensors(gL_y, k, j, l)
 
                         do i = 1, num_dims
                             flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2,i)
 
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(2,i)*vSrc_rsy(j, k, l, i)
+                                Omega(2,i)*vSrc_rsy(k, j, l, i)
                         end do
-
-                        e0L = sigma*gL_y(j, k, l,num_dims+1)
-                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            e0L * vSrc_rsy(j, k, l, 2)
 
                     end do
                 end do
@@ -158,10 +141,6 @@ contains
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
                                 Omega(3,i)*vSrc_rsz(j,k,l,i)
                         end do
-
-                        e0L = sigma*gL_z(j,k,l,num_dims+1)
-                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            e0L * vSrc_rsz(j,k,l,3)
 
                     end do
                 end do
@@ -251,13 +230,13 @@ contains
             do l = iz%beg, iz%end
                 do k = iy%beg, iy%end
                     do j = ix%beg, ix%end
-                        gL_y(j, k, l, num_dims+1) = 0d0
+                        gL_y(k, j, l, num_dims+1) = 0d0
                         do i = 1, num_dims
-                            gL_y(j, k, l, num_dims+1) = &
-                                gL_y(j, k, l, num_dims+1) + &
-                                gL_y(j, k, l, i)**2d0
+                            gL_y(k, j, l, num_dims+1) = &
+                                gL_y(k, j, l, num_dims+1) + &
+                                gL_y(k, j, l, i)**2d0
                         end do
-                        gL_y(j, k, l, num_dims+1) = sqrt(gL_y(j, k, l, num_dims+1))
+                        gL_y(k, j, l, num_dims+1) = sqrt(gL_y(k, j, l, num_dims+1))
                     end do
                 end do
             end do
@@ -287,30 +266,33 @@ contains
         real(kind(0d0)), dimension(startx:,starty:,startz:,:) :: gL
 
         !$acc routine seq
-        Omega(1,1) = -sigma*(gL(j,k,l,2)**2) / &
+        Omega(1,1) = -sigma*(gL(j,k,l,2)**2d0) / &
                         max(gL(j,k,l,num_dims+1),sgm_eps)
         if (m > 0) then
-            Omega(1,2) = sigma*gL(j, k, l, 1) * gL(j, k, l, 2) / &
+            Omega(1,2) = sigma*(gL(j, k, l, 1) * gL(j, k, l, 2)) / &
                                 max(gL(j, k, l, num_dims + 1),sgm_eps)
             Omega(2,1) = Omega(1,2)
 
-            Omega(2,2) = -sigma*(gL(j,k,l,1)**2) / &
+            Omega(2,2) = -sigma*(gL(j,k,l,1)**2d0) / &
                             max(gL(j,k,l,num_dims+1),sgm_eps)
             if (p > 0) then
-                Omega(1,3) = sigma*(gL(j, k, l, 1) * gL(j, k, l, 3) / &
-                                    max(gL(j, k, l, num_dims + 1),sgm_eps))
+                Omega(1,3) = sigma*(gL(j, k, l, 1) * gL(j, k, l, 3)) / &
+                                    max(gL(j, k, l, num_dims + 1),sgm_eps)
                 Omega(3,1) = Omega(1,3)
 
-                Omega(2,3) = sigma*gL(j, k, l, 2) * gL(j, k, l, 3) / &
+                Omega(2,3) = sigma*(gL(j, k, l, 2) * gL(j, k, l, 3)) / &
                                     max(gL(j, k, l, num_dims + 1),sgm_eps)
                 Omega(3,2) = Omega(2,3)
 
-                Omega(3,3) = -sigma*(gL(j, k, l, 1)**2 + gL(j, k, l, 2)**2) / &
+                Omega(3,3) = -sigma*(gL(j, k, l, 1)**2d0 + gL(j, k, l, 2)**2d0) / &
                                     max(gL(j, k, l, num_dims+1),sgm_eps)
-                Omega(1,1) = -sigma*(gL(j, k, l, 2)**2 + gL(j, k, l, 3)**2) / &
-                                    max(gL(j, k, l, num_dims+1), sgm_eps)
-                Omega(2,2) = -sigma*(gL(j, k, l, 1)**2 + gL(j, k, l, 3)**2) / &
-                                    max(gL(j, k, l, num_dims+1),sgm_eps) 
+
+                ! Updates to x and y fluxes
+                Omega(1,1) = Omega(1,1) - sigma*(gL(j,k,l,3)**2d0) / &
+                                max(gL(j,k,l,num_dims+1),sgm_eps)
+                Omega(2,2) = Omega(2,2) - sigma*(gL(j,k,l,3)**2d0) / &
+                                max(gL(j,k,l,num_dims+1),sgm_eps)
+
             end if
         end if
 
