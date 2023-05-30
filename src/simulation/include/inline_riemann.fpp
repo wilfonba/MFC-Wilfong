@@ -9,8 +9,6 @@
     H_avg = 5d-1*(H_L + H_R)
     gamma_avg = 5d-1*(gamma_L + gamma_R)
 
-
-
 #:enddef arithmetic_avg
 
 

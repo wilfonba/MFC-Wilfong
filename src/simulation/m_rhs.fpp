@@ -734,7 +734,9 @@ contains
         call nvtxEndRange()
 
         call nvtxStartRange("Surface_Tensions")
-        if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf, ix, iy, iz)
+
+        if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf)
+        
         call nvtxEndRange
         
         call nvtxStartRange("RHS-BodyForces")
@@ -1056,6 +1058,21 @@ contains
                     end do
                 end if
 
+                if (sigma .ne. dflt_real) then
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(c_idx)%sf(j, k, l) = &
+                                    rhs_vf(c_idx)%sf(j, k, l) - 1d0/dx(j)* &
+                                    q_prim_qp%vf(c_idx)%sf(j, k, l)* &
+                                    (flux_src_n(1)%vf(advxb)%sf(j - 1, k, l) - &
+                                        flux_src_n(1)%vf(advxb)%sf(j, k, l))
+                            end do
+                        end do
+                    end do
+                end if
+
                 if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
@@ -1072,8 +1089,6 @@ contains
                         end do
                     end do
                 endif
-
-
 
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
@@ -1247,6 +1262,21 @@ contains
                         end do
                     end do
 
+                    if (sigma .ne. dflt_real) then
+                        !$acc parallel loop collapse(4) gang vector default(present)
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    rhs_vf(c_idx)%sf(j, k, l) = &
+                                        rhs_vf(c_idx)%sf(j, k, l) - 1d0/dx(j)* &
+                                        q_prim_qp%vf(c_idx)%sf(j, k, l)* &
+                                        (flux_src_n(1)%vf(advxb)%sf(j, k - 1, l) - &
+                                            flux_src_n(1)%vf(advxb)%sf(j, k, l))
+                                end do
+                            end do
+                        end do
+                    end if
+
                     if (cyl_coord) then
                         !$acc parallel loop collapse(4) gang vector default(present)
                         do l = 0, p
@@ -1395,6 +1425,7 @@ contains
                         end if
                     end if
                 end if
+
 
             elseif (id == 3) then
                 ! RHS Contribution in z-direction ===============================

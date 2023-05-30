@@ -490,7 +490,6 @@ contains
         is1 = is1_d
         is2 = is2_d
         is3 = is3_d
-        
 !$acc update device(is1, is2, is3)
 
         if (weno_order /= 1) then
