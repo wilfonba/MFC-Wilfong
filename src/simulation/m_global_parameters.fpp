@@ -117,9 +117,7 @@ module m_global_parameters
     logical :: mixture_err    !< Mixture properties correction
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
-    logical :: tvd_riemann_flux
 
-    integer :: flux_lim
 
     logical :: bodyForces
     integer :: bf_x, bf_y, bf_z !< body force toggle in three directions
@@ -129,7 +127,6 @@ module m_global_parameters
             real :: ${param}$_${dir}$
         #:endfor
     #:endfor
-    real(kind(0d0)) :: densRef
     real(kind(0d0)), dimension(3) :: accel_bf
 !$acc declare create(accel_bf)
 

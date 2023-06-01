@@ -34,6 +34,8 @@ module m_riemann_solvers
     use m_bubbles              !< To get the bubble wall pressure function
 
     use m_surface_tension
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -217,10 +219,7 @@ module m_riemann_solvers
 
     ! Additional variables for applying a flux limiter
     real(kind(0d0)) :: flf
-    real(kind(0d0)) :: lo_s_L, lo_s_R, lo_s_S
-    real(kind(0d0)) :: lo_s_M, lo_s_P
     real(kind(0d0)) :: tvd_s_M, tvd_s_P
-    real(kind(0d0)) :: lo_xi_M, lo_xi_P
     real(kind(0d0)) :: tvd_xi_M, tvd_xi_P
 
 contains
@@ -816,29 +815,6 @@ contains
         real(kind(0d0)) :: xi_L, xi_R !< Left and right wave speeds functions
         real(kind(0d0)) :: xi_M, xi_P
 
-        real(kind(0d0)), dimension(num_fluids) :: lo_alpha_rho_L, lo_alpha_rho_R
-        real(kind(0d0)) :: lo_rho_L, lo_rho_R
-        real(kind(0d0)), dimension(num_dims) :: lo_vel_L, lo_vel_R
-        real(kind(0d0)) :: lo_pres_L, lo_pres_R
-        real(kind(0d0)) :: lo_E_L, lo_E_R
-        real(kind(0d0)) :: lo_H_L, lo_H_R
-        real(kind(0d0)), dimension(num_fluids) :: lo_alpha_L, lo_alpha_R
-        real(kind(0d0)) :: lo_Y_L, lo_Y_R
-        real(kind(0d0)) :: lo_gamma_L, lo_gamma_R
-        real(kind(0d0)) :: lo_pi_inf_L, lo_pi_inf_R
-        real(kind(0d0)) :: lo_c_L, lo_c_R
-        real(kind(0d0)), dimension(2) :: lo_Re_L, lo_Re_R
-
-        real(kind(0d0)) :: lo_rho_avg
-        real(kind(0d0)), dimension(num_dims) :: lo_vel_avg
-        real(kind(0d0)) :: lo_H_avg
-        real(kind(0d0)) :: lo_gamma_avg
-        real(kind(0d0)) :: lo_c_avg
-
-        real(kind(0d0)) :: lo_s_L, lo_s_R, lo_s_M, lo_s_P, lo_s_S
-        real(kind(0d0)) :: lo_xi_L, lo_xi_R !< Left and right wave speeds functions
-        real(kind(0d0)) :: lo_xi_M, lo_xi_P
-
         real(kind(0d0)) :: nbub_L, nbub_R
         real(kind(0d0)), dimension(nb) :: R0_L, R0_R
         real(kind(0d0)), dimension(nb) :: V0_L, V0_R
@@ -848,7 +824,6 @@ contains
         real(kind(0d0)) :: ptilde_L, ptilde_R
 
         real(kind(0d0)) :: alpha_L_sum, alpha_R_sum, nbub_L_denom, nbub_R_denom
-        real(kind(0d0)) :: lo_alpha_L_sum, lo_alpha_R_sum, lo_nbub_L_denom, lo_nbub_R_denom
 
         real(kind(0d0)) :: PbwR3Lbar, Pbwr3Rbar
         real(kind(0d0)) :: R3Lbar, R3Rbar
@@ -861,10 +836,6 @@ contains
         real(kind(0d0)) :: start, finish
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
-
-        real(kind(0d0)) :: lo_vel_L_rms, lo_vel_R_rms, lo_vel_avg_rms
-        real(kind(0d0)) :: lo_rho_Star, lo_E_Star, lo_p_Star, lo_p_K_Star
-        real(kind(0d0)) :: lo_pres_SL, lo_pres_SR, lo_Ms_L, lo_Ms_R
 
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
@@ -4160,64 +4131,5 @@ contains
         end if
 
     end subroutine s_finalize_riemann_solvers_module ! ---------------------
-
-    SUBROUTINE s_compute_flux_limiter(j,k,l,flf,norm_dir, q_prim_vf) ! ------
-        ! Description: This subroutine computes the flux limiter function value
-        !       at the cell boundary
-
-            INTEGER, INTENT(IN) :: j,k,l,norm_dir
-            REAL(KIND(0d0)), INTENT(OUT) :: flf
-            REAL(KIND(0d0)) :: top, bottom, slope
-            type(scalar_field), dimension(sys_size) :: q_prim_vf
-
-            IF (q_prim_vf(cont_idx%end+norm_dir)%sf(j,k,l) >= 0d0) THEN
-                top = q_prim_vf(advxb)%sf(j-1 ,k,l) - &
-                    q_prim_vf(advxb)%sf(j-2,k,l)
-                bottom = q_prim_vf(advxb)%sf(j,k,l) - &
-                    q_prim_vf(advxb)%sf(j-1,k,l)
-            ELSE
-                top = q_prim_vf(advxb)%sf(j+1,k,l) - &
-                    q_prim_vf(advxb)%sf(j,k,l)
-                bottom = q_prim_vf(advxb)%sf(j,k,l) - &
-                    q_prim_vf(advxb)%sf(j-1,k,l)
-            END IF
-        
-            ! Limit the flux limiter to only be applied where the change in
-            ! volume fraction is greater than machine precision so that 
-            ! insignificant fluctuations do not trip the limiter
-!           IF (ABS(top) < sgm_eps) top = 0d0
-!           IF (ABS(bottom) < sgm_eps) bottom = 0d0
-            IF (ABS(top) < 1d-8) top = 0d0
-            IF (ABS(bottom) < 1d-8) bottom = 0d0
-
-            ! If top = bottom, then cell boundary is in a smooth region of
-            ! the flow and the high order flux should be used. Also ensures
-            ! that areas of no change in volume fraction (0/0) use the high
-            ! order flux
-            IF (top == bottom) THEN
-                slope = 1d0
-            ELSE
-                slope = (top*bottom)/MAX(bottom**2d0,sgm_eps)
-                ! print*, slope, top, bottom, j, k, l
-            END IF
-
-            ! Flux limiter function
-            IF (flux_lim == 1) THEN ! MINMOD (MM)
-                flf = MAX(0d0,MIN(1d0,slope))
-            ELSEIF (flux_lim == 2) THEN ! MUSCL (MC)
-                flf = MAX(0d0,MIN(2d0*slope,5d-1*(1d0+slope),2d0))
-            ELSEIF (flux_lim == 3) THEN ! OSPRE (OP)
-                flf = (15d-1*(slope**2d0+slope))/(slope**2d0+slope+1d0)
-            ELSEIF (flux_lim == 4) THEN ! SUPERBEE (SB)
-                flf = MAX(0d0,MIN(1d0,2d0*slope),MIN(slope,2d0))
-            ELSEIF (flux_lim == 5) THEN ! SWEBY (SW) (beta = 1.5)
-                flf = MAX(0d0,MIN(15d-1*slope,1d0),MIN(slope,15d-1))
-            ELSEIF (flux_lim == 6) THEN ! VAN ALBADA (VA)
-                flf = (slope**2d0+slope)/(slope**2d0+1d0)
-            ELSEIF (flux_lim == 7) THEN ! VAN LEER (VL)
-                flf = (ABS(slope) + slope)/(1d0 + ABS(slope))
-            END IF
-
-        END SUBROUTINE s_compute_flux_limiter ! --------------------------------
 
 end module m_riemann_solvers

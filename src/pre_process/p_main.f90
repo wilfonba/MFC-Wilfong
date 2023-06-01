@@ -31,6 +31,8 @@ program p_main
     use m_patches
 
     use m_assign_variables
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
