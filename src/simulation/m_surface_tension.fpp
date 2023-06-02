@@ -33,6 +33,8 @@ module m_surface_tension
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 
+    real(kind(0d0)), allocatable, dimension(:,:,:,:) :: cL_x, cR_x, cL_y, cR_y, cL_z, cR_z
+
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
     !$acc declare create(ix, iy, iz, is1, is2, is3)
 
@@ -64,13 +66,19 @@ contains
 
         @:ALLOCATE(gL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
         @:ALLOCATE(gR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
+        @:ALLOCATE(cL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, c_idx:c_idx))
+        @:ALLOCATE(cR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, c_idx:c_idx))
 
         @:ALLOCATE(gL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
         @:ALLOCATE(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
-        
+        @:ALLOCATE(cL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, c_idx:c_idx))
+        @:ALLOCATE(cR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, c_idx:c_idx))
+
         if (p > 0) then
             @:ALLOCATE(gL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
             @:ALLOCATE(gR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
+            @:ALLOCATE(cL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, c_idx:c_idx))
+            @:ALLOCATE(cR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, c_idx:c_idx))
         end if
 
         @:ALLOCATE(Omega(1:num_dims, 1:num_dims))
@@ -177,7 +185,7 @@ contains
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vsrc_rsy(k, j, l, 2)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vsrc_rsy(k, j, l, 1)
 
                     end do
                 end do
@@ -268,17 +276,26 @@ contains
 
         isx%end = m; isy%end = n; isz%end = p
 
+
+        iv%beg = c_idx; iv%end=c_idx
+        ! reconstruct color function at cell boundaries
+        do i = 1, num_dims
+            call s_reconstruct_cell_boundary_values_capilary(q_prim_vf, cL_x, cL_y, cL_z, cR_x, cR_y, cR_z, i)
+        end do
+
         ! compute gradient components
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+                    ! c_divs%vf(1)%sf(j, k, l) = &
+                    !     (q_prim_vf(c_idx)%sf(j - 2, k, l) &
+                    !     - 8d0*q_prim_vf(c_idx)%sf(j - 1, k, l) &
+                    !     + 8d0*q_prim_vf(c_idx)%sf(j + 1, k, l) &
+                    !     - q_prim_vf(c_idx)%sf(j + 2, k, l)) &
+                    !     /(12d0*dx(j))
                     c_divs%vf(1)%sf(j, k, l) = &
-                        (q_prim_vf(c_idx)%sf(j - 2, k, l) &
-                        - 8d0*q_prim_vf(c_idx)%sf(j - 1, k, l) &
-                        + 8d0*q_prim_vf(c_idx)%sf(j + 1, k, l) &
-                        - q_prim_vf(c_idx)%sf(j + 2, k, l)) &
-                        /(12d0*dx(j))
+                        (cR_x(j,k,l,c_idx) - cL_x(j, k, l,c_idx))/dx(j)
                 end do
             end do
         end do
@@ -287,12 +304,14 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+                    ! c_divs%vf(2)%sf(j, k, l) = &
+                    !     (q_prim_vf(c_idx)%sf(j, k - 2, l) &
+                    !     - 8d0*q_prim_vf(c_idx)%sf(j, k - 1, l) &
+                    !     + 8d0*q_prim_vf(c_idx)%sf(j, k + 1, l) &
+                    !     - q_prim_vf(c_idx)%sf(j, k + 2, l)) &
+                    !     /(12d0*dy(k))
                     c_divs%vf(2)%sf(j, k, l) = &
-                        (q_prim_vf(c_idx)%sf(j, k - 2, l) &
-                        - 8d0*q_prim_vf(c_idx)%sf(j, k - 1, l) &
-                        + 8d0*q_prim_vf(c_idx)%sf(j, k + 1, l) &
-                        - q_prim_vf(c_idx)%sf(j, k + 2, l)) &
-                        /(12d0*dy(k))
+                        (cR_y(k,j,l,c_idx) - cL_y(k,j,l,c_idx))/dy(k)
                 end do
             end do
         end do
@@ -302,12 +321,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        c_divs%vf(3)%sf(j, k, l) = &
-                            (q_prim_vf(c_idx)%sf(j, k, l - 2) &
-                            - 8d0*q_prim_vf(c_idx)%sf(j, k, l - 1) &
-                            + 8d0*q_prim_vf(c_idx)%sf(j, k, l + 1) &
-                            - q_prim_vf(c_idx)%sf(j, k, l + 2)) &
-                            /(12d0*dz(l))
+                        c_divs%vf(2)%sf(j, k, l) = &
+                            (cR_z(l,j,k,1) - cL_z(l,j,k,1))/dz(l)
                     end do
                 end do
             end do
