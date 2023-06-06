@@ -33,6 +33,8 @@ module m_surface_tension
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 
+    real(kind(0d0)), allocatable, dimension(:,:,:,:) :: cL_x, cR_x, cL_y, cR_y, cL_z, cR_z
+
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
     !$acc declare create(ix, iy, iz, is1, is2, is3)
 
@@ -64,13 +66,19 @@ contains
 
         @:ALLOCATE(gL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
         @:ALLOCATE(gR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
+        @:ALLOCATE(cL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, c_idx:c_idx))
+        @:ALLOCATE(cR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, c_idx:c_idx))
 
         @:ALLOCATE(gL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
         @:ALLOCATE(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
+        @:ALLOCATE(cL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, c_idx:c_idx))
+        @:ALLOCATE(cR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, c_idx:c_idx))
         
         if (p > 0) then
             @:ALLOCATE(gL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
             @:ALLOCATE(gR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
+            @:ALLOCATE(cL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, c_idx:c_idx))
+            @:ALLOCATE(cR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, c_idx:c_idx))
         end if
 
         @:ALLOCATE(Omega(1:num_dims, 1:num_dims))
@@ -177,7 +185,7 @@ contains
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vsrc_rsy(k, j, l, 2)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vsrc_rsy(k, j, l, 1)
 
                     end do
                 end do
@@ -236,23 +244,37 @@ contains
 
         real(kind(0d0)) :: s1, s2, s3, normS
 
-        Omega(1,1) = -sigma*(s2*s2 + s3*s3) / max(normS, sgm_eps)
+        if (normS > 1d-6) then
+            Omega(1,1) = -sigma*(s2*s2 + s3*s3) / normS
 
-        Omega(2,1) = sigma*s1*s2 / max(normS, sgm_eps)
-        Omega(1,2) = Omega(2,1)
+            Omega(2,1) = sigma*s1*s2 / normS
+            Omega(1,2) = Omega(2,1)
 
-        Omega(2,2) = -sigma*(s1*s1 + s3*s3) / max(normS, sgm_eps)  
-        
-        if (p > 0) then
+            Omega(2,2) = -sigma*(s1*s1 + s3*s3) / normS 
+            
+            if (p > 0) then
 
-            Omega(3,1) = sigma*s1*s3 / max(normS, sgm_eps)
-            Omega(1,3) = Omega(3,1)
+                Omega(3,1) = sigma*s1*s3 / normS
+                Omega(1,3) = Omega(3,1)
 
-            Omega(3,2) = sigma*s2*s2 / max(normS, sgm_eps)
-            Omega(2,3) = Omega(3,2)
+                Omega(3,2) = sigma*s2*s2 / normS
+                Omega(2,3) = Omega(3,2)
 
-            Omega(3,3) = sigma*(s1*s1 + s2*s2) / max(normS, sgm_eps)
+                Omega(3,3) = -sigma*(s1*s1 + s2*s2) / normS
 
+            end if
+        else
+            Omega(1,1) = 0d0
+            Omega(1,2) = 0d0
+            Omega(2,1) = 0d0
+            Omega(2,2) = 0d0
+            if (p > 0) then
+                Omega(1,3) = 0d0
+                Omega(3,1) = 0d0
+                Omega(2,3) = 0d0
+                Omega(3,2) = 0d0
+                Omega(3,3) = 0d0
+            end if
         end if
 
     end subroutine s_compute_capilary_tensor
@@ -268,6 +290,12 @@ contains
 
         isx%end = m; isy%end = n; isz%end = p
 
+        ! iv%beg = c_idx; iv%end=c_idx
+        ! ! reconstruct color function at cell boundaries
+        ! do i = 1, num_dims
+        !     call s_reconstruct_cell_boundary_values_capilary(q_prim_vf, cL_x, cL_y, cL_z, cR_x, cR_y, cR_z, i)
+        ! end do
+
         ! compute gradient components
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -279,6 +307,10 @@ contains
                         + 8d0*q_prim_vf(c_idx)%sf(j + 1, k, l) &
                         - q_prim_vf(c_idx)%sf(j + 2, k, l)) &
                         /(12d0*dx(j))
+                    ! c_divs%vf(1)%sf(j, k, l) = &
+                    !     1d0/(dx(j)) * &
+                    !     (cR_x(j, k, l, c_idx) - &
+                    !      cL_x(j, k, l, c_idx))
                 end do
             end do
         end do
@@ -293,6 +325,10 @@ contains
                         + 8d0*q_prim_vf(c_idx)%sf(j, k + 1, l) &
                         - q_prim_vf(c_idx)%sf(j, k + 2, l)) &
                         /(12d0*dy(k))
+                    ! c_divs%vf(2)%sf(j, k, l) = &
+                    !     1d0/(dy(k)) * &
+                    !     (cR_y(j, k, l, c_idx) - &
+                    !     cL_y(j, k, l, c_idx))
                 end do
             end do
         end do
@@ -342,9 +378,9 @@ contains
     subroutine s_populate_capillary_buffers()
 
         ! x - direction
-        if (bc_x%beg == -3) then        
+        if (bc_x%beg == -3) then !< ghost cell extrapolation   
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims
+            do i = 1, num_dims + 1
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
@@ -354,13 +390,25 @@ contains
                     end do
                 end do
             end do
+        elseif (bc_x%beg == -14 .or. bc_x%beg == -2) then !< slip wall or reflective
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            c_divs%vf(i)%sf(-j, k, l) = &
+                                c_divs%vf(i)%sf(j - 1, k, l)
+                        end do
+                    end do
+                end do
+            end do
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 1, -1)
         end if
 
-        if (bc_x%end == -3) then
+        if (bc_x%end == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims
+            do i = 1, num_dims + 1
                 do l = 0, p
                     do k = 0, n
                         do j = 1, buff_size
@@ -370,16 +418,27 @@ contains
                     end do
                 end do
             end do
-        else 
+        elseif (bc_x%end == -14 .or. bc_x%end == -2) then !< slip wall or reflective
+            !$acc parallel loop collapse(4) default(present)
+            do i = 1, num_dims + 1
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            c_divs%vf(i)%sf(m + j, k, l) = &
+                                c_divs%vf(i)%sf(m - (j - 1), k, l)
+                        end do
+                    end do
+                end do
+            end do
+        else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 1, 1)
         end if
 
-        if (m == 0) return
-
-        ! y - direction
-        if (bc_y%beg == -3) then
+        if (n == 0) then
+            return
+        elseif (bc_y%beg == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims
+            do i = 1, num_dims + 1
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
@@ -389,13 +448,25 @@ contains
                     end do
                 end do
             end do
+        elseif (bc_y%beg == -14 .or. bc_y%beg == -2) then !< slip wall or reflective
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(l, -j, k) = &
+                                c_divs%vf(i)%sf(l, j - 1, k)
+                        end do
+                    end do
+                end do
+            end do
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 2, -1)
         endif
 
-        if (bc_y%end == -3) then
+        if (bc_y%end == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims
+            do i = 1, num_dims + 1
                 do k = 0, p
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
@@ -405,16 +476,27 @@ contains
                     end do
                 end do
             end do
+        elseif (bc_y%end == -14 .or. bc_y%end == -2) then !< slip wall or reflective
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(l, n + j, k) = &
+                                c_divs%vf(i)%sf(l, n - (j - 1), k)
+                        end do
+                    end do
+                end do
+            end do
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 2, 1)
         end if
 
-        if (p == 0) return
-
-        ! z - direction
-        if (bc_z%beg == -3) then
+        if (p == 0) then
+            return
+        elseif (bc_z%beg == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims
+            do i = 1, num_dims + 1
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
@@ -424,18 +506,66 @@ contains
                     end do
                 end do
             end do
+        elseif (bc_z%beg == -14) then !< slip wall
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(k, l, -j) = &
+                                c_divs%vf(i)%sf(k, l, 0)
+                        end do
+                    end do
+                end do
+            end do
+        elseif (bc_z%beg == -2) then !< symmetry
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1 
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                                c_divs%vf(i)%sf(k, l, -j) = &
+                                    c_divs%vf(i)%sf(k, l, j - 1)
+                        end do
+                    end do
+                end do
+            end do
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 3, -1)
         end if
         
-        if (bc_z%end == -3) then
+        if (bc_z%end == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, num_dims
+            do i = 1, num_dims + 1
                 do j = 1, buff_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
                             c_divs%vf(i)%sf(k, l, p + j) = &
                                 c_divs%vf(i)%sf(k, l, p)
+                        end do
+                    end do
+                end do
+            end do
+        else if ( bc_Z%end == -14 ) then !< slip wall
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(k, l, p+j) = &
+                                c_divs%vf(i)%sf(k, l, p)
+                        end do
+                    end do
+                end do
+            end do
+        elseif (bc_z%end == -2) then !< symmetry
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(k, l, p + j) = &
+                                c_divs%vf(i)%sf(k, l, p - (j - 1))
                         end do
                     end do
                 end do

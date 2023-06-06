@@ -1061,7 +1061,7 @@ contains
 
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*vel_L(dir_idx(1))
                                     end if
 
                                     ! Compute right solution state
@@ -1093,7 +1093,7 @@ contains
 
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*vel_R(dir_idx(1))
                                     end if
 
                                     ! Compute left star solution state
@@ -1132,7 +1132,7 @@ contains
 
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*xi_L*s_S
                                     end if
 
                                     ! Compute right star solution state
@@ -1175,7 +1175,7 @@ contains
 
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*xi_R*s_S
                                     end if
 
                                 end if

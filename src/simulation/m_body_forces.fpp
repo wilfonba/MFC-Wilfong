@@ -130,25 +130,6 @@ contains
                 end do
             end do
 
-            ! Six equation model
-            if (model_eqns == 3) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(rhoF)
-                do l = 0,p
-                    do k = 0,n
-                        do j = 0,m 
-                            !$acc loop seq
-                            do i = 1,num_fluids
-                                rhoF = q_cons_vf(contxb + i - 1)%sf(j,k,l)/&
-                                    q_cons_vf(advxb + i - 1)%sf(j,k,l)
-                                rhs_vf(intxb + i - 1)%sf(j,k,l) = &
-                                    rhs_vf(intxb + i - 1)%sf(j,k,l) + &
-                                    rhoF*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(1)
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
         elseif (idir == 2 .and. bf_y .ne. dflt_int) then
 
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -163,25 +144,6 @@ contains
                 end do
             end do
 
-            ! Six equation model
-            if (model_eqns == 5) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(rhoF)
-                do l = 0,p
-                    do k = 0,n
-                        do j = 0,m
-                            !$acc loop seq          
-                            do i = 1,num_fluids
-                                rhoF = q_cons_vf(contxb + i - 1)%sf(j,k,l)/&
-                                    q_cons_vf(advxb + i - 1)%sf(j,k,l)
-                                rhs_vf(intxb + i - 1)%sf(j,k,l) = &
-                                    rhs_vf(intxb + i - 1)%sf(j,k,l) + &
-                                    rhoF*q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
         elseif (idir == 3 .and. bf_z .ne. dflt_int) then
 
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -195,24 +157,7 @@ contains
                     end do
                 end do
             end do
-            
-            ! Six equation model
-            ! if (model_eqns == 3) then
-            !     !$acc parallel loop collapse(4) gang vector default(present) private(rhoF)
-            !     do l = 0,p
-            !         do k = 0,n
-            !             do j = 0,m
-            !                 do i = 1,num_fluids
-            !                     rhoF = q_cons_vf(contxb + i - 1)%sf(j,k,l)/&
-            !                         q_cons_vf(advxb + i - 1)%sf(j,k,l)
-            !                     rhs_vf(intxb + i - 1)%sf(j,k,l) = &
-            !                         rhs_vf(intxb + i - 1)%sf(j,k,l) + &
-            !                         rhoF*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(3)
-            !                 end do
-            !             end do
-            !         end do
-            !     end do
-            ! end if
+
         end if
 
     end subroutine s_compute_body_forces_rhs
