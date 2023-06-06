@@ -302,15 +302,15 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs%vf(1)%sf(j, k, l) = &
-                        (q_prim_vf(c_idx)%sf(j - 2, k, l) &
-                        - 8d0*q_prim_vf(c_idx)%sf(j - 1, k, l) &
-                        + 8d0*q_prim_vf(c_idx)%sf(j + 1, k, l) &
-                        - q_prim_vf(c_idx)%sf(j + 2, k, l)) &
+                        (q_prim_vf(advxb)%sf(j - 2, k, l) &
+                        - 8d0*q_prim_vf(advxb)%sf(j - 1, k, l) &
+                        + 8d0*q_prim_vf(advxb)%sf(j + 1, k, l) &
+                        - q_prim_vf(advxb)%sf(j + 2, k, l)) &
                         /(12d0*dx(j))
                     ! c_divs%vf(1)%sf(j, k, l) = &
                     !     1d0/(dx(j)) * &
-                    !     (cR_x(j, k, l, c_idx) - &
-                    !      cL_x(j, k, l, c_idx))
+                    !     (cR_x(j, k, l, advxb) - &
+                    !      cL_x(j, k, l, advxb))
                 end do
             end do
         end do
@@ -320,15 +320,15 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs%vf(2)%sf(j, k, l) = &
-                        (q_prim_vf(c_idx)%sf(j, k - 2, l) &
-                        - 8d0*q_prim_vf(c_idx)%sf(j, k - 1, l) &
-                        + 8d0*q_prim_vf(c_idx)%sf(j, k + 1, l) &
-                        - q_prim_vf(c_idx)%sf(j, k + 2, l)) &
+                        (q_prim_vf(advxb)%sf(j, k - 2, l) &
+                        - 8d0*q_prim_vf(advxb)%sf(j, k - 1, l) &
+                        + 8d0*q_prim_vf(advxb)%sf(j, k + 1, l) &
+                        - q_prim_vf(advxb)%sf(j, k + 2, l)) &
                         /(12d0*dy(k))
                     ! c_divs%vf(2)%sf(j, k, l) = &
                     !     1d0/(dy(k)) * &
-                    !     (cR_y(j, k, l, c_idx) - &
-                    !     cL_y(j, k, l, c_idx))
+                    !     (cR_y(j, k, l, advxb) - &
+                    !     cL_y(j, k, l, advxb))
                 end do
             end do
         end do

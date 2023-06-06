@@ -32,10 +32,8 @@ module m_riemann_solvers
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_bubbles              !< To get the bubble wall pressure function
-
+    
     use m_surface_tension
-
-    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -216,11 +214,6 @@ module m_riemann_solvers
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
-
-    ! Additional variables for applying a flux limiter
-    real(kind(0d0)) :: flf
-    real(kind(0d0)) :: tvd_s_M, tvd_s_P
-    real(kind(0d0)) :: tvd_xi_M, tvd_xi_P
 
 contains
 
@@ -867,6 +860,7 @@ contains
 
 !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
 !$acc rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R)
+
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -919,12 +913,6 @@ contains
                                     do i = 1, num_fluids
                                         qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)/max(alpha_R_sum, sgm_eps)
                                     end do
-
-                                    if (sigma .ne. dflt_real) then
-                                        qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) = max(0d0, qL_prim_rs${XYZ}$_vf(j, k, l, c_idx))
-                                        qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx) = max(0d0, qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx))
-                                    end if
-
                                 end if
 
                                 !$acc loop seq
@@ -1054,14 +1042,14 @@ contains
                                             rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
 
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
-                                                                                    dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i)))
+                                                                                       dir_flg(dir_idx(i))*(s_S - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
-
+                                    
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*vel_L(dir_idx(1))
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
                                     end if
 
                                     ! Compute right solution state
@@ -1086,14 +1074,14 @@ contains
                                             rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
 
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
-                                                                                    dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i)))
+                                                                                       dir_flg(dir_idx(i))*(s_S - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_R + pres_R)*vel_R(dir_idx(1))
 
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*vel_R(dir_idx(1))
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
                                     end if
 
                                     ! Compute left star solution state
@@ -1101,12 +1089,12 @@ contains
                                     xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
                                     rho_Star = rho_L*xi_L
                                     E_Star = xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
-                                                (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1)))))
+                                                   (rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1)))))
                                     p_Star = rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))) + pres_L
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         p_K_Star = (pres_L + pi_infs(i)/(1d0 + gammas(i)))* &
-                                                xi_L**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
+                                                   xi_L**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
                                             qL_prim_rs${XYZ}$_vf(j, k, l, i + advxb - 1)*s_S
@@ -1122,17 +1110,17 @@ contains
                                     do i = 1, num_dims
                                         flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = &
                                             rho_Star*s_S*(s_S*dir_flg(dir_idx(i)) + vel_L(dir_idx(i))* &
-                                                        (1d0 - dir_flg(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star
+                                                          (1d0 - dir_flg(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star
 
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_L(dir_idx(i)) + &
-                                                                                dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i)))
+                                                                                  dir_flg(dir_idx(i))*(s_S*xi_L - vel_L(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
 
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*xi_L*s_S
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
                                     end if
 
                                     ! Compute right star solution state
@@ -1142,13 +1130,13 @@ contains
                                     rho_Star = rho_R*xi_R
 
                                     E_Star = xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
-                                                (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1)))))
+                                                   (rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1)))))
 
                                     p_Star = rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1))) + pres_R
                                     !$acc loop seq
                                     do i = 1, num_fluids
                                         p_K_Star = (pres_R + pi_infs(i)/(1d0 + gammas(i)))* &
-                                                xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
+                                                   xi_R**(1d0/gammas(i) + 1d0) - pi_infs(i)/(1d0 + gammas(i))
 
                                         flux_rs${XYZ}$_vf(j, k, l, i + advxb - 1) = &
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i + advxb - 1)*s_S
@@ -1163,11 +1151,11 @@ contains
                                     !$acc loop seq
                                     do i = 1, num_dims
                                         flux_rs${XYZ}$_vf(j, k, l, momxb - 1 + dir_idx(i)) = rho_Star*s_S* &
-                                                    (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
-                                                                                                dir_flg(dir_idx(i))*p_Star
+                                                       (s_S*dir_flg(dir_idx(i)) + vel_R(dir_idx(i))*(1d0 - dir_flg(dir_idx(i)))) + &
+                                                                                                  dir_flg(dir_idx(i))*p_Star
 
                                         vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = vel_R(dir_idx(i)) + &
-                                                                                dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
+                                                                                  dir_flg(dir_idx(i))*(s_S*xi_R - vel_R(dir_idx(i)))
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
 
@@ -1175,7 +1163,7 @@ contains
 
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*xi_R*s_S
+                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
                                     end if
 
                                 end if
@@ -1202,8 +1190,6 @@ contains
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0d0
                                     end do
                                 end if
-
-
 
                             end do
                         end do
@@ -2212,14 +2198,12 @@ contains
         end if
 
         if (sigma .ne. dflt_real) then
-            call s_compute_capilary_source_flux( &
-                q_prim_vf, & 
+            call s_compute_capilary_source_flux(q_prim_vf, &
                 vel_src_rsx_vf, &
                 vel_src_rsy_vf, &
                 vel_src_rsz_vf, &
                 flux_src_vf, &
-                norm_dir, &
-                isx, isy, isz, dir_idx)
+                norm_dir, ix, iy, iz, dir_idx)
         end if
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
@@ -2227,6 +2211,7 @@ contains
                                        norm_dir, ix, iy, iz)
 
     end subroutine s_hllc_riemann_solver
+
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
@@ -2787,7 +2772,7 @@ contains
 
         if (norm_dir == 1) then
 
-            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
+            if (any(Re_size > 0)) then
 
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
@@ -2820,7 +2805,7 @@ contains
             ! Reshaping Inputted Data in y-direction ===========================
         elseif (norm_dir == 2) then
 
-            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
+            if (any(Re_size > 0)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
@@ -2851,7 +2836,7 @@ contains
             ! Reshaping Inputted Data in z-direction ===========================
         else
 
-            if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
+            if (any(Re_size > 0)) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end
