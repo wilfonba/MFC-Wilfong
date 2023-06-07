@@ -2772,7 +2772,7 @@ contains
 
         if (norm_dir == 1) then
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. sigma .ne. dflt_real) then
 
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
@@ -2805,7 +2805,7 @@ contains
             ! Reshaping Inputted Data in y-direction ===========================
         elseif (norm_dir == 2) then
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. sigma .ne. dflt_real) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do l = is3%beg, is3%end
@@ -2836,7 +2836,7 @@ contains
             ! Reshaping Inputted Data in z-direction ===========================
         else
 
-            if (any(Re_size > 0)) then
+            if (any(Re_size > 0) .or. sigma .ne. dflt_Real) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end

@@ -1058,20 +1058,20 @@ contains
                     end do
                 end if
 
-                ! if (sigma .ne. dflt_real) then
-                !     !$acc parallel loop collapse(3) gang vector default(present)
-                !     do l = 0, p
-                !         do k = 0, n
-                !             do j = 0, m
-                !                 rhs_vf(c_idx)%sf(j, k, l) = &
-                !                     rhs_vf(c_idx)%sf(j, k, l) + 1d0/dx(j)* &
-                !                     q_cons_qp%vf(c_idx)%sf(j, k, l)* &
-                !                     (flux_src_n(1)%vf(advxb)%sf(j, k, l) - &
-                !                         flux_src_n(1)%vf(advxb)%sf(j - 1, k, l))
-                !             end do
-                !         end do
-                !     end do
-                ! end if
+                if (sigma .ne. dflt_real) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(c_idx)%sf(j, k, l) = &
+                                    rhs_vf(c_idx)%sf(j, k, l) + 1d0/dx(j)* &
+                                    q_cons_qp%vf(c_idx)%sf(j, k, l)* &
+                                    (flux_src_n(1)%vf(advxb)%sf(j, k, l) - &
+                                        flux_src_n(1)%vf(advxb)%sf(j - 1, k, l))
+                            end do
+                        end do
+                    end do
+                end if
 
                 if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     !$acc parallel loop collapse(3) gang vector default(present)
@@ -1297,20 +1297,20 @@ contains
                     end do
                 end if
 
-                ! if (sigma .ne. dflt_real) then
-                !     !$acc parallel loop collapse(3) gang vector default(present)
-                !     do l = 0, p
-                !         do k = 0, n
-                !             do j = 0, m
-                !                 rhs_vf(c_idx)%sf(j, k, l) = &
-                !                     rhs_vf(c_idx)%sf(j, k, l) + 1d0/dy(k)* &
-                !                     q_cons_qp%vf(c_idx)%sf(j, k, l)* &
-                !                     (flux_src_n(2)%vf(advxb)%sf(j, k, l) - &
-                !                         flux_src_n(2)%vf(advxb)%sf(j, k - 1, l))
-                !             end do
-                !         end do
-                !     end do
-                ! end if
+                if (sigma .ne. dflt_real) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(c_idx)%sf(j, k, l) = &
+                                    rhs_vf(c_idx)%sf(j, k, l) + 1d0/dy(k)* &
+                                    q_cons_qp%vf(c_idx)%sf(j, k, l)* &
+                                    (flux_src_n(2)%vf(advxb)%sf(j, k, l) - &
+                                        flux_src_n(2)%vf(advxb)%sf(j, k - 1, l))
+                            end do
+                        end do
+                    end do
+                end if
 
                 if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -13))) then

@@ -185,7 +185,7 @@ contains
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vsrc_rsy(k, j, l, 1)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsy(k, j, l, 2)
 
                     end do
                 end do
@@ -290,27 +290,23 @@ contains
 
         isx%end = m; isy%end = n; isz%end = p
 
-        ! iv%beg = c_idx; iv%end=c_idx
-        ! ! reconstruct color function at cell boundaries
-        ! do i = 1, num_dims
-        !     call s_reconstruct_cell_boundary_values_capilary(q_prim_vf, cL_x, cL_y, cL_z, cR_x, cR_y, cR_z, i)
-        ! end do
+
+        iv%beg = c_idx;iv%end = c_idx
+        ! reconstruct gradient components at cell boundaries
+        do i = 1, num_dims
+            call s_reconstruct_cell_boundary_values_capilary(q_prim_vf(iv%beg:iv%end), &
+                                                                cL_x, cL_y, cL_z, &
+                                                                cR_x, cR_y, cR_z, i)
+        end do
 
         ! compute gradient components
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs%vf(1)%sf(j, k, l) = &
-                        (q_prim_vf(advxb)%sf(j - 2, k, l) &
-                        - 8d0*q_prim_vf(advxb)%sf(j - 1, k, l) &
-                        + 8d0*q_prim_vf(advxb)%sf(j + 1, k, l) &
-                        - q_prim_vf(advxb)%sf(j + 2, k, l)) &
-                        /(12d0*dx(j))
-                    ! c_divs%vf(1)%sf(j, k, l) = &
-                    !     1d0/(dx(j)) * &
-                    !     (cR_x(j, k, l, advxb) - &
-                    !      cL_x(j, k, l, advxb))
+                    c_divs%vf(1)%sf(j, k, l) = 1d0/(2d0*dx(j))  * &
+                        (cL_x(j+1,k,l,c_idx) + cR_x(j,k,l,c_idx) - &
+                        cL_x(j,k,l,c_idx) - cR_x(j-1,k,l,c_idx))
                 end do
             end do
         end do
@@ -319,16 +315,9 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs%vf(2)%sf(j, k, l) = &
-                        (q_prim_vf(advxb)%sf(j, k - 2, l) &
-                        - 8d0*q_prim_vf(advxb)%sf(j, k - 1, l) &
-                        + 8d0*q_prim_vf(advxb)%sf(j, k + 1, l) &
-                        - q_prim_vf(advxb)%sf(j, k + 2, l)) &
-                        /(12d0*dy(k))
-                    ! c_divs%vf(2)%sf(j, k, l) = &
-                    !     1d0/(dy(k)) * &
-                    !     (cR_y(j, k, l, advxb) - &
-                    !     cL_y(j, k, l, advxb))
+                    c_divs%vf(2)%sf(j, k, l) = 1d0/(2d0*dy(k)) * &
+                        (cL_y(k+1,j,l,c_idx) + cR_y(k,j,l,c_idx) - &
+                        cL_y(k,j,l,c_idx) - cR_y(k-1,j,l,c_idx))
                 end do
             end do
         end do
@@ -338,12 +327,9 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        c_divs%vf(3)%sf(j, k, l) = &
-                            (q_prim_vf(c_idx)%sf(j, k, l - 2) &
-                            - 8d0*q_prim_vf(c_idx)%sf(j, k, l - 1) &
-                            + 8d0*q_prim_vf(c_idx)%sf(j, k, l + 1) &
-                            - q_prim_vf(c_idx)%sf(j, k, l + 2)) &
-                            /(12d0*dz(l))
+                        c_divs%vf(3)%sf(j, k, l) = 1d0/(2d0*dz(l)) * &
+                            (cL_z(k+1,j,l,c_idx) + cR_z(k,j,l,c_idx) - &
+                            cL_z(k,j,l,c_idx) - cR_z(k-1,j,l,c_idx))
                     end do
                 end do
             end do
@@ -390,7 +376,7 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_x%beg == -14 .or. bc_x%beg == -2) then !< slip wall or reflective
+        elseif (bc_x%beg == -2) then !< slip wall or reflective
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do l = 0, p
@@ -398,6 +384,18 @@ contains
                         do j = 1, buff_size
                             c_divs%vf(i)%sf(-j, k, l) = &
                                 c_divs%vf(i)%sf(j - 1, k, l)
+                        end do
+                    end do
+                end do
+            end do
+        elseif (bc_x%beg == -14) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            c_divs%vf(i)%sf(-j, k, l) = &
+                                c_divs%vf(i)%sf(0, k, l)
                         end do
                     end do
                 end do
@@ -418,7 +416,7 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_x%end == -14 .or. bc_x%end == -2) then !< slip wall or reflective
+        elseif (bc_x%end == -2) then
             !$acc parallel loop collapse(4) default(present)
             do i = 1, num_dims + 1
                 do l = 0, p
@@ -426,6 +424,18 @@ contains
                         do j = 1, buff_size
                             c_divs%vf(i)%sf(m + j, k, l) = &
                                 c_divs%vf(i)%sf(m - (j - 1), k, l)
+                        end do
+                    end do
+                end do
+            end do
+        elseif (bc_x%end == -14) then
+            !$acc parallel loop collapse(4) default(present)
+            do i = 1, num_dims + 1
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            c_divs%vf(i)%sf(m + j, k, l) = &
+                                c_divs%vf(i)%sf(m, k, l)
                         end do
                     end do
                 end do
@@ -448,7 +458,7 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_y%beg == -14 .or. bc_y%beg == -2) then !< slip wall or reflective
+        elseif (bc_y%beg == -2) then !< slip wall or reflective
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do k = 0, p
@@ -456,6 +466,18 @@ contains
                         do l = -buff_size, m + buff_size
                             c_divs%vf(i)%sf(l, -j, k) = &
                                 c_divs%vf(i)%sf(l, j - 1, k)
+                        end do
+                    end do
+                end do
+            end do
+        elseif (bc_y%beg == -14) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(l, -j, k) = &
+                                c_divs%vf(i)%sf(l, 0, k)
                         end do
                     end do
                 end do
@@ -476,7 +498,7 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_y%end == -14 .or. bc_y%end == -2) then !< slip wall or reflective
+        elseif (bc_y%end == -2) then !< slip wall or reflective
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do k = 0, p
@@ -484,6 +506,18 @@ contains
                         do l = -buff_size, m + buff_size
                             c_divs%vf(i)%sf(l, n + j, k) = &
                                 c_divs%vf(i)%sf(l, n - (j - 1), k)
+                        end do
+                    end do
+                end do
+            end do
+        elseif (bc_y%end == -14) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(l, n + j, k) = &
+                                c_divs%vf(i)%sf(l, n, k)
                         end do
                     end do
                 end do
