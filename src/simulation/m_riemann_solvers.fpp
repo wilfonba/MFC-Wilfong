@@ -34,6 +34,8 @@ module m_riemann_solvers
     use m_bubbles              !< To get the bubble wall pressure function
     
     use m_surface_tension
+
+    use m_helper
     ! ==========================================================================
 
     implicit none

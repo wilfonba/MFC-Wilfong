@@ -90,6 +90,7 @@ module m_global_parameters
         integer, parameter :: num_dims = ${num_dims}$       !< Number of spatial dimensions
     #:else
         integer :: num_dims       !< Number of spatial dimensions
+        !$acc declare create(num_dims)
     #:endif
     integer :: num_fluids     !< Number of fluids in the flow
     logical :: adv_alphan     !< Advection of the last volume fraction
@@ -662,6 +663,7 @@ contains
                 if (sigma .ne. dflt_real) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
+                    !$acc update device(sigma)
                 end if
 
             else if (model_eqns == 4) then

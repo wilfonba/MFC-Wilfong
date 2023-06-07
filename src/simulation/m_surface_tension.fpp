@@ -1,4 +1,5 @@
 #:include 'macros.fpp'
+#:include 'inline_capilary.fpp'
 
 !> @brief This module is used to compute source terms for hypoelastic model
 module m_surface_tension
@@ -34,9 +35,10 @@ module m_surface_tension
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: cL_x, cR_x, cL_y, cR_y, cL_z, cR_z
+    !$acc declare create(cL_x, cR_x, cL_y, cR_y, cL_z, cR_z)
 
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
-    !$acc declare create(ix, iy, iz, is1, is2, is3)
+    !$acc declare create(ix, iy, iz, is1, is2, is3, iv)
 
     real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
     !$acc declare create(w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3)
@@ -93,9 +95,12 @@ contains
         type(int_bounds_info) :: isx, isy, isz 
         integer, dimension(3) :: dir_idx
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(isx%beg:,isy%beg:,isz%beg:,1:) :: vSrc_rsx
-        real(kind(0d0)), dimension(isy%beg:,isx%beg:,isz%beg:,1:) :: vSrc_rsy
-        real(kind(0d0)), dimension(isz%beg:,isx%beg:,isy%beg:,1:) :: vSrc_rsz
+        ! real(kind(0d0)), dimension(isx%beg:,isy%beg:,isz%beg:,1:) :: vSrc_rsx
+        ! real(kind(0d0)), dimension(isy%beg:,isx%beg:,isz%beg:,1:) :: vSrc_rsy
+        ! real(kind(0d0)), dimension(isz%beg:,isx%beg:,isy%beg:,1:) :: vSrc_rsz
+        real(kind(0d0)), dimension(-1:m,0:n,0:p,1:num_dims) :: vSrc_rsx
+        real(kind(0d0)), dimension(-1:n,0:m,0:p,1:num_dims) :: vSrc_rsy
+        real(kind(0d0)), dimension(-1:p,0:n,0:m,1:num_dims) :: vSrc_rsz
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: flux_src_vf
@@ -109,25 +114,7 @@ contains
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
-                        w1L = gL_x(j, k, l, 1)
-                        w2L = gL_x(j, k, l, 2)
-                        w3L = 0d0
-                        if (p > 0) w3L = gL_x(j, k, l, 3)
-
-                        w1R = gR_x(j + 1, k, l, 1)
-                        w2R = gR_x(j + 1, k, l, 2)
-                        w3R = 0d0
-                        if (p > 0) w3R = gR_x(j + 1, k, l, 3)
-
-                        normWL = gL_x(j, k, l, num_dims + 1)
-                        normWR = gR_x(j + 1, k, l, num_dims + 1)
-
-                        w1 = (w1L + w1R)/2d0
-                        w2 = (w2L + w2R)/2d0
-                        w3 = (w3L + w3R)/2d0
-                        normW = (normWL + normWR)/2d0
-                    
-                        call s_compute_capilary_tensor(w1, w2, w3, normW)
+                        @:compute_capilary_tensor_x()
 
                         do i = 1, num_dims
 
@@ -140,7 +127,7 @@ contains
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vsrc_rsx(j, k, l, 1)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx(j, k, l, 1)
 
                     end do
                 end do
@@ -154,25 +141,7 @@ contains
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
-                        w1L = gL_y(k, j, l, 1)
-                        w2L = gL_y(k, j, l, 2)
-                        w3L = 0d0
-                        if (p > 0) w3L = gL_y(k, j, l, 3)
-
-                        w1R = gR_y(k + 1, j, l, 1)
-                        w2R = gR_y(k + 1, j, l, 2)
-                        w3R = 0d0
-                        if (p > 0) w3R = gR_y(k + 1, j, l, 3)
-
-                        normWL = gL_y(k, j, l, num_dims + 1)
-                        normWR = gR_y(k + 1, j, l, num_dims + 1)
-
-                        w1 = (w1L + w1R)/2d0
-                        w2 = (w2L + w2R)/2d0
-                        w3 = (w3L + w3R)/2d0
-                        normW = (normWL + normWR)/2d0
-
-                        call s_compute_capilary_tensor(w1, w2, w3, normW)
+                        @:compute_capilary_tensor_y()
 
                         do i = 1, num_dims
 
@@ -199,25 +168,7 @@ contains
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
-                        w1L = gL_z(l, j, k, 1)
-                        w2L = gL_z(l, j, k, 2)
-                        w3L = 0d0
-                        if (p > 0) w3L = gL_z(l, j, k, 3)
-
-                        w1R = gR_z(l + 1, j, k, 1)
-                        w2R = gR_z(l + 1, j, k, 2)
-                        w3R = 0d0
-                        if (p > 0) w3R = gR_z(l + 1, j, k, 3)
-
-                        normWL = gL_z(l, j, k, num_dims + 1)
-                        normWR = gR_z(l + 1, j, k, num_dims + 1)
-
-                        w1 = (w1L + w1R)/2d0
-                        w2 = (w2L + w2R)/2d0
-                        w3 = (w3L + w3R)/2d0
-                        normW = (normWL + normWR)/2d0
-
-                        call s_compute_capilary_tensor(w1, w2, w3, normW)
+                        @:compute_capilary_tensor_z()
 
                         do i = 1, num_dims
 
@@ -230,7 +181,7 @@ contains
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vsrc_rsz(l, j, k, 3)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsz(l, j, k, 3)
 
                     end do
                 end do
@@ -239,45 +190,6 @@ contains
         end if
 
     end subroutine s_compute_capilary_source_flux
-
-    subroutine s_compute_capilary_tensor(s1, s2, s3, normS)
-
-        real(kind(0d0)) :: s1, s2, s3, normS
-
-        if (normS > 1d-6) then
-            Omega(1,1) = -sigma*(s2*s2 + s3*s3) / normS
-
-            Omega(2,1) = sigma*s1*s2 / normS
-            Omega(1,2) = Omega(2,1)
-
-            Omega(2,2) = -sigma*(s1*s1 + s3*s3) / normS 
-            
-            if (p > 0) then
-
-                Omega(3,1) = sigma*s1*s3 / normS
-                Omega(1,3) = Omega(3,1)
-
-                Omega(3,2) = sigma*s2*s2 / normS
-                Omega(2,3) = Omega(3,2)
-
-                Omega(3,3) = -sigma*(s1*s1 + s2*s2) / normS
-
-            end if
-        else
-            Omega(1,1) = 0d0
-            Omega(1,2) = 0d0
-            Omega(2,1) = 0d0
-            Omega(2,2) = 0d0
-            if (p > 0) then
-                Omega(1,3) = 0d0
-                Omega(3,1) = 0d0
-                Omega(2,3) = 0d0
-                Omega(3,2) = 0d0
-                Omega(3,3) = 0d0
-            end if
-        end if
-
-    end subroutine s_compute_capilary_tensor
 
     subroutine s_get_capilary(q_prim_vf)
 
@@ -335,6 +247,7 @@ contains
             end do
         end if
 
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -675,11 +588,11 @@ contains
         @:DEALLOCATE(c_divs%vf)
 
         @:DEALLOCATE(Omega)
-        @:DEALLOCATE(gL_x, gR_x)
+        @:DEALLOCATE(gL_x, gR_x, cL_x, cR_x)
 
-        @:DEALLOCATE(gL_y, gR_y)
+        @:DEALLOCATE(gL_y, gR_y, cL_y, cR_y)
         if (p > 0) then
-            @:DEALLOCATE(gL_z, gR_z)
+            @:DEALLOCATE(gL_z, gR_z, cL_z, cR_z)
         end if
 
     end subroutine s_finalize_surface_tension_module
