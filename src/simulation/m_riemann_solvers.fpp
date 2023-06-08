@@ -32,10 +32,8 @@ module m_riemann_solvers
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_bubbles              !< To get the bubble wall pressure function
-    
-    use m_surface_tension
 
-    use m_helper
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -1048,7 +1046,7 @@ contains
                                         ! Compute the star velocities for the non-conservative terms
                                     end do
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_L + pres_L)*vel_L(dir_idx(1))
-                                    
+
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
@@ -1084,7 +1082,7 @@ contains
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
-                                    end if
+                                    end if 
 
                                     ! Compute left star solution state
                                 else if (s_S >= 0d0) then
@@ -1122,7 +1120,7 @@ contains
 
                                     if (sigma .ne. dflt_real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*s_S
+                                            qL_prim_rs${XYZ}$_vf(j, k, l, c_idx)*xi_L*s_S
                                     end if
 
                                     ! Compute right star solution state
@@ -1163,9 +1161,9 @@ contains
 
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = (E_Star + p_Star)*s_S
 
-                                    if (sigma .ne. dflt_real) then
+                                    if (sigma .ne. dflt_Real) then
                                         flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
-                                            qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx)*s_S
+                                            qR_prim_rs${XYZ}$_vf(j+1, k, l, c_idx)*xi_R*s_S
                                     end if
 
                                 end if
@@ -2200,12 +2198,13 @@ contains
         end if
 
         if (sigma .ne. dflt_real) then
-            call s_compute_capilary_source_flux(q_prim_vf, &
+            call s_compute_capilary_source_flux( &
+                q_prim_vf, &
                 vel_src_rsx_vf, &
                 vel_src_rsy_vf, &
                 vel_src_rsz_vf, &
                 flux_src_vf, &
-                norm_dir, ix, iy, iz, dir_idx)
+                norm_dir, ix, iy, iz)
         end if
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
@@ -2838,7 +2837,7 @@ contains
             ! Reshaping Inputted Data in z-direction ===========================
         else
 
-            if (any(Re_size > 0) .or. sigma .ne. dflt_Real) then
+            if (any(Re_size > 0) .or. sigma .ne. dflt_real) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = momxb, E_idx
                     do j = is1%beg, is1%end

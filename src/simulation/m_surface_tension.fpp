@@ -27,9 +27,7 @@ module m_surface_tension
         s_finalize_surface_tension_module
 
     type(vector_field) :: c_divs
-
-    real(kind(0d0)), allocatable, dimension(:, :) :: Omega
-    !$acc declare create(c_divs, Omega)
+    !$acc declare create(c_divs)
 
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
@@ -39,12 +37,6 @@ module m_surface_tension
 
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
     !$acc declare create(ix, iy, iz, is1, is2, is3, iv)
-
-    real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
-    !$acc declare create(w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3)
-
-    real(kind(0d0)) :: normWL, normWR, normW
-    !$acc declare create(normWL, normWR, normW)
 
     integer :: j, k, l, i  
 
@@ -83,38 +75,55 @@ contains
             @:ALLOCATE(cR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, c_idx:c_idx))
         end if
 
-        @:ALLOCATE(Omega(1:num_dims, 1:num_dims))
-
     end subroutine s_initialize_surface_tension_module
 
     subroutine s_compute_capilary_source_flux(q_prim_vf, &
-                                              vSrc_rsx, vSrc_rsy, vSrc_rsz, &
+                                              vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
                                               flux_src_vf, &
-                                              id, isx, isy, isz, dir_idx)
+                                              id, isx, isy, isz)
 
-        type(int_bounds_info) :: isx, isy, isz 
-        integer, dimension(3) :: dir_idx
+        type(int_bounds_info) :: isx, isy, isz
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        ! real(kind(0d0)), dimension(isx%beg:,isy%beg:,isz%beg:,1:) :: vSrc_rsx
-        ! real(kind(0d0)), dimension(isy%beg:,isx%beg:,isz%beg:,1:) :: vSrc_rsy
-        ! real(kind(0d0)), dimension(isz%beg:,isx%beg:,isy%beg:,1:) :: vSrc_rsz
-        real(kind(0d0)), dimension(-1:m,0:n,0:p,1:num_dims) :: vSrc_rsx
-        real(kind(0d0)), dimension(-1:n,0:m,0:p,1:num_dims) :: vSrc_rsy
-        real(kind(0d0)), dimension(-1:p,0:n,0:m,1:num_dims) :: vSrc_rsz
+        real(kind(0d0)), dimension(-1:m,0:n,0:p,1:num_dims) :: vel_src_rsx_vf
+        real(kind(0d0)), dimension(-1:n,0:m,0:p,1:num_dims) :: vel_src_rsy_vf
+        real(kind(0d0)), dimension(-1:p,0:n,0:m,1:num_dims) :: vel_src_rsz_vf
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: flux_src_vf
         integer :: id
 
-        if (id == 1) then
+        real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
+        real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
+        real(kind(0d0)) :: normWL, normWR, normW
 
+        !$acc update device(isx, isy, isz)
+
+        if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
             !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
-                        @:compute_capilary_tensor_x()
+                        w1L = gL_x(j, k, l, 1)
+                        w2L = gL_x(j, k, l, 2)
+                        w3L = 0d0
+                        if (p > 0) w3L = gL_x(j, k, l, 3)
+
+                        w1R = gR_x(j + 1, k, l, 1)
+                        w2R = gR_x(j + 1, k, l, 2)
+                        w3R = 0d0
+                        if (p > 0) w3R = gR_x(j + 1, k, l, 3)
+
+                        normWL = gL_x(j, k, l, num_dims + 1)
+                        normWR = gR_x(j + 1, k, l, num_dims + 1)
+
+                        w1 = (w1L + w1R)/2d0
+                        w2 = (w2L + w2R)/2d0
+                        w3 = (w3L + w3R)/2d0
+                        normW = (normWL + normWR)/2d0
+
+                        @:compute_capilary_stress_tensor()
 
                         do i = 1, num_dims
 
@@ -122,12 +131,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1,i)
 
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(1,i)*vSrc_rsx(j,k,l,i)
+                                Omega(1,i)*vel_src_rsx_vf(j,k,l,i)
 
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx(j, k, l, 1)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vel_src_rsx_vf(j, k, l, 1)
 
                     end do
                 end do
@@ -141,7 +150,25 @@ contains
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
-                        @:compute_capilary_tensor_y()
+                        w1L = gL_y(k, j, l, 1)
+                        w2L = gL_y(k, j, l, 2)
+                        w3L = 0d0
+                        if (p > 0) w3L = gL_y(k, j, l, 3)
+
+                        w1R = gR_y(k + 1, j, l, 1)
+                        w2R = gR_y(k + 1, j, l, 2)
+                        w3R = 0d0
+                        if (p > 0) w3R = gR_y(k + 1, j, l, 3)
+
+                        normWL = gL_y(k, j, l, num_dims + 1)
+                        normWR = gR_y(k + 1, j, l, num_dims + 1)
+
+                        w1 = (w1L + w1R)/2d0
+                        w2 = (w2L + w2R)/2d0
+                        w3 = (w3L + w3R)/2d0
+                        normW = (normWL + normWR)/2d0
+
+                        @:compute_capilary_stress_tensor()
 
                         do i = 1, num_dims
 
@@ -149,12 +176,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2,i)
 
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(2,i)*vSrc_rsy(k, j, l, i)
+                                Omega(2,i)*vel_src_rsy_vf(k, j, l, i)
                                 
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsy(k, j, l, 2)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vel_src_rsy_vf(k, j, l, 2)
 
                     end do
                 end do
@@ -168,7 +195,25 @@ contains
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
-                        @:compute_capilary_tensor_z()
+                        w1L = gL_z(l, j, k, 1)
+                        w2L = gL_z(l, j, k, 2)
+                        w3L = 0d0
+                        if (p > 0) w3L = gL_z(l, j, k, 3)
+
+                        w1R = gR_z(l + 1, j, k, 1)
+                        w2R = gR_z(l + 1, j, k, 2)
+                        w3R = 0d0
+                        if (p > 0) w3R = gR_z(l + 1, j, k, 3)
+
+                        normWL = gL_z(l, j, k, num_dims + 1)
+                        normWR = gR_z(l + 1, j, k, num_dims + 1)
+
+                        w1 = (w1L + w1R)/2d0
+                        w2 = (w2L + w2R)/2d0
+                        w3 = (w3L + w3R)/2d0
+                        normW = (normWL + normWR)/2d0
+
+                        @:compute_capilary_stress_tensor()
 
                         do i = 1, num_dims
 
@@ -176,12 +221,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3,i)
 
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(3,i)*vSrc_rsz(l, j, k, i)
+                                Omega(3,i)*vel_src_rsz_vf(l, j, k, i)
                                 
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsz(l, j, k, 3)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vel_src_rsz_vf(l, j, k, 3)
 
                     end do
                 end do
@@ -252,6 +297,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs%vf(num_dims + 1)%sf(j, k, l) = 0d0
+                    !s$acc loop seq
                     do i = 1, num_dims
                         c_divs%vf(num_dims + 1)%sf(j, k, l) = &
                             c_divs%vf(num_dims + 1)%sf(j, k, l) + &
@@ -587,7 +633,6 @@ contains
 
         @:DEALLOCATE(c_divs%vf)
 
-        @:DEALLOCATE(Omega)
         @:DEALLOCATE(gL_x, gR_x, cL_x, cR_x)
 
         @:DEALLOCATE(gL_y, gR_y, cL_y, cR_y)

@@ -218,9 +218,15 @@ contains
             @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
         end do
 
-        do l = adv_idx%end + 1, sys_size
-            @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-        end do
+        if (sigma .ne. dflt_real) then
+            do l = adv_idx%end + 1, intxe
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            end do
+        else
+            do l = adv_idx%end + 1, sys_size
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+            end do
+        end if
 
         do l = 1, cont_idx%end
             q_prim_qp%vf(l)%sf => &
