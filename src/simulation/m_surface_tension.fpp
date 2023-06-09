@@ -78,15 +78,15 @@ contains
     end subroutine s_initialize_surface_tension_module
 
     subroutine s_compute_capilary_source_flux(q_prim_vf, &
-                                              vel_src_rsx_vf, vel_src_rsy_vf, vel_src_rsz_vf, &
+                                              vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
                                               flux_src_vf, &
                                               id, isx, isy, isz)
 
         type(int_bounds_info) :: isx, isy, isz
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(-1:m,0:n,0:p,1:num_dims) :: vel_src_rsx_vf
-        real(kind(0d0)), dimension(-1:n,0:m,0:p,1:num_dims) :: vel_src_rsy_vf
-        real(kind(0d0)), dimension(-1:p,0:n,0:m,1:num_dims) :: vel_src_rsz_vf
+        real(kind(0d0)), dimension(-1:m,0:n,0:p,1:num_dims) :: vSrc_rsx_vf
+        real(kind(0d0)), dimension(-1:n,0:m,0:p,1:num_dims) :: vSrc_rsy_vf
+        real(kind(0d0)), dimension(-1:p,0:n,0:m,1:num_dims) :: vSrc_rsz_vf
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: flux_src_vf
@@ -95,8 +95,6 @@ contains
         real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
         real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(kind(0d0)) :: normWL, normWR, normW
-
-        !$acc update device(isx, isy, isz)
 
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
@@ -131,12 +129,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1,i)
 
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(1,i)*vel_src_rsx_vf(j,k,l,i)
+                                Omega(1,i)*vSrc_rsx_vf(j,k,l,i)
 
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vel_src_rsx_vf(j, k, l, 1)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
 
                     end do
                 end do
@@ -176,12 +174,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2,i)
 
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(2,i)*vel_src_rsy_vf(k, j, l, i)
+                                Omega(2,i)*vSrc_rsy_vf(k, j, l, i)
                                 
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vel_src_rsy_vf(k, j, l, 2)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsy_vf(k, j, l, 2)
 
                     end do
                 end do
@@ -221,12 +219,12 @@ contains
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3,i)
 
                             flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                                Omega(3,i)*vel_src_rsz_vf(l, j, k, i)
+                                Omega(3,i)*vSrc_rsz_vf(l, j, k, i)
                                 
                         end do
 
                         flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vel_src_rsz_vf(l, j, k, 3)
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsz_vf(l, j, k, 3)
 
                     end do
                 end do

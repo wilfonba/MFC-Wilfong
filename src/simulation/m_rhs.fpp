@@ -219,7 +219,7 @@ contains
         end do
 
         if (sigma .ne. dflt_real) then
-            do l = adv_idx%end + 1, intxe
+            do l = adv_idx%end + 1, sys_size - 1
                 @:ALLOCATE(q_prim_qp%vf(l)%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
             end do
         else

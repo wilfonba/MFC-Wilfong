@@ -34,6 +34,8 @@ module m_riemann_solvers
     use m_bubbles              !< To get the bubble wall pressure function
 
     use m_surface_tension
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -2204,7 +2206,7 @@ contains
                 vel_src_rsy_vf, &
                 vel_src_rsz_vf, &
                 flux_src_vf, &
-                norm_dir, ix, iy, iz)
+                norm_dir, isx, isy, isz)
         end if
 
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, &
