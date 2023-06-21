@@ -259,9 +259,11 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs%vf(1)%sf(j, k, l) = 1d0/(2d0*dx(j))  * &
-                        (cL_x(j+1,k,l,c_idx) + cR_x(j,k,l,c_idx) - &
-                        cL_x(j,k,l,c_idx) - cR_x(j-1,k,l,c_idx))
+                   !c_divs%vf(1)%sf(j, k, l) = 1d0/(2d0*dx(j))  * &
+                   !   (cL_x(j+1,k,l,c_idx) + cR_x(j,k,l,c_idx) - &
+                   !    cL_x(j,k,l,c_idx) - cR_x(j-1,k,l,c_idx))
+                    c_divs%vf(1)%sf(j, k, l) = 1d0/(2d0*dx(j)) * &
+                        (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j-1, k, l))    
                 end do
             end do
         end do
@@ -270,9 +272,11 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+                   !c_divs%vf(2)%sf(j, k, l) = 1d0/(2d0*dy(k)) * &
+                   !   (cL_y(k+1,j,l,c_idx) + cR_y(k,j,l,c_idx) - &
+                   !    cL_y(k,j,l,c_idx) - cR_y(k-1,j,l,c_idx))
                     c_divs%vf(2)%sf(j, k, l) = 1d0/(2d0*dy(k)) * &
-                        (cL_y(k+1,j,l,c_idx) + cR_y(k,j,l,c_idx) - &
-                        cL_y(k,j,l,c_idx) - cR_y(k-1,j,l,c_idx))
+                        (q_prim_vf(c_idx)%sf(j, k + 1,  l) - q_prim_vf(c_idx)%sf(j, k-1, l))
                 end do
             end do
         end do
@@ -600,26 +604,46 @@ contains
 
         !$acc update device(is1, is2, is3, iv)
 
-        if (n > 0) then
-            if (p > 0) then
-
-                call s_weno(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                                norm_dir, weno_dir, &
-                                is1, is2, is3)
-            else
-                call s_weno(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                                norm_dir, weno_dir, &
-                                is1, is2, is3)
+        if (weno_dir == 1) then
+!$acc parallel loop collapse(4) default(present)
+                do i = 1, ubound(v_vf, 1)
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            end do
+                        end do
+                    end do
+                end do
+                !$acc end parallel loop
+            else if (weno_dir == 2) then
+!$acc parallel loop collapse(4) default(present)
+                do i = 1, ubound(v_vf, 1)
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                                vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            end do
+                        end do
+                    end do
+                end do
+                !$acc end parallel loop
+            else if (weno_dir == 3) then
+!$acc parallel loop collapse(4) default(present)
+                do i = 1, ubound(v_vf, 1)
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                                vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            end do
+                        end do
+                    end do
+                end do
+                !$acc end parallel loop
             end if
-        else
-
-            call s_weno(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
-                            is1, is2, is3)
-        end if
 
     end subroutine s_reconstruct_cell_boundary_values_capilary
 

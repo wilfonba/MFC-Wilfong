@@ -2,10 +2,4 @@
 ! option is passed to ./mfc.sh run or test, enabling a GPU-oriented optimization
 ! that hard-codes certain case parameters from the input file.
 
-#:set MFC_CASE_OPTIMIZATION = True
-
-#:set weno_order = 1
-#:set weno_polyn = 0
-#:set nb         = 1
-#:set num_dims   = 2
-#:set nterms     = -100
+#:set MFC_CASE_OPTIMIZATION = False
