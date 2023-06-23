@@ -95,7 +95,7 @@ contains
         real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
         real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(kind(0d0)) :: normWL, normWR, normW
-
+        
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
             !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
@@ -245,23 +245,11 @@ contains
 
         isx%end = m; isy%end = n; isz%end = p
 
-
-        iv%beg = c_idx;iv%end = c_idx
-        ! reconstruct gradient components at cell boundaries
-        do i = 1, num_dims
-            call s_reconstruct_cell_boundary_values_capilary(q_prim_vf(iv%beg:iv%end), &
-                                                                cL_x, cL_y, cL_z, &
-                                                                cR_x, cR_y, cR_z, i)
-        end do
-
         ! compute gradient components
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                   !c_divs%vf(1)%sf(j, k, l) = 1d0/(2d0*dx(j))  * &
-                   !   (cL_x(j+1,k,l,c_idx) + cR_x(j,k,l,c_idx) - &
-                   !    cL_x(j,k,l,c_idx) - cR_x(j-1,k,l,c_idx))
                     c_divs%vf(1)%sf(j, k, l) = 1d0/(2d0*dx(j)) * &
                         (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j-1, k, l))    
                 end do
@@ -272,9 +260,6 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                   !c_divs%vf(2)%sf(j, k, l) = 1d0/(2d0*dy(k)) * &
-                   !   (cL_y(k+1,j,l,c_idx) + cR_y(k,j,l,c_idx) - &
-                   !    cL_y(k,j,l,c_idx) - cR_y(k-1,j,l,c_idx))
                     c_divs%vf(2)%sf(j, k, l) = 1d0/(2d0*dy(k)) * &
                         (q_prim_vf(c_idx)%sf(j, k + 1,  l) - q_prim_vf(c_idx)%sf(j, k-1, l))
                 end do
@@ -287,8 +272,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         c_divs%vf(3)%sf(j, k, l) = 1d0/(2d0*dz(l)) * &
-                            (cL_z(k+1,j,l,c_idx) + cR_z(k,j,l,c_idx) - &
-                            cL_z(k,j,l,c_idx) - cR_z(k-1,j,l,c_idx))
+                            (q_prim_vf(c_idx)%sf(j, k, l+1) - q_prim_vf(c_idx)%sf(j, k, l-1))
                     end do
                 end do
             end do
@@ -606,7 +590,7 @@ contains
 
         if (weno_dir == 1) then
 !$acc parallel loop collapse(4) default(present)
-                do i = 1, ubound(v_vf, 1)
+            do i = iv%beg, iv%end 
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -619,7 +603,7 @@ contains
                 !$acc end parallel loop
             else if (weno_dir == 2) then
 !$acc parallel loop collapse(4) default(present)
-                do i = 1, ubound(v_vf, 1)
+                do i = iv%beg, iv%end
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -632,7 +616,7 @@ contains
                 !$acc end parallel loop
             else if (weno_dir == 3) then
 !$acc parallel loop collapse(4) default(present)
-                do i = 1, ubound(v_vf, 1)
+                do i = iv%beg, iv%end
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end

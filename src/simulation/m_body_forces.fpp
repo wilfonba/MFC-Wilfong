@@ -125,7 +125,7 @@ contains
                         rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + &
                             rhoM(j,k,l)*accel_bf(1)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
-                            rhoM(j,k,l)*q_prim_vf(momxb)%sf(j,k,l)*accel_bf(1)
+                            q_cons_vf(momxb)%sf(j,k,l)*accel_bf(1)
                     end do
                 end do
             end do
@@ -139,7 +139,7 @@ contains
                         rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + &
                             rhoM(j,k,l)*accel_bf(2)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
-                            rhoM(j,k,l)*q_prim_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
+                            q_cons_vf(momxb+1)%sf(j,k,l)*accel_bf(2)
                     end do
                 end do
             end do
@@ -153,7 +153,7 @@ contains
                         rhs_vf(momxe)%sf(j,k,l) = rhs_vf(momxe)%sf(j,k,l) + &
                             (rhoM(j,k,l))*accel_bf(3)
                         rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + &
-                            rhoM(j,k,l)*q_prim_vf(momxe)%sf(j,k,l)*accel_bf(3)
+                            q_cons_vf(momxe)%sf(j,k,l)*accel_bf(3)
                     end do
                 end do
             end do
