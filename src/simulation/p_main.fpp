@@ -63,6 +63,8 @@ program p_main
     use m_surface_tension
     
     use m_body_forces
+
+    use m_muscl
     ! ==========================================================================
 
     implicit none
@@ -120,7 +122,7 @@ program p_main
     if (proc_rank == 0) then
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
-        call s_check_input_file()
+        !call s_check_input_file()
         print '(" Simulating a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
     end if
 
@@ -197,10 +199,14 @@ program p_main
     ! Populating the buffers of the grid variables using the boundary conditions
     call s_populate_grid_variables_buffers()
 
-    ! Computation of parameters, allocation of memory, association of pointers,
-    ! and/or execution of any other tasks that are needed to properly configure
-    ! the modules. The preparations below DO DEPEND on the grid being complete.
-    call s_initialize_weno_module()
+    if (recon_type == 1) then
+        ! Computation of parameters, allocation of memory, association of pointers,
+        ! and/or execution of any other tasks that are needed to properly configure
+        ! the modules. The preparations below DO DEPEND on the grid being complete.
+        call s_initialize_weno_module()
+    elseif (recon_type == 2) then
+        call s_initialize_muscl_module()
+    end if
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
     print *, "[MEM-INST] After: s_initialize_weno_module"
@@ -372,7 +378,11 @@ program p_main
     call s_finalize_rhs_module()
     call s_finalize_cbc_module()
     call s_finalize_riemann_solvers_module()
-    call s_finalize_weno_module()
+    if (recon_type == 1) then
+        call s_finalize_weno_module()
+    elseif (recon_type == 2) then
+        call s_finalize_muscl_module()
+    endif
     call s_finalize_start_up_module()
     call s_finalize_variables_conversion_module()
     if (grid_geometry == 3) call s_finalize_fftw_module

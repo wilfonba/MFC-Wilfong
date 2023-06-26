@@ -48,6 +48,8 @@ module m_rhs
     use m_body_forces
     
     use m_surface_tension
+
+    use m_muscl
     ! ==========================================================================
 
     implicit none
@@ -2678,48 +2680,52 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
+        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
         ! Reconstruction in s1-direction ===================================
-
+        
+        #:for SCHEME, NUM in [('weno',1),('muscl',2)] 
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
-            weno_dir = 1; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+            recon_dir = 1; is1%beg = is1%beg + ${SCHEME}$_polyn
+            is1%end = is1%end - ${SCHEME}$_polyn
 
         elseif (norm_dir == 2) then
             is1 = iy; is2 = ix; is3 = iz
-            weno_dir = 2; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+            recon_dir = 2; is1%beg = is1%beg + ${SCHEME}$_polyn
+            is1%end = is1%end - ${SCHEME}$_polyn
 
         else
             is1 = iz; is2 = iy; is3 = ix
-            weno_dir = 3; is1%beg = is1%beg + weno_polyn
-            is1%end = is1%end - weno_polyn
+            recon_dir = 3; is1%beg = is1%beg + ${SCHEME}$_polyn
+            is1%end = is1%end - ${SCHEME}$_polyn
 
         end if
 
-        if (n > 0) then
-            if (p > 0) then
+        if (recon_type == ${NUM}$) then
+            if (n > 0) then
+                if (p > 0) then
 
-                call s_weno(v_vf(iv%beg:iv%end), &
+                    call s_${SCHEME}$(v_vf(iv%beg:iv%end), &
                     vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                                norm_dir, weno_dir, &
+                                norm_dir, recon_dir, &
                                 is1, is2, is3)
-            else
-                call s_weno(v_vf(iv%beg:iv%end), &
+                else
+                    call s_${SCHEME}$(v_vf(iv%beg:iv%end), &
                     vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                                norm_dir, weno_dir, &
+                                norm_dir, recon_dir, &
                                 is1, is2, is3)
-            end if
-        else
+                end if
+            else
 
-            call s_weno(v_vf(iv%beg:iv%end), &
+                call s_${SCHEME}$(v_vf(iv%beg:iv%end), &
                         vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
+                            norm_dir, recon_dir, &
                             is1, is2, is3)
-        end if
+            end if
+        endif
+        #:endfor
 
         ! ==================================================================
     end subroutine s_reconstruct_cell_boundary_values ! --------------------

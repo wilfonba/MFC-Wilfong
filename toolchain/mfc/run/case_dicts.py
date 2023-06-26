@@ -7,7 +7,7 @@ COMMON = [
     "Web", "poly_sigma", "case_dir", "thermal", "polytropic",
     "m", "mpp_lim", "R0ref", "adv_alphan", "num_fluids", "model_eqns",
     "nb", "weno_order", "rhoref", "bubbles", "Re_inv", "n", "precision",
-    "Ca", "polydisperse", "sigma"
+    "Ca", "polydisperse", "sigma", "recon_type", "muscl_order",
 ]
 
 
@@ -73,7 +73,7 @@ SIMULATION = COMMON + [
     'alt_crv', 'alt_soundspeed', 'regularization', 'null_weights',
     'mixture_err', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
-    'num_integrals', 'cu_mpi', 'tvd_riemann_flux', 'flux_lim'
+    'num_integrals', 'cu_mpi', 'tvd_riemann_flux', 'muscl_lim'
 ]
 
 for cmp in ["x", "y", "z"]:
@@ -140,7 +140,7 @@ for fl_id in range(1,10+1):
         POST_PROCESS.append(f"fluid_pp({fl_id})%{attribute}")
 
 
-CASE_OPTIMIZATION = [ "nb", "weno_order" ]
+CASE_OPTIMIZATION = [ "nb", "weno_order", "muscl_order" ]
 
 
 def get_input_dict_keys(target_name: str) -> list:

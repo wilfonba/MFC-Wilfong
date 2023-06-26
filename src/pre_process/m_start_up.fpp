@@ -105,7 +105,8 @@ contains
             rhoref, pref, bubbles, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, qbmm, &
-            sigR, sigV, dist_type, rhoRV, R0_type, sigma
+            sigR, sigV, dist_type, rhoRV, R0_type, sigma, &
+            recon_type, muscl_order
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -126,6 +127,10 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            if (recon_type == 2) then
+                weno_order = muscl_order
+            end if
 
         else
             call s_mpi_abort('File pre_process.inp is missing. Exiting ...')

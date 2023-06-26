@@ -96,7 +96,7 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, weno_order, &
+            nb, weno_order, muscl_order, muscl_lim, &
 #:endif
             Ca, Web, Re_inv, &
             monopole, mono, num_mono, &
@@ -105,7 +105,7 @@ contains
             polydisperse, poly_sigma, qbmm, &
             R0_type, sigma, &
             bf_x, bf_y, bf_z, k_x, k_y, k_z, &
-            w_x, w_y, w_z, p_x, p_y, p_z
+            w_x, w_y, w_z, p_x, p_y, p_z, recon_type
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.

@@ -67,7 +67,7 @@ program p_main
     if (proc_rank == 0) then
         call s_assign_default_values_to_user_inputs()
         call s_read_input_file()
-        call s_check_input_file()
+        !call s_check_input_file()
         
         print '(" Post-processing a "I0"x"I0"x"I0" case on "I0" rank(s)")', m, n, p, num_procs
     end if

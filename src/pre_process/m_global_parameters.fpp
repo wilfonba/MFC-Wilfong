@@ -76,7 +76,9 @@ module m_global_parameters
     logical :: adv_alphan      !< Advection of the last volume fraction
     logical :: mpp_lim         !< Alpha limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
+    integer :: recon_type      !< type of reconstruction to use
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order     !< Order of accuracy for the MUSCL reconstruction
     logical :: hypoelasticity  !< activate hypoelasticity
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
@@ -240,6 +242,8 @@ contains
         model_eqns = dflt_int
         num_fluids = dflt_int
         adv_alphan = .false.
+        recon_type = dflt_int
+        muscl_order = dflt_int
         weno_order = dflt_int
 
         hypoelasticity = .false.

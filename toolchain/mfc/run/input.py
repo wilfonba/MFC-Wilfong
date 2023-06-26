@@ -60,9 +60,22 @@ class MFCInputFile:
             elif bubble_model == 3:
                 nterms = 6
 
-            content = content + f"""
+            if self.case_dict["recon_type"] == 1:
+                content = content + f"""
 #:set weno_order = {int(self.case_dict["weno_order"])}
 #:set weno_polyn = {int((self.case_dict["weno_order"] - 1) / 2)}
+#:set muscl_order = 0
+@:set muscl_lim  = 0
+#:set nb         = {int(self.case_dict.get("nb", 1))}
+#:set num_dims   = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
+#:set nterms     = {nterms}
+"""
+            elif self.case_dict["recon_type"] == 2:
+                content = content + f"""
+#:set weno_order = 0
+#:set weno_polyn = 0
+#:set muscl_order = {int((self.case_dict["muscl_order"]))}
+#:set muscl_lim  = {int((self.case_dict["muscl_lim"]))}
 #:set nb         = {int(self.case_dict.get("nb", 1))}
 #:set num_dims   = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
 #:set nterms     = {nterms}
