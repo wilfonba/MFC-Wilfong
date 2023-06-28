@@ -107,8 +107,9 @@ contains
 
         integer :: j, k, l, i, q
         real(kind(0d0)) :: r, phir, delta, top, bottom
-        real(kind(0d0)) :: ph = 0d0 ! placeholder for speed of sound
-        real(kind(0d0)) :: rho_avg, gamma_avg, pi_inf_avg, c_avg
+        real(kind(0d0)) :: iceps, aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C, beta, sign, moncon
+
+        iceps = 1d-4; beta = 1.6d0
 
         is1 = is1_d
         is2 = is2_d
@@ -163,6 +164,7 @@ contains
 !$acc end parallel loop
             end if
         else if (muscl_order == 2) then
+            ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 !$acc parallel loop collapse(4) gang hector default(present) private(r, phir, delta, rho_avg, &
@@ -174,22 +176,23 @@ contains
 
                                 if (v_rs_ws_${XYZ}$(j, k, l, momxb + ${MUSCL_DIR}$ - 1) < 0) then
                                     top = v_rs_ws_${XYZ}$(j, k, l, i) - &
-                                        v_rs_ws_${XYZ}$(j - 2, k, l, advxb)
-                                    bottom = v_rs_ws_${XYZ}$(j + 1, k, l, advxb) - &
-                                        v_rs_ws_${XYZ}$(j - 1, k, l, advxb) 
+                                        v_rs_ws_${XYZ}$(j - 2, k, l, i)
+                                    bottom = v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
+                                        v_rs_ws_${XYZ}$(j - 1, k, l, i) 
                                 else
-                                    top = v_rs_ws_${XYZ}$(j + 2, k, l, advxb) - &
-                                        v_rs_ws_${XYZ}$(j, k, l, advxb)
-                                    bottom = v_rs_ws_${XYZ}$(j + 1, k, l, advxb) - &
-                                        v_rs_ws_${XYZ}$(j - 1, k, l, advxb)
+                                    top = v_rs_ws_${XYZ}$(j + 2, k, l, i) - &
+                                        v_rs_ws_${XYZ}$(j, k, l, i)
+                                    bottom = v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
+                                        v_rs_ws_${XYZ}$(j - 1, k, l, i)
                                 end if
 
-                                if (abs(bottom) > sgm_eps) then
-                                    r = top/bottom
-                                    @:compute_slope_limiter()
+                                if (bottom <= 0d0) then
+                                    r = top/min(bottom, sgm_eps)
                                 else
-                                    phir = 1d0
+                                    r = top/max(bottom, sgm_eps)
                                 endif
+
+                                @:compute_slope_limiter()
                             
                                 delta = 5d-1*(v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
                                               v_rs_ws_${XYZ}$(j - 1, k, l, i))
@@ -208,6 +211,65 @@ contains
                 end do
             end if
             #:endfor
+            ! THINC Update
+!             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+!             if (muscl_dir == ${MUSCL_DIR}$) then
+! !$acc parallel loop collapse(4) gang hector default(present) private(r, phir, delta, rho_avg, &
+! !$acc gamma_avg, H_avg, vel_avg_rms, c_avgg)
+!                 do l = is3%beg, is3%end
+!                     do k = is2%beg, is2%end
+!                         do j = is1%beg, is1%end
+                            
+!                             aCL = v_rs_ws_${XYZ}$(j - 1, k, l, advxb)
+!                             aC = v_rs_ws_${XYZ}$(j, k, l, advxb)
+!                             aCR = v_rs_ws_${XYZ}$(j + 1, k, l, advxb)
+
+!                             moncon = (aCR - aC)*(aC - aCL)
+
+!                             if (aC > iceps .and. aC < 1d0 - iceps .and. moncon > 1d-8) then ! Interface cell
+!                                 print*, "HERE", j
+!                                 if (aCR - aCL > 0d0) then
+!                                     sign = 1d0
+!                                 else
+!                                     sign = -1d0
+!                                 endif
+
+!                                 qmin = min(aCR, aCL)
+!                                 qmax = max(aCR, aCL) - qmin
+
+!                                 C = (aC - qmin + sgm_eps) / (qmax + sgm_eps)
+!                                 B = exp(sign*beta*(2d0*C - 1d0))
+!                                 A = (B / cosh(beta) - 1d0) / tanh(beta)
+
+!                                 ! Left reconstruction
+!                                 aTHINC = qmin + 5d-1*qmax*(1d0 + sign * A)
+!                                 if (aTHINC < iceps) aTHINC = iceps
+!                                 if (aTHINC > 1 - iceps) aTHINC = 1 - iceps
+!                                 vL_rs_vf_${XYZ}$(j, k, l, contxb) = vL_rs_vf_${XYZ}$(j, k, l, contxb) / &
+!                                     vL_rs_vf_${XYZ}$(j, k, l, advxb) * aTHINC
+!                                 vL_rs_vf_${XYZ}$(j, k, l, contxe) = vL_rs_vf_${XYZ}$(j, k, l, contxe) / &
+!                                     (1d0 - vL_rs_vf_${XYZ}$(j, k, l, advxb)) * (1d0 - aTHINC)
+!                                 vL_rs_vf_${XYZ}$(j, k, l, advxb) = aTHINC
+!                                 vL_rs_vf_${XYZ}$(j, k, l, advxe) = 1 - aTHINC
+
+!                                 ! Right reconstruction
+!                                 aTHINC = qmin + 5d-1*qmax*(1d0 + sign*(tanh(beta) + A) / (1d0 + A*tanh(beta)))
+!                                 if (aTHINC < iceps) aTHINC = iceps
+!                                 if (aTHINC > 1 - iceps) aTHINC = 1 - iceps
+!                                 vR_rs_vf_${XYZ}$(j, k, l, contxb) = vL_rs_vf_${XYZ}$(j, k, l, contxb) / &
+!                                     vL_rs_vf_${XYZ}$(j, k, l, advxb) * aTHINC
+!                                 vR_rs_vf_${XYZ}$(j, k, l, contxe) = vL_rs_vf_${XYZ}$(j, k, l, contxe) / &
+!                                     (1d0 - vL_rs_vf_${XYZ}$(j, k, l, advxb)) * (1d0 - aTHINC)
+!                                 vR_rs_vf_${XYZ}$(j, k, l, advxb) = aTHINC
+!                                 vR_rs_vf_${XYZ}$(j, k, l, advxe) = 1 - aTHINC
+
+!                             end if
+
+!                         end do
+!                     end do
+!                 end do
+!             end if
+!             #:endfor
         else if (muscl_order == 3) then
              #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
