@@ -167,7 +167,7 @@ contains
             ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
-!$acc parallel loop collapse(4) gang hector default(present) private(r, phir, delta, rho_avg, &
+!$acc parallel loop collapse(4) gang vector default(present) private(r, phir, delta, rho_avg, &
 !$acc gamma_avg, H_avg, vel_avg_rms, c_avgg)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end

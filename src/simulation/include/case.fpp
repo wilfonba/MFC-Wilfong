@@ -4,8 +4,11 @@
 
 #:set MFC_CASE_OPTIMIZATION = True
 
-#:set weno_order = 3
-#:set weno_polyn = 1
+#:set weno_order = 5
+#:set weno_polyn = 2
+#:set muscl_order = 0
+#:set muscl_lim  = 0
+#:set muscl_polyn = 0
 #:set nb         = 1
 #:set num_dims   = 2
 #:set nterms     = -100
