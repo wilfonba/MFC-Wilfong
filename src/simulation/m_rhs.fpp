@@ -50,6 +50,8 @@ module m_rhs
     use m_surface_tension
 
     use m_muscl
+
+    use m_helper
     ! ==========================================================================
 
     implicit none
@@ -687,7 +689,6 @@ contains
         call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers()
         call nvtxEndRange
-
         
         ! ==================================================================
 
@@ -2726,6 +2727,83 @@ contains
             end if
         endif
         #:endfor
+
+        ! print*, vL_x(:,0,0,1)
+        ! print*, vL_x(:,0,0,2)
+        ! print*, vL_x(:,0,0,3)
+        ! print*, vL_x(:,0,0,4)
+
+        ! if (recon_dir == 1) then
+        !     print*, '========================================================='
+        !     print*, 'dir: ', recon_dir
+        !     print*, '========================================================='
+        !     print*, ''
+        !     print*, '=== Left Reconstruction ================================='
+        !     print*, "contxb"
+        !     call s_print_2d_array(transpose(vL_x(:,:,0,contxb)))
+        !     print*, "contxe"
+        !     call s_print_2d_array(transpose(vL_x(:,:,0,contxe)))
+        !     print*, "momxb"
+        !     call s_print_2d_array(transpose(vL_x(:,:,0,momxb)))
+        !     print*, "momxe"
+        !     call s_print_2d_array(transpose(vL_x(:,:,0,momxe)))
+        !     print*, "advxb"
+        !     call s_print_2d_array(transpose(vL_x(:,:,0,advxb)))
+        !     print*, "advxe"
+        !     call s_print_2d_array(transpose(vL_x(:,:,0,advxe)))
+        !     print*, "E_idx"
+        !     call s_print_2d_array(transpose(vR_x(:,:,0,E_idx)))
+        !     print*, '=== Right Reconstruction ================================='
+        !     print*, "contxb"
+        !     call s_print_2d_array(transpose(vR_x(:,:,0,contxb)))
+        !     print*, "contxe"
+        !     call s_print_2d_array(transpose(vR_x(:,:,0,contxe)))
+        !     print*, "momxb"
+        !     call s_print_2d_array(transpose(vR_x(:,:,0,momxb)))
+        !     print*, "momxe"
+        !     call s_print_2d_array(transpose(vR_x(:,:,0,momxe)))
+        !     print*, "advxb"
+        !     call s_print_2d_array(transpose(vR_x(:,:,0,advxb)))
+        !     print*, "advxe"
+        !     call s_print_2d_array(transpose(vR_x(:,:,0,advxe)))
+        !     print*, "E_idx"
+        !     call s_print_2d_array(transpose(vR_x(:,:,0,E_idx)))
+        ! else
+        !     print*, '========================================================='
+        !     print*, 'dir: ', recon_dir
+        !     print*, '========================================================='
+        !     print*, ''
+        !     print*, '=== Left Reconstruction ================================='
+        !     print*, "contxb"
+        !     call s_print_2d_array(transpose(vL_y(:,:,0,contxb)))
+        !     print*, "contxe"
+        !     call s_print_2d_array(transpose(vL_y(:,:,0,contxe)))
+        !     print*, "momxb"
+        !     call s_print_2d_array(transpose(vL_y(:,:,0,momxb)))
+        !     print*, "momxe"
+        !     call s_print_2d_array(transpose(vL_y(:,:,0,momxe)))
+        !     print*, "advxb"
+        !     call s_print_2d_array(transpose(vL_y(:,:,0,advxb)))
+        !     print*, "advxe"
+        !     call s_print_2d_array(transpose(vL_y(:,:,0,advxe)))
+        !     print*, "E_idx"
+        !     call s_print_2d_array(transpose(vR_y(:,:,0,E_idx)))
+        !     print*, '=== Right Reconstruction ================================='
+        !     print*, "contxb"
+        !     call s_print_2d_array(transpose(vR_y(:,:,0,contxb)))
+        !     print*, "contxe"
+        !     call s_print_2d_array(transpose(vR_y(:,:,0,contxe)))
+        !     print*, "momxb"
+        !     call s_print_2d_array(transpose(vR_y(:,:,0,momxb)))
+        !     print*, "momxe"
+        !     call s_print_2d_array(transpose(vR_y(:,:,0,momxe)))
+        !     print*, "advxb"
+        !     call s_print_2d_array(transpose(vR_y(:,:,0,advxb)))
+        !     print*, "advxe"
+        !     call s_print_2d_array(transpose(vR_y(:,:,0,advxe)))
+        !     print*, "E_idx"
+        !     call s_print_2d_array(transpose(vR_y(:,:,0,E_idx)))
+        ! endif
 
         ! ==================================================================
     end subroutine s_reconstruct_cell_boundary_values ! --------------------

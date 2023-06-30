@@ -496,7 +496,7 @@ contains
             call s_initialize_weno(v_vf, &
                                    norm_dir, weno_dir)
         end if
-
+        
         if (weno_order == 1) then
             if (weno_dir == 1) then
 !$acc parallel loop collapse(4) default(present)

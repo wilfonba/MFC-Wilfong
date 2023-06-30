@@ -110,6 +110,8 @@ contains
             (n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) &
             .and. &
             (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
+        
+        return
 
         if (n == 0) then
             is2%beg = 0

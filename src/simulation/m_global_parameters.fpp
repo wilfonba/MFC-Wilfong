@@ -113,6 +113,8 @@ module m_global_parameters
         integer :: muscl_polyn
     #:endif
 
+    logical :: int_comp
+
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
     logical :: mapped_weno    !< WENO with mapping of nonlinear weights
     logical :: mp_weno        !< Monotonicity preserving (MP) WENO
@@ -424,6 +426,8 @@ contains
             muscl_lim = dflt_int
         #:endif
 
+        int_comp = .false.
+
         R0_type = dflt_int
 
         ! User inputs for qbmm for simulation code
@@ -511,7 +515,7 @@ contains
 !$acc update device(weno_polyn)
 !$acc update device(nb)
             elseif (recon_type == 2) then
-                muscl_polyn = muscl_order
+                muscl_polyn = muscl_order - 1
             end if
         #:endif
 
@@ -800,7 +804,7 @@ contains
             if (any(Re_size > 0)) then
                 buff_size = 2*muscl_order + 2
             else
-                buff_size = muscl_order + 2
+                buff_size = muscl_order
             end if
         endif
 
