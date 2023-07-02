@@ -171,8 +171,8 @@ contains
             ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
-!$acc parallel loop collapse(4) gang vector default(present) private(r, phir, delta, rho_avg, &
-!$acc gamma_avg, H_avg, vel_avg_rms, c_avgg)
+!$acc parallel loop collapse(4) gang vector default(present) private(top, &
+!$acc bottom, sign, r, phir, delta)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -207,7 +207,6 @@ contains
                                 ! reconstruct from the right side
                                 vR_rs_vf_${XYZ}$(j, k, l, i) = &
                                    v_rs_ws_${XYZ}$(j, k, l, i) - 5d-1*phir*delta
-
                             end do
                         end do
                     end do
@@ -219,12 +218,13 @@ contains
                 call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
                                             vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
                                             norm_dir, muscl_dir, is1_d, is2_d, is3_d)
-            endif
+            endif 
 
         else if (muscl_order == 3) then
              #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
-!$acc parallel loop collapse(4) gang vector default(present) private(r, phir, delta)
+!$acc parallel loop collapse(4) gang vector default(present) private(top, &
+!$acc bottom, sign, r, phir, delta)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -277,7 +277,7 @@ contains
                     vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
                     norm_dir, muscl_dir, is1_d, is2_d, is3_d)
             end if
-        
+
         end if
 
     end subroutine s_muscl
@@ -307,8 +307,8 @@ contains
 
         #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
-!$acc parallel loop collapse(4) gang hector default(present) private(r, phir, delta, rho_avg, &
-!$acc gamma_avg, H_avg, vel_avg_rms, c_avgg)
+!$acc parallel loop collapse(3) gang vector default(present) private(aCL, aC, &
+!$acc aCR, aTHINC, moncon, sign, qmin, qmax)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end

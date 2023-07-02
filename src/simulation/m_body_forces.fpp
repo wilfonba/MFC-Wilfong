@@ -17,9 +17,7 @@ module m_body_forces
 
     implicit none
 
-    private; public :: s_compute_acceleration, &
-        s_compute_mixture_density, &
-        s_compute_body_forces_rhs, &
+    private; public :: s_compute_body_forces_rhs, &
         s_initialize_body_forces_module, &
         s_finalize_body_forces_module
 
@@ -107,17 +105,30 @@ contains
 
     end subroutine s_compute_mixture_density
 
-    subroutine s_compute_body_forces_rhs(idir, q_prim_vf, q_cons_vf, rhs_vf)
+    subroutine s_compute_body_forces_rhs(q_cons_vf, q_prim_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        integer, intent(IN) :: idir
 
         integer :: i, j, k, l !< Loop variables
 
-        if (idir == 1 .and. bf_x .ne. dflt_int) then
+        call s_compute_acceleration(mytime)
+        call s_compute_mixture_density(q_cons_vf)
 
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = momxb, E_idx
+            do l = 0,p
+                do k = 0,n
+                    do j = 0,m
+                        rhs_vf(i)%sf(j, k, l) = 0d0
+                    end do
+                end do
+            end do
+        end do
+
+        if (bf_x .ne. dflt_int) then
+            
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0,p
                 do k = 0,n
@@ -129,9 +140,10 @@ contains
                     end do
                 end do
             end do
+        end if
 
-        elseif (idir == 2 .and. bf_y .ne. dflt_int) then
-
+        if (bf_y .ne. dflt_int) then
+            
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0,p
                 do k = 0,n
@@ -143,8 +155,9 @@ contains
                     end do
                 end do
             end do
+        end if
 
-        elseif (idir == 3 .and. bf_z .ne. dflt_int) then
+        if (bf_z .ne. dflt_int) then
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0,p

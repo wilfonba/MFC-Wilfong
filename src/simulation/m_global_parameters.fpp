@@ -418,7 +418,7 @@ contains
         thermal = dflt_int
         R0ref = dflt_real
 
-        recon_type = dflt_int
+        recon_type = 1
         #:if not MFC_CASE_OPTIMIZATION
             nb = dflt_int
             weno_order = dflt_int

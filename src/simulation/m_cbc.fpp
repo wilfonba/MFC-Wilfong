@@ -1454,6 +1454,8 @@ contains
             .and. &
             (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
 
+        return
+
         ! Deallocating the cell-average primitive variables
         deallocate (q_prim_rsx_vf)
         if (weno_order > 1) then

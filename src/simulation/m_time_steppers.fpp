@@ -28,6 +28,8 @@ module m_time_steppers
     use m_fftw
 
     use m_nvtx
+
+    use m_body_forces
     ! ==========================================================================
 
     implicit none
@@ -225,6 +227,8 @@ contains
         !print *, q_cons_ts(1)%vf(adv_idx%end)%sf(102,0,0)
         !print *, q_cons_ts(1)%vf(mom_idx%beg)%sf(102,0,0)
 
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
@@ -284,6 +288,8 @@ contains
             end do
         end do
 
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
@@ -306,6 +312,8 @@ contains
                 end do
             end do
         end do
+
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt/2d0)
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
@@ -367,6 +375,8 @@ contains
             end do
         end do
 
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
@@ -392,6 +402,8 @@ contains
             end do
         end do
 
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4d0)
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
@@ -416,6 +428,8 @@ contains
             end do
         end do
 
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
@@ -435,6 +449,29 @@ contains
         ! ==================================================================
 
     end subroutine s_3rd_order_tvd_rk ! ------------------------------------
+
+    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf, rhs_vf, ldt)
+
+        type(scalar_field), dimension(1:sys_size) :: q_cons_vf, q_prim_vf, rhs_vf
+        real(kind(0d0)) :: ldt !< local dt
+
+        integer :: i, j, k, l
+
+        call s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = momxb, E_idx
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
+                            dt*rhs_vf(i)%sf(j, k, l)
+                    end do 
+                end do
+            end do
+        end do
+
+    end subroutine s_apply_bodyforces
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main

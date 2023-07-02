@@ -747,15 +747,6 @@ contains
         if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf)
         
         call nvtxEndRange
-        
-        call nvtxStartRange("RHS-BodyForces")
-
-        if (bodyForces) then
-            call s_compute_mixture_density(q_cons_qp%vf)
-            call s_compute_acceleration(mytime)
-        end if
-
-        call nvtxEndRange
         ! Dimensional Splitting Loop =======================================
 
         do id = 1, num_dims
@@ -1720,15 +1711,6 @@ contains
 
             call nvtxEndRange
 
-            ! RHS additions for body forces
-            call nvtxStartRange("RHS-BodyForces")
-
-            if (bodyForces) then
-                call  s_compute_body_forces_rhs(id, q_prim_qp%vf, q_cons_qp%vf, rhs_vf)
-            end if
-
-            call nvtxEndRange
-
             ! RHS additions for hypoelasticity
             call nvtxStartRange("RHS_Hypoelasticity")
             
@@ -2238,7 +2220,8 @@ contains
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
                             if (i == momxb + 1) then
-                                q_cons_qp%vf(i)%sf(l, -j, k) = 0d0
+                                q_cons_qp%vf(i)%sf(l, -j, k) = &
+                                    - q_cons_qp%vf(i)%sf(l, j- 1, k)
                             else
                                 q_cons_qp%vf(i)%sf(l, -j, k) = &
                                     q_cons_qp%vf(i)%sf(l, 0, k)
@@ -2378,7 +2361,8 @@ contains
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
                             if (i == momxb + 1) then
-                                q_cons_qp%vf(i)%sf(l, n + j, k) = 0d0
+                                q_cons_qp%vf(i)%sf(l, n + j, k) = &
+                                    -q_cons_qp%vf(i)%sf(l, n - (j - 1), k)
                             else
                                 q_cons_qp%vf(i)%sf(l, n + j, k) = &
                                     q_cons_qp%vf(i)%sf(l, n, k)

@@ -53,6 +53,7 @@ print(json.dumps({
     'mpp_lim'                      : 'T',
     'mixture_err'                  : 'T',
     'time_stepper'                 : 3,
+    'recon_type'                   : 1,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
     'mapped_weno'                  : 'T',
@@ -62,10 +63,10 @@ print(json.dumps({
     'riemann_solver'               : 2,
     'wave_speeds'                  : 1,
     'avg_state'                    : 2,
-    'bc_x%beg'                     : -6,#11,
-    'bc_x%end'                     : -6,#12
-    'bc_y%beg'                     : -2,
-    'bc_y%end'                     : -6,
+    'bc_x%beg'                     : -3,#11,
+    'bc_x%end'                     : -3,#12
+    'bc_y%beg'                     : -3,
+    'bc_y%end'                     : -3,
     # ==========================================================
 
     # Formatted Database Files Structure Parameters ============
