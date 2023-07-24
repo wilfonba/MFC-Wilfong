@@ -3409,24 +3409,24 @@ contains
         ! Reconstruction in s1-direction ===================================
         
         #:for SCHEME, NUM in [('weno',1),('muscl',2)] 
-        if (norm_dir == 1) then
-            is1 = ix; is2 = iy; is3 = iz
-            recon_dir = 1; is1%beg = is1%beg + ${SCHEME}$_polyn
-            is1%end = is1%end - ${SCHEME}$_polyn
-
-        elseif (norm_dir == 2) then
-            is1 = iy; is2 = ix; is3 = iz
-            recon_dir = 2; is1%beg = is1%beg + ${SCHEME}$_polyn
-            is1%end = is1%end - ${SCHEME}$_polyn
-
-        else
-            is1 = iz; is2 = iy; is3 = ix
-            recon_dir = 3; is1%beg = is1%beg + ${SCHEME}$_polyn
-            is1%end = is1%end - ${SCHEME}$_polyn
-
-        end if
-
         if (recon_type == ${NUM}$) then
+            if (norm_dir == 1) then
+                is1 = ix; is2 = iy; is3 = iz
+                recon_dir = 1; is1%beg = is1%beg + ${SCHEME}$_polyn
+                is1%end = is1%end - ${SCHEME}$_polyn
+
+            elseif (norm_dir == 2) then
+                is1 = iy; is2 = ix; is3 = iz
+                recon_dir = 2; is1%beg = is1%beg + ${SCHEME}$_polyn
+                is1%end = is1%end - ${SCHEME}$_polyn
+
+            else
+                is1 = iz; is2 = iy; is3 = ix
+                recon_dir = 3; is1%beg = is1%beg + ${SCHEME}$_polyn
+                is1%end = is1%end - ${SCHEME}$_polyn
+
+            end if
+        
             if (n > 0) then
                 if (p > 0) then
 

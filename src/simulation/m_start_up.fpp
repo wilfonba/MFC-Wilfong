@@ -66,6 +66,8 @@ module m_start_up
     use m_compile_specific
 
     use m_checker
+
+    use m_muscl
     ! ==========================================================================
 
     implicit none
@@ -177,8 +179,8 @@ contains
 
             !$acc update device(sigma)
 
-            if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_real) .or. &
-                (bf_z .ne. dflt_real)) then
+            if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_int) .or. &
+                (bf_z .ne. dflt_int)) then
                 bodyForces = .true.
             endif
 
@@ -1020,10 +1022,14 @@ contains
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
 
-        ! Computation of parameters, allocation of memory, association of pointers,
-        ! and/or execution of any other tasks that are needed to properly configure
-        ! the modules. The preparations below DO DEPEND on the grid being complete.
-        call s_initialize_weno_module()
+        if (recon_type == 1) then
+            ! Computation of parameters, allocation of memory, association of pointers,
+            ! and/or execution of any other tasks that are needed to properly configure
+            ! the modules. The preparations below DO DEPEND on the grid being complete.
+            call s_initialize_weno_module()
+        elseif (recon_type == 2) then
+            call s_initialize_muscl_module()
+        endif
 
 #if defined(_OPENACC) && defined(MFC_MEMORY_DUMP)
         print *, "[MEM-INST] After: s_initialize_weno_module"
@@ -1123,7 +1129,11 @@ contains
         call s_finalize_rhs_module()
         call s_finalize_cbc_module()
         call s_finalize_riemann_solvers_module()
-        call s_finalize_weno_module()
+        if (recon_type == 1) then
+            call s_finalize_weno_module()
+        elseif (recon_type == 2) then
+            call s_finalize_muscl_module()
+        endif
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()

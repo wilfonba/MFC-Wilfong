@@ -111,7 +111,11 @@ contains
             .and. &
             (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
         
-        return
+        if (all((/bc_x%beg, bc_x%end/) < -13) &
+            .and. &
+            (n > 0 .and. all((/bc_y%beg, bc_y%end/) < -13)) &
+            .and. &
+            (p > 0 .and. all((/bc_z%beg, bc_z%end/) < -13))) return
 
         if (n == 0) then
             is2%beg = 0
@@ -1453,7 +1457,11 @@ contains
             .and. &
             (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
 
-        return
+        if (all((/bc_x%beg, bc_x%end/) < -13) &
+            .and. &
+            (n > 0 .and. all((/bc_y%beg, bc_y%end/) < -13)) &
+            .and. &
+            (p > 0 .and. all((/bc_z%beg, bc_z%end/) < -13))) return
 
         ! Deallocating the cell-average primitive variables
         deallocate (q_prim_rsx_vf)

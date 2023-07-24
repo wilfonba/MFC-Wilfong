@@ -19,11 +19,10 @@ module m_helper
         s_comp_n_from_prim, &
         s_comp_n_from_cons, &
         s_int_to_str, &
-        s_print_2D_array
+        s_print_2D_array, &
         s_initialize_nonpoly, &
         s_simpson, &
         s_transcoeff, &
-        s_int_to_str, &
         s_transform_vec, &
         s_transform_triangle, &
         s_transform_model, &

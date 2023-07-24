@@ -81,32 +81,38 @@ contains
             call s_mpi_abort('Unsupported combination of values of '// &
                 'model_eqns and adv_alphan. '// &
                 'Exiting ...')
+        end if
 
+        if (recon_type == 1) then
             ! Constraints on the order of the WENO scheme
-        elseif (weno_order /= 1 .and. weno_order /= 3 &
-                .and. &
-                weno_order /= 5) then
-            call s_mpi_abort('Unsupported choice for the value of '// &
-                'weno_order. Exiting ...')
-        elseif (m + 1 < weno_order) then 
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                'values for m and weno_order. Exiting ...')
-        elseif (n > 0 .and. n + 1 < weno_order) then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                'values for n and weno_order. Exiting ...')
-        elseif (p > 0 .and. p + 1 < weno_order) then 
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                'values for p and weno_order. Exiting ...')
-        elseif ((m + 1)*(n + 1)*(p + 1) &
-                < &
-                weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs) &
-            then
-            call s_mpi_abort('Unsupported choice of the combination of '// &
-                'values for num_procs, m, n, p and '// &
-                'weno_order. Exiting ...')
+            if (weno_order /= 1 .and. weno_order /= 3 &
+                    .and. &
+                    weno_order /= 5) then
+                call s_mpi_abort('Unsupported choice for the value of '// &
+                    'weno_order. Exiting ...')
+            elseif (m + 1 < weno_order) then 
+                call s_mpi_abort('Unsupported choice of the combination of '// &
+                    'values for m and weno_order. Exiting ...')
+            elseif (n > 0 .and. n + 1 < weno_order) then
+                call s_mpi_abort('Unsupported choice of the combination of '// &
+                    'values for n and weno_order. Exiting ...')
+            elseif (p > 0 .and. p + 1 < weno_order) then 
+                call s_mpi_abort('Unsupported choice of the combination of '// &
+                    'values for p and weno_order. Exiting ...')
+            elseif ((m + 1)*(n + 1)*(p + 1) &
+                    < &
+                    weno_order**(min(1, m) + min(1, n) + min(1, p))*num_procs) &
+                then
+                call s_mpi_abort('Unsupported choice of the combination of '// &
+                    'values for num_procs, m, n, p and '// &
+                    'weno_order. Exiting ...')
+            end if
+        elseif (recon_type == 2) then
+
+        end if
 
             ! Constraints on the boundary conditions in the x-direction
-        elseif (bc_x%beg < -15 .or. bc_x%beg > -1) then
+        if (bc_x%beg < -15 .or. bc_x%beg > -1) then
             call s_mpi_abort('Unsupported choice for the value of '// &
                 'bc_x%beg. Exiting ...')
         elseif (bc_x%end < -15 .or. bc_x%end > -1) then

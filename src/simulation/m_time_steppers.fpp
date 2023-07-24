@@ -525,7 +525,7 @@ contains
                 end do
             end do
         end do
-
+        
         !Evolve pb and mv for non-polytropic qbmm
         if(qbmm .and. (.not. polytropic)) then
 !$acc parallel loop collapse(5) gang vector default(present)
@@ -562,11 +562,11 @@ contains
         end if
 
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
-
+        
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
-
+        
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-
+        
         ! ==================================================================
 
         ! Stage 2 of 3 =====================================================
