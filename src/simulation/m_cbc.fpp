@@ -105,17 +105,15 @@ contains
 
         integer :: i
 
-        if (all((/bc_x%beg, bc_x%end/) > -5) &
+        if ((any((/bc_x%beg, bc_x%end/) < -5) .and. any((/bc_x%beg, bc_x%end/) > -14)) &
             .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) &
+            (n > 0 .and. (any((/bc_y%beg, bc_y%end/) < -5) .and. any((/bc_y%beg, bc_y%end/) > -14))) &
             .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
-        
-        if (all((/bc_x%beg, bc_x%end/) < -13) &
-            .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) < -13)) &
-            .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) < -13))) return
+            (p > 0 .and. (any((/bc_z%beg, bc_z%end/) < -5) .and. any((/ bc_z%beg, bc_z%end/) > -14)))) then
+            continue
+        else
+            return
+        end if
 
         if (n == 0) then
             is2%beg = 0
