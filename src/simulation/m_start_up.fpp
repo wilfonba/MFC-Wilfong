@@ -68,6 +68,10 @@ module m_start_up
     use m_checker
 
     use m_muscl
+
+    use m_body_forces
+
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -1040,6 +1044,9 @@ contains
 
         call s_initialize_derived_variables()
 
+        if (bodyForces) call s_initialize_body_forces_module()
+        if (sigma .ne. dflt_real) call s_initialize_surface_tension_module()
+
     end subroutine s_initialize_modules
 
     subroutine s_initialize_mpi_domain()
@@ -1142,6 +1149,9 @@ contains
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()
         end if
+
+        if (bodyForces) call s_finalize_body_forces_module()
+        if (sigma .ne. dflt_real) call s_finalize_surface_tension_module()
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()
