@@ -2217,7 +2217,8 @@ contains
                     do k = 0, n
                         do j = 1, buff_size
                             if (i == momxb) then
-                                q_cons_qp%vf(i)%sf(-j,k,l) = 0d0
+                                q_cons_qp%vf(i)%sf(-j,k,l) = &
+                                    - q_cons_qp%vf(i)%sf(j - 1, k, l)
                             else
                                 q_cons_qp%vf(i)%sf(-j, k, l) = &
                                     q_cons_qp%vf(i)%sf(0, k, l)
@@ -2235,7 +2236,8 @@ contains
                     do k = 0, n
                         do j = 1, buff_size
                             if (i >= momxb .and. i <= momxe) then
-                                q_cons_qp%vf(i)%sf(-j,k,l) = 0d0
+                                q_cons_qp%vf(i)%sf(-j,k,l) = &
+                                    q_cons_qp%vf(i)%sf(j - 1, k, l)
                             else
                                 q_cons_qp%vf(i)%sf(-j, k, l) = &
                                     q_cons_qp%vf(i)%sf(0, k, l)
@@ -2378,7 +2380,8 @@ contains
                     do k = 0, n
                         do j = 1, buff_size
                             if (i == momxb) then
-                                q_cons_qp%vf(i)%sf(m+j,k,l) = 0d0
+                                q_cons_qp%vf(i)%sf(m+j,k,l) = &
+                                    - q_cons_qp%vf(i)%sf(m - (j - 1), k, l)
                             else
                                 q_cons_qp%vf(i)%sf(m+j, k, l) = &
                                     q_cons_qp%vf(i)%sf(m, k, l)
@@ -2396,7 +2399,8 @@ contains
                     do k = 0, n
                         do j = 1, buff_size
                             if (i >= momxb .and. i <= momxe) then
-                                q_cons_qp%vf(i)%sf(m+j,k,l) = 0d0
+                                q_cons_qp%vf(i)%sf(m+j,k,l) = &
+                                    q_cons_qp%vf(i)%sf(m - (j - 1), k, l)
                             else
                                 q_cons_qp%vf(i)%sf(m+j, k, l) = &
                                     q_cons_qp%vf(i)%sf(m, k, l)
@@ -2566,7 +2570,8 @@ contains
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
                             if (i >= momxb .and. i <= momxe) then
-                                q_cons_qp%vf(i)%sf(l, -j, k) = 0d0
+                                q_cons_qp%vf(i)%sf(l, -j, k) = &
+                                    - q_cons_qp%vf(i)%sf(l, j - 1, k)
                             else
                                 q_cons_qp%vf(i)%sf(l, -j, k) = &
                                     q_cons_qp%vf(i)%sf(l, 0, k)
@@ -2834,7 +2839,8 @@ contains
                     do j = 1, buff_size
                         do l = -buff_size, m + buff_size
                             if (i >= momxb .and. i <= momxe) then
-                                q_cons_qp%vf(i)%sf(l, n + j, k) = 0d0
+                                q_cons_qp%vf(i)%sf(l, n + j, k) = &
+                                    - q_cons_qp%vf(i)%sf(l, n - (j - 1), k)
                             else
                                 q_cons_qp%vf(i)%sf(l, n + j, k) = &
                                     q_cons_qp%vf(i)%sf(l, n, k)
@@ -3013,7 +3019,8 @@ contains
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
                             if (i == momxe) then
-                                q_cons_qp%vf(i)%sf(k, l, -j) = 0d0
+                                q_cons_qp%vf(i)%sf(k, l, -j) = &
+                                    - q_cons_qp%vf(i)%sf(k, l, j - 1)
                             else
                                 q_cons_qp%vf(i)%sf(k, l, -j) = &
                                     q_cons_qp%vf(i)%sf(k, l, 0)
@@ -3031,7 +3038,8 @@ contains
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
                             if (i >= momxb .and. i <= momxe) then
-                                q_cons_qp%vf(i)%sf(k, l, -j) = 0d0
+                                q_cons_qp%vf(i)%sf(k, l, -j) = &
+                                    - q_cons_qp%vf(i)%sf(k, l, j - 1)
                             else
                                 q_cons_qp%vf(i)%sf(k, l, -j) = &
                                     q_cons_qp%vf(i)%sf(k, l, 0)
@@ -3203,7 +3211,8 @@ contains
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
                             if (i == momxe) then
-                                q_cons_qp%vf(i)%sf(k, l, p+j) = 0d0
+                                q_cons_qp%vf(i)%sf(k, l, p+j) = &
+                                    - q_cons_qp%vf(i)%sf(k, l, p - (j - 1))
                             else
                                 q_cons_qp%vf(i)%sf(k, l, p+j) = &
                                     q_cons_qp%vf(i)%sf(k, l, p)
@@ -3221,7 +3230,8 @@ contains
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
                             if (i >= momxb .and. i <= momxe) then
-                                q_cons_qp%vf(i)%sf(k, l, p+j) = 0d0
+                                q_cons_qp%vf(i)%sf(k, l, p+j) = &
+                                    - q_cons_qp%vf(i)%sf(k, l, p - (j - 1))
                             else
                                 q_cons_qp%vf(i)%sf(k, l, p+j) = &
                                     q_cons_qp%vf(i)%sf(k, l, p)

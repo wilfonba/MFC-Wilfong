@@ -1,4 +1,3 @@
-#:include 'inline_muscl.fpp'
 #:include 'macros.fpp'
 module m_muscl
 
@@ -106,7 +105,7 @@ contains
         type(int_bounds_info), intent(IN) :: is1_d, is2_d, is3_d
 
         integer :: j, k, l, i, q
-        real(kind(0d0)) :: r, phir, delta, top, bottom, sign
+        real(kind(0d0)) :: phir, delta, top, bottom, sign
 
         is1 = is1_d
         is2 = is2_d
@@ -167,35 +166,23 @@ contains
                     norm_dir, muscl_dir, is1_d, is2_d, is3_d)
             endif
         
-            else if (muscl_order == 2) then
+        else if (muscl_order == 2) then
             ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 !$acc parallel loop collapse(4) gang vector default(present) private(top, &
-!$acc bottom, sign, r, phir, delta)
+!$acc bottom, sign, phir, delta)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            do i = 1, v_size
+                            do j = is1%beg, is1%end
+                                do i = 1, v_size
 
                                 top = v_rs_ws_${XYZ}$(j, k, l, i) - &
                                     v_rs_ws_${XYZ}$(j - 1, k, l, i)
                                 bottom = v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
                                     v_rs_ws_${XYZ}$(j, k, l,  i )
 
-                                if (bottom < 0d0) then
-                                    sign = -1d0
-                                else
-                                    sign = 1d0
-                                endif
-
-                                if (bottom == 0d0 .or. top == 0d0) then
-                                    r = 0d0
-                                else
-                                    r = sign*top/(max(abs(bottom), sgm_eps))
-                                endif
-
-                                @:compute_slope_limiter()
+                                call s_compute_slope_limiter(top, bottom, phir)
                                 
                                 delta = (1d0/2d0)*(v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
                                                 v_rs_ws_${XYZ}$(j - 1, k, l, i))
@@ -224,7 +211,7 @@ contains
              #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 !$acc parallel loop collapse(4) gang vector default(present) private(top, &
-!$acc bottom, sign, r, phir, delta)
+!$acc bottom, sign, phir, delta)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -235,19 +222,7 @@ contains
                                 bottom = v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
                                     v_rs_ws_${XYZ}$(j, k, l,  i )
 
-                                if (bottom < 0d0) then
-                                    sign = -1d0
-                                else
-                                    sign = 1d0
-                                endif
-
-                                if (bottom == 0d0 .or. top == 0d0) then
-                                    r = 0d0
-                                else
-                                    r = sign*top/(max(abs(bottom), sgm_eps))
-                                endif
-
-                                @:compute_slope_limiter()
+                                call s_compute_slope_limiter(top, bottom, phir)
 
                                 ! reconstruct from left side
                                 delta = 2d0/3d0*(v_rs_ws_${XYZ}$(j, k, l, i) - &
@@ -282,6 +257,31 @@ contains
 
     end subroutine s_muscl
 
+    subroutine s_compute_slope_limiter(top, bottom, phir)
+!$acc routine seq
+    
+        real(kind(0d0)) :: top, bottom, phir
+        real(kind(0d0)) :: r
+
+        if (r <= 0) then
+            phir = 0d0
+        else
+            if (muscl_lim == 1) then ! ULTRABEE like
+                phir = min(2d0*r/(1d0 + r), 2d0/(1d0 + r))
+            elseif (muscl_lim == 2) then ! SUPERBEE like 
+                if (r <= 5d-1) phir = 2d0*r
+                if (r < 1d0) phir = 1d0
+                if (r > 1d0) phir = min(r, 2d0/(1d0 + r), 2d0)
+            elseif (muscl_lim == 3) then ! van-Alabada like
+                phir = min(r*(1d0 + r)/(1d0 + r**2d0), 2d0/(1d0 + r))
+            elseif (muscl_lim == 4) then ! MINBEE like
+                if (r < 1d0) phir = r
+                if (r >=1d0) phir = min(1d0, 2d0/(1d0 + r))
+            end if
+        end if
+
+    end subroutine s_compute_slope_limiter
+
     subroutine s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & 
             norm_dir, muscl_dir, &
             is1_d, is2_d, is3_d)
@@ -307,6 +307,7 @@ contains
 
         #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
+                
 !$acc parallel loop collapse(3) gang vector default(present) private(aCL, aC, &
 !$acc aCR, aTHINC, moncon, sign, qmin, qmax)
                 do l = is3%beg, is3%end
@@ -319,8 +320,8 @@ contains
 
                             moncon = (aCR - aC)*(aC - aCL)
 
-                            if (aC > iceps .and. aC < 1d0 - iceps .and. moncon > 1d-8) then ! Interface cell
-
+                            if (aC >= iceps .and. aC <= 1d0 - iceps .and. moncon > 1d-8) then ! Interface cell
+                                     
                                 if (aCR - aCL > 0d0) then
                                     sign = 1d0
                                 else
