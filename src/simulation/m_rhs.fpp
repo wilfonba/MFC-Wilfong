@@ -156,7 +156,7 @@ module m_rhs
     !> @}
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: blkmod1, blkmod2, alpha1, alpha2, Kterm
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
+    real(kind(0d0)), allocatable, dimension(:, :, :, :), public :: qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf
     real(kind(0d0)), allocatable, dimension(:, :, :, :) :: dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf
 
     real(kind(0d0)), allocatable, dimension(:) :: gamma_min, pres_inf
@@ -164,6 +164,8 @@ module m_rhs
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
+
+    integer, public :: MHStage
 
 !$acc declare create(q_cons_qp,q_prim_qp,  &
 !$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
@@ -768,8 +770,8 @@ contains
             ! ===============================================================
             ! Reconstructing Primitive/Conservative Variables ===============
             
-            if (all(Re_size == 0)) then
-                    iv%beg = 1; iv%end = sys_size
+            if (all(Re_size == 0) .and. (MHStage == 1 .or. time_stepper_type == 1)) then
+                iv%beg = 1; iv%end = sys_size
                 !call nvtxStartRange("RHS-WENO")
                 call nvtxStartRange("RHS-WENO")
                 call s_reconstruct_cell_boundary_values( &
@@ -780,34 +782,36 @@ contains
                 call nvtxEndRange
             else
                 call nvtxStartRange("RHS-WENO")
-                iv%beg = 1; iv%end = contxe
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
-
-                iv%beg = E_idx; iv%end = E_idx
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
-
-                iv%beg = advxb; iv%end = advxe
-                call s_reconstruct_cell_boundary_values( &
-                    q_prim_qp%vf(iv%beg:iv%end), &
-                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                    id)
-
-                if (bubbles) then
-                    iv%beg = bubxb; iv%end = bubxe
+                if (MHStage == 1 .or. time_stepper_type == 1) then
+                    iv%beg = 1; iv%end = contxe
                     call s_reconstruct_cell_boundary_values( &
                         q_prim_qp%vf(iv%beg:iv%end), &
                         qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                         qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                         id)
+
+                    iv%beg = E_idx; iv%end = E_idx
+                    call s_reconstruct_cell_boundary_values( &
+                        q_prim_qp%vf(iv%beg:iv%end), &
+                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                        id)
+
+                    iv%beg = advxb; iv%end = advxe
+                    call s_reconstruct_cell_boundary_values( &
+                        q_prim_qp%vf(iv%beg:iv%end), &
+                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                        id)
+                
+                    if (bubbles) then
+                        iv%beg = bubxb; iv%end = bubxe
+                        call s_reconstruct_cell_boundary_values( &
+                            q_prim_qp%vf(iv%beg:iv%end), &
+                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                            id)
+                    end if
                 end if
                                     
                 iv%beg = mom_idx%beg; iv%end = mom_idx%end

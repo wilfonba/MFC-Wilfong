@@ -706,6 +706,145 @@ contains
 
     end subroutine s_3rd_order_tvd_rk ! ------------------------------------
 
+    subroutine s_2nd_order_muscl_hancock(t_step, time_avg)
+
+        integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
+        type(int_bounds_info) :: is1, is2, is3, ix, iy, iz
+
+        integer :: i, j, k, l, q!< Generic loop iterator
+        real(kind(0d0)) :: start, finish
+
+        call cpu_time(start)
+
+        call nvtxStartRange("Time_Step")
+
+        ! Configuring Coordinate Direction Indexes ======================
+        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
+
+        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
+
+        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
+        ! ===============================================================
+
+        ! Stage 1 of 2 =====================================================
+
+        MHStage = 1
+        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+        
+        #:for SCHEME, NUM in [('weno',1),('muscl',2)] 
+        if (recon_type == ${NUM}$) then
+            is1 = ix; is2 = iy; is3 = iz
+            is1%beg = is1%beg + ${SCHEME}$_polyn
+            is1%end = is1%end - ${SCHEME}$_polyn
+        end if
+        #:endfor
+        !$acc parallel loop collapse(4) default(present)
+        do i = 1, sys_size
+            do l = is3%beg, is3%end
+                do k = is2%beg, is3%end
+                    do j = is1%beg, is1%end
+                        qL_rsx_vf(j, k, l, i) = qL_rsx_vf(j, k, l, i) + &
+                                                dt/2*rhs_vf(i)%sf(j, k, l)
+                        qL_rsx_vf(j, k, l, i) = qR_rsx_vf(j, k, l, i) + &
+                                                dt/2*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+        !$acc end parallel loop
+
+        if (n > 0) then
+            #:for SCHEME, NUM in [('weno',1),('muscl',2)] 
+            if (recon_type == ${NUM}$) then
+                is1 = iy; is2 = ix; is3 = iz
+                is1%beg = is1%beg + ${SCHEME}$_polyn
+                is1%end = is1%end - ${SCHEME}$_polyn
+            end if
+            #:endfor
+
+            !$acc parallel loop collapse(4) default(present)
+            do i = 1, sys_size
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is3%end
+                        do j = is1%beg, is1%end
+                            qL_rsy_vf(j, k, l, i) = qL_rsy_vf(j, k, l, i) + &
+                                                    dt/2*rhs_vf(i)%sf(j, k, l)
+                            qL_rsy_vf(j, k, l, i) = qR_rsy_vf(j, k, l, i) + &
+                                                    dt/2*rhs_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+        end if
+
+        if (p > 0) then
+            #:for SCHEME, NUM in [('weno',1),('muscl',2)] 
+            if (recon_type == ${NUM}$) then
+                is1 = iz; is2 = iy; is3 = ix
+                is1%beg = is1%beg + ${SCHEME}$_polyn
+                is1%end = is1%end - ${SCHEME}$_polyn
+            end if
+            #:endfor
+            !$acc parallel loop collapse(4) default(present)
+            do i = 1, sys_size
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is3%end
+                        do j = is1%beg, is1%end
+                            qL_rsz_vf(j, k, l, i) = qL_rsz_vf(j, k, l, i) + &
+                                                    dt/2*rhs_vf(i)%sf(j, k, l)
+                            qL_rsz_vf(j, k, l, i) = qR_rsz_vf(j, k, l, i) + &
+                                                    dt/2*rhs_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            !$acc end parallel loop
+        endif
+
+        ! ==================================================================
+
+        ! Stage 2 of 2 =====================================================
+        MHStage = 2
+        call s_compute_rhs(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+        
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+        ! ==================================================================        
+
+        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+
+        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+
+        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+
+        call nvtxEndRange
+
+        call cpu_time(finish)
+
+        time = time + (finish - start)
+
+        if (t_step >= 4) then
+            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if
+
+        ! ==================================================================
+    
+    end subroutine s_2nd_order_muscl_hancock
+
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf, rhs_vf, ldt)
 
         type(scalar_field), dimension(1:sys_size) :: q_cons_vf, q_prim_vf, rhs_vf
