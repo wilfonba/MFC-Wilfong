@@ -148,7 +148,8 @@ contains
             polydisperse, poly_sigma, qbmm, &
             R0_type, sigma, &
             bf_x, bf_y, bf_z, k_x, k_y, k_z, &
-            w_x, w_y, w_z, p_x, p_y, p_z, recon_type, int_comp
+            w_x, w_y, w_z, p_x, p_y, p_z, recon_type, int_comp, &
+            time_stepper_type
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -851,13 +852,17 @@ contains
         print *, 'Computed derived vars'
 #endif
 
-        ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
-        if (time_stepper == 1) then
-            call s_1st_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 2) then
-            call s_2nd_order_tvd_rk(t_step, time_avg)
-        elseif (time_stepper == 3) then
-            call s_3rd_order_tvd_rk(t_step, time_avg)
+        if (time_stepper_type == 1) then
+            ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
+            if (time_stepper == 1) then
+                call s_1st_order_tvd_rk(t_step, time_avg)
+            elseif (time_stepper == 2) then
+                call s_2nd_order_tvd_rk(t_step, time_avg)
+            elseif (time_stepper == 3) then
+                call s_3rd_order_tvd_rk(t_step, time_avg)
+            end if
+        elseif (time_stepper_type == 2) then
+            call s_2nd_order_muscl_hancock(t_step, time_avg)
         end if
 
         ! Time-stepping loop controls

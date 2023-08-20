@@ -29,6 +29,8 @@ docs/*/initial*
 docs/*/result*
 docs/documentation/examples.md
 
+misc/*.mp4
+
 examples/*batch/*/
 examples/*/D/*
 examples/*/p*
