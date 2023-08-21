@@ -745,9 +745,9 @@ contains
                 do k = is2%beg, is3%end
                     do j = is1%beg, is1%end
                         qL_rsx_vf(j, k, l, i) = qL_rsx_vf(j, k, l, i) + &
-                                                dt/2*rhs_vf(i)%sf(j, k, l)
-                        qL_rsx_vf(j, k, l, i) = qR_rsx_vf(j, k, l, i) + &
-                                                dt/2*rhs_vf(i)%sf(j, k, l)
+                                                (dt/2d0)*rhs_vf(i)%sf(j, k, l)
+                        qR_rsx_vf(j, k, l, i) = qR_rsx_vf(j, k, l, i) + &
+                                                (dt/2d0)*rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -769,9 +769,9 @@ contains
                     do k = is2%beg, is3%end
                         do j = is1%beg, is1%end
                             qL_rsy_vf(j, k, l, i) = qL_rsy_vf(j, k, l, i) + &
-                                                    dt/2*rhs_vf(i)%sf(j, k, l)
-                            qL_rsy_vf(j, k, l, i) = qR_rsy_vf(j, k, l, i) + &
-                                                    dt/2*rhs_vf(i)%sf(j, k, l)
+                                                    (dt/2d0)*rhs_vf(i)%sf(j, k, l)
+                            qR_rsy_vf(j, k, l, i) = qR_rsy_vf(j, k, l, i) + &
+                                                    (dt/2d0)*rhs_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
@@ -793,9 +793,9 @@ contains
                     do k = is2%beg, is3%end
                         do j = is1%beg, is1%end
                             qL_rsz_vf(j, k, l, i) = qL_rsz_vf(j, k, l, i) + &
-                                                    dt/2*rhs_vf(i)%sf(j, k, l)
-                            qL_rsz_vf(j, k, l, i) = qR_rsz_vf(j, k, l, i) + &
-                                                    dt/2*rhs_vf(i)%sf(j, k, l)
+                                                    (dt/2d0)*rhs_vf(i)%sf(j, k, l)
+                            qR_rsz_vf(j, k, l, i) = qR_rsz_vf(j, k, l, i) + &
+                                                    (dt/2d0)*rhs_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
@@ -860,7 +860,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
-                            dt*rhs_vf(i)%sf(j, k, l)
+                            ldt*rhs_vf(i)%sf(j, k, l)
                     end do 
                 end do
             end do
