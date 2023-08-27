@@ -205,15 +205,14 @@ end if
 
 #### Hard Coded Patches
 
-Some patch configurations are not adequatley handeled with the above analytic variable definitions. In this case, a hard coded patch can be used. Hard coded patches can be added by adding additional hard coded patch identifers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`. For example, to add a 2D Hardcoded patch with an id of 201, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
+Some patch configurations are not adequatley handeled with the above analytic variable definitions. In this case, a hard coded patch can be used. Hard coded patches can be added by adding additional hard coded patch identifers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`. For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
 
 ```f90
-    if (patch_icpp%hcid == 201) then
+    case(200)
         ! Primitive variables assignment
-    end if
 ```
 
-and use `patch_icpp(i)%geometry = y` and `patch_icpp(i)%hcid = 201` in the input file. As a convention, any hard coded patches that are part of the MFC master branch should be identied as 1[2,3]xx where the first digit indiates the number of dimensions.
+and use `patch_icpp(i)%geometry = 7` and `patch_icpp(i)%hcid = 200` in the input file. Additional variables can be declared in `Hardcoded1[2,3]DVariables` and used in `hardcoded1[2,3]D`. As a convention, any hard coded patches that are part of the MFC master branch should be identied as 1[2,3]xx where the first digit indiates the number of dimensions.
 
 #### Parameter Descriptions
 
@@ -283,6 +282,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*	 |
 | `avg_state`	           | Integer | Averaged state evaluation method: [1] Roe averagen*; [2] Arithmetic mean  |
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
+| `weno_Re_flux`          | Logical | Compute velocity gradient using scaler divergence theorem	 |
+| `weno_avg`          	 | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 
 - \* Options that work only with `model_eqns` $=2$.
 - † Options that work only with `cyl_coord` $=$ `False`.
@@ -330,6 +331,10 @@ Note that `time_stepper` $=$ 3 specifies the total variation diminishing (TVD), 
 
 - `wave_speeds` specifies the choice of the method to compute the left, right, and middle wave speeds in the Riemann solver by an integer of 1 and 2.
 `wave_speeds` $=$ 1 and 2 correspond to the direct method ([Batten et al., 1997](references.md#Batten97)), and indirect method that approximates the pressures and velocity ([Toro, 2013](references.md#Toro13)), respectively.
+
+- `weno_Re_flux` activates the scaler divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values. If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
+
+- `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values. This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
 
 ### 6. Formatted Output

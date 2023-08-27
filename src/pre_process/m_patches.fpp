@@ -76,6 +76,8 @@ module m_patches
     !! x-, y- and z-coordinate directions. They are used as a means to concisely
     !! perform the actions necessary to lay out a particular patch on the grid.
 
+    character(len=5) :: istr ! string to store int to string result for error checking
+
 contains
     !>          The line segment patch is a 1D geometry that may be used,
     !!              for example, in creating a Riemann problem. The geometry
@@ -787,6 +789,8 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
 
+        @:Hardcoded1DVariables()
+
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1d0 + gamma)/gamma
@@ -892,6 +896,8 @@ contains
 
         integer :: i, j, k !< generic loop iterators
 
+        @:Hardcoded2DVariables()
+
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma
         lit_gamma = (1d0 + gamma)/gamma
@@ -952,6 +958,8 @@ contains
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
 
         integer :: i, j, k !< generic loop iterators
+
+        @:Hardcoded3DVariables()
 
         pi_inf = fluid_pp(1)%pi_inf
         gamma = fluid_pp(1)%gamma

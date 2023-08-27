@@ -1,4 +1,4 @@
-#:def Hardcoded2D()
+#:def Hardcoded2DVariables()
 
     select case (patch_icpp(patch_id)%hcid)
         case(200) ! Rayleigh Taylor case 1
