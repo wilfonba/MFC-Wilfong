@@ -165,7 +165,7 @@ contains
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err', &
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',        &
             & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt', &
-            & 'prim_vars_wrt', 'bodyForces', 'int_comp']
+            & 'prim_vars_wrt', 'bodyForces', 'int_comp', 'weno_avg']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -525,6 +525,7 @@ contains
                     start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
                 end if
             end if
+
             ! ==================================================================
 
             ! 1D Cartesian Processor Topology ==================================
@@ -567,8 +568,6 @@ contains
             proc_coords(1) = proc_coords(1) + 1
         end if
 
-        print *, bc_x%beg
-
         ! Boundary condition at the end
         if (proc_coords(1) < num_procs_x - 1 .or. bc_x%end == -1) then
             proc_coords(1) = proc_coords(1) + 1
@@ -585,10 +584,6 @@ contains
             end if
         end if
         ! ==================================================================
-
-        if (proc_rank == 0) then
-            print *, m, n, p
-        end if
 
 #endif
 
@@ -858,7 +853,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -914,7 +909,7 @@ contains
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
@@ -971,7 +966,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1023,13 +1018,13 @@ contains
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
                 end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                 if (cu_mpi .eqv. .false.) then
                     !$acc update device(q_cons_buff_recv)
                 end if
@@ -1043,7 +1038,13 @@ contains
                             do i = 1, sys_size
                                 r = (i - 1) + v_size* &
                                     (j + buff_size*((k + 1) + (n + 1)*l))
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)                                
+#if defined(__INTEL_COMPILER)  
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                        print *, "Error", j, k, l, i
+                                        error stop "NaN(s) in recv"
+                                end if
+#endif
                             end do
                         end do
                     end do
@@ -1139,7 +1140,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1190,7 +1191,7 @@ contains
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
@@ -1247,7 +1248,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1299,7 +1300,7 @@ contains
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
@@ -1317,7 +1318,13 @@ contains
                             do i = 1, sys_size
                                 r = (i - 1) + v_size* &
                                     ((j - m - 1) + buff_size*(k + (n + 1)*l))
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+                                q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r) 
+#if defined(__INTEL_COMPILER)                                                               
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                        print *, "Error", j, k, l, i
+                                        error stop "NaN(s) in recv"
+                                end if
+#endif
                             end do
                         end do
                     end do
@@ -1418,7 +1425,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1471,7 +1478,7 @@ contains
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
@@ -1527,7 +1534,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1580,13 +1587,13 @@ contains
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
                 end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                 if (cu_mpi .eqv. .false.) then
                     !$acc update device(q_cons_buff_recv)
                 end if
@@ -1602,6 +1609,12 @@ contains
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k + buff_size) + buff_size*l))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+#if defined(__INTEL_COMPILER)  
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                        print *, "Error", j, k, l, i
+                                        error stop "NaN(s) in recv"
+                                end if
+#endif                                
                             end do
                         end do
                     end do
@@ -1695,7 +1708,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1748,7 +1761,7 @@ contains
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
@@ -1804,7 +1817,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -1857,13 +1870,13 @@ contains
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
                 end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                 if (cu_mpi .eqv. .false.) then
                     !$acc update device(q_cons_buff_recv)
                 end if
@@ -1879,6 +1892,12 @@ contains
                                     ((j + buff_size) + (m + 2*buff_size + 1)* &
                                      ((k - n - 1) + buff_size*l))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+#if defined(__INTEL_COMPILER)   
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    print *, "Error", j, k, l, i
+                                    error stop "NaN(s) in recv"
+                                end if
+#endif                                
                             end do
                         end do
                     end do
@@ -1981,7 +2000,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -2012,7 +2031,7 @@ contains
                             MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
@@ -2070,7 +2089,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -2101,13 +2120,13 @@ contains
                             MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
                 end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                 if (cu_mpi .eqv. .false.) then
                     !$acc update device(q_cons_buff_recv)
                 end if
@@ -2124,6 +2143,12 @@ contains
                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
                                       (l + buff_size)))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+#if defined(__INTEL_COMPILER)  
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    print *, "Error", j, k, l, i
+                                    error stop "NaN(s) in recv"
+                                end if
+#endif                                
                             end do
                         end do
                     end do
@@ -2220,7 +2245,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -2250,7 +2275,7 @@ contains
                             MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                         
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
@@ -2310,7 +2335,7 @@ contains
 
                     !call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     if (cu_mpi) then
 !$acc host_data use_device( q_cons_buff_recv, q_cons_buff_send )
 
@@ -2340,13 +2365,13 @@ contains
                             MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                     end if
 #endif
 
                 end if
 
-#if defined(_OPENACC) && defined(__PGI)
+#if defined(MFC_OpenACC) && defined(__PGI)
                 if (cu_mpi .eqv. .false.) then
                     !$acc update device(q_cons_buff_recv)
                 end if
@@ -2363,6 +2388,13 @@ contains
                                      ((k + buff_size) + (n + 2*buff_size + 1)* &
                                       (l - p - 1)))
                                 q_cons_vf(i)%sf(j, k, l) = q_cons_buff_recv(r)
+#if defined(__INTEL_COMPILER)  
+                                
+                                if(ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    print *, "Error", j, k, l, i
+                                    error stop "NaN(s) in recv"
+                                end if
+#endif
                             end do
                         end do
                     end do
