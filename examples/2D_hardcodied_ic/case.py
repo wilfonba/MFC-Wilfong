@@ -64,7 +64,7 @@ print(json.dumps({
                                                             
     # Patch 1: Base ============================================
     'patch_icpp(1)%geometry'       : 7,
-    'patch_icpp(1)%hcid'           : 200,
+    'patch_icpp(1)%hcid'           : 202,
     'patch_icpp(1)%x_centroid'     : 4.,
     'patch_icpp(1)%y_centroid'     : 4.,
     'patch_icpp(1)%length_x'       : 8.,
