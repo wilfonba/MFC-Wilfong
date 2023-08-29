@@ -3,10 +3,5 @@
 ! expressions that are evaluated at runtime from the input file.
 
 #:def analytical()
-    if (patch_id == 1) then
-        q_prim_vf(contxb)%sf(i, 0, 0) = (1d0/4d0)*sin(2d0*3.141592653589793*x_cc(i)) + 1d0/2d0
-        q_prim_vf(contxb + 1)%sf(i, 0, 0) = 1000*(1d0 - ((1d0/4d0)*sin(2d0*3.141592653589793*x_cc(i)) + 1d0/2d0))
-        q_prim_vf(advxb)%sf(i, 0, 0) = (1d0/4d0)*sin(2d0*3.141592653589793*x_cc(i)) + 1d0/2d0
-        q_prim_vf(advxb + 1)%sf(i, 0, 0) = 1 - ((1d0/4d0)*sin(2d0*3.141592653589793*x_cc(i)) + 1d0/2d0)
-    end if
+
 #:enddef

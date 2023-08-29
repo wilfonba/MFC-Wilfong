@@ -105,15 +105,7 @@ contains
 
         integer :: i
 
-        if ((any((/bc_x%beg, bc_x%end/) < -5) .and. any((/bc_x%beg, bc_x%end/) > -14)) &
-            .and. &
-            (n > 0 .and. (any((/bc_y%beg, bc_y%end/) < -5) .and. any((/bc_y%beg, bc_y%end/) > -14))) &
-            .and. &
-            (p > 0 .and. (any((/bc_z%beg, bc_z%end/) < -5) .and. any((/ bc_z%beg, bc_z%end/) > -14)))) then
-            continue
-        else
-            return
-        end if
+        return
 
         if (n == 0) then
             is2%beg = 0
@@ -1449,17 +1441,7 @@ contains
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_cbc_module() ! -----------------------------------
 
-        if (all((/bc_x%beg, bc_x%end/) > -5) &
-            .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) > -5)) &
-            .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) > -5))) return
-
-        if (all((/bc_x%beg, bc_x%end/) < -13) &
-            .and. &
-            (n > 0 .and. all((/bc_y%beg, bc_y%end/) < -13)) &
-            .and. &
-            (p > 0 .and. all((/bc_z%beg, bc_z%end/) < -13))) return
+        return
 
         ! Deallocating the cell-average primitive variables
         deallocate (q_prim_rsx_vf)

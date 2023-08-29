@@ -390,7 +390,7 @@ contains
         adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
-        time_stepper_type = 2
+        time_stepper_type = 1
         weno_eps = dflt_real
         mapped_weno = .false.
         mp_weno = .false.
