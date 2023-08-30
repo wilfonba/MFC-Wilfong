@@ -345,6 +345,18 @@ contains
                     end do
                 end do
             end do
+        elseif (bc_x%beg == -1) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            c_divs%vf(i)%sf(-j, k, l) = &
+                                c_divs%vf(i)%sf(m - (j - 1), k, l)
+                        end do
+                    end do
+                end do
+            end do
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 1, -1)
         end if
@@ -381,6 +393,18 @@ contains
                         do j = 1, buff_size
                             c_divs%vf(i)%sf(m + j, k, l) = &
                                 c_divs%vf(i)%sf(m, k, l)
+                        end do
+                    end do
+                end do
+            end do
+        else if (bc_x%end == -1) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            c_divs%vf(i)%sf(m + j, k, l) = &
+                                c_divs%vf(i)%sf(j - 1, k, l)
                         end do
                     end do
                 end do
@@ -427,6 +451,18 @@ contains
                     end do
                 end do
             end do
+        elseif (bc_y%beg == -1) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(l, -j, k) = &
+                                c_divs%vf(i)%sf(l, n - (j - 1), k)
+                        end do
+                    end do
+                end do
+            end do
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 2, -1)
         endif
@@ -463,6 +499,18 @@ contains
                         do l = -buff_size, m + buff_size
                             c_divs%vf(i)%sf(l, n + j, k) = &
                                 c_divs%vf(i)%sf(l, n, k)
+                        end do
+                    end do
+                end do
+            end do
+        elseif (bc_y%end == -1) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do k = 0, p
+                    do j = 1, buff_size
+                        do l = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(l, n + j, k) = &
+                                c_divs%vf(i)%sf(l, j - 1, k)
                         end do
                     end do
                 end do
@@ -509,6 +557,18 @@ contains
                     end do
                 end do
             end do
+        elseif (bc_z%beg == -1) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(k, l, -j) = &
+                                c_divs%vf(i)%sf(k, l, p - (j - 1))
+                        end do
+                    end do
+                end do
+            end do
         else
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 3, -1)
         end if
@@ -545,6 +605,18 @@ contains
                         do k = -buff_size, m + buff_size
                             c_divs%vf(i)%sf(k, l, p + j) = &
                                 c_divs%vf(i)%sf(k, l, p - (j - 1))
+                        end do
+                    end do
+                end do
+            end do
+        elseif (bc_z%end == -1) then
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, num_dims + 1
+                do j = 1, buff_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            c_divs%vf(i)%sf(k, l, p + j) = &
+                                c_divs%vf(i)%sf(k, l, j - 1)
                         end do
                     end do
                 end do
