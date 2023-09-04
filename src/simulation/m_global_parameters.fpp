@@ -167,6 +167,7 @@ module m_global_parameters
     integer :: gamma_idx                 !< Index of specific heat ratio func. eqn.
     integer :: pi_inf_idx                !< Index of liquid stiffness func. eqn.
     type(int_bounds_info) :: stress_idx                !< Indexes of first and last shear stress eqns.
+    integer :: c_idx                               !< Index for the surfact tension color function
     !> @}
 
 !$acc declare create(bub_idx)
@@ -307,6 +308,11 @@ module m_global_parameters
     !> @}
 !$acc declare create(monopole, mono, num_mono)
 
+    !> @name Surface tension parameters
+    !> @{
+    real(kind(0d0)) :: sigma
+    !$acc declare create(sigma)
+    !> @}
     
 
      integer :: momxb, momxe
@@ -433,6 +439,10 @@ contains
         ! Monopole source
         monopole = .false.
         num_mono = 1
+
+        ! Coefficient of surface tension
+        sigma = dflt_real
+        c_idx = dflt_Real
 
         cu_tensor = .false.
 
@@ -657,6 +667,12 @@ contains
                 internalEnergies_idx%beg = adv_idx%end + 1
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
+
+                if (sigma .ne. dflt_real) then
+                    c_idx = sys_size + 1
+                    sys_size = c_idx
+                    !$acc update device(sigma)
+                end if
             else if (model_eqns == 4) then
                 cont_idx%beg = 1 ! one continuity equation
                 cont_idx%end = 1 !num_fluids

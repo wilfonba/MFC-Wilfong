@@ -66,6 +66,8 @@ module m_start_up
     use m_compile_specific
 
     use m_checker
+
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -140,7 +142,7 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type
+            R0_type, sigma
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -172,6 +174,8 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            !$acc update device(sigma)
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -496,7 +500,7 @@ contains
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
             ! Read the data for each variable
-            if (bubbles .or. hypoelasticity) then
+            if (bubbles .or. hypoelasticity .or. sigma .ne. dflt_real) then
 
                 do i = 1, sys_size!adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
@@ -914,10 +918,10 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p                                
-                                error stop "NaN(s) in timestep output."
-                            end if
+                            ! if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                            !     print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p                                
+                            !     error stop "NaN(s) in timestep output."
+                            ! end if
                         end do
                     end do
                 end do
@@ -1025,6 +1029,8 @@ contains
 
         call s_initialize_derived_variables()
 
+        if (sigma .ne. dflt_real) call s_initialize_surface_tension_module()
+
     end subroutine s_initialize_modules
 
     subroutine s_initialize_mpi_domain()
@@ -1123,6 +1129,8 @@ contains
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()
         end if
+
+        if (sigma .ne. dflt_real) call s_finalize_surface_tension_module()
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

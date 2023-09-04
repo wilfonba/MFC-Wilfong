@@ -48,3 +48,5 @@ examples/*/viz/
 examples/*.jpg
 examples/*.png
 *.mod
+
+misc/*.mp4

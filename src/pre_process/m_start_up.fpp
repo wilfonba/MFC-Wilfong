@@ -121,7 +121,8 @@ contains
             rhoref, pref, bubbles, R0ref, nb, &
             polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, qbmm, &
-            sigR, sigV, dist_type, rhoRV, R0_type
+            sigR, sigV, dist_type, rhoRV, R0_type, &
+            sigma
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'

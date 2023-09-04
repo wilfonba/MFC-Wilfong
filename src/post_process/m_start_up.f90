@@ -69,7 +69,7 @@ contains
             flux_lim, flux_wrt, cyl_coord, &
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
-            polydisperse, poly_sigma
+            polydisperse, poly_sigma, cf_wrt, sigma
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -569,6 +569,18 @@ contains
                     varname(:) = ' '
                 end do
             end if
+        end if
+
+        ! Adding the color function to the formatted database file -------------
+        if (cf_wrt) then
+            q_sf = q_cons_vf(c_idx)%sf( &
+                -offset_x%beg:m + offset_x%end, &
+                -offset_y%beg:n + offset_y%end, &
+                -offset_z%beg:p + offset_z%end)
+
+            write (varname, '(A,I0)') 'colorFunction'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+            varname(:) = ' '
         end if
 
         ! Closing the formatted database file

@@ -1069,6 +1069,10 @@ contains
                             end if
                         end do
                     end if
+
+                    if (sigma .ne. dflt_real) then
+                        q_cons_vf(c_idx)%sf(j,k,l) = q_prim_vf(c_idx)%sf(j,k,l)
+                    end if
                 end do
             end do
         end do

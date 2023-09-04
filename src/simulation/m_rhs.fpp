@@ -44,7 +44,8 @@ module m_rhs
     use m_viscous
     
     use m_nvtx
-    
+
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -230,6 +231,12 @@ contains
                 q_cons_qp%vf(l)%sf
             !$acc enter data attach(q_prim_qp%vf(l)%sf)
         end do
+
+        if (sigma .ne. dflt_real) then
+            q_prim_qp%vf(c_idx)%sf => &
+                q_cons_qp%vf(c_idx)%sf
+            !$acc enter data attach(q_prim_qp%vf(c_idx)%sf)
+        end if
 
         ! ==================================================================
 
@@ -500,7 +507,7 @@ contains
                             & iz%beg:iz%end))
                 end do
 
-                if (any(Re_size > 0)) then
+                if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     do l = mom_idx%beg, E_idx
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & ix%beg:ix%end, &
@@ -726,6 +733,12 @@ contains
                                             dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                                             ix, iy, iz)
         call nvtxEndRange()
+
+        call nvtxStartRange("Surface_Tensions")
+
+        if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf)
+        
+        call nvtxEndRange
         
         ! Dimensional Splitting Loop =======================================
 
@@ -1085,7 +1098,22 @@ contains
                     end do
                 end if
 
-                if (any(Re_size > 0)) then
+                if (sigma .ne. dflt_real) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(c_idx)%sf(j, k, l) = &
+                                    rhs_vf(c_idx)%sf(j, k, l) + 1d0/dx(j)* &
+                                    q_cons_qp%vf(c_idx)%sf(j, k, l)* &
+                                    (flux_src_n(1)%vf(advxb)%sf(j, k, l) - &
+                                        flux_src_n(1)%vf(advxb)%sf(j - 1, k, l))
+                            end do
+                        end do
+                    end do
+                end if
+
+                if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 0, n
@@ -1357,7 +1385,22 @@ contains
                     end do
                 end if
 
-                if (any(Re_size > 0)) then
+                if (sigma .ne. dflt_real) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(c_idx)%sf(j, k, l) = &
+                                    rhs_vf(c_idx)%sf(j, k, l) + 1d0/dy(k)* &
+                                    q_cons_qp%vf(c_idx)%sf(j, k, l)* &
+                                    (flux_src_n(2)%vf(advxb)%sf(j, k, l) - &
+                                        flux_src_n(2)%vf(advxb)%sf(j, k - 1, l))
+                            end do
+                        end do
+                    end do
+                end if
+
+                if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -13))) then
                         if (p > 0) then
                             call s_compute_viscous_stress_tensor(q_prim_qp%vf, &
@@ -1808,7 +1851,22 @@ contains
                     end do
                 end if
 
-                if (any(Re_size > 0)) then
+                if (sigma .ne. dflt_real) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(c_idx)%sf(j, k, l) = &
+                                    rhs_vf(c_idx)%sf(j, k, l) + 1d0/dz(l)* &
+                                    q_cons_qp%vf(c_idx)%sf(j, k, l)* &
+                                    (flux_src_n(3)%vf(advxb)%sf(j, k, l) - &
+                                        flux_src_n(3)%vf(advxb)%sf(j, k - 1, l))
+                            end do
+                        end do
+                    end do
+                end if
+
+                if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 0, n
