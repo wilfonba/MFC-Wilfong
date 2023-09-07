@@ -37,6 +37,9 @@ module m_surface_tension
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
     !$acc declare create(ix, iy, iz, is1, is2, is3, iv)
 
+    real(kind(0d0)), allocatable, dimension(:) :: flux_src_H, flux_src_L
+    !$acc declare create(flux_src_H, flux_src_L)
+
     integer :: j, k, l, i  
 
 contains
@@ -74,6 +77,8 @@ contains
             @:ALLOCATE(cR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, c_idx:c_idx))
         end if
 
+        @:ALLOCATE(flux_src_H(momxb:E_idx), flux_src_L(momxb:E_idx))
+
     end subroutine s_initialize_surface_tension_module
 
     subroutine s_compute_capilary_source_flux(q_prim_vf, &
@@ -94,14 +99,16 @@ contains
         real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
         real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(kind(0d0)) :: normWL, normWR, normW
+        real(kind(0d0)) :: phi
 
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW, phi)
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
+                        ! High order flux ======================================
                         w1L = gL_x(j, k, l, 1)
                         w2L = gL_x(j, k, l, 2)
                         w3L = 0d0
@@ -124,16 +131,63 @@ contains
 
                         do i = 1, num_dims
 
-                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1,i)
+                            flux_src_H(momxb + i - 1) = flux_src_H(momxb + i - 1) + Omega(1,i)
 
-                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                            flux_src_H(E_idx) = flux_src_H(E_idx) + &
                                 Omega(1,i)*vSrc_rsx_vf(j,k,l,i)
 
                         end do
 
-                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                        flux_src_H(E_idx) = flux_src_H(E_idx) + &
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
+
+                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
+
+                        ! Low order flux =======================================
+                        w1L = c_divs%vf(1)%sf(j, k, l)
+                        w2L = c_divs%vf(2)%sf(j, k, l)
+                        w3L = 0d0
+                        if (p > 0) w3L = c_divs%vf(3)%sf(j, k, l)
+
+                        w1R = c_divs%vf(1)%sf(j + 1, k, l)
+                        w2R = c_divs%vf(2)%sf(j + 1, k, l)
+                        w3R = 0d0
+                        if (p > 0) w3R = c_divs%vf(3)%sf(j + 1, k, l)
+
+                        normWL = c_divs%vf(num_dims + 1)%sf(j, k, l)
+                        normWR = c_divs%vf(num_dims + 1)%sf(j + 1, k, l)
+
+                        w1 = (w1L + w1R)/2d0
+                        w2 = (w2L + w2R)/2d0
+                        w3 = (w3L + w3R)/2d0
+                        normW = (normWL + normWR)/2d0
+
+                        call s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
+
+                        do i = 1, num_dims
+
+                            flux_src_L(momxb + i - 1) = flux_src_L(momxb + i - 1) + Omega(1,i)
+
+                            flux_src_L(E_idx) = flux_src_L(E_idx) + &
+                                Omega(1,i)*vSrc_rsx_vf(j,k,l,i)
+
+                        end do
+
+                        flux_src_L(E_idx) = flux_src_L(E_idx) + &
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
+
+                        ! Computing final flux =================================
+                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
+
+                        do i = 1, num_dims
+                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = & 
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + &
+                                flux_src_L(momxb + i - 1) + phi*(flux_src_H(momxb + i - 1) - &
+                                flux_src_L(momxb + i - 1))
+                        end do
+
+                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                            flux_src_L(E_idx) + phi*(flux_src_H(E_idx) - flux_src_L(E_idx))
 
                     end do
                 end do
@@ -142,11 +196,12 @@ contains
         elseif (id == 2) then
 
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW, phi)
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
+                        ! High order flux ======================================
                         w1L = gL_y(k, j, l, 1)
                         w2L = gL_y(k, j, l, 2)
                         w3L = 0d0
@@ -169,16 +224,61 @@ contains
 
                         do i = 1, num_dims
 
-                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2,i)
+                            flux_src_H(momxb + i - 1) = flux_src_H(momxb + i - 1) + Omega(2,i)
 
-                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                            flux_src_H(E_idx) = flux_src_H(E_idx) + &
                                 Omega(2,i)*vSrc_rsy_vf(k, j, l, i)
                                 
                         end do
 
-                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                        flux_src_H(E_idx) = flux_src_H(E_idx) + &
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsy_vf(k, j, l, 2)
+
+                        ! Low order flux =======================================
+                        w1L = c_divs%vf(1)%sf(j, k, l)
+                        w2L = c_divs%vf(2)%sf(j, k, l)
+                        w3L = 0d0
+                        if (p > 0) w3L = c_divs%vf(3)%sf(j, k, l)
+
+                        w1R = c_divs%vf(1)%sf(j, k + 1, l)
+                        w2R = c_divs%vf(2)%sf(j, k + 1, l)
+                        w3R = 0d0
+                        if (p > 0) w3R = c_divs%vf(3)%sf(j, k + 1, l)
+
+                        normWL = c_divs%vf(num_dims + 1)%sf(j, k, l)
+                        normWR = c_divs%vf(num_dims + 1)%sf(j, k + 1, l)
+
+                        w1 = (w1L + w1R)/2d0
+                        w2 = (w2L + w2R)/2d0
+                        w3 = (w3L + w3R)/2d0
+                        normW = (normWL + normWR)/2d0
+
+                        call s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
+
+                        do i = 1, num_dims
+
+                            flux_src_L(momxb + i - 1) = flux_src_L(momxb + i - 1) + Omega(2,i)
+
+                            flux_src_L(E_idx) = flux_src_L(E_idx) + &
+                                Omega(2,i)*vSrc_rsy_vf(k, j, l, i)
+                                
+                        end do
+
+                        flux_src_L(E_idx) = flux_src_L(E_idx) + &
+                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsy_vf(k, j, l, 2)
+
+                        ! Computing final flux =================================
+                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
+
+                        do i = 1, num_dims
+                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = & 
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + &
+                                flux_src_L(momxb + i - 1) + phi*(flux_src_H(momxb + i - 1) - &
+                                flux_src_L(momxb + i - 1))
+                        end do
+
+                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                            flux_src_L(E_idx) + phi*(flux_src_H(E_idx) - flux_src_L(E_idx))
 
                     end do
                 end do
@@ -192,6 +292,7 @@ contains
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
+                        ! High order flux ======================================
                         w1L = gL_z(l, j, k, 1)
                         w2L = gL_z(l, j, k, 2)
                         w3L = 0d0
@@ -214,16 +315,30 @@ contains
 
                         do i = 1, num_dims
 
-                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3,i)
+                            flux_src_H(momxb + i - 1) = &
+                                flux_src_H(momxb + i - 1) + Omega(3,i)
 
-                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                            flux_src_H(E_idx) = flux_src_H(E_idx) + &
                                 Omega(3,i)*vSrc_rsz_vf(l, j, k, i)
                                 
                         end do
 
-                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
+                        flux_src_H(E_idx) = flux_src_H(E_idx) + &
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsz_vf(l, j, k, 3)
+
+                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
+
+                        ! Computing final flux =================================
+                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
+
+                        do i = 1, num_dims
+                            flux_src_L(momxb + i - 1) = flux_src_L(momxb + i - 1) + &
+                                flux_src_L(momxb + i - 1) + phi*(flux_src_H(momxb + i - 1) - &
+                                flux_src_L(momxb + i - 1))
+                        end do
+
+                        flux_src_L(E_idx) = flux_src_L(E_idx) + flux_src_L(E_idx) + &
+                            phi*(flux_src_H(E_idx) - flux_src_L(E_idx))
 
                     end do
                 end do
@@ -272,6 +387,81 @@ contains
         end if
 
     end subroutine s_compute_capilary_stress_tensor
+
+    subroutine s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
+        !$acc routine seq
+        real(kind(0d0)), intent(out) :: phi
+        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field), dimension(sys_size) :: flux_src_vf
+        integer :: j, k, l, id, flux_lim
+        real(kind(0d0)) :: slope, top, bottom
+
+        if (id == 1) then
+            if (flux_src_vf(advxb)%sf(j, k, l) <= 0d0) then
+                top = q_prim_vf(advxb)%sf(j, k, l) - &
+                    q_prim_vf(advxb)%sf(j - 1, k, l)
+                bottom = q_prim_vf(advxb)%sf(j + 1, k, l) - &
+                    q_prim_vf(advxb)%sf(j, k, l)
+            else
+                top = q_prim_vf(advxb)%sf(j + 2, k, l) - &
+                    q_prim_vf(advxb)%sf(j + 1, k, l)
+                bottom = q_prim_vf(advxb)%sf(j + 1, k, l) - &
+                    q_prim_vf(advxb)%sf(j, k, l)    
+            end if
+        elseif(id == 2) then
+            if (flux_src_vf(advxb)%sf(j, k, l) <= 0d0) then
+                top = q_prim_vf(advxb)%sf(j, k, l) - &
+                    q_prim_vf(advxb)%sf(j, k - 1, l)
+                bottom = q_prim_vf(advxb)%sf(j, k + 1, l) - &
+                    q_prim_vf(advxb)%sf(j, k, l)
+            else
+                top = q_prim_vf(advxb)%sf(j, k + 2, l) - &
+                    q_prim_vf(advxb)%sf(j, k + 1, l)
+                bottom = q_prim_vf(advxb)%sf(j, k + 1, l) - &
+                    q_prim_vf(advxb)%sf(j, k, l)    
+            end if
+        else
+            if (flux_src_vf(advxb)%sf(j, k, l) <= 0d0) then
+                top = q_prim_vf(advxb)%sf(j, k, l) - &
+                    q_prim_vf(advxb)%sf(j, k, l - 1)
+                bottom = q_prim_vf(advxb)%sf(j, k, l + 1) - &
+                    q_prim_vf(advxb)%sf(j, k, l)
+            else
+                top = q_prim_vf(advxb)%sf(j, k, l + 2) - &
+                    q_prim_vf(advxb)%sf(j, k, l + 1)
+                bottom = q_prim_vf(advxb)%sf(j, k, l + 1) - &
+                    q_prim_vf(advxb)%sf(j, k, l)    
+            end if
+        end if
+
+        if (abs(top) < 1d-8) top = 0d0
+        if (abs(bottom) < 1d-8) bottom = 0d0
+
+        if (top == bottom) then
+            slope = 1d0
+        else
+            slope = (top*bottom)/max(bottom**2d0,sgm_eps)
+        end if
+
+        flux_lim = 4
+
+        ! flux limiter function
+        if (flux_lim == 1) then ! minmod (mm)
+            phi = max(0d0,min(1d0,slope))
+        elseif (flux_lim == 2) then ! muscl (mc)
+            phi = max(0d0,min(2d0*slope,5d-1*(1d0+slope),2d0))
+        elseif (flux_lim == 3) then ! ospre (op)
+            phi = (15d-1*(slope**2d0+slope))/(slope**2d0+slope+1d0)
+        elseif (flux_lim == 4) then ! superbee (sb)
+            phi = max(0d0,min(1d0,2d0*slope),min(slope,2d0))
+        elseif (flux_lim == 5) then ! sweby (sw) (beta = 1.5)
+            phi = max(0d0,min(15d-1*slope,1d0),min(slope,15d-1))
+        elseif (flux_lim == 6) then ! van albada (va)
+            phi = (slope**2d0+slope)/(slope**2d0+1d0)
+        elseif (flux_lim == 7) then ! van leer (vl)
+            phi = (abs(slope) + slope)/(1d0 + abs(slope))
+        end if
+    end subroutine s_compute_flux_lim
 
     subroutine s_get_capilary(q_prim_vf)
 
@@ -795,6 +985,8 @@ contains
         if (p > 0) then
             @:DEALLOCATE(gL_z, gR_z, cL_z, cR_z)
         end if
+
+        !@:DEALLOCATE(flux_src_H(momxb:E_idx), flux_src_L(momxb:E_idx))
 
     end subroutine s_finalize_surface_tension_module
 
