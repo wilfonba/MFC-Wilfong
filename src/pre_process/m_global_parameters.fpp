@@ -344,7 +344,7 @@ contains
         Tw = dflt_real
 
         sigma = dflt_real
-        c_idx = dflt_real
+        c_idx = dflt_int
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max

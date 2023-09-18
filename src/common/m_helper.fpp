@@ -22,6 +22,7 @@ module m_helper
         s_simpson, &
         s_transcoeff, &
         s_int_to_str, &
+        s_print_2D_array, &
         s_transform_vec, &
         s_transform_triangle, &
         s_transform_model, &
@@ -333,6 +334,36 @@ contains
         tmp = DEXP(-0.5d0*(phi(nb)/sd)**2)/DSQRT(2.d0*pi)/sd
         weight(nb) = tmp*dphi/3.d0
     end subroutine s_simpson
+
+    !> This procedure prints a formatted matrix to the terminal for debugging.
+    !! @param A The 2D array to print
+    !! @param div (optional) Scaling factor applied to each element of A
+    subroutine s_print_2D_array(A, div)
+
+        real(kind(0d0)), dimension(:,:) :: A
+        integer :: i, j
+        integer :: m, n
+        real :: c
+        real, optional :: div
+
+        m = size(A,1)
+        n = size(A,2)
+
+        if (present(div)) then 
+            c = div
+        else
+            c = 1
+        endif
+        
+        do i = 1,m
+            do j = 1,n
+                write(*,fmt="(F12.4)",advance="no") A(i,j)/c
+            end do
+            write(*, fmt="(A1)") " "
+        end do
+        write(*, fmt="(A1)") " "
+
+    end subroutine
     
     !> This procedure computes the cross product of two vectors.
     !! @param a First vector.

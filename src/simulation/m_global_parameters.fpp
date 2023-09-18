@@ -443,7 +443,7 @@ contains
 
         ! Coefficient of surface tension
         sigma = dflt_real
-        c_idx = dflt_Real
+        c_idx = dflt_int
         flux_lim = dflt_int
 
         cu_tensor = .false.

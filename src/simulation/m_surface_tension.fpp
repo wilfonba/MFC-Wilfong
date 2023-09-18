@@ -121,6 +121,9 @@ contains
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
+                        
+                        flux_src_H = 0d0
+                        flux_src_L = 0d0
 
                         ! High order flux ======================================
                         w1L = gL_x(j, k, l, 1)
@@ -140,7 +143,7 @@ contains
                         w2 = (w2L + w2R)/2d0
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
-
+                        
                         call s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
 
                         do i = 1, num_dims
@@ -173,7 +176,7 @@ contains
                         w2 = (w2L + w2R)/2d0
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
-
+                                           
                         call s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
 
                         do i = 1, num_dims
@@ -187,7 +190,7 @@ contains
 
                         flux_src_L(E_idx) = flux_src_L(E_idx) + &
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
-
+                        
                         ! Computing final flux =================================
                         do i = 1, num_dims
                             flux_src_vf(momxb + i - 1)%sf(j, k, l) = & 
@@ -210,6 +213,9 @@ contains
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
+
+                        flux_src_H = 0d0
+                        flux_src_L = 0d0
 
                         ! High order flux ======================================
                         w1L = gL_y(k, j, l, 1)
@@ -295,7 +301,8 @@ contains
         elseif (id == 3) then
 
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
+            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW, top, &
+            !$acc bottom, phi, flux_src_H, flux_src_L)
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -406,8 +413,10 @@ contains
         isx%end = m; isy%end = n; isz%end = p
 
         iv%beg = c_idx; iv%end = c_idx
+
         do i = 1, num_dims
-            call s_reconstruct_cell_boundary_values_capilary(q_prim_vf, cL_x, cL_y, cL_z, cR_x, cR_y, cR_z, i)
+            call s_reconstruct_cell_boundary_gradient_values_capilary(q_prim_vf(iv%beg:iv%end), &
+                cL_x, cL_y, cL_z, cR_x, cR_y, cR_z, i)
         end do
 
         ! compute gradient components
@@ -415,14 +424,14 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs%vf(1)%sf(j, k, l) = 1d0/(x_cc(j+1) - x_cc(j-1)) * &
-                        (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j-1, k, l)) 
-                    ! c_divs%vf(1)%sf(j, k, l) = &
-                    !     1d0/((1d0+wa_flg)*dx(j)) &
-                    !     *( wa_flg*cL_x(j + 1, k, l, c_idx) &
-                    !     +        cR_x(j, k, l, c_idx) &
-                    !     -        cL_x(j, k, l, c_idx) &
-                    !     - wa_flg*cR_x(j - 1, k, l, c_idx))
+                    ! c_divs%vf(1)%sf(j, k, l) = 1d0/(x_cc(j+1) - x_cc(j-1)) * &
+                        ! (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j-1, k, l)) 
+                    c_divs%vf(1)%sf(j, k, l) = &
+                        1d0/((1d0+wa_flg)*dx(j)) &
+                        *( wa_flg*cL_x(j + 1, k, l, c_idx) &
+                        +        cR_x(j, k, l, c_idx) &
+                        -        cL_x(j, k, l, c_idx) &
+                        - wa_flg*cR_x(j - 1, k, l, c_idx))
                 end do
             end do
         end do
@@ -431,14 +440,14 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs%vf(2)%sf(j, k, l) = 1d0/(y_cc(j+1) -y_cc(j-1)) * &
-                        (q_prim_vf(c_idx)%sf(j, k + 1,  l) - q_prim_vf(c_idx)%sf(j, k-1, l))
-                    ! c_divs%vf(2)%sf(j, k, l) = &
-                    !     1d0/((1d0+wa_flg)*dy(k)) &
-                    !     *( wa_flg*cL_x(j, k + 1, l,c_idx) &
-                    !     +        cR_x(j, k, l, c_idx) &
-                    !     -        cL_x(j, k, l, c_idx) &
-                    !     - wa_flg*cR_x(j, k - 1, l, c_idx) )
+                    ! c_divs%vf(2)%sf(j, k, l) = 1d0/(y_cc(j+1) -y_cc(j-1)) * &
+                        ! (q_prim_vf(c_idx)%sf(j, k + 1,  l) - q_prim_vf(c_idx)%sf(j, k-1, l))
+                    c_divs%vf(2)%sf(j, k, l) = &
+                        1d0/((1d0+wa_flg)*dy(k)) &
+                        *( wa_flg*cL_y(k + 1, j, l, c_idx) &
+                        +        cR_y(k, j, l, c_idx) &
+                        -        cL_y(k, j, l, c_idx) &
+                        - wa_flg*cR_y(k - 1, j, l, c_idx) )
                 end do
             end do
         end do
@@ -460,7 +469,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs%vf(num_dims + 1)%sf(j, k, l) = 0d0
-                    !s$acc loop seq
+                    !$acc loop seq
                     do i = 1, num_dims
                         c_divs%vf(num_dims + 1)%sf(j, k, l) = &
                             c_divs%vf(num_dims + 1)%sf(j, k, l) + &
@@ -804,8 +813,8 @@ contains
 
     end subroutine s_populate_capillary_buffers
 
-    subroutine s_reconstruct_cell_boundary_values_capilary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                             norm_dir)
+    subroutine s_reconstruct_cell_boundary_gradient_values_capilary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+        norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
@@ -816,23 +825,21 @@ contains
         integer :: weno_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
+
         ! Reconstruction in s1-direction ===================================
 
         if (norm_dir == 1) then
             is1 = ix; is2 = iy; is3 = iz
             weno_dir = 1; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
-
         elseif (norm_dir == 2) then
             is1 = iy; is2 = ix; is3 = iz
             weno_dir = 2; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
-
         else
             is1 = iz; is2 = iy; is3 = ix
             weno_dir = 3; is1%beg = is1%beg + weno_polyn
             is1%end = is1%end - weno_polyn
-
         end if
 
         !$acc update device(is1, is2, is3, iv)

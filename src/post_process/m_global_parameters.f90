@@ -338,7 +338,7 @@ contains
 
         ! surfact tension modelig
         sigma = dflt_real
-        c_idx = dflt_real
+        c_idx = dflt_int
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 
