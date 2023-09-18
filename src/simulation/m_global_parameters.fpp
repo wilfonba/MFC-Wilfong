@@ -311,7 +311,8 @@ module m_global_parameters
     !> @name Surface tension parameters
     !> @{
     real(kind(0d0)) :: sigma
-    !$acc declare create(sigma)
+    integer :: flux_lim
+    !$acc declare create(sigma, flux_lim)
     !> @}
     
 
@@ -443,6 +444,7 @@ contains
         ! Coefficient of surface tension
         sigma = dflt_real
         c_idx = dflt_Real
+        flux_lim = dflt_int
 
         cu_tensor = .false.
 
@@ -671,7 +673,7 @@ contains
                 if (sigma .ne. dflt_real) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
-                    !$acc update device(sigma)
+                    !$acc update device(sigma, flux_lim)
                 end if
             else if (model_eqns == 4) then
                 cont_idx%beg = 1 ! one continuity equation

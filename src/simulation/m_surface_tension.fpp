@@ -15,6 +15,8 @@ module m_surface_tension
 
     use m_weno
 
+    use m_derived_variables
+
     use m_helper
     ! ==========================================================================
 
@@ -25,20 +27,29 @@ module m_surface_tension
         s_get_capilary, &
         s_finalize_surface_tension_module
 
+    !< gradient components and magnitud
     type(vector_field) :: c_divs
     !$acc declare create(c_divs)
 
+    !< Gradient reconstructions
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 
+    !< Color function reconstructions
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: cL_x, cR_x, cL_y, cR_y, cL_z, cR_z
     !$acc declare create(cL_x, cR_x, cL_y, cR_y, cL_z, cR_z)
 
+    !< indexing variables
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
     !$acc declare create(ix, iy, iz, is1, is2, is3, iv)
 
+    !< storage of high and low order fluxes for flux li miting
     real(kind(0d0)), allocatable, dimension(:) :: flux_src_H, flux_src_L
     !$acc declare create(flux_src_H, flux_src_L)
+
+    !< flux limiter value
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: phi_sf
+    !$acc declare create(phi_sf)
 
     integer :: j, k, l, i  
 
@@ -79,6 +90,8 @@ contains
 
         @:ALLOCATE(flux_src_H(momxb:E_idx), flux_src_L(momxb:E_idx))
 
+        @:ALLOCATE(phi_sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
+
     end subroutine s_initialize_surface_tension_module
 
     subroutine s_compute_capilary_source_flux(q_prim_vf, &
@@ -99,11 +112,12 @@ contains
         real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
         real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(kind(0d0)) :: normWL, normWR, normW
-        real(kind(0d0)) :: phi
+
+        call s_derive_flux_limiter(id, q_prim_vf, phi_sf, ix, iy, iz)
 
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW, phi)
+            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -141,8 +155,6 @@ contains
                         flux_src_H(E_idx) = flux_src_H(E_idx) + &
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
 
-                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
-
                         ! Low order flux =======================================
                         w1L = c_divs%vf(1)%sf(j, k, l)
                         w2L = c_divs%vf(2)%sf(j, k, l)
@@ -177,17 +189,15 @@ contains
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
 
                         ! Computing final flux =================================
-                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
-
                         do i = 1, num_dims
                             flux_src_vf(momxb + i - 1)%sf(j, k, l) = & 
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + &
-                                flux_src_L(momxb + i - 1) + phi*(flux_src_H(momxb + i - 1) - &
+                                flux_src_L(momxb + i - 1) + phi_sf(j,k,l)*(flux_src_H(momxb + i - 1) - &
                                 flux_src_L(momxb + i - 1))
                         end do
 
                         flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                            flux_src_L(E_idx) + phi*(flux_src_H(E_idx) - flux_src_L(E_idx))
+                            flux_src_L(E_idx) + phi_sf(j,k,l)*(flux_src_H(E_idx) - flux_src_L(E_idx))
 
                     end do
                 end do
@@ -196,7 +206,7 @@ contains
         elseif (id == 2) then
 
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW, phi)
+            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -268,17 +278,15 @@ contains
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsy_vf(k, j, l, 2)
 
                         ! Computing final flux =================================
-                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
-
                         do i = 1, num_dims
                             flux_src_vf(momxb + i - 1)%sf(j, k, l) = & 
                                 flux_src_vf(momxb + i - 1)%sf(j, k, l) + &
-                                flux_src_L(momxb + i - 1) + phi*(flux_src_H(momxb + i - 1) - &
+                                flux_src_L(momxb + i - 1) + phi_sf(j, k, l)*(flux_src_H(momxb + i - 1) - &
                                 flux_src_L(momxb + i - 1))
                         end do
 
                         flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                            flux_src_L(E_idx) + phi*(flux_src_H(E_idx) - flux_src_L(E_idx))
+                            flux_src_L(E_idx) + phi_sf(j, k, l)*(flux_src_H(E_idx) - flux_src_L(E_idx))
 
                     end do
                 end do
@@ -326,19 +334,17 @@ contains
                         flux_src_H(E_idx) = flux_src_H(E_idx) + &
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsz_vf(l, j, k, 3)
 
-                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
 
                         ! Computing final flux =================================
-                        call s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
-
                         do i = 1, num_dims
-                            flux_src_L(momxb + i - 1) = flux_src_L(momxb + i - 1) + &
-                                flux_src_L(momxb + i - 1) + phi*(flux_src_H(momxb + i - 1) - &
+                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = & 
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + &
+                                flux_src_L(momxb + i - 1) + phi_sf(j, k, l)*(flux_src_H(momxb + i - 1) - &
                                 flux_src_L(momxb + i - 1))
                         end do
-
-                        flux_src_L(E_idx) = flux_src_L(E_idx) + flux_src_L(E_idx) + &
-                            phi*(flux_src_H(E_idx) - flux_src_L(E_idx))
+    
+                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                            flux_src_L(E_idx) + phi_sf(j, k, l)*(flux_src_H(E_idx) - flux_src_L(E_idx))
 
                     end do
                 end do
@@ -387,81 +393,6 @@ contains
         end if
 
     end subroutine s_compute_capilary_stress_tensor
-
-    subroutine s_compute_flux_lim(j, k, l, phi, q_prim_vf, flux_src_vf, id)
-        !$acc routine seq
-        real(kind(0d0)), intent(out) :: phi
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        type(scalar_field), dimension(sys_size) :: flux_src_vf
-        integer :: j, k, l, id, flux_lim
-        real(kind(0d0)) :: slope, top, bottom
-
-        if (id == 1) then
-            if (flux_src_vf(advxb)%sf(j, k, l) <= 0d0) then
-                top = q_prim_vf(advxb)%sf(j, k, l) - &
-                    q_prim_vf(advxb)%sf(j - 1, k, l)
-                bottom = q_prim_vf(advxb)%sf(j + 1, k, l) - &
-                    q_prim_vf(advxb)%sf(j, k, l)
-            else
-                top = q_prim_vf(advxb)%sf(j + 2, k, l) - &
-                    q_prim_vf(advxb)%sf(j + 1, k, l)
-                bottom = q_prim_vf(advxb)%sf(j + 1, k, l) - &
-                    q_prim_vf(advxb)%sf(j, k, l)    
-            end if
-        elseif(id == 2) then
-            if (flux_src_vf(advxb)%sf(j, k, l) <= 0d0) then
-                top = q_prim_vf(advxb)%sf(j, k, l) - &
-                    q_prim_vf(advxb)%sf(j, k - 1, l)
-                bottom = q_prim_vf(advxb)%sf(j, k + 1, l) - &
-                    q_prim_vf(advxb)%sf(j, k, l)
-            else
-                top = q_prim_vf(advxb)%sf(j, k + 2, l) - &
-                    q_prim_vf(advxb)%sf(j, k + 1, l)
-                bottom = q_prim_vf(advxb)%sf(j, k + 1, l) - &
-                    q_prim_vf(advxb)%sf(j, k, l)    
-            end if
-        else
-            if (flux_src_vf(advxb)%sf(j, k, l) <= 0d0) then
-                top = q_prim_vf(advxb)%sf(j, k, l) - &
-                    q_prim_vf(advxb)%sf(j, k, l - 1)
-                bottom = q_prim_vf(advxb)%sf(j, k, l + 1) - &
-                    q_prim_vf(advxb)%sf(j, k, l)
-            else
-                top = q_prim_vf(advxb)%sf(j, k, l + 2) - &
-                    q_prim_vf(advxb)%sf(j, k, l + 1)
-                bottom = q_prim_vf(advxb)%sf(j, k, l + 1) - &
-                    q_prim_vf(advxb)%sf(j, k, l)    
-            end if
-        end if
-
-        if (abs(top) < 1d-8) top = 0d0
-        if (abs(bottom) < 1d-8) bottom = 0d0
-
-        if (top == bottom) then
-            slope = 1d0
-        else
-            slope = (top*bottom)/max(bottom**2d0,sgm_eps)
-        end if
-
-        flux_lim = 4
-
-        ! flux limiter function
-        if (flux_lim == 1) then ! minmod (mm)
-            phi = max(0d0,min(1d0,slope))
-        elseif (flux_lim == 2) then ! muscl (mc)
-            phi = max(0d0,min(2d0*slope,5d-1*(1d0+slope),2d0))
-        elseif (flux_lim == 3) then ! ospre (op)
-            phi = (15d-1*(slope**2d0+slope))/(slope**2d0+slope+1d0)
-        elseif (flux_lim == 4) then ! superbee (sb)
-            phi = max(0d0,min(1d0,2d0*slope),min(slope,2d0))
-        elseif (flux_lim == 5) then ! sweby (sw) (beta = 1.5)
-            phi = max(0d0,min(15d-1*slope,1d0),min(slope,15d-1))
-        elseif (flux_lim == 6) then ! van albada (va)
-            phi = (slope**2d0+slope)/(slope**2d0+1d0)
-        elseif (flux_lim == 7) then ! van leer (vl)
-            phi = (abs(slope) + slope)/(1d0 + abs(slope))
-        end if
-    end subroutine s_compute_flux_lim
 
     subroutine s_get_capilary(q_prim_vf)
 
@@ -906,67 +837,67 @@ contains
 
         !$acc update device(is1, is2, is3, iv)
 
-        ! if (n > 0) then
-        !     if (p > 0) then
+        if (n > 0) then
+            if (p > 0) then
 
-        !         call s_weno(v_vf(iv%beg:iv%end), &
-        !             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-        !                         norm_dir, weno_dir, &
-        !                         is1, is2, is3)
-        !     else
-        !         call s_weno(v_vf(iv%beg:iv%end), &
-        !             vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-        !                         norm_dir, weno_dir, &
-        !                         is1, is2, is3)
-        !     end if
-        ! else
+                call s_weno(v_vf(iv%beg:iv%end), &
+                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
+                                norm_dir, weno_dir, &
+                                is1, is2, is3)
+            else
+                call s_weno(v_vf(iv%beg:iv%end), &
+                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
+                                norm_dir, weno_dir, &
+                                is1, is2, is3)
+            end if
+        else
 
-        !     call s_weno(v_vf(iv%beg:iv%end), &
-        !                 vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-        !                     norm_dir, weno_dir, &
-        !                     is1, is2, is3)
-        ! end if
-
-        if (weno_dir == 1) then
-!$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end 
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-                                vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                            end do
-                        end do
-                    end do
-                end do
-                !$acc end parallel loop
-        else if (weno_dir == 2) then
-!$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                            vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                        end do
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
-        else if (weno_dir == 3) then
-!$acc parallel loop collapse(4) default(present)
-            do i = iv%beg, iv%end
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                            vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                        end do
-                    end do
-                end do
-            end do
-            !$acc end parallel loop
+            call s_weno(v_vf(iv%beg:iv%end), &
+                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
+                            norm_dir, weno_dir, &
+                            is1, is2, is3)
         end if
+
+!         if (weno_dir == 1) then
+! !$acc parallel loop collapse(4) default(present)
+!             do i = iv%beg, iv%end 
+!                     do l = is3%beg, is3%end
+!                         do k = is2%beg, is2%end
+!                             do j = is1%beg, is1%end
+!                                 vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+!                                 vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+!                             end do
+!                         end do
+!                     end do
+!                 end do
+!                 !$acc end parallel loop
+!         else if (weno_dir == 2) then
+! !$acc parallel loop collapse(4) default(present)
+!             do i = iv%beg, iv%end
+!                 do l = is3%beg, is3%end
+!                     do k = is2%beg, is2%end
+!                         do j = is1%beg, is1%end
+!                             vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+!                             vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+!                         end do
+!                     end do
+!                 end do
+!             end do
+!             !$acc end parallel loop
+!         else if (weno_dir == 3) then
+! !$acc parallel loop collapse(4) default(present)
+!             do i = iv%beg, iv%end
+!                 do l = is3%beg, is3%end
+!                     do k = is2%beg, is2%end
+!                         do j = is1%beg, is1%end
+!                             vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+!                             vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+!                         end do
+!                     end do
+!                 end do
+!             end do
+!             !$acc end parallel loop
+!         end if
 
     end subroutine s_reconstruct_cell_boundary_values_capilary
 
@@ -987,6 +918,8 @@ contains
         end if
 
         !@:DEALLOCATE(flux_src_H(momxb:E_idx), flux_src_L(momxb:E_idx))
+
+        @:DEALLOCATE(phi_sf)
 
     end subroutine s_finalize_surface_tension_module
 

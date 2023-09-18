@@ -142,7 +142,7 @@ contains
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type, sigma
+            R0_type, sigma, flux_lim
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -175,7 +175,9 @@ contains
             n_glb = n
             p_glb = p
 
-            !$acc update device(sigma)
+            !$acc update device(sigma, flux_lim)
+
+            print*, "flux_lim = ", flux_lim
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
