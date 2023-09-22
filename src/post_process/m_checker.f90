@@ -112,7 +112,7 @@ contains
         end if
 
             ! Constraints on the boundary conditions in the x-direction
-        elseif (bc_x%beg < -16 .or. bc_x%beg > -1 .or. bc_x%beg == -14) then
+        if (bc_x%beg < -16 .or. bc_x%beg > -1 .or. bc_x%beg == -14) then
             call s_mpi_abort('Unsupported choice for the value of '// &
                 'bc_x%beg. Exiting ...')
         elseif (bc_x%end < -16 .or. bc_x%end > -1 .or. bc_x%beg == -14) then
