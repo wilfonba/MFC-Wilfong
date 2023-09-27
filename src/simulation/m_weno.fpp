@@ -26,8 +26,6 @@ module m_weno
 #endif
 
     use m_mpi_proxy
-
-    use m_helper
     ! ==========================================================================
 
     !implicit none

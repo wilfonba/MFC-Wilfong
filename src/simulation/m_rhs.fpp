@@ -755,8 +755,6 @@ contains
         if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf)
         
         call nvtxEndRange
-        
-        call nvtxEndRange
         ! Dimensional Splitting Loop =======================================
 
         do id = 1, num_dims
@@ -1419,8 +1417,8 @@ contains
                     end do
                 end if
 
-                if (any(Re_size > 0) .or. (sigma .ne. dflt_real)) then
-                    if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -13))) then
+                if (any(Re_size > 0)) then
+                    if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
                         if (p > 0) then
                             call s_compute_viscous_stress_tensor(q_prim_qp%vf, &
                                                                  dq_prim_dx_qp%vf(mom_idx%beg:mom_idx%end), &
@@ -1866,21 +1864,6 @@ contains
                                         (flux_src_n(3)%vf(advxb)%sf(j, k, l) - &
                                          flux_src_n(3)%vf(advxb)%sf(j, k, l - 1))
                                 end do
-                            end do
-                        end do
-                    end do
-                end if
-
-                if (sigma .ne. dflt_real) then
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                rhs_vf(c_idx)%sf(j, k, l) = &
-                                    rhs_vf(c_idx)%sf(j, k, l) + 1d0/dz(l)* &
-                                    q_cons_qp%vf(c_idx)%sf(j, k, l)* &
-                                    (flux_src_n(3)%vf(advxb)%sf(j, k, l) - &
-                                        flux_src_n(3)%vf(advxb)%sf(j, k - 1, l))
                             end do
                         end do
                     end do

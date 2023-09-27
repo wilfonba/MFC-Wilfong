@@ -28,8 +28,7 @@ module m_derived_variables
     private; public :: s_initialize_derived_variables_module, &
                      s_initialize_derived_variables, &
                      s_compute_derived_variables, &
-                     s_finalize_derived_variables_module, &
-                     s_derive_flux_limiter
+                     s_finalize_derived_variables_module
 
     !> @name Finite-difference coefficients
     !! Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
@@ -316,102 +315,6 @@ contains
         end if
 
     end subroutine s_derive_acceleration_component ! --------------------------
-
-        !>  This subroutine derives the flux_limiter at cell boundary
-        !!      i+1/2. This is an approximation because the velocity used
-        !!      to determine the upwind direction is the velocity at the
-        !!      cell center i instead of the contact velocity at the cell
-        !!      boundary from the Riemann solver.
-        !!  @param i Component indicator
-        !!  @param q_prim_vf Primitive variables
-        !!  @param q_sf Flux limiter
-    subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf, isx, isy, isz) ! -----------------
-
-        integer, intent(IN) :: i
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        type(int_bounds_info) :: isx, isy, isz
-        real(kind(0d0)), dimension(isx%beg:isx%end, isy%beg:isy%end, isz%beg:isz%end), &
-            intent(INOUT) :: q_sf
-
-        real(kind(0d0)) :: top, bottom, slope !< Flux limiter calcs
-        integer :: j, k, l !< Generic loop iterators
-
-        !$acc parallel loop collapse(3) gang vector default(present) private(top &
-        !$acc bottom, slope)
-        do l = isz%beg, isz%end
-            do k = isy%beg, isy%end
-                do j = isx%beg, isx%end
-                    if (i == 1) then
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0d0) then
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j - 1, k, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j + 1, k, l) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
-                        else
-                            top = q_prim_vf(adv_idx%beg)%sf(j + 2, k, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j + 1, k, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j + 1, k, l) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
-                        end if
-                    elseif (i == 2) then
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0d0) then
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j, k - 1, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k + 1, l) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
-                        else
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k + 2, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j, k + 1, l)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k + 1, l) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
-                        end if
-                    else
-                        if (q_prim_vf(cont_idx%end + i)%sf(j, k, l) >= 0d0) then
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j, k, l - 1)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k, l + 1) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
-                        else
-                            top = q_prim_vf(adv_idx%beg)%sf(j, k, l + 2) - &
-                                  q_prim_vf(adv_idx%beg)%sf(j, k, l + 1)
-                            bottom = q_prim_vf(adv_idx%beg)%sf(j, k, l + 1) - &
-                                     q_prim_vf(adv_idx%beg)%sf(j, k, l)
-                        end if
-                    end if
-
-                    if (abs(top) < 1d-8) top = 0d0
-                    if (abs(bottom) < 1d-8) bottom = 0d0
-
-                    if (top == bottom) then
-                        slope = 1d0
-                        !       ELSEIF((top == 0d0 .AND. bottom /= 0d0) &
-                        !               .OR.            &
-                        !           (bottom == 0d0 .AND. top /= 0d0)) THEN
-                        !           slope = 0d0
-                    else
-                        slope = (top*bottom)/(bottom**2d0 + 1d-16)
-                    end if
-
-                    ! Flux limiter function
-                    if (flux_lim == 1) then ! MINMOD (MM)
-                        q_sf(j, k, l) = max(0d0, min(1d0, slope))
-                    elseif (flux_lim == 2) then ! MUSCL (MC)
-                        q_sf(j, k, l) = max(0d0, min(2d0*slope, 5d-1*(1d0 + slope), 2d0))
-                    elseif (flux_lim == 3) then ! OSPRE (OP)
-                        q_sf(j, k, l) = (15d-1*(slope**2d0 + slope))/(slope**2d0 + slope + 1d0)
-                    elseif (flux_lim == 4) then ! SUPERBEE (SB)
-                        q_sf(j, k, l) = max(0d0, min(1d0, 2d0*slope), min(slope, 2d0))
-                    elseif (flux_lim == 5) then ! SWEBY (SW) (beta = 1.5)
-                        q_sf(j, k, l) = max(0d0, min(15d-1*slope, 1d0), min(slope, 15d-1))
-                    elseif (flux_lim == 6) then ! VAN ALBADA (VA)
-                        q_sf(j, k, l) = (slope**2d0 + slope)/(slope**2d0 + 1d0)
-                    elseif (flux_lim == 7) then ! VAN LEER (VL)
-                        q_sf(j, k, l) = (abs(slope) + slope)/(1d0 + abs(slope))
-                    end if
-                end do
-            end do
-        end do
-    end subroutine s_derive_flux_limiter ! ---------------------------------
 
 
     !> Deallocation procedures for the module

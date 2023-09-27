@@ -246,8 +246,6 @@ contains
         real(kind(0d0)) :: top, bottom, slope !< Flux limiter calcs
         integer :: j, k, l !< Generic loop iterators
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(top &
-        !$acc bottom, slope)
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end

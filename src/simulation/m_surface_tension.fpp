@@ -1,4 +1,5 @@
 #:include 'macros.fpp'
+#:include 'inline_capilary.fpp'
 
 !> @brief This module is used to compute source terms for hypoelastic model
 module m_surface_tension
@@ -15,8 +16,6 @@ module m_surface_tension
 
     use m_weno
 
-    use m_derived_variables
-
     use m_helper
     ! ==========================================================================
 
@@ -27,29 +26,17 @@ module m_surface_tension
         s_get_capilary, &
         s_finalize_surface_tension_module
 
-    !< gradient components and magnitud
     type(vector_field) :: c_divs
     !$acc declare create(c_divs)
 
-    !< Gradient reconstructions
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 
-    !< Color function reconstructions
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: cL_x, cR_x, cL_y, cR_y, cL_z, cR_z
     !$acc declare create(cL_x, cR_x, cL_y, cR_y, cL_z, cR_z)
 
-    !< indexing variables
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
     !$acc declare create(ix, iy, iz, is1, is2, is3, iv)
-
-    !< storage of high and low order fluxes for flux li miting
-    real(kind(0d0)), allocatable, dimension(:) :: flux_src_H, flux_src_L
-    !$acc declare create(flux_src_H, flux_src_L)
-
-    !< flux limiter value
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: phi_sf
-    !$acc declare create(phi_sf)
 
     integer :: j, k, l, i  
 
@@ -88,10 +75,6 @@ contains
             @:ALLOCATE(cR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, c_idx:c_idx))
         end if
 
-        @:ALLOCATE(flux_src_H(momxb:E_idx), flux_src_L(momxb:E_idx))
-
-        @:ALLOCATE(phi_sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
-
     end subroutine s_initialize_surface_tension_module
 
     subroutine s_compute_capilary_source_flux(q_prim_vf, &
@@ -112,20 +95,14 @@ contains
         real(kind(0d0)), dimension(num_dims, num_dims) :: Omega
         real(kind(0d0)) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(kind(0d0)) :: normWL, normWR, normW
-
-        call s_derive_flux_limiter(id, q_prim_vf, phi_sf, ix, iy, iz)
-
+        
         if (id == 1) then
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
             !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
-                        
-                        flux_src_H = 0d0
-                        flux_src_L = 0d0
 
-                        ! High order flux ======================================
                         w1L = gL_x(j, k, l, 1)
                         w2L = gL_x(j, k, l, 2)
                         w3L = 0d0
@@ -143,64 +120,21 @@ contains
                         w2 = (w2L + w2R)/2d0
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
-                        
-                        call s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
+
+                        @:compute_capilary_stress_tensor()
 
                         do i = 1, num_dims
 
-                            flux_src_H(momxb + i - 1) = flux_src_H(momxb + i - 1) + Omega(1,i)
+                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1,i)
 
-                            flux_src_H(E_idx) = flux_src_H(E_idx) + &
+                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
                                 Omega(1,i)*vSrc_rsx_vf(j,k,l,i)
 
                         end do
 
-                        flux_src_H(E_idx) = flux_src_H(E_idx) + &
+                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
-
-                        ! Low order flux =======================================
-                        w1L = c_divs%vf(1)%sf(j, k, l)
-                        w2L = c_divs%vf(2)%sf(j, k, l)
-                        w3L = 0d0
-                        if (p > 0) w3L = c_divs%vf(3)%sf(j, k, l)
-
-                        w1R = c_divs%vf(1)%sf(j + 1, k, l)
-                        w2R = c_divs%vf(2)%sf(j + 1, k, l)
-                        w3R = 0d0
-                        if (p > 0) w3R = c_divs%vf(3)%sf(j + 1, k, l)
-
-                        normWL = c_divs%vf(num_dims + 1)%sf(j, k, l)
-                        normWR = c_divs%vf(num_dims + 1)%sf(j + 1, k, l)
-
-                        w1 = (w1L + w1R)/2d0
-                        w2 = (w2L + w2R)/2d0
-                        w3 = (w3L + w3R)/2d0
-                        normW = (normWL + normWR)/2d0
-                                           
-                        call s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
-
-                        do i = 1, num_dims
-
-                            flux_src_L(momxb + i - 1) = flux_src_L(momxb + i - 1) + Omega(1,i)
-
-                            flux_src_L(E_idx) = flux_src_L(E_idx) + &
-                                Omega(1,i)*vSrc_rsx_vf(j,k,l,i)
-
-                        end do
-
-                        flux_src_L(E_idx) = flux_src_L(E_idx) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsx_vf(j, k, l, 1)
-                        
-                        ! Computing final flux =================================
-                        do i = 1, num_dims
-                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = & 
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + &
-                                flux_src_L(momxb + i - 1) + phi_sf(j,k,l)*(flux_src_H(momxb + i - 1) - &
-                                flux_src_L(momxb + i - 1))
-                        end do
-
-                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                            flux_src_L(E_idx) + phi_sf(j,k,l)*(flux_src_H(E_idx) - flux_src_L(E_idx))
 
                     end do
                 end do
@@ -214,10 +148,6 @@ contains
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
-                        flux_src_H = 0d0
-                        flux_src_L = 0d0
-
-                        ! High order flux ======================================
                         w1L = gL_y(k, j, l, 1)
                         w2L = gL_y(k, j, l, 2)
                         w3L = 0d0
@@ -236,63 +166,20 @@ contains
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
 
-                        call s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
+                        @:compute_capilary_stress_tensor()
 
                         do i = 1, num_dims
 
-                            flux_src_H(momxb + i - 1) = flux_src_H(momxb + i - 1) + Omega(2,i)
+                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2,i)
 
-                            flux_src_H(E_idx) = flux_src_H(E_idx) + &
+                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
                                 Omega(2,i)*vSrc_rsy_vf(k, j, l, i)
                                 
                         end do
 
-                        flux_src_H(E_idx) = flux_src_H(E_idx) + &
+                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsy_vf(k, j, l, 2)
-
-                        ! Low order flux =======================================
-                        w1L = c_divs%vf(1)%sf(j, k, l)
-                        w2L = c_divs%vf(2)%sf(j, k, l)
-                        w3L = 0d0
-                        if (p > 0) w3L = c_divs%vf(3)%sf(j, k, l)
-
-                        w1R = c_divs%vf(1)%sf(j, k + 1, l)
-                        w2R = c_divs%vf(2)%sf(j, k + 1, l)
-                        w3R = 0d0
-                        if (p > 0) w3R = c_divs%vf(3)%sf(j, k + 1, l)
-
-                        normWL = c_divs%vf(num_dims + 1)%sf(j, k, l)
-                        normWR = c_divs%vf(num_dims + 1)%sf(j, k + 1, l)
-
-                        w1 = (w1L + w1R)/2d0
-                        w2 = (w2L + w2R)/2d0
-                        w3 = (w3L + w3R)/2d0
-                        normW = (normWL + normWR)/2d0
-
-                        call s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
-
-                        do i = 1, num_dims
-
-                            flux_src_L(momxb + i - 1) = flux_src_L(momxb + i - 1) + Omega(2,i)
-
-                            flux_src_L(E_idx) = flux_src_L(E_idx) + &
-                                Omega(2,i)*vSrc_rsy_vf(k, j, l, i)
-                                
-                        end do
-
-                        flux_src_L(E_idx) = flux_src_L(E_idx) + &
-                            sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsy_vf(k, j, l, 2)
-
-                        ! Computing final flux =================================
-                        do i = 1, num_dims
-                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = & 
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + &
-                                flux_src_L(momxb + i - 1) + phi_sf(j, k, l)*(flux_src_H(momxb + i - 1) - &
-                                flux_src_L(momxb + i - 1))
-                        end do
-
-                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                            flux_src_L(E_idx) + phi_sf(j, k, l)*(flux_src_H(E_idx) - flux_src_L(E_idx))
 
                     end do
                 end do
@@ -301,13 +188,11 @@ contains
         elseif (id == 3) then
 
             !$acc parallel loop collapse(3) gang vector default(present) private(Omega, &
-            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW, top, &
-            !$acc bottom, phi, flux_src_H, flux_src_L)
+            !$acc w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW)
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
 
-                        ! High order flux ======================================
                         w1L = gL_z(l, j, k, 1)
                         w2L = gL_z(l, j, k, 2)
                         w3L = 0d0
@@ -326,32 +211,20 @@ contains
                         w3 = (w3L + w3R)/2d0
                         normW = (normWL + normWR)/2d0
 
-                        call s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
+                        @:compute_capilary_stress_tensor()
 
                         do i = 1, num_dims
 
-                            flux_src_H(momxb + i - 1) = &
-                                flux_src_H(momxb + i - 1) + Omega(3,i)
+                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(3,i)
 
-                            flux_src_H(E_idx) = flux_src_H(E_idx) + &
+                            flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
                                 Omega(3,i)*vSrc_rsz_vf(l, j, k, i)
                                 
                         end do
 
-                        flux_src_H(E_idx) = flux_src_H(E_idx) + &
+                        flux_src_vf(E_idx)%sf(j,k,l) = flux_src_vf(E_idx)%sf(j,k,l) + &
                             sigma*c_divs%vf(num_dims + 1)%sf(j,k,l)*vSrc_rsz_vf(l, j, k, 3)
-
-
-                        ! Computing final flux =================================
-                        do i = 1, num_dims
-                            flux_src_vf(momxb + i - 1)%sf(j, k, l) = & 
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) + &
-                                flux_src_L(momxb + i - 1) + phi_sf(j, k, l)*(flux_src_H(momxb + i - 1) - &
-                                flux_src_L(momxb + i - 1))
-                        end do
-    
-                        flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                            flux_src_L(E_idx) + phi_sf(j, k, l)*(flux_src_H(E_idx) - flux_src_L(E_idx))
 
                     end do
                 end do
@@ -360,46 +233,6 @@ contains
         end if
 
     end subroutine s_compute_capilary_source_flux
-
-    subroutine s_compute_capilary_stress_tensor(w1, w2, w3, omega, normW)
-        !$acc routine seq
-        real(kind(0d0)) :: w1, w2, w3, normW
-        real(kind(0d0)), dimension(num_dims, num_dims) :: omega
-
-        if (normW > 1d-6) then
-            Omega(1,1) = -sigma*(w2*w2 + w3*w3) / normW
-        
-            Omega(2,1) = sigma*w1*w2 / normW
-            Omega(1,2) = Omega(2,1)
-        
-            Omega(2,2) = -sigma*(w1*w1 + w3*w3) / normW
-            
-            if (p > 0) then
-        
-                Omega(3,1) = sigma*w1*w3 / normW
-                Omega(1,3) = Omega(3,1)
-        
-                Omega(3,2) = sigma*w2*w3 / normW
-                Omega(2,3) = Omega(3,2)
-        
-                Omega(3,3) = -sigma*(w1*w1 + w2*w2) / normW
-        
-            end if
-        else
-            Omega(1,1) = 0d0
-            Omega(1,2) = 0d0
-            Omega(2,1) = 0d0
-            Omega(2,2) = 0d0
-            if (p > 0) then
-                Omega(1,3) = 0d0
-                Omega(3,1) = 0d0
-                Omega(2,3) = 0d0
-                Omega(3,2) = 0d0
-                Omega(3,3) = 0d0
-            end if
-        end if
-
-    end subroutine s_compute_capilary_stress_tensor
 
     subroutine s_get_capilary(q_prim_vf)
 
@@ -412,26 +245,13 @@ contains
 
         isx%end = m; isy%end = n; isz%end = p
 
-        iv%beg = c_idx; iv%end = c_idx
-
-        do i = 1, num_dims
-            call s_reconstruct_cell_boundary_gradient_values_capilary(q_prim_vf(iv%beg:iv%end), &
-                cL_x, cL_y, cL_z, cR_x, cR_y, cR_z, i)
-        end do
-
         ! compute gradient components
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    ! c_divs%vf(1)%sf(j, k, l) = 1d0/(x_cc(j+1) - x_cc(j-1)) * &
-                        ! (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j-1, k, l)) 
-                    c_divs%vf(1)%sf(j, k, l) = &
-                        1d0/((1d0+wa_flg)*dx(j)) &
-                        *( wa_flg*cL_x(j + 1, k, l, c_idx) &
-                        +        cR_x(j, k, l, c_idx) &
-                        -        cL_x(j, k, l, c_idx) &
-                        - wa_flg*cR_x(j - 1, k, l, c_idx))
+                    c_divs%vf(1)%sf(j, k, l) = 1d0/(x_cc(j+1) - x_cc(j-1)) * &
+                        (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j-1, k, l))    
                 end do
             end do
         end do
@@ -440,14 +260,8 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    ! c_divs%vf(2)%sf(j, k, l) = 1d0/(y_cc(j+1) -y_cc(j-1)) * &
-                        ! (q_prim_vf(c_idx)%sf(j, k + 1,  l) - q_prim_vf(c_idx)%sf(j, k-1, l))
-                    c_divs%vf(2)%sf(j, k, l) = &
-                        1d0/((1d0+wa_flg)*dy(k)) &
-                        *( wa_flg*cL_y(k + 1, j, l, c_idx) &
-                        +        cR_y(k, j, l, c_idx) &
-                        -        cL_y(k, j, l, c_idx) &
-                        - wa_flg*cR_y(k - 1, j, l, c_idx) )
+                    c_divs%vf(2)%sf(j, k, l) = 1d0/(y_cc(j+1) -y_cc(j-1)) * &
+                        (q_prim_vf(c_idx)%sf(j, k + 1,  l) - q_prim_vf(c_idx)%sf(j, k-1, l))
                 end do
             end do
         end do
@@ -457,8 +271,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        ! c_divs%vf(3)%sf(j, k, l) = 1d0/(z_cc(l+1) - z_cc(l-1)) * &
-                        !     (q_prim_vf(c_idx)%sf(j, k, l+1) - q_prim_vf(c_idx)%sf(j, k, l-1))
+                        c_divs%vf(3)%sf(j, k, l) = 1d0/(z_cc(l+1) - z_cc(l-1)) * &
+                            (q_prim_vf(c_idx)%sf(j, k, l+1) - q_prim_vf(c_idx)%sf(j, k, l-1))
                     end do
                 end do
             end do
@@ -469,7 +283,7 @@ contains
             do k = 0, n
                 do j = 0, m
                     c_divs%vf(num_dims + 1)%sf(j, k, l) = 0d0
-                    !$acc loop seq
+                    !s$acc loop seq
                     do i = 1, num_dims
                         c_divs%vf(num_dims + 1)%sf(j, k, l) = &
                             c_divs%vf(num_dims + 1)%sf(j, k, l) + &
@@ -495,7 +309,7 @@ contains
     subroutine s_populate_capillary_buffers()
 
         ! x - direction
-        if (bc_x%beg <= -3) then !< ghost cell extrapolation   
+        if (bc_x%beg == -3) then !< ghost cell extrapolation   
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do l = 0, p
@@ -507,7 +321,7 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_x%beg == -2) then !< Reflective
+        elseif (bc_x%beg == -2) then !< slip wall or reflective
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do l = 0, p
@@ -547,7 +361,7 @@ contains
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 1, -1)
         end if
 
-        if (bc_x%end <= -3) then !< ghost-cell extrapolation
+        if (bc_x%end == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do l = 0, p
@@ -601,7 +415,7 @@ contains
 
         if (n == 0) then
             return
-        elseif (bc_y%beg <= -3) then !< ghost-cell extrapolation
+        elseif (bc_y%beg == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do k = 0, p
@@ -613,7 +427,7 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_y%beg == -2) then !< Reflective
+        elseif (bc_y%beg == -2) then !< slip wall or reflective
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do k = 0, p
@@ -653,7 +467,7 @@ contains
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 2, -1)
         endif
 
-        if (bc_y%end <= -3) then !< ghost-cell extrapolation
+        if (bc_y%end == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do k = 0, p
@@ -665,7 +479,7 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_y%end == -2) then !< Reflective
+        elseif (bc_y%end == -2) then !< slip wall or reflective
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do k = 0, p
@@ -707,7 +521,7 @@ contains
 
         if (p == 0) then
             return
-        elseif (bc_z%beg <= -3) then !< ghost-cell extrapolation
+        elseif (bc_z%beg == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do j = 1, buff_size
@@ -731,7 +545,7 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_z%beg == -2) then !< Reflective
+        elseif (bc_z%beg == -2) then !< symmetry
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1 
                 do j = 1, buff_size
@@ -759,7 +573,7 @@ contains
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 3, -1)
         end if
         
-        if (bc_z%end <= -3) then !< ghost-cell extrapolation
+        if (bc_z%end == -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do j = 1, buff_size
@@ -783,7 +597,7 @@ contains
                     end do
                 end do
             end do
-        elseif (bc_z%end == -2) then !< Reflective
+        elseif (bc_z%end == -2) then !< symmetry
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do j = 1, buff_size
@@ -820,7 +634,7 @@ contains
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
 
-        integer, intent(IN) :: recon_dir
+        integer, intent(IN) :: norm_dir
 
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
@@ -845,72 +659,51 @@ contains
                 is1%end = is1%end - ${SCHEME}$_polyn
 
             end if
-        
-            if (n > 0) then
-                if (p > 0) then
 
-                    call s_${SCHEME}$(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                                norm_dir, recon_dir, &
-                                is1, is2, is3)
-                else
-                    call s_${SCHEME}$(v_vf(iv%beg:iv%end), &
-                    vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                                norm_dir, recon_dir, &
-                                is1, is2, is3)
-                end if
-            else
+            !$acc update device(is1, is2, is3, iv)
 
-                call s_${SCHEME}$(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                            norm_dir, recon_dir, &
-                            is1, is2, is3)
+            if (recon_dir == 1) then
+    !$acc parallel loop collapse(4) default(present)
+                do i = iv%beg, iv%end 
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                    vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                end do
+                            end do
+                        end do
+                    end do
+                    !$acc end parallel loop
+            else if (recon_dir == 2) then
+!$acc parallel loop collapse(4) default(present)
+                do i = iv%beg, iv%end
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                                vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            end do
+                        end do
+                    end do
+                end do
+                !$acc end parallel loop
+            else if (recon_dir == 3) then
+!$acc parallel loop collapse(4) default(present)
+                do i = iv%beg, iv%end
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                                vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            end do
+                        end do
+                    end do
+                end do
+                !$acc end parallel loop
             end if
-        endif
+        end if
         #:endfor
-
-
-
-!             if (recon_dir == 1) then
-!     !$acc parallel loop collapse(4) default(present)
-!                 do i = iv%beg, iv%end 
-!                         do l = is3%beg, is3%end
-!                             do k = is2%beg, is2%end
-!                                 do j = is1%beg, is1%end
-!                                     vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-!                                     vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-!                                 end do
-!                             end do
-!                         end do
-!                     end do
-!                     !$acc end parallel loop
-!             else if (recon_dir == 2) then
-! !$acc parallel loop collapse(4) default(present)
-!                 do i = iv%beg, iv%end
-!                     do l = is3%beg, is3%end
-!                         do k = is2%beg, is2%end
-!                             do j = is1%beg, is1%end
-!                                 vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-!                                 vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-!                             end do
-!                         end do
-!                     end do
-!                 end do
-!                 !$acc end parallel loop
-!             else if (recon_dir == 3) then
-! !$acc parallel loop collapse(4) default(present)
-!                 do i = iv%beg, iv%end
-!                     do l = is3%beg, is3%end
-!                         do k = is2%beg, is2%end
-!                             do j = is1%beg, is1%end
-!                                 vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-!                                 vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-!                             end do
-!                         end do
-!                     end do
-!                 end do
-!                 !$acc end parallel loop
-!             end if
 
     end subroutine s_reconstruct_cell_boundary_values_capilary
 
@@ -925,14 +718,9 @@ contains
         @:DEALLOCATE(gL_x, gR_x, cL_x, cR_x)
 
         @:DEALLOCATE(gL_y, gR_y, cL_y, cR_y)
-        
         if (p > 0) then
             @:DEALLOCATE(gL_z, gR_z, cL_z, cR_z)
         end if
-
-        !@:DEALLOCATE(flux_src_H(momxb:E_idx), flux_src_L(momxb:E_idx))
-
-        @:DEALLOCATE(phi_sf)
 
     end subroutine s_finalize_surface_tension_module
 

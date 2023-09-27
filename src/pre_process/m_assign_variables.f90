@@ -639,11 +639,6 @@ contains
 
         end if
 
-        if (sigma .ne. dflt_real) then
-            q_prim_vf(c_idx)%sf(j, k, l) = eta*(patch_id - 1d0) + &
-                (1d0 - eta)*(smooth_patch_id - 1d0)
-        end if
-
         ! Updating the patch identities bookkeeping variable
         if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
 
