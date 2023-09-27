@@ -339,6 +339,7 @@ contains
 
         ! surfact tension modelig
         sigma = dflt_real
+        c_idx = dflt_int
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 
@@ -501,6 +502,11 @@ contains
             end if
 
             alf_idx = 1 ! dummy, cannot actually have a void fraction
+
+            if (sigma .ne. dflt_real) then
+                c_idx = sys_size + 1
+                sys_size = c_idx
+            end if
 
         else if (model_eqns == 4) then
             cont_idx%beg = 1 ! one continuity equation

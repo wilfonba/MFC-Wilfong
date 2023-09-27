@@ -81,8 +81,7 @@ SIMULATION = COMMON + [
     'alt_crv', 'alt_soundspeed', 'regularization', 'null_weights',
     'mixture_err', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
-    'num_integrals', 'cu_mpi', 'tvd_riemann_flux', 'muscl_lim', 'int_comp', 
-    'time_stepper_type'
+    'num_integrals', 'cu_mpi', 'muscl_lim', 'int_comp',
 ]
 
 for cmp in ["x", "y", "z"]:

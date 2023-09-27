@@ -46,6 +46,9 @@ module m_mpi_proxy
     integer, private :: err_code, ierr, v_size
     !> @}
 
+    real(kind(0d0)), private, allocatable, dimension(:) :: c_divs_buff_send
+    real(kind(0d0)), private, allocatable, dimension(:) :: c_divs_buff_recv
+
 !$acc declare create(q_cons_buff_send, q_cons_buff_recv, c_divs_buff_send, c_divs_buff_recv, v_size)
 
     !real :: s_time, e_time
@@ -152,9 +155,10 @@ contains
             & 't_step_start','t_step_stop','t_step_save','model_eqns',         &
             & 'num_fluids','time_stepper', 'riemann_solver',      & 
             & 'wave_speeds', 'avg_state', 'precision', 'bc_x%beg', 'bc_x%end', & 
-            & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'fd_order',      &
-            & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
-            & 'R0_type', 'num_mono', 'recon_type', 'time_stepper_type' ]
+            & 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'bc_x_glb%beg',  & 
+            & 'bc_x_glb%end', 'bc_y_glb%beg', 'bc_y_glb%end', 'bc_z_glb%beg',  &
+            & 'bc_z_glb%end', 'fd_order', 'num_probes', 'num_integrals',       &
+            & 'bubble_model', 'thermal', 'R0_type', 'num_mono', 'flux_lim' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
