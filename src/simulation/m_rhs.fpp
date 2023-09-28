@@ -1417,7 +1417,7 @@ contains
                     end do
                 end if
 
-                if (any(Re_size > 0)) then
+                if (any(Re_size > 0) .or. sigma .ne. dflt_real) then
                     if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
                         if (p > 0) then
                             call s_compute_viscous_stress_tensor(q_prim_qp%vf, &

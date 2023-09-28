@@ -641,7 +641,7 @@ contains
         integer :: i, j, k, l
         ! Reconstruction in s1-direction ===================================
 
-        #:for SCHEME, NUM in [('weno',1),('muscl',2)] 
+        #:for SCHEME, NUM in [('weno',1), ('muscl',2)] 
         if (recon_type == ${NUM}$) then
             if (norm_dir == 1) then
                 is1 = ix; is2 = iy; is3 = iz
