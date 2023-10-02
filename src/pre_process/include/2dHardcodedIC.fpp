@@ -14,6 +14,9 @@
     real(kind(0d0)) :: minValX201
     integer :: q201
 
+    !HCID = 203
+    real(kind(0d0)) :: num
+
 #:enddef  
 
 #:def Hardcoded2D()
@@ -106,6 +109,23 @@
                 ! Pressure
                 q_prim_vf(E_idx)%sf(i, j, 0) = 1000d0
             end if
+
+        case(203) ! 2D Interface
+            
+            num = 0.002*(sin(2*pi*x_cc(i)) + abs(0.4*cos(10*pi*x_cc(i))) - abs(0.4*sin(10*pi*x_cc(i) - pi)))
+
+            if (y_cc(j) > num) then
+                ! Volume Fractions
+                q_prim_vf(advxb)%sf(i, j, 0) = 1d0 - 1d-8
+                q_prim_vf(advxe)%sf(i, j, 0) = 1d-8
+                q_prim_vf(contxb)%sf(i, j, 0) = (1d0 - 1d-8)*19d0
+                q_prim_vf(contxe)%sf(i, j, 0) = 1d-8*1d0
+            else
+                q_prim_vf(advxb)%sf(i, j, 0) = 1d-8
+                q_prim_vf(advxe)%sf(i, j, 0) = 1d0 - 1d-8
+                q_prim_vf(contxb)%sf(i, j, 0) = 1d-8*19d0
+                q_prim_vf(contxe)%sf(i, j, 0) = (1d0 - 1d-8)*1d0
+            endif
 
         case default
             
