@@ -171,6 +171,8 @@ module m_derived_types
         integer :: hcid
         !! id for hard coded initial condition
 
+        integer :: cf_val !< color function value for surface tension
+
     end type ic_patch_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These

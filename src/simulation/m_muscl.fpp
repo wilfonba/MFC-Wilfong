@@ -159,12 +159,6 @@ contains
                 end do
 !$acc end parallel loop
             end if
-
-            if (int_comp) then
-                call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
-                    vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
-                    norm_dir, muscl_dir, is1_d, is2_d, is3_d)
-            endif
         
         else if (muscl_order == 2) then
             ! MUSCL Reconstruction
@@ -201,59 +195,13 @@ contains
             end if
             #:endfor
 
-            if (int_comp) then
-                call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
-                                            vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
-                                            norm_dir, muscl_dir, is1_d, is2_d, is3_d)
-            endif 
+        endif
 
-        else if (muscl_order == 3) then
-             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (muscl_dir == ${MUSCL_DIR}$) then
-!$acc parallel loop collapse(4) gang vector default(present) private(top, &
-!$acc bottom, sign, phir, delta)
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            do i = 1, v_size
-                                
-                                top = v_rs_ws_${XYZ}$(j, k, l, i) - &
-                                    v_rs_ws_${XYZ}$(j - 1, k, l, i)
-                                bottom = v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
-                                    v_rs_ws_${XYZ}$(j, k, l,  i )
-
-                                call s_compute_slope_limiter(top, bottom, phir)
-
-                                ! reconstruct from left side
-                                delta = 2d0/3d0*(v_rs_ws_${XYZ}$(j, k, l, i) - &
-                                                 v_rs_ws_${XYZ}$(j - 1, k, l, i)) + &
-                                        4d0/3d0*(v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
-                                                 v_rs_ws_${XYZ}$(j, k, l, i))
-                                vL_rs_vf_${XYZ}$(j, k, l, i) = &
-                                    v_rs_ws_${XYZ}$(j, k, l, i) + (phir/4d0)*delta
-
-                                ! reconstruct from the right side
-                                delta = 2d0/3d0*(v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
-                                                 v_rs_ws_${XYZ}$(j, k, l, i)) + &
-                                        4d0/3d0*(v_rs_ws_${XYZ}$(j, k, l, i) - &
-                                                 v_rs_ws_${XYZ}$(j - 1, k, l, i))
-                                vR_rs_vf_${XYZ}$(j, k, l, i) = &
-                                    v_rs_ws_${XYZ}$(j, k, l, i) - (phir/4d0)*delta
-
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-            #:endfor
-            
-            if (int_comp) then
-                call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
-                    vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
-                    norm_dir, muscl_dir, is1_d, is2_d, is3_d)
-            end if
-
-        end if
+        if (int_comp) then
+            call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
+                vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
+                norm_dir, muscl_dir, is1_d, is2_d, is3_d)
+        endif
 
     end subroutine s_muscl
 

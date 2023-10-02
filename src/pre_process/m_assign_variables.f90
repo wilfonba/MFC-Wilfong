@@ -640,8 +640,8 @@ contains
         end if
 
         if (sigma .ne. dflt_real) then
-            q_prim_vf(c_idx)%sf(j, k, l) = eta*(patch_id - 1d0) + &
-                (1d0 - eta)*(smooth_patch_id - 1d0)
+            q_prim_vf(c_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%cf_val + &
+                (1d0 - eta)*patch_icpp(smooth_patch_id)%cf_val
         end if
 
         ! Updating the patch identities bookkeeping variable

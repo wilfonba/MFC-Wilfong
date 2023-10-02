@@ -260,7 +260,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs%vf(2)%sf(j, k, l) = 1d0/(y_cc(j+1) -y_cc(j-1)) * &
+                    c_divs%vf(2)%sf(j, k, l) = 1d0/(y_cc(k+1) -y_cc(k-1)) * &
                         (q_prim_vf(c_idx)%sf(j, k + 1,  l) - q_prim_vf(c_idx)%sf(j, k-1, l))
                 end do
             end do
