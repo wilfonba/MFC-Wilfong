@@ -520,6 +520,8 @@ contains
                                 s_S = 5d-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
                                             (pres_L - pres_R)/ &
                                             (rho_avg*c_avg))
+                            else if (wave_speeds == 3) then
+                                
                             end if
 
                             s_M = min(0d0, s_L); s_P = max(0d0, s_R)

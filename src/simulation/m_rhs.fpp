@@ -768,7 +768,7 @@ contains
             ! ===============================================================
             ! Reconstructing Primitive/Conservative Variables ===============
             
-            if (all(Re_size == 0) .and. (MHStage == 1 .or. time_stepper_type == 1)) then
+            if (all(Re_size == 0) .and. sigma == dflt_real) then
                 iv%beg = 1; iv%end = sys_size
                 !call nvtxStartRange("RHS-WENO")
                 call nvtxStartRange("RHS-WENO")
@@ -780,36 +780,34 @@ contains
                 call nvtxEndRange
             else
                 call nvtxStartRange("RHS-WENO")
-                if (MHStage == 1 .or. time_stepper_type == 1) then
-                    iv%beg = 1; iv%end = contxe
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                iv%beg = 1; iv%end = contxe
+                call s_reconstruct_cell_boundary_values( &
+                    q_prim_qp%vf(iv%beg:iv%end), &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                    id)
 
-                    iv%beg = E_idx; iv%end = E_idx
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                iv%beg = E_idx; iv%end = E_idx
+                call s_reconstruct_cell_boundary_values( &
+                    q_prim_qp%vf(iv%beg:iv%end), &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                    id)
 
-                    iv%beg = advxb; iv%end = advxe
+                iv%beg = advxb; iv%end = advxe
+                call s_reconstruct_cell_boundary_values( &
+                    q_prim_qp%vf(iv%beg:iv%end), &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                    id)
+            
+                if (bubbles) then
+                    iv%beg = bubxb; iv%end = bubxe
                     call s_reconstruct_cell_boundary_values( &
                         q_prim_qp%vf(iv%beg:iv%end), &
                         qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                         qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                         id)
-                
-                    if (bubbles) then
-                        iv%beg = bubxb; iv%end = bubxe
-                        call s_reconstruct_cell_boundary_values( &
-                            q_prim_qp%vf(iv%beg:iv%end), &
-                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                            id)
-                    end if
                 end if
                                     
                 iv%beg = mom_idx%beg; iv%end = mom_idx%end
