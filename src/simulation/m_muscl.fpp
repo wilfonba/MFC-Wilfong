@@ -8,7 +8,7 @@ module m_muscl
 
     use m_variables_conversion !< State variables type conversion procedures
 
-#ifdef _OPENACC
+#ifdef MFC_OpenACC
     use openacc
 #endif
 
