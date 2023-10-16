@@ -634,15 +634,15 @@ contains
                                           + poly_coef_cbL_${XYZ}$(j, 2, 0)*dvd(-1) &
                                           + poly_coef_cbL_${XYZ}$(j, 2, 1)*dvd(-2)
 
-                                beta(0) = beta_coef_${XYZ}$(j, 0, 0)*dvd(1)*dvd(1) &
-                                          + beta_coef_${XYZ}$(j, 0, 1)*dvd(1)*dvd(0) &
-                                          + beta_coef_${XYZ}$(j, 0, 2)*dvd(0)*dvd(0) &
-                                beta(1) = beta_coef_${XYZ}$(j, 1, 0)*dvd(0)*dvd(0) &
-                                          + beta_coef_${XYZ}$(j, 1, 1)*dvd(0)*dvd(-1) &
-                                          + beta_coef_${XYZ}$(j, 1, 2)*dvd(-1)*dvd(-1) &
-                                beta(2) = beta_coef_${XYZ}$(j, 2, 0)*dvd(-1)*dvd(-1) &
-                                          + beta_coef_${XYZ}$(j, 2, 1)*dvd(-1)*dvd(-2) &
-                                          + beta_coef_${XYZ}$(j, 2, 2)*dvd(-2)*dvd(-2) &
+                                beta(0) = beta_coef_${XYZ}$(j, 0, 0)*dvd(1)*dvd(1)
+                                          + beta_coef_${XYZ}$(j, 0, 1)*dvd(1)*dvd(0)
+                                          + beta_coef_${XYZ}$(j, 0, 2)*dvd(0)*dvd(0)
+                                beta(1) = beta_coef_${XYZ}$(j, 1, 0)*dvd(0)*dvd(0)
+                                          + beta_coef_${XYZ}$(j, 1, 1)*dvd(0)*dvd(-1)
+                                          + beta_coef_${XYZ}$(j, 1, 2)*dvd(-1)*dvd(-1)
+                                beta(2) = beta_coef_${XYZ}$(j, 2, 0)*dvd(-1)*dvd(-1)
+                                          + beta_coef_${XYZ}$(j, 2, 1)*dvd(-1)*dvd(-2)
+                                          + beta_coef_${XYZ}$(j, 2, 2)*dvd(-2)*dvd(-2)
 
                                 alpha = d_cbL_${XYZ}$(:, j)/(beta*beta + weno_eps)
 
