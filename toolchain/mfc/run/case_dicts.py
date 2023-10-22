@@ -89,7 +89,7 @@ for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%beg')
     SIMULATION.append(f'bc_{cmp}%end')
 
-    for param in ["bf", "k", "w", "p"]:
+    for param in ["bf", "k", "w", "p", "g"]:
         SIMULATION.append(f"{param}_{cmp}")
 
 for wrt_id in range(1,10+1):

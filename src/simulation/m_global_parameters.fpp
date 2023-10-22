@@ -136,7 +136,7 @@ module m_global_parameters
     integer :: bf_x, bf_y, bf_z !< body force toggle in three directions
     !< amplitude, frequency, and phase shift sinusoid in each direction
     #:for dir in {'x', 'y', 'z'}
-        #:for param in {'k','w','p'}
+        #:for param in {'k','w','p','g'}
             real :: ${param}$_${dir}$
         #:endfor
     #:endfor
@@ -342,7 +342,7 @@ module m_global_parameters
     integer :: intxb, intxe
     integer :: bubxb, bubxe
     integer :: strxb, strxe
-    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe)
+    !$acc declare create(momxb, momxe, advxb, advxe, contxb, contxe, intxb, intxe, bubxb, bubxe, strxb, strxe, c_idx)
 
     real(kind(0d0)), allocatable, dimension(:) :: gammas, pi_infs
     !$acc declare create(gammas, pi_infs)
@@ -476,7 +476,7 @@ contains
         bf_x = dflt_int; bf_y = dflt_int; bf_z = dflt_int
         !< amplitude, frequency, and phase shift sinusoid in each direction
         #:for dir in {'x', 'y', 'z'}
-            #:for param in {'k','w','p'}
+            #:for param in {'k','w','p','g'}
                 ${param}$_${dir}$ = dflt_real
             #:endfor
         #:endfor
@@ -714,7 +714,6 @@ contains
                 if (sigma .ne. dflt_real) then
                     c_idx = sys_size + 1
                     sys_size = c_idx
-                    !$acc update device(sigma)
                 end if
 
             else if (model_eqns == 4) then

@@ -318,8 +318,8 @@ contains
                     ! Perturb velocity
                     call random_number(rand_real)
                     rand_real = rand_real*1.d-2
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(mom_idx%beg)%sf(i, j, k)
-                    q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real*q_prim_vf(mom_idx%beg)%sf(i, j, k)
+                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = rand_real + q_prim_vf(mom_idx%beg)%sf(i, j, k)
+                    q_prim_vf(mom_idx%end)%sf(i, j, k) = rand_real + q_prim_vf(mom_idx%beg)%sf(i, j, k)
                     if (bubbles) then
                         q_prim_vf(alf_idx)%sf(i, j, k) = (1.d0 + rand_real)*q_prim_vf(alf_idx)%sf(i, j, k)
                     end if

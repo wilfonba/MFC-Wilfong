@@ -693,7 +693,7 @@ contains
                 end do
             end do
         end do
-
+        
         call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers(Q_CONS_QP%VF, pb, mv)
         call nvtxEndRange
@@ -722,7 +722,7 @@ contains
             end do
 
         end if
-
+        
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
             q_cons_qp%vf, &
@@ -853,7 +853,6 @@ contains
             call nvtxStartRange("RHS-Riemann")
 
             ! Computing Riemann Solver Flux and Source Flux =================
-
             call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                   dqR_prim_dx_n(id)%vf, &
                                   dqR_prim_dy_n(id)%vf, &
@@ -870,7 +869,6 @@ contains
                                   flux_gsrc_n(id)%vf, &
                                   id, ix, iy, iz)
             call nvtxEndRange
-            
             ! ===============================================================
 
             if (alt_soundspeed) then
@@ -896,10 +894,10 @@ contains
                     end do
                 end do
             end if
-
+   
             call nvtxStartRange("RHS_Flux_Add")
             if (id == 1) then
-
+                
                 if (bc_x%beg <= -5 .and. bc_x%beg >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
@@ -1150,7 +1148,7 @@ contains
             elseif (id == 2) then
                 ! RHS Contribution in y-direction ===============================
                 ! Applying the Riemann fluxes
-
+                
                 if (bc_y%beg <= -5 .and. bc_y%beg >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
@@ -2263,83 +2261,6 @@ contains
             end if
         endif
         #:endfor
-
-        ! print*, vL_x(:,0,0,1)
-        ! print*, vL_x(:,0,0,2)
-        ! print*, vL_x(:,0,0,3)
-        ! print*, vL_x(:,0,0,4)
-
-        ! if (recon_dir == 1) then
-        !     print*, '========================================================='
-        !     print*, 'dir: ', recon_dir
-        !     print*, '========================================================='
-        !     print*, ''
-        !     print*, '=== Left Reconstruction ================================='
-        !     print*, "contxb"
-        !     call s_print_2d_array(transpose(vL_x(:,:,0,contxb)))
-        !     print*, "contxe"
-        !     call s_print_2d_array(transpose(vL_x(:,:,0,contxe)))
-        !     print*, "momxb"
-        !     call s_print_2d_array(transpose(vL_x(:,:,0,momxb)))
-        !     print*, "momxe"
-        !     call s_print_2d_array(transpose(vL_x(:,:,0,momxe)))
-        !     print*, "advxb"
-        !     call s_print_2d_array(transpose(vL_x(:,:,0,advxb)))
-        !     print*, "advxe"
-        !     call s_print_2d_array(transpose(vL_x(:,:,0,advxe)))
-        !     print*, "E_idx"
-        !     call s_print_2d_array(transpose(vR_x(:,:,0,E_idx)))
-        !     print*, '=== Right Reconstruction ================================='
-        !     print*, "contxb"
-        !     call s_print_2d_array(transpose(vR_x(:,:,0,contxb)))
-        !     print*, "contxe"
-        !     call s_print_2d_array(transpose(vR_x(:,:,0,contxe)))
-        !     print*, "momxb"
-        !     call s_print_2d_array(transpose(vR_x(:,:,0,momxb)))
-        !     print*, "momxe"
-        !     call s_print_2d_array(transpose(vR_x(:,:,0,momxe)))
-        !     print*, "advxb"
-        !     call s_print_2d_array(transpose(vR_x(:,:,0,advxb)))
-        !     print*, "advxe"
-        !     call s_print_2d_array(transpose(vR_x(:,:,0,advxe)))
-        !     print*, "E_idx"
-        !     call s_print_2d_array(transpose(vR_x(:,:,0,E_idx)))
-        ! else
-        !     print*, '========================================================='
-        !     print*, 'dir: ', recon_dir
-        !     print*, '========================================================='
-        !     print*, ''
-        !     print*, '=== Left Reconstruction ================================='
-        !     print*, "contxb"
-        !     call s_print_2d_array(transpose(vL_y(:,:,0,contxb)))
-        !     print*, "contxe"
-        !     call s_print_2d_array(transpose(vL_y(:,:,0,contxe)))
-        !     print*, "momxb"
-        !     call s_print_2d_array(transpose(vL_y(:,:,0,momxb)))
-        !     print*, "momxe"
-        !     call s_print_2d_array(transpose(vL_y(:,:,0,momxe)))
-        !     print*, "advxb"
-        !     call s_print_2d_array(transpose(vL_y(:,:,0,advxb)))
-        !     print*, "advxe"
-        !     call s_print_2d_array(transpose(vL_y(:,:,0,advxe)))
-        !     print*, "E_idx"
-        !     call s_print_2d_array(transpose(vR_y(:,:,0,E_idx)))
-        !     print*, '=== Right Reconstruction ================================='
-        !     print*, "contxb"
-        !     call s_print_2d_array(transpose(vR_y(:,:,0,contxb)))
-        !     print*, "contxe"
-        !     call s_print_2d_array(transpose(vR_y(:,:,0,contxe)))
-        !     print*, "momxb"
-        !     call s_print_2d_array(transpose(vR_y(:,:,0,momxb)))
-        !     print*, "momxe"
-        !     call s_print_2d_array(transpose(vR_y(:,:,0,momxe)))
-        !     print*, "advxb"
-        !     call s_print_2d_array(transpose(vR_y(:,:,0,advxb)))
-        !     print*, "advxe"
-        !     call s_print_2d_array(transpose(vR_y(:,:,0,advxe)))
-        !     print*, "E_idx"
-        !     call s_print_2d_array(transpose(vR_y(:,:,0,E_idx)))
-        ! endif
 
         ! ==================================================================
     end subroutine s_reconstruct_cell_boundary_values ! --------------------

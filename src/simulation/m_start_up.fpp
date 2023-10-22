@@ -150,7 +150,7 @@ contains
             R0_type, sigma, &
             bf_x, bf_y, bf_z, k_x, k_y, k_z, &
             w_x, w_y, w_z, p_x, p_y, p_z, recon_type, int_comp, &
-            time_stepper_type
+            time_stepper_type, g_x, g_y, g_z
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -174,8 +174,6 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
-
-            !$acc update device(sigma)
 
             if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_int) .or. &
                 (bf_z .ne. dflt_int)) then
@@ -935,10 +933,10 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            ! if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                            !     print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p                                
-                            !     error stop "NaN(s) in timestep output."
-                            ! end if
+                            if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                                print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p
+                                error stop "NaN(s) in timestep output."
+                            end if
                         end do
                     end do
                 end do
@@ -1118,7 +1116,7 @@ contains
         !$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
         !$acc update device(sys_size, buff_size)
         !$acc update device(m, n, p)
-        !$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
+        !$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe, c_idx)
         do i = 1, sys_size
         !$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
@@ -1129,6 +1127,7 @@ contains
         !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
         !$acc update device(monopole, num_mono)
+        !$acc update device(sigma)
     end subroutine s_initialize_gpu_vars
 
 

@@ -947,7 +947,7 @@ contains
                 end if
             end do
         end do
-
+    
     end subroutine s_2D_analytical ! ---------------------------------------
 
     !>      This patch assigns the primitive variables as analytical

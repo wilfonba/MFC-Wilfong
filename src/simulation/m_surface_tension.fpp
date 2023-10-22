@@ -84,9 +84,9 @@ contains
 
         type(int_bounds_info) :: isx, isy, isz
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(-1:m,0:n,0:p,1:num_dims) :: vSrc_rsx_vf
-        real(kind(0d0)), dimension(-1:n,0:m,0:p,1:num_dims) :: vSrc_rsy_vf
-        real(kind(0d0)), dimension(-1:p,0:n,0:m,1:num_dims) :: vSrc_rsz_vf
+        real(kind(0d0)), dimension(-1:,0:,0:,1:) :: vSrc_rsx_vf
+        real(kind(0d0)), dimension(-1:,0:,0:,1:) :: vSrc_rsy_vf
+        real(kind(0d0)), dimension(-1:,0:,0:,1:) :: vSrc_rsz_vf
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: flux_src_vf
@@ -309,7 +309,7 @@ contains
     subroutine s_populate_capillary_buffers()
 
         ! x - direction
-        if (bc_x%beg == -3) then !< ghost cell extrapolation   
+        if (bc_x%beg <= -3) then !< ghost cell extrapolation   
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do l = 0, p
@@ -361,7 +361,7 @@ contains
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 1, -1)
         end if
 
-        if (bc_x%end == -3) then !< ghost-cell extrapolation
+        if (bc_x%end <= -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do l = 0, p
@@ -415,7 +415,7 @@ contains
 
         if (n == 0) then
             return
-        elseif (bc_y%beg == -3) then !< ghost-cell extrapolation
+        elseif (bc_y%beg <= -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do k = 0, p
@@ -467,7 +467,7 @@ contains
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 2, -1)
         endif
 
-        if (bc_y%end == -3) then !< ghost-cell extrapolation
+        if (bc_y%end <= -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do k = 0, p
@@ -521,7 +521,7 @@ contains
 
         if (p == 0) then
             return
-        elseif (bc_z%beg == -3) then !< ghost-cell extrapolation
+        elseif (bc_z%beg <= -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do j = 1, buff_size
@@ -573,7 +573,7 @@ contains
             call s_mpi_sendrecv_capilary_variables_buffers(c_divs%vf, 3, -1)
         end if
         
-        if (bc_z%end == -3) then !< ghost-cell extrapolation
+        if (bc_z%end <= -3) then !< ghost-cell extrapolation
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do j = 1, buff_size
