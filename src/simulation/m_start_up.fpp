@@ -150,7 +150,7 @@ contains
             R0_type, sigma, &
             bf_x, bf_y, bf_z, k_x, k_y, k_z, &
             w_x, w_y, w_z, p_x, p_y, p_z, recon_type, int_comp, &
-            time_stepper_type, g_x, g_y, g_z
+            g_x, g_y, g_z
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
