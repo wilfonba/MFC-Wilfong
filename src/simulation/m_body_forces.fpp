@@ -12,7 +12,9 @@ module m_body_forces
 
     use m_nvtx
 
+#ifdef MFC_OpenACC
     use openacc
+#endif
     ! ==========================================================================
 
     implicit none

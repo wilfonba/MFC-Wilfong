@@ -843,17 +843,13 @@ contains
         print *, 'Computed derived vars'
 #endif
 
-        if (time_stepper_type == 1) then
-            ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
-            if (time_stepper == 1) then
-                call s_1st_order_tvd_rk(t_step, time_avg)
-            elseif (time_stepper == 2) then
-                call s_2nd_order_tvd_rk(t_step, time_avg)
-            elseif (time_stepper == 3) then
-                call s_3rd_order_tvd_rk(t_step, time_avg)
-            end if
-        elseif (time_stepper_type == 2) then
-            call s_2nd_order_muscl_hancock(t_step, time_avg)
+        ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
+        if (time_stepper == 1) then
+            call s_1st_order_tvd_rk(t_step, time_avg)
+        elseif (time_stepper == 2) then
+            call s_2nd_order_tvd_rk(t_step, time_avg)
+        elseif (time_stepper == 3) then
+            call s_3rd_order_tvd_rk(t_step, time_avg)
         end if
 
         ! Time-stepping loop controls
@@ -934,7 +930,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             if(ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                                print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p
+                                print *, "NaN(s) in timestep output.", j, k, l, i,  proc_rank, t_step, m, n, p                                
                                 error stop "NaN(s) in timestep output."
                             end if
                         end do

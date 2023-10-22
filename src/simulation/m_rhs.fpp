@@ -768,7 +768,7 @@ contains
             ! ===============================================================
             ! Reconstructing Primitive/Conservative Variables ===============
             
-            if (all(Re_size == 0) .and. (MHStage == 1 .or. time_stepper_type == 1)) then
+            if (all(Re_size == 0) .and. sigma == dflt_real) then
                 iv%beg = 1; iv%end = sys_size
                 !call nvtxStartRange("RHS-WENO")
                 call nvtxStartRange("RHS-WENO")
@@ -778,38 +778,57 @@ contains
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
                 call nvtxEndRange
+            elseif (sigma .ne. dflt_real) then
+                iv%beg = 1; iv%end = E_idx - 1
+                call s_reconstruct_cell_boundary_values( &
+                q_prim_qp%vf(1:E_idx - 1), &
+                qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                id)
+
+                iv%beg = E_idx; iv%end = E_idx
+                call s_reconstruct_cell_boundary_values_first_order( &
+                q_prim_qp%vf(E_idx), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                                     qR_rsx_vf, qR_rsy_vf, qR_rsx_vf, id)
+
+                iv%beg = E_idx + 1; iv%end = sys_size
+                call s_reconstruct_cell_boundary_values( &
+                q_prim_qp%vf(E_idx + 1:sys_size), &
+                qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                id)
+
+                ! call s_print_2d_array(qL_rsx_vf(:,:,0,E_idx))
             else
                 call nvtxStartRange("RHS-WENO")
-                if (MHStage == 1 .or. time_stepper_type == 1) then
-                    iv%beg = 1; iv%end = contxe
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                iv%beg = 1; iv%end = contxe
+                call s_reconstruct_cell_boundary_values( &
+                    q_prim_qp%vf(iv%beg:iv%end), &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                    id)
 
-                    iv%beg = E_idx; iv%end = E_idx
-                    call s_reconstruct_cell_boundary_values( &
-                        q_prim_qp%vf(iv%beg:iv%end), &
-                        qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                        qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                        id)
+                iv%beg = E_idx; iv%end = E_idx
+                call s_reconstruct_cell_boundary_values( &
+                    q_prim_qp%vf(iv%beg:iv%end), &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                    id)
 
-                    iv%beg = advxb; iv%end = advxe
+                iv%beg = advxb; iv%end = advxe
+                call s_reconstruct_cell_boundary_values( &
+                    q_prim_qp%vf(iv%beg:iv%end), &
+                    qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                    qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                    id)
+            
+                if (bubbles) then
+                    iv%beg = bubxb; iv%end = bubxe
                     call s_reconstruct_cell_boundary_values( &
                         q_prim_qp%vf(iv%beg:iv%end), &
                         qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                         qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                         id)
-                
-                    if (bubbles) then
-                        iv%beg = bubxb; iv%end = bubxe
-                        call s_reconstruct_cell_boundary_values( &
-                            q_prim_qp%vf(iv%beg:iv%end), &
-                            qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                            id)
-                    end if
                 end if
                                     
                 iv%beg = mom_idx%beg; iv%end = mom_idx%end
@@ -2195,6 +2214,86 @@ contains
         end do
 
     end subroutine s_pressure_relaxation_procedure ! -----------------------
+
+    subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
+                                                             norm_dir)
+
+        type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
+
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
+
+        integer, intent(IN) :: norm_dir
+
+        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
+
+        integer :: i, j, k, l
+        ! Reconstruction in s1-direction ===================================
+
+        #:for SCHEME, NUM in [('weno',1), ('muscl',2)] 
+        if (recon_type == ${NUM}$) then
+            if (norm_dir == 1) then
+                is1 = ix; is2 = iy; is3 = iz
+                recon_dir = 1; is1%beg = is1%beg + ${SCHEME}$_polyn
+                is1%end = is1%end - ${SCHEME}$_polyn
+
+            elseif (norm_dir == 2) then
+                is1 = iy; is2 = ix; is3 = iz
+                recon_dir = 2; is1%beg = is1%beg + ${SCHEME}$_polyn
+                is1%end = is1%end - ${SCHEME}$_polyn
+
+            else
+                is1 = iz; is2 = iy; is3 = ix
+                recon_dir = 3; is1%beg = is1%beg + ${SCHEME}$_polyn
+                is1%end = is1%end - ${SCHEME}$_polyn
+
+            end if
+
+            !$acc update device(is1, is2, is3, iv)
+
+            if (recon_dir == 1) then
+    !$acc parallel loop collapse(4) default(present)
+                do i = iv%beg, iv%end 
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                    vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                end do
+                            end do
+                        end do
+                    end do
+                    !$acc end parallel loop
+            else if (recon_dir == 2) then
+!$acc parallel loop collapse(4) default(present)
+                do i = iv%beg, iv%end
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                                vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            end do
+                        end do
+                    end do
+                end do
+                !$acc end parallel loop
+            else if (recon_dir == 3) then
+!$acc parallel loop collapse(4) default(present)
+                do i = iv%beg, iv%end
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                                vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            end do
+                        end do
+                    end do
+                end do
+                !$acc end parallel loop
+            end if
+        end if
+        #:endfor
+
+    end subroutine s_reconstruct_cell_boundary_values_first_order
 
     !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values

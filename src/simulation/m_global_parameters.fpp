@@ -97,7 +97,6 @@ module m_global_parameters
     logical :: adv_alphan     !< Advection of the last volume fraction
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
-    integer :: time_stepper_type
     logical :: prim_vars_wrt
 
     integer :: recon_type
@@ -389,7 +388,6 @@ contains
         adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
-        time_stepper_type = 1
         weno_eps = dflt_real
         mapped_weno = .false.
         mp_weno = .false.
