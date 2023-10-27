@@ -113,7 +113,7 @@ contains
             call s_convert_conservative_to_primitive_variables(q_cons_vf, &
                                                                q_prim_vf)
         end if
-
+        print*, "Variables converted"
         !  3D Patch Geometries =============================================
         if (p > 0) then
 

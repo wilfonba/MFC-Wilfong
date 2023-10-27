@@ -766,6 +766,7 @@ contains
         call s_write_data_files(q_cons_vf)
 
         call cpu_time(finish)
+        
     end subroutine s_apply_initial_condition
 
     subroutine s_save_data(proc_time, time_avg, time_final, file_exists)

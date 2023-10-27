@@ -518,6 +518,11 @@ contains
                 sys_size = stress_idx%end
             end if
 
+            if (sigma .ne. dflt_real) then
+                c_idx = sys_size + 1
+                sys_size = c_idx
+            end if
+
             ! ==================================================================
 
             ! Volume Fraction Model (6-equation model) =========================

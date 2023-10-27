@@ -696,6 +696,11 @@ contains
                     sys_size = stress_idx%end
                 end if
 
+                if (sigma .ne. dflt_real) then
+                    c_idx = sys_size + 1
+                    sys_size = c_idx
+                end if
+
             else if (model_eqns == 3) then
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids

@@ -32,9 +32,9 @@ program p_main
     call s_read_grid()
 
     allocate (proc_time(0:num_procs - 1))
-
+    
     call s_apply_initial_condition(start, finish, proc_time, time_avg, time_final, file_exists)
-
+    
     time_avg = abs(finish - start)
 
     call s_save_data(proc_time, time_avg, time_final, file_exists)

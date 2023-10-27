@@ -86,13 +86,13 @@
                 ! Volume Fractions
                 q_prim_vf(advxb)%sf(i, j, 0) = 1d0 - 1e-8
                 q_prim_vf(advxe)%sf(i, j, 0) = 1d-8
-                q_prim_vf(contxb)%sf(i, j, 0) = (1d0-1e-8)*1d3
-                q_prim_vf(contxe)%sf(i, j, 0) = 1d-8*1d0
+                q_prim_vf(contxb)%sf(i, j, 0) = (1d0-1e-8)*1
+                q_prim_vf(contxe)%sf(i, j, 0) = 1d-8*1d-3
             else
                 q_prim_vf(advxb)%sf(i, j, 0) = 1d-8
                 q_prim_vf(advxe)%sf(i, j, 0) = 1d0 - 1d-8
-                q_prim_vf(contxb)%sf(i, j, 0) = 1d-8*1d3
-                q_prim_vf(contxe)%sf(i, j, 0) = (1d0 - 1d-8)*1d0
+                q_prim_vf(contxb)%sf(i, j, 0) = 1d-8*1
+                q_prim_vf(contxe)%sf(i, j, 0) = (1d0 - 1d-8)*1d0-3
             endif
 
         case default

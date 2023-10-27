@@ -282,6 +282,7 @@ contains
         @:ALLOCATE(qR_prim(1:num_dims))
 
         do i = 1, num_dims
+            print*, sys_size
             @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
             @:ALLOCATE(qR_prim(i)%vf(1:sys_size))
         end do
