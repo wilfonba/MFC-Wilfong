@@ -14,6 +14,8 @@
     real(kind(0d0)) :: minValX201
     integer :: q201
 
+    real(kind(0d0)) :: ih, alph
+
 #:enddef  
 
 #:def Hardcoded2D()
@@ -80,6 +82,9 @@
             end if
 
         case(203) ! 2D Interface
+
+            ih =  5d-1 + 0.01*(sin(pi*x_cc(i)) + sin(2*pi*x_cc(i)) + sin(4*pi*x_cc(i)) + sin(8*pi*x_cc(i)) + sin(16*pi*x_cc(i)) + sin(32*pi*x_cc(i)) + sin(64*pi*x_cc(i)))
+            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/0.005))
 
             !print*, y_cc(j), 50d-3*(r(i) - 0.5)
             if (y_cc(j) <  1e-2*(sin(10*pi*x_cc(i))**2d0 + sin(25*pi*x_cc(i)))) then
