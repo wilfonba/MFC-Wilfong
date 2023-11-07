@@ -90,15 +90,16 @@
 
         case(302) ! 3D Shaking Interface
 
-            ih = 8d-1 + 0.0025*(sin(pi*x_cc(i)) + sin(pi*z_cc(k)) + sin(2*pi*x_cc(i)) + sin(2*pi*z_cc(k)) + &
+            ih = 0.5 + 0.007*(sin(pi*x_cc(i)) + sin(pi*z_cc(k)) + sin(2*pi*x_cc(i)) + sin(2*pi*z_cc(k)) + &
                 sin(4*pi*x_cc(i)) + sin(4*pi*z_cc(k)) + sin(8*pi*x_cc(i)) + sin(8*pi*z_cc(k)) + &
-                sin(16*pi*x_cc(i)) + sin(16*pi*z_cc(k)))**2d0
+                sin(16*pi*x_cc(i)) + sin(16*pi*z_cc(k)) + sin(32*pi*x_cc(i)) + sin(32*pi*z_cc(k)) + &
+                sin(64*pi*x_cc(i)) + sin(64*pi*z_cc(k)))
             alph = 5d-1*(1 + tanh((y_cc(j) - ih)/0.005))
 
-            q_prim_vf(advxb)%sf(i, j, k) = 1d0 - alph
-            q_prim_vf(advxe)%sf(i, j, k) = alph
-            q_prim_vf(contxb)%sf(i, j, k) = (1d0-alph)*2d0
-            q_prim_vf(contxe)%sf(i, j, k) = alph*1d0
+            q_prim_vf(advxb)%sf(i, j, k) = alph
+            q_prim_vf(advxe)%sf(i, j, k) = 1d0 - alph
+            q_prim_vf(contxb)%sf(i, j, k) = alph*2d0
+            q_prim_vf(contxe)%sf(i, j, k) = (1d0-alph)*1d0
   
         case default
             call s_int_to_str(patch_id, iStr)
