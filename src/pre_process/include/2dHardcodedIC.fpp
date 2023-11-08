@@ -83,22 +83,13 @@
 
         case(203) ! 2D Interface
 
-            ih =  5d-1 + 0.01*(sin(pi*x_cc(i)) + sin(2*pi*x_cc(i)) + sin(4*pi*x_cc(i)) + sin(8*pi*x_cc(i)) + sin(16*pi*x_cc(i)) + sin(32*pi*x_cc(i)) + sin(64*pi*x_cc(i)))
+            ih =  3.5 + 0.01*(sin(pi*x_cc(i)) + sin(2*pi*x_cc(i)) + sin(4*pi*x_cc(i)) + sin(8*pi*x_cc(i)) + sin(16*pi*x_cc(i)) + sin(32*pi*x_cc(i)) + sin(64*pi*x_cc(i)))
             alph = 5d-1*(1 + tanh((y_cc(j) - ih)/0.005))
 
-            !print*, y_cc(j), 50d-3*(r(i) - 0.5)
-            if (y_cc(j) <  1e-2*(sin(10*pi*x_cc(i))**2d0 + sin(25*pi*x_cc(i)))) then
-                ! Volume Fractions
-                q_prim_vf(advxb)%sf(i, j, 0) = 1d0 - 1e-8
-                q_prim_vf(advxe)%sf(i, j, 0) = 1d-8
-                q_prim_vf(contxb)%sf(i, j, 0) = (1d0-1e-8)*1
-                q_prim_vf(contxe)%sf(i, j, 0) = 1d-8*1d-3
-            else
-                q_prim_vf(advxb)%sf(i, j, 0) = 1d-8
-                q_prim_vf(advxe)%sf(i, j, 0) = 1d0 - 1d-8
-                q_prim_vf(contxb)%sf(i, j, 0) = 1d-8*1
-                q_prim_vf(contxe)%sf(i, j, 0) = (1d0 - 1d-8)*1d0-3
-            endif
+            q_prim_vf(advxb)%sf(i, j, 0) = 1 - alph
+            q_prim_vf(advxe)%sf(i, j, 0) = alph
+            q_prim_vf(contxb)%sf(i, j, 0) = (1d0-alph)*2d0
+            q_prim_vf(contxe)%sf(i, j, 0) = alph*1d0
 
         case default
             
