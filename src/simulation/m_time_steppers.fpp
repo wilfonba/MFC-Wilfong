@@ -142,6 +142,11 @@ contains
 
         @:ALLOCATE(pb_ts(1:2))
         !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
+        
+        @:ALLOCATE(rhs_pb(1, 1, 1, 1, 1))
+        @:ALLOCATE(pb_ts(1)%sf(1, 1, 1, 1, 1))
+        @:ALLOCATE(pb_ts(2)%sf(1,1,1,1,1))
+        
         if(qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(pb_ts(1)%sf(ix_t%beg:ix_t%end, &
                           iy_t%beg:iy_t%end, &
@@ -165,7 +170,7 @@ contains
         end if
 
         @:ALLOCATE(mv_ts(1:2))
-
+        @:ALLOCATE(rhs_mv(1, 1, 1, 1, 1))
         if(qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(mv_ts(1)%sf(ix_t%beg:ix_t%end, &
                           iy_t%beg:iy_t%end, &

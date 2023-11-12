@@ -790,7 +790,7 @@ contains
                 iv%beg = E_idx; iv%end = E_idx
                 call s_reconstruct_cell_boundary_values_first_order( &
                 q_prim_qp%vf(E_idx), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                     qR_rsx_vf, qR_rsy_vf, qR_rsx_vf, id)
+                                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
 
                 iv%beg = E_idx + 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values( &
@@ -1560,7 +1560,7 @@ contains
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
                 end if
 
-                if (bc_z%end <= -5 .and. bc_z%beg >= -13) then
+                if (bc_z%end <= -5 .and. bc_z%end >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, 1, ix, iy, iz)
                 end if
@@ -2232,6 +2232,7 @@ contains
 
         #:for SCHEME, NUM in [('weno',1), ('muscl',2)] 
         if (recon_type == ${NUM}$) then
+
             if (norm_dir == 1) then
                 is1 = ix; is2 = iy; is3 = iz
                 recon_dir = 1; is1%beg = is1%beg + ${SCHEME}$_polyn
@@ -2248,7 +2249,7 @@ contains
                 is1%end = is1%end - ${SCHEME}$_polyn
 
             end if
-
+        
             !$acc update device(is1, is2, is3, iv)
 
             if (recon_dir == 1) then
