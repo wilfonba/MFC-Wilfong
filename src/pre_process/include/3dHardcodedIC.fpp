@@ -49,10 +49,10 @@
      
             ! Pressure
             if (y_cc(j) > 0.7) then
-                q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 19d0*9.81*(1.2 - y_cc(j))
+                q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 19d0*490.5*(1.2 - y_cc(j))
             else
-                q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 19d0*9.81*0.5 + &
-                    1d0*9.81*(0.7 - y_cc(j))
+                q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 19d0*490.5*0.5 + &
+                    1d0*490.5*(0.7 - y_cc(j))
             end if
 
                 q_prim_vf(advxb)%sf(i, j, k) = alph3
