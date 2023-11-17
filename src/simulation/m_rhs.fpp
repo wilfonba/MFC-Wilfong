@@ -754,7 +754,7 @@ contains
         call nvtxStartRange("Surface_Tensions")
 
         if (sigma .ne. dflt_real) call s_get_capilary(q_prim_qp%vf)
-        
+
         call nvtxEndRange
         ! Dimensional Splitting Loop =======================================
 
@@ -781,6 +781,7 @@ contains
                 call nvtxEndRange
             elseif (sigma .ne. dflt_real) then
                 iv%beg = 1; iv%end = E_idx - 1
+
                 call s_reconstruct_cell_boundary_values( &
                 q_prim_qp%vf(1:E_idx - 1), &
                 qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
@@ -799,7 +800,6 @@ contains
                 qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                 id)
 
-                ! call s_print_2d_array(qL_rsx_vf(:,:,0,E_idx))
             else
                 call nvtxStartRange("RHS-WENO")
                 iv%beg = 1; iv%end = contxe
@@ -917,7 +917,7 @@ contains
    
             call nvtxStartRange("RHS_Flux_Add")
             if (id == 1) then
-                
+
                 if (bc_x%beg <= -5 .and. bc_x%beg >= -13) then
                     call s_cbc(q_prim_qp%vf, flux_n(id)%vf, &
                                flux_src_n(id)%vf, id, -1, ix, iy, iz)
@@ -1114,7 +1114,7 @@ contains
                                              rhs_vf)
                     end if
                 end if
-
+                
                 if (model_eqns == 3) then
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do l = 0, p

@@ -32,9 +32,6 @@ module m_surface_tension
     real(kind(0d0)), allocatable, dimension(:,:,:,:) :: gL_x, gR_x, gL_y, gR_y, gL_z, gR_z
     !$acc declare create(gL_x, gR_x, gL_y, gR_y, gL_z, gR_z)
 
-    real(kind(0d0)), allocatable, dimension(:,:,:,:) :: cL_x, cR_x, cL_y, cR_y, cL_z, cR_z
-    !$acc declare create(cL_x, cR_x, cL_y, cR_y, cL_z, cR_z)
-
     type(int_bounds_info) :: ix, iy, iz, is1, is2, is3, iv
     !$acc declare create(ix, iy, iz, is1, is2, is3, iv)
 
@@ -60,20 +57,16 @@ contains
 
         @:ALLOCATE(gL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
         @:ALLOCATE(gR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, num_dims + 1))
-        @:ALLOCATE(cL_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, c_idx:c_idx))
-        @:ALLOCATE(cR_x(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end, c_idx:c_idx))
 
         @:ALLOCATE(gL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
         @:ALLOCATE(gR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, num_dims + 1))
-        @:ALLOCATE(cL_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, c_idx:c_idx))
-        @:ALLOCATE(cR_y(iy%beg:iy%end, ix%beg:ix%end, iz%beg:iz%end, c_idx:c_idx))
-        
-        if (p > 0) then
+
+        if (p == 0) then
+            @:ALLOCATE(gL_z(0,0,0,0), gR_z(0,0,0,0))
+        else
             @:ALLOCATE(gL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
             @:ALLOCATE(gR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, num_dims + 1))
-            @:ALLOCATE(cL_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, c_idx:c_idx))
-            @:ALLOCATE(cR_z(iz%beg:iz%end, ix%beg:ix%end, iy%beg:iy%end, c_idx:c_idx))
-        end if
+        endif
 
     end subroutine s_initialize_surface_tension_module
 
@@ -84,9 +77,9 @@ contains
 
         type(int_bounds_info) :: isx, isy, isz
         type(scalar_field), dimension(sys_size) :: q_prim_vf
-        real(kind(0d0)), dimension(-1:,0:,0:,1:) :: vSrc_rsx_vf
-        real(kind(0d0)), dimension(-1:,0:,0:,1:) :: vSrc_rsy_vf
-        real(kind(0d0)), dimension(-1:,0:,0:,1:) :: vSrc_rsz_vf
+        real(kind(0d0)), dimension(-1:,0:,0:,1:), intent(IN) :: vSrc_rsx_vf
+        real(kind(0d0)), dimension(-1:,0:,0:,1:), intent(IN) :: vSrc_rsy_vf
+        real(kind(0d0)), dimension(-1:,0:,0:,1:), intent(IN) :: vSrc_rsz_vf
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: flux_src_vf
@@ -632,7 +625,7 @@ contains
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
+        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(OUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
 
         integer, intent(IN) :: norm_dir
 
@@ -715,11 +708,11 @@ contains
 
         @:DEALLOCATE(c_divs%vf)
 
-        @:DEALLOCATE(gL_x, gR_x, cL_x, cR_x)
+        @:DEALLOCATE(gL_x, gR_x)
 
-        @:DEALLOCATE(gL_y, gR_y, cL_y, cR_y)
+        @:DEALLOCATE(gL_y, gR_y)
         if (p > 0) then
-            @:DEALLOCATE(gL_z, gR_z, cL_z, cR_z)
+            @:DEALLOCATE(gL_z, gR_z)
         end if
 
     end subroutine s_finalize_surface_tension_module

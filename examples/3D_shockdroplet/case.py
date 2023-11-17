@@ -61,7 +61,7 @@ c_w = math.sqrt( gamw * ( p0w + piw ) / rho0w )
 
 # Shock Mach number of interest. Note that the post-shock properties can be defined in terms of either 
 # Min or psOp0a. Just comment/uncomment appropriatelly
-Min = 2.4
+Min = 8
 
 ## Pos to pre shock ratios - AIR
 
@@ -113,10 +113,10 @@ ze =  10 * D0
 StF = 4.0                                                                             
 
 # number of elements into y direction
-Ny = 100
+Ny = 3199
 
 # number of elements into z direction
-Nz = 100
+Nz = 6399
 
 # number of elements into x direction
 Nx = Ny * 2
@@ -130,7 +130,7 @@ dx = ( xe - xb ) / Nx
 # number (think of a smarter way).
 
 # dimensionless time
-ttilde = 1.92
+ttilde = 6.
 
 # auxiliary simulation physical time - s. This is not YET the total simulation time, as it will be corrected so as to avoid
 # mismatches in simulation and post_process parts. Note that I wrote it this way so I have better control over the # of autosaves
@@ -158,7 +158,7 @@ Nt = AS * SF
 
 # total simulation time - s. Note that tend >= tendA
 tend = Nt * dt
-
+print(Nt, dt)
 # Configuring case dictionary
 print(json.dumps({
     # Logistics ================================================

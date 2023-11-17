@@ -26,29 +26,14 @@
 #>   files that is required to run MFC. They are not
 #>   intended to be modified by users.
 #>
-#SBATCH --job-name="{name}"
-#SBATCH --nodes={nodes}
+#SBATCH -J{name}                                # Job name
+#SBATCH -A{account}                             # Charge account
+#SBATCH -N{nodes} --gres=gpu:V100:{(1 if gpu else 0)*tasks_per_node}
+#>SBATCH --mem-per-gpu=16G                           # Memory per gpu
 #SBATCH --ntasks-per-node={tasks_per_node}
-#SBATCH --cpus-per-task=1
-#SBATCH --gpu-bind=verbose,closest
-#SBATCH --gpus=v100-16:{(1 if gpu else 0)*tasks_per_node*nodes}
-#SBATCH --time={walltime}
-#SBATCH --partition="{partition}"
-#SBATCH --output="{name}.out"
-#SBATCH --account="{account}"
-#SBATCH --error="{name}.err"
-#SBATCH --mail-user="{email}"
-#SBATCH --export=ALL
-#SBATCH --mail-type="BEGIN, END, FAIL"
-#>
-#> Note: The following options aren't enabled by default.
-#>       They serve as a guide to users that wish to pass
-#>       more options to the batch system.
-#>
-#> #SBATCH --mem=...
-#> #SBATCH --constraint="lustre"
-#> #SBATCH --gpus-per-task={1 if gpu else 0}
-
+#SBATCH -t{walltime}                                      # Duration of the job (Ex: 15 mins)
+#SBATCH -q{partition}                                   # QOS name
+#SBATCH -oReport-%j.out                             # Combined output and error messages file
 
 #>
 #> Note: If your system requires you to load environment
@@ -74,21 +59,9 @@ for binpath in {MFC::BINARIES}; do
 
     echo -e ":) Running $binpath:"
 
-    if command -v srun > /dev/null 2>&1; then
-        srun                                   \
-            --nodes           {nodes}          \
-            --ntasks-per-node {tasks_per_node} \
-            {MFC::PROFILER} "$binpath"
-
-        #>
-        #> srun --mpi=pmix                 \
-        #>      {MFC::PROFILER} "$binpath"
-        #>
-    else
-        mpirun                         \
+       mpirun                         \
             -np {nodes*tasks_per_node} \
             {MFC::PROFILER} "$binpath"
-    fi
 
 done
 

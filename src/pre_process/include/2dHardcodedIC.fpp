@@ -83,12 +83,13 @@
 
         case(203) ! 2D Interface
 
-            ih =  3.5 + 0.005*(sin(5d0*pi*x_cc(i)) + sin(15d0*pi*x_cc(i)) + sin(45d0*pi*x_cc(i)) + sin(135*pi*x_cc(i)))**2d0
-            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/0.005))
+            !ih =  3.5 + 0.005*(sin(5d0*pi*x_cc(i)) + sin(15d0*pi*x_cc(i)) + sin(45d0*pi*x_cc(i)) + sin(135*pi*x_cc(i)))**2d0
+            ih = 0.0245 + 0.000245/4d0*sin(2564.5*pi*x_cc(i))
+            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/0.0001))
 
             q_prim_vf(advxb)%sf(i, j, 0) = 1 - alph
             q_prim_vf(advxe)%sf(i, j, 0) = alph
-            q_prim_vf(contxb)%sf(i, j, 0) = (1d0-alph)*1000d0
+            q_prim_vf(contxb)%sf(i, j, 0) = (1d0-alph)*2d0
             q_prim_vf(contxe)%sf(i, j, 0) = alph*1d0
 
         case default

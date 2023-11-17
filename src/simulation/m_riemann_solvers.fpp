@@ -2306,7 +2306,10 @@ contains
                                          is3%beg:is3%end, 1:2))
         end if
 
-        if (n == 0) return
+        if (n == 0) then
+            allocate (vel_src_rsy_vf(0,0,0,0))
+            return
+        end if
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = n; is2%end = m; is3%end = p
@@ -2334,7 +2337,10 @@ contains
                                          is3%beg:is3%end, 1:2))
         end if
 
-        if (p == 0) return
+        if (p == 0) then
+            allocate (vel_src_rsz_vf(0,0,0,0))
+            return
+        end if
 
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = p; is2%end = n; is3%end = m
