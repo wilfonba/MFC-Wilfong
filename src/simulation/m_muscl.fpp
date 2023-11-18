@@ -107,7 +107,7 @@ contains
         type(int_bounds_info), intent(IN) :: is1_d, is2_d, is3_d
 
         integer :: j, k, l, i, q
-        real(kind(0d0)) :: phir, delta, top, bottom, sign
+        real(kind(0d0)) :: phir, delta, top, bottom, sign, slopeL, slopeR, slope
 
         is1 = is1_d
         is2 = is2_d
@@ -167,46 +167,52 @@ contains
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 !$acc parallel loop collapse(4) gang vector default(present) private(top, &
-!$acc bottom, sign, phir, delta, r)
+!$acc bottom, sign, phir, delta, r, slopeL, slopeR, slope)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
                             do i = 1, v_size
 
-                                top = v_rs_ws_${XYZ}$(j, k, l, i) - &
+                                slopeL = v_rs_ws_${XYZ}$(j, k, l, i) - &
                                     v_rs_ws_${XYZ}$(j - 1, k, l, i)
-                                bottom = v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
-                                    v_rs_ws_${XYZ}$(j, k, l,  i)
-                                
-                                r = top*bottom/max(bottom**2d0,1e-6)
- 
-                                if (r <= 0) then
-                                    phir = 0d0
-                                else
-                                    if (muscl_lim == 1) then ! ULTRABEE like
-                                        phir = min(2d0*r/(1d0 + r), 2d0/(1d0 + r))
-                                    elseif (muscl_lim == 2) then ! SUPERBEE like 
-                                        if (r <= 5d-1) phir = 2d0*r
-                                        if (r < 1d0) phir = 1d0
-                                        if (r > 1d0) phir = min(r, 2d0/(1d0 + r), 2d0)
-                                    elseif (muscl_lim == 3) then ! van-Alabada like
-                                        phir = min(r*(1d0 + r)/(1d0 + r**2d0), 2d0/(1d0 + r))
-                                    elseif (muscl_lim == 4) then ! MINBEE like
-                                        if (r < 1d0) phir = r
-                                        if (r >=1d0) phir = min(1d0, 2d0/(1d0 + r))
-                                    end if
-                                end if
+                                slopeR = v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
+                                    v_rs_ws_${XYZ}$(j, k, l, i)
 
-                                delta = (1d0/2d0)*(v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
-                                                v_rs_ws_${XYZ}$(j - 1, k, l, i))
+                                slope = 0d0
+                                if (muscl_lim == 1) then ! minmod
+                                    if (slopeL*slopeR > 0d0) then
+                                        slope = min(abs(slopeL), abs(slopeR))
+                                    end if
+                                    if (slopeL < 0 ) slope = -slope
+                                elseif (muscl_lim == 2) then ! MC
+                                    if (slopeL*slopeR > 0d0) then
+                                        slope = min(2d0*abs(slope1), 2d0*abs(slopeR))
+                                        slope = min(slope, 5d-1*(abs(slopeL + slopeR)))
+                                    end if
+                                    if (slopeL < 0 ) slope = -slope
+                                elseif (muscl_lim == 3) then ! Van Albada
+                                    if (abs(slopeL) > 0 .and. abs(slopeR) > 0 .and. &
+                                        abs(slopeL + slopeR) > 0d0 .and. slopeL*slopeR > 0d0) then
+                                        slope = ((slopeL + slopeR)*slopeL*slopeR)/(slopeL**2d0 + slopeR**2d0)
+                                    end if
+                                elseif (muscl_lim == 4) then ! Van Leer
+                                    if (abs(slopeL + slopeR) > 0d0 .and. slopeL*slopeR > 0d0) then
+                                        slope = 2*slopeL*slopeR/(slopeL + slopeR)
+                                    endif
+                                elseif (muscl_lim == 5) then ! SUPERBEE
+                                    if (slopeL*slopeR > 0d0) then
+                                        slope = -1d0*min(-min(2d0*abs(slopeL), abs(slopeR)), -min(abs(slopeL), 2d0*abs(slopeR)))
+                                    end if
+                                endif
+
 
                                 ! reconstruct from left side
                                 vL_rs_vf_${XYZ}$(j, k, l, i) = &
-                                   v_rs_ws_${XYZ}$(j, k, l, i) + 5d-1*phir*delta
+                                   v_rs_ws_${XYZ}$(j, k, l, i) + 5d-1*slope
                                 
                                 ! reconstruct from the right side
                                 vR_rs_vf_${XYZ}$(j, k, l, i) = &
-                                   v_rs_ws_${XYZ}$(j, k, l, i) - 5d-1*phir*delta
+                                   v_rs_ws_${XYZ}$(j, k, l, i) - 5d-1*slope
 
                             end do
                         end do

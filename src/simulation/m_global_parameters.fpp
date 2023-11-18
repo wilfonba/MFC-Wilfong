@@ -539,6 +539,7 @@ contains
 !$acc update device(nb)
             elseif (recon_type == 2) then
                 muscl_polyn = muscl_order - 1
+!$acc update device(muscl_polyn)
             end if
         #:endif
 
