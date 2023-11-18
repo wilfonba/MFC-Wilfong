@@ -13,6 +13,8 @@ module m_muscl
 #endif
 
     use m_mpi_proxy
+
+    use m_helper
     ! ==========================================================================
 
     private; public :: s_initialize_muscl_module, &
@@ -165,19 +167,36 @@ contains
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 !$acc parallel loop collapse(4) gang vector default(present) private(top, &
-!$acc bottom, sign, phir, delta)
+!$acc bottom, sign, phir, delta, r)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-                                do i = 1, v_size
+                        do j = is1%beg, is1%end
+                            do i = 1, v_size
 
                                 top = v_rs_ws_${XYZ}$(j, k, l, i) - &
                                     v_rs_ws_${XYZ}$(j - 1, k, l, i)
                                 bottom = v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
-                                    v_rs_ws_${XYZ}$(j, k, l,  i )
-
-                                call s_compute_slope_limiter(top, bottom, phir)
+                                    v_rs_ws_${XYZ}$(j, k, l,  i)
                                 
+                                r = top*bottom/max(bottom**2d0,1e-6)
+ 
+                                if (r <= 0) then
+                                    phir = 0d0
+                                else
+                                    if (muscl_lim == 1) then ! ULTRABEE like
+                                        phir = min(2d0*r/(1d0 + r), 2d0/(1d0 + r))
+                                    elseif (muscl_lim == 2) then ! SUPERBEE like 
+                                        if (r <= 5d-1) phir = 2d0*r
+                                        if (r < 1d0) phir = 1d0
+                                        if (r > 1d0) phir = min(r, 2d0/(1d0 + r), 2d0)
+                                    elseif (muscl_lim == 3) then ! van-Alabada like
+                                        phir = min(r*(1d0 + r)/(1d0 + r**2d0), 2d0/(1d0 + r))
+                                    elseif (muscl_lim == 4) then ! MINBEE like
+                                        if (r < 1d0) phir = r
+                                        if (r >=1d0) phir = min(1d0, 2d0/(1d0 + r))
+                                    end if
+                                end if
+
                                 delta = (1d0/2d0)*(v_rs_ws_${XYZ}$(j + 1, k, l, i) - &
                                                 v_rs_ws_${XYZ}$(j - 1, k, l, i))
 
@@ -188,13 +207,13 @@ contains
                                 ! reconstruct from the right side
                                 vR_rs_vf_${XYZ}$(j, k, l, i) = &
                                    v_rs_ws_${XYZ}$(j, k, l, i) - 5d-1*phir*delta
+
                             end do
                         end do
                     end do
                 end do
             end if
             #:endfor
-
         endif
 
         if (int_comp) then
@@ -204,31 +223,6 @@ contains
         endif
 
     end subroutine s_muscl
-
-    subroutine s_compute_slope_limiter(top, bottom, phir)
-!$acc routine seq
-    
-        real(kind(0d0)) :: top, bottom, phir
-        real(kind(0d0)) :: r
-
-        if (r <= 0) then
-            phir = 0d0
-        else
-            if (muscl_lim == 1) then ! ULTRABEE like
-                phir = min(2d0*r/(1d0 + r), 2d0/(1d0 + r))
-            elseif (muscl_lim == 2) then ! SUPERBEE like 
-                if (r <= 5d-1) phir = 2d0*r
-                if (r < 1d0) phir = 1d0
-                if (r > 1d0) phir = min(r, 2d0/(1d0 + r), 2d0)
-            elseif (muscl_lim == 3) then ! van-Alabada like
-                phir = min(r*(1d0 + r)/(1d0 + r**2d0), 2d0/(1d0 + r))
-            elseif (muscl_lim == 4) then ! MINBEE like
-                if (r < 1d0) phir = r
-                if (r >=1d0) phir = min(1d0, 2d0/(1d0 + r))
-            end if
-        end if
-
-    end subroutine s_compute_slope_limiter
 
     subroutine s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & 
             norm_dir, muscl_dir, &

@@ -1124,6 +1124,7 @@ contains
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
         !$acc update device(monopole, num_mono)
         !$acc update device(sigma)
+        !$acc update device(muscl_lim)
     end subroutine s_initialize_gpu_vars
 
 
