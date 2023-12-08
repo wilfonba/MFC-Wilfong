@@ -731,7 +731,7 @@ contains
             gm_alpha_qp%vf, &
             ix, iy, iz)
         call nvtxEndRange
-        
+
         if (t_step == t_step_stop) return
         ! ==================================================================
 
@@ -815,7 +815,7 @@ contains
                     qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                     qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                     id)
-
+                    
                 iv%beg = advxb; iv%end = advxe
                 call s_reconstruct_cell_boundary_values( &
                     q_prim_qp%vf(iv%beg:iv%end), &

@@ -1315,13 +1315,12 @@ module m_boundary_conditions
                 end if
 
             else !< bc_y%end
-
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size
                     do k = 0, p
                         do j = 1, buff_size
                             do l = -buff_size, m + buff_size
-                                if (i == momxb + 1) then
+                                if (i >= momxb .and. i <= momxe) then
                                     q_cons_vf(i)%sf(l, n + j, k) = &
                                         - q_cons_vf(i)%sf(l, n - (j - 1), k)
                                 else
