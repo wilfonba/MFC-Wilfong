@@ -24,7 +24,7 @@
     select case(patch_icpp(patch_id)%hcid)
         case(200) ! Rayleigh-Taylor Case 1
 
-            ih = 3 - 0.025*sin(pi*x_cc(i))
+            ih = 3 - 0.1*sin(2*pi*x_cc(i) - pi/2)
 
             ! Everything Else
             if (y_cc(j)  > ih) then
@@ -82,16 +82,24 @@
         case(203) ! 2D Interface
 
             !ih =  3.5 + 0.005*(sin(5d0*pi*x_cc(i)) + sin(15d0*pi*x_cc(i)) + sin(45d0*pi*x_cc(i)) + sin(135*pi*x_cc(i)))**2d0
-            ih = 3 - 0.025*sin(pi*x_cc(i))
-            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/0.025))
+            ih = 3.0 - 0.025*sin(2*pi*x_cc(i)-pi/2)
+            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/0.01))
 
-            if (alph < 1e-9) alph = 1e-6
-            if (alph > 1 - 1e-9) alph = 1 - 1e-9
+            if (alph < 1e-5) alph = 1e-6
+            if (alph > 1 - 1e-5) alph = 1 - 1e-5
 
             q_prim_vf(advxb)%sf(i, j, 0) = alph
             q_prim_vf(advxe)%sf(i, j, 0) = 1 - alph
             q_prim_vf(contxb)%sf(i, j, 0) = alph*1000d0
             q_prim_vf(contxe)%sf(i, j, 0) = (1-alph)*1d0
+
+            if (y_cc(j)  > ih) then
+                q_prim_vf(E_idx)%sf(i, j, 0) = 1d5 + 1000*30*9.81*(4 - y_cc(j))
+            else
+                pInterface = 1d5 + 1000*30*9.81*(4 - ih)
+                q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1d0*30*9.81*(ih - y_cc(j))
+            end if
+
 
         case default
             
