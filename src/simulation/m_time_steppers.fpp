@@ -566,7 +566,10 @@ contains
             end do
         end if
 
+
+        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+        call nvtxEndRange
         
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
         
@@ -628,7 +631,9 @@ contains
             end do
         end if
        
+        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4d0)
+        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
@@ -689,7 +694,9 @@ contains
             end do
         end if
 
+        call nvtxStartRange("body_forces")
         if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2d0*dt/3d0)
+        call nvtxEndRange
 
         if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 

@@ -99,7 +99,7 @@
                 pInterface = 1d5 + 1000*30*9.81*(4 - ih)
                 q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1d0*30*9.81*(ih - y_cc(j))
             end if
-
+            
 
         case default
             

@@ -959,6 +959,7 @@ contains
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size) :: q_prim_vf
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma !< equation of state parameters
+        character(len=10000) :: line
 
         integer :: i, j, k !< generic loop iterators
 

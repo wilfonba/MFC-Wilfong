@@ -10,7 +10,17 @@
     integer :: q300, p300
 
     real(kind(0d0)) :: ih3, alph3
-    
+
+    integer :: i1, i2
+    real(kind(0d0)), dimension(0:199,0:199) :: ihPerlin
+
+    open(32,file="/storage/scratch1/6/bwilfong3/software/MFC-Wilfong3/src/pre_process/include/perlinNoise.csv")
+
+    do i1 = 0,199
+        read(32,*) (ihPerlin(i1,i2),i2=0,199)
+    end do
+
+    print*, ihPerlin(0:2,0:2)
 
 #:enddef
 
@@ -72,6 +82,27 @@
             q_prim_vf(contxb)%sf(i, j, k) = alph3*2d0
             q_prim_vf(contxe)%sf(i, j, k) = (1d0-alph3)*1d0
   
+        case(303) ! Perlin noise
+
+            ih3 = 0.025*ihPerlin(i,k) + 1.5d0
+            alph3 = 5d-1*(1 + tanh((y_cc(j) - ih3)/0.01))
+
+            if (alph3 < 1e-6) alph3 = 1e-6
+            if (alph3 > 1 - 1e-6) alph3 = 1 - 1e-6
+
+            q_prim_vf(advxb)%sf(i, j, k) = 1d0 - alph3
+            q_prim_vf(advxe)%sf(i, j, k) = alph3
+            q_prim_vf(contxb)%sf(i, j, k) = (1d0 - alph3)*1000
+            q_prim_vf(contxe)%sf(i, j, k) = alph3*1d0
+
+            ! ! Pressure
+            ! if (y_cc(j) > ih3) then
+            !     q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 1d0*9.8*(ih3 - y_cc(j))
+            ! else
+            !     q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 1d0*9.8*(2 - ih3) + &
+            !         1000d0*9.8*(ih3 - y_cc(j))
+            ! end if
+
         case default
             call s_int_to_str(patch_id, iStr)
             call s_mpi_abort("Invalid hcid specified for patch " // trim(iStr))
