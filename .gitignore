@@ -18,6 +18,7 @@ __pycache__
 
 /tests/*/**
 !/tests/*/golden.txt
+!/tests/*/golden-metadata.txt
 !/tests/*/case.py
 !/tests/*/README.md
 
@@ -27,6 +28,7 @@ __pycache__
 
 docs/*/initial*
 docs/*/result*
+docs/documentation/*-example.png
 docs/documentation/examples.md
 
 misc/*.mp4

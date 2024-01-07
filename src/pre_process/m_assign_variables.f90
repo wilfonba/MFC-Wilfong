@@ -19,7 +19,7 @@ module m_assign_variables
     type(scalar_field) :: alf_sum
 
     procedure(s_assign_patch_xxxxx_primitive_variables), &
-    pointer :: s_assign_patch_primitive_variables => null() !<
+        pointer :: s_assign_patch_primitive_variables => null() !<
     !! Depending on the multicomponent flow model, this variable is a pointer to
     !! either the subroutine s_assign_patch_mixture_primitive_variables, or the
     !! subroutine s_assign_patch_species_primitive_variables
@@ -36,7 +36,7 @@ module m_assign_variables
         !! @param k (y,th) cell index in which the mixture or species primitive variables from the indicated patch areassigned
         !! @param l (z) cell index in which the mixture or species primitive variables from the indicated patch areassigned
         subroutine s_assign_patch_xxxxx_primitive_variables(patch_id, j, k, l, &
-                                                eta, q_prim_vf, patch_id_fp)
+                                                            eta, q_prim_vf, patch_id_fp)
 
             import :: scalar_field, sys_size, n, m, p
 
@@ -51,10 +51,10 @@ module m_assign_variables
     end interface
 
     private; public :: s_initialize_assign_variables_module, &
-        s_assign_patch_primitive_variables, &
-        s_assign_patch_mixture_primitive_variables, &
-        s_assign_patch_species_primitive_variables, &
-        s_finialize_assign_variables_module
+ s_assign_patch_primitive_variables, &
+ s_assign_patch_mixture_primitive_variables, &
+ s_assign_patch_species_primitive_variables, &
+ s_finalize_assign_variables_module
 
 contains
 
@@ -73,7 +73,7 @@ contains
             s_assign_patch_primitive_variables => &
                 s_assign_patch_species_primitive_variables
         end if
-    
+
     end subroutine s_initialize_assign_variables_module
 
     !>  This subroutine assigns the mixture primitive variables
@@ -91,7 +91,7 @@ contains
         !! @param k  the y-dir node index
         !! @param l  the z-dir node index
     subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
-                                         eta, q_prim_vf, patch_id_fp)
+                                                          eta, q_prim_vf, patch_id_fp)
 
         !$acc routine seq
         integer, intent(IN) :: patch_id
@@ -112,94 +112,42 @@ contains
         integer :: i !< generic loop operator
 
         ! Assigning the mixture primitive variables of a uniform state patch
-        if (patch_icpp(patch_id)%geometry /= 6) then
 
-            ! Transferring the identity of the smoothing patch
-            smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+        ! Transferring the identity of the smoothing patch
+        smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
 
-            ! Density
-            q_prim_vf(1)%sf(j, k, l) = &
-                eta*patch_icpp(patch_id)%rho &
-                + (1d0 - eta)*patch_icpp(smooth_patch_id)%rho
+        ! Density
+        q_prim_vf(1)%sf(j, k, l) = &
+            eta*patch_icpp(patch_id)%rho &
+            + (1d0 - eta)*patch_icpp(smooth_patch_id)%rho
 
-            ! Velocity
-            do i = 1, E_idx - mom_idx%beg
-                q_prim_vf(i + 1)%sf(j, k, l) = &
-                    1d0/q_prim_vf(1)%sf(j, k, l)* &
-                    (eta*patch_icpp(patch_id)%rho &
-                     *patch_icpp(patch_id)%vel(i) &
-                     + (1d0 - eta)*patch_icpp(smooth_patch_id)%rho &
-                     *patch_icpp(smooth_patch_id)%vel(i))
-            end do
+        ! Velocity
+        do i = 1, E_idx - mom_idx%beg
+            q_prim_vf(i + 1)%sf(j, k, l) = &
+                1d0/q_prim_vf(1)%sf(j, k, l)* &
+                (eta*patch_icpp(patch_id)%rho &
+                 *patch_icpp(patch_id)%vel(i) &
+                 + (1d0 - eta)*patch_icpp(smooth_patch_id)%rho &
+                 *patch_icpp(smooth_patch_id)%vel(i))
+        end do
 
-            ! Specific heat ratio function
-            q_prim_vf(gamma_idx)%sf(j, k, l) = &
-                eta*patch_icpp(patch_id)%gamma &
-                + (1d0 - eta)*patch_icpp(smooth_patch_id)%gamma
+        ! Specific heat ratio function
+        q_prim_vf(gamma_idx)%sf(j, k, l) = &
+            eta*patch_icpp(patch_id)%gamma &
+            + (1d0 - eta)*patch_icpp(smooth_patch_id)%gamma
 
-            ! Pressure
-            q_prim_vf(E_idx)%sf(j, k, l) = &
-                1d0/q_prim_vf(gamma_idx)%sf(j, k, l)* &
-                (eta*patch_icpp(patch_id)%gamma &
-                 *patch_icpp(patch_id)%pres &
-                 + (1d0 - eta)*patch_icpp(smooth_patch_id)%gamma &
-                 *patch_icpp(smooth_patch_id)%pres)
+        ! Pressure
+        q_prim_vf(E_idx)%sf(j, k, l) = &
+            1d0/q_prim_vf(gamma_idx)%sf(j, k, l)* &
+            (eta*patch_icpp(patch_id)%gamma &
+             *patch_icpp(patch_id)%pres &
+             + (1d0 - eta)*patch_icpp(smooth_patch_id)%gamma &
+             *patch_icpp(smooth_patch_id)%pres)
 
-            ! Liquid stiffness function
-            q_prim_vf(pi_inf_idx)%sf(j, k, l) = &
-                eta*patch_icpp(patch_id)%pi_inf &
-                + (1d0 - eta)*patch_icpp(smooth_patch_id)%pi_inf
-
-            ! Assigning mixture primitive variables of isentropic vortex patch
-        else
-
-            ! Transferring the centroid of the isentropic vortex patch, the
-            ! amplitude of its disturbance and also its domain of influence
-            x_centroid = patch_icpp(patch_id)%x_centroid
-            y_centroid = patch_icpp(patch_id)%y_centroid
-            epsilon = patch_icpp(patch_id)%epsilon
-            beta = patch_icpp(patch_id)%beta
-
-            ! Reference density, velocity, pressure and specific heat ratio
-            ! function of the isentropic vortex patch
-            rho = patch_icpp(patch_id)%rho
-            vel = patch_icpp(patch_id)%vel
-            pres = patch_icpp(patch_id)%pres
-            gamma = patch_icpp(patch_id)%gamma
-
-            ! Density
-            q_prim_vf(1)%sf(j, k, 0) = &
-                rho*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
-                     (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
-                     exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
-                                   - (y_cc(k) - y_centroid)**2)) &
-                     )**gamma
-
-            ! Velocity
-            q_prim_vf(2)%sf(j, k, 0) = &
-                vel(1) - (y_cc(k) - y_centroid)*(epsilon/(2d0*pi))* &
-                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
-                          - (y_cc(k) - y_centroid)**2))
-            q_prim_vf(3)%sf(j, k, 0) = &
-                vel(2) + (x_cc(j) - x_centroid)*(epsilon/(2d0*pi))* &
-                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
-                          - (y_cc(k) - y_centroid)**2))
-
-            ! Pressure
-            q_prim_vf(4)%sf(j, k, 0) = &
-                pres*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
-                      (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
-                      exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
-                                    - (y_cc(k) - y_centroid)**2)) &
-                      )**(gamma + 1d0)
-
-            ! Specific heat ratio function
-            q_prim_vf(5)%sf(j, k, 0) = gamma
-
-            ! Liquid stiffness function
-            q_prim_vf(6)%sf(j, k, 0) = 0d0
-
-        end if
+        ! Liquid stiffness function
+        q_prim_vf(pi_inf_idx)%sf(j, k, l) = &
+            eta*patch_icpp(patch_id)%pi_inf &
+            + (1d0 - eta)*patch_icpp(smooth_patch_id)%pi_inf
 
         ! Updating the patch identities bookkeeping variable
         if (1d0 - eta < 1d-16) patch_id_fp(j, k, l) = patch_id
@@ -213,62 +161,60 @@ contains
         integer, intent(IN) :: j, k, l
 
         integer :: i
-        real(kind(0d0)) :: pres_mag , loc, n_tait, B_tait, p0
+        real(kind(0d0)) :: pres_mag, loc, n_tait, B_tait, p0
         real(kind(0d0)) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
         p0 = 101325
-        pres_mag = 1D-1
+        pres_mag = 1d-1
         loc = x_cc(177)
         n_tait = fluid_pp(1)%gamma
         B_tait = fluid_pp(1)%pi_inf
 
-        n_tait = 1.d0/n_tait + 1.d0 
-        B_tait = B_tait * (n_tait - 1d0) / n_tait
+        n_tait = 1.d0/n_tait + 1.d0
+        B_tait = B_tait*(n_tait - 1d0)/n_tait
 
-        if(j < 177) then
-            q_prim_vf(E_idx)%sf(j, k, l) = 0.5 * q_prim_vf(E_idx)%sf(j, k, l) 
+        if (j < 177) then
+            q_prim_vf(E_idx)%sf(j, k, l) = 0.5*q_prim_vf(E_idx)%sf(j, k, l)
         end if
 
-
-        if(qbmm) then
+        if (qbmm) then
             do i = 1, nb
-                q_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) * ((p0 - fluid_pp(1)%pv) / (q_prim_vf(E_idx)%sf(j, k, l) * p0 - fluid_pp(1)%pv)) ** (1 / 3d0)
+                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1/3d0)
             end do
         end if
-
 
         R3bar = 0d0
 
-        if(qbmm) then
+        if (qbmm) then
             do i = 1, nb
-                R3bar = R3bar + weight(i) * 0.5d0 * (q_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) ) ** 3d0
-                R3bar = R3bar + weight(i) * 0.5d0 * (q_prim_vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l) ) ** 3d0
+                R3bar = R3bar + weight(i)*0.5d0*(q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))**3d0
+                R3bar = R3bar + weight(i)*0.5d0*(q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))**3d0
             end do
         else
             do i = 1, nb
-                if(polytropic) then
-                    R3bar = R3bar + weight(i) * (q_prim_vf(bubxb + (i - 1) * 2)%sf(j, k, l)) ** 3d0
+                if (polytropic) then
+                    R3bar = R3bar + weight(i)*(q_prim_vf(bubxb + (i - 1)*2)%sf(j, k, l))**3d0
                 else
-                    R3bar = R3bar + weight(i) * (q_prim_vf(bubxb + (i - 1) * 4)%sf(j, k, l)) ** 3d0
+                    R3bar = R3bar + weight(i)*(q_prim_vf(bubxb + (i - 1)*4)%sf(j, k, l))**3d0
                 end if
             end do
         end if
 
-        n0 = 3d0 * q_prim_vf(alf_idx) % sf(j, k, l) / (4d0 * pi * R3bar)
+        n0 = 3d0*q_prim_vf(alf_idx)%sf(j, k, l)/(4d0*pi*R3bar)
 
-        ratio = ((1d0 + B_tait) / (q_prim_vf(E_idx)%sf(j, k, l) + B_tait)) ** (1D0 / n_tait)
+        ratio = ((1d0 + B_tait)/(q_prim_vf(E_idx)%sf(j, k, l) + B_tait))**(1d0/n_tait)
 
-        nH = n0 / ( (1d0 - q_prim_vf(alf_idx)%sf(j, k, l)) * ratio + (4d0 * pi / 3d0) * n0 * R3bar )
-        vfH = (4d0 * pi / 3d0) * nH * R3bar
-        rhoH = (1d0 - vfH) / ratio
-        deno = 1d0 - (1d0 - q_prim_vf(alf_idx)%sf(j, k, l)) / rhoH
+        nH = n0/((1d0 - q_prim_vf(alf_idx)%sf(j, k, l))*ratio + (4d0*pi/3d0)*n0*R3bar)
+        vfH = (4d0*pi/3d0)*nH*R3bar
+        rhoH = (1d0 - vfH)/ratio
+        deno = 1d0 - (1d0 - q_prim_vf(alf_idx)%sf(j, k, l))/rhoH
 
-        if(deno == 0d0) then
+        if (deno == 0d0) then
             velH = 0d0
         else
-            velH = (q_prim_vf(E_idx)%sf(j, k, l) - 1d0) / (1d0 - q_prim_vf(alf_idx)%sf(j, k, l)) / deno
+            velH = (q_prim_vf(E_idx)%sf(j, k, l) - 1d0)/(1d0 - q_prim_vf(alf_idx)%sf(j, k, l))/deno
             velH = dsqrt(velH)
-            velH = velH * deno
+            velH = velH*deno
         end if
 
         do i = cont_idx%beg, cont_idx%end
@@ -291,7 +237,7 @@ contains
         !! @param k  the y-dir node index
         !! @param l  the z-dir node index
     subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, &
-                                                eta, q_prim_vf, patch_id_fp)
+                                                          eta, q_prim_vf, patch_id_fp)
 
         !$acc routine seq
         integer, intent(IN) :: patch_id
@@ -307,9 +253,11 @@ contains
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: lit_gamma    !< specific heat ratio
         real(kind(0d0)) :: pi_inf       !< stiffness from SEOS
+        real(kind(0d0)) :: qv       !< reference energy from SEOS
         real(kind(0d0)) :: orig_rho
         real(kind(0d0)) :: orig_gamma
         real(kind(0d0)) :: orig_pi_inf
+        real(kind(0d0)) :: orig_qv
         real(kind(0d0)) :: muR, muV
 
         real(kind(0d0)), dimension(int(E_idx - mom_idx%beg)) :: vel    !< velocity
@@ -350,7 +298,7 @@ contains
             q_prim_vf, j, k, l, &
             orig_rho, &
             orig_gamma, &
-            orig_pi_inf)
+            orig_pi_inf, orig_qv)
 
         ! Computing Mixture Variables of Current Patch =====================
 
@@ -378,14 +326,15 @@ contains
                 q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha_rho(i)
             end do
         end if
-  
+
         ! Density and the specific heat ratio and liquid stiffness functions
         ! call s_convert_species_to_mixture_variables( &
         call s_convert_to_mixture_variables( &
             q_prim_vf, j, k, l, &
             patch_icpp(patch_id)%rho, &
             patch_icpp(patch_id)%gamma, &
-            patch_icpp(patch_id)%pi_inf)
+            patch_icpp(patch_id)%pi_inf, &
+            patch_icpp(patch_id)%qv)
 
         ! ==================================================================
 
@@ -455,7 +404,8 @@ contains
             q_prim_vf, j, k, l, &
             patch_icpp(smooth_patch_id)%rho, &
             patch_icpp(smooth_patch_id)%gamma, &
-            patch_icpp(smooth_patch_id)%pi_inf)
+            patch_icpp(smooth_patch_id)%pi_inf, &
+            patch_icpp(smooth_patch_id)%qv)
 
         ! ==================================================================
 
@@ -516,7 +466,7 @@ contains
         ! Density and the specific heat ratio and liquid stiffness functions
         ! call s_convert_species_to_mixture_variables(q_prim_vf, j, k, l, &
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, &
-                                                    rho, gamma, pi_inf)
+                                            rho, gamma, pi_inf, qv)
 
         ! Velocity
         do i = 1, E_idx - mom_idx%beg
@@ -526,12 +476,19 @@ contains
         end do
 
         ! Set streamwise velocity to hypertangent function of y
-         if (vel_profile) then
-             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
-                 (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
+        if (vel_profile) then
+            q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
+                (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
                  + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
-         end if
-   
+        end if
+
+        ! Set partial pressures to mixture pressure for the 6-eqn model
+        if (model_eqns == 3) then
+            do i = internalEnergies_idx%beg, internalEnergies_idx%end
+                q_prim_vf(i)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l)
+            end do
+        end if
+
         ! Smoothed bubble variables
         if (bubbles) then
             do i = 1, nb
@@ -597,47 +554,6 @@ contains
                 end if
             end do
         end if
-      
-        if (patch_icpp(patch_id)%geometry == 6) then
-            x_centroid = patch_icpp(patch_id)%x_centroid
-            y_centroid = patch_icpp(patch_id)%y_centroid
-            epsilon = patch_icpp(patch_id)%epsilon
-            beta = patch_icpp(patch_id)%beta
-
-            ! Reference density, velocity, pressure and specific heat ratio
-            ! function of the isentropic vortex patch
-            rho = patch_icpp(patch_id)%rho
-            vel = patch_icpp(patch_id)%vel
-            pres = patch_icpp(patch_id)%pres
-            gamma = patch_icpp(patch_id)%gamma
-
-            ! Density
-            q_prim_vf(1)%sf(j, k, 0) = &
-                rho*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
-                     (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
-                     exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
-                                   - (y_cc(k) - y_centroid)**2)) &
-                     )**gamma
-
-            ! Velocity
-            q_prim_vf(2)%sf(j, k, 0) = &
-                vel(1) - (y_cc(k) - y_centroid)*(epsilon/(2d0*pi))* &
-                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
-                          - (y_cc(k) - y_centroid)**2))
-            q_prim_vf(3)%sf(j, k, 0) = &
-                vel(2) + (x_cc(j) - x_centroid)*(epsilon/(2d0*pi))* &
-                exp(beta*(1d0 - (x_cc(j) - x_centroid)**2 &
-                          - (y_cc(k) - y_centroid)**2))
-
-            ! Pressure
-            q_prim_vf(4)%sf(j, k, 0) = &
-                pres*(1d0 - (rho/pres)*(epsilon/(2d0*pi))* &
-                      (epsilon/(8d0*beta*(gamma + 1d0)*pi))* &
-                      exp(2d0*beta*(1d0 - (x_cc(j) - x_centroid)**2 &
-                                    - (y_cc(k) - y_centroid)**2)) &
-                      )**(gamma + 1d0)
-
-        end if
 
         if (sigma .ne. dflt_real) then
             q_prim_vf(c_idx)%sf(j, k, l) = eta*patch_icpp(patch_id)%cf_val + &
@@ -649,13 +565,13 @@ contains
 
     end subroutine s_assign_patch_species_primitive_variables! ------------
 
-    subroutine s_finialize_assign_variables_module
+    subroutine s_finalize_assign_variables_module
 
         ! Nullifying procedure pointer to the subroutine assigning either
         ! the patch mixture or species primitive variables to a cell in the
         ! computational domain
         s_assign_patch_primitive_variables => null()
 
-    end subroutine s_finialize_assign_variables_module
+    end subroutine s_finalize_assign_variables_module
 
 end module

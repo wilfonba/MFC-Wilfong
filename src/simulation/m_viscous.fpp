@@ -18,21 +18,20 @@ module m_viscous
     use m_helper
     ! ==========================================================================
 
-    private; public  s_get_viscous, &
-    s_compute_viscous_stress_tensor, &
-    s_initialize_viscous_module, &
-    s_reconstruct_cell_boundary_values_visc_deriv, &
-    s_finalize_viscous_module
+    private; public s_get_viscous, &
+ s_compute_viscous_stress_tensor, &
+ s_initialize_viscous_module, &
+ s_reconstruct_cell_boundary_values_visc_deriv, &
+ s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1, is2, is3
- !$acc declare create(is1, is2, is3, iv)   
+    !$acc declare create(is1, is2, is3, iv)
 
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
-!$acc declare create(Res)
+    !$acc declare create(Res)
 
-
-    contains
+contains
 
     subroutine s_initialize_viscous_module()
         integer :: i, j !< generic loop iterators
@@ -44,8 +43,7 @@ module m_viscous
                 Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
             end do
         end do
-!$acc update device(Res, Re_idx, Re_size)
-
+        !$acc update device(Res, Re_idx, Re_size)
 
     end subroutine s_initialize_viscous_module
 
@@ -77,13 +75,13 @@ module m_viscous
 
         type(int_bounds_info) :: ix, iy, iz
 
-    !$acc update device(ix, iy, iz)
+        !$acc update device(ix, iy, iz)
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = iz%beg, iz%end
             do k = iy%beg, iy%end
                 do j = ix%beg, ix%end
-    !$acc loop seq
+                    !$acc loop seq
                     do i = momxb, E_idx
                         tau_Re_vf(i)%sf(j, k, l) = 0d0
                     end do
@@ -91,17 +89,17 @@ module m_viscous
             end do
         end do
         if (Re_size(1) > 0) then    ! Shear stresses
-    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = iz%beg, iz%end
                 do k = -1, 1
                     do j = ix%beg, ix%end
 
-    !$acc loop seq
+                        !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
-                            else                                
+                            else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
@@ -112,14 +110,14 @@ module m_viscous
                             pi_inf_visc = 0d0
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                     pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                 end do
                             else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids - 1
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -138,7 +136,7 @@ module m_viscous
                             alpha_visc_sum = 0d0
 
                             if (mpp_lim) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_rho_visc(i) = max(0d0, alpha_rho_visc(i))
                                     alpha_visc(i) = min(max(0d0, alpha_visc(i)), 1d0)
@@ -149,7 +147,7 @@ module m_viscous
 
                             end if
 
-    !$acc loop seq
+                            !$acc loop seq
                             do i = 1, num_fluids
                                 rho_visc = rho_visc + alpha_rho_visc(i)
                                 gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -157,15 +155,15 @@ module m_viscous
                             end do
 
                             if (any(Re_size > 0)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
-    !$acc loop seq
+                                    !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i, q) &
-                                                    + Re_visc(i)
+                                                     + Re_visc(i)
                                     end do
 
                                     Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
@@ -176,18 +174,18 @@ module m_viscous
 
                         tau_Re(2, 1) = (grad_y_vf(1)%sf(j, k, l) + &
                                         grad_x_vf(2)%sf(j, k, l))/ &
-                                    Re_visc(1)
-                        
+                                       Re_visc(1)
+
                         tau_Re(2, 2) = (4d0*grad_y_vf(2)%sf(j, k, l) &
                                         - 2d0*grad_x_vf(1)%sf(j, k, l) &
                                         - 2d0*q_prim_vf(momxb + 1)%sf(j, k, l)/y_cc(k))/ &
-                                    (3d0*Re_visc(1))      
-    !$acc loop seq
+                                       (3d0*Re_visc(1))
+                        !$acc loop seq
                         do i = 1, 2
                             tau_Re_vf(contxe + i)%sf(j, k, l) = &
                                 tau_Re_vf(contxe + i)%sf(j, k, l) - &
                                 tau_Re(2, i)
-                            
+
                             tau_Re_vf(E_idx)%sf(j, k, l) = &
                                 tau_Re_vf(E_idx)%sf(j, k, l) - &
                                 q_prim_vf(contxe + i)%sf(j, k, l)*tau_Re(2, i)
@@ -198,17 +196,17 @@ module m_viscous
         end if
 
         if (Re_size(2) > 0) then    ! Bulk stresses
-    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = iz%beg, iz%end
                 do k = -1, 1
                     do j = ix%beg, ix%end
 
-    !$acc loop seq
+                        !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
-                            else                                
+                            else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
@@ -219,14 +217,14 @@ module m_viscous
                             pi_inf_visc = 0d0
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                     pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                 end do
                             else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids - 1
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -245,7 +243,7 @@ module m_viscous
                             alpha_visc_sum = 0d0
 
                             if (mpp_lim) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_rho_visc(i) = max(0d0, alpha_rho_visc(i))
                                     alpha_visc(i) = min(max(0d0, alpha_visc(i)), 1d0)
@@ -256,7 +254,7 @@ module m_viscous
 
                             end if
 
-    !$acc loop seq
+                            !$acc loop seq
                             do i = 1, num_fluids
                                 rho_visc = rho_visc + alpha_rho_visc(i)
                                 gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -264,15 +262,15 @@ module m_viscous
                             end do
 
                             if (any(Re_size > 0)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
-    !$acc loop seq
+                                    !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i, q) &
-                                                    + Re_visc(i)
+                                                     + Re_visc(i)
                                     end do
 
                                     Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
@@ -284,7 +282,7 @@ module m_viscous
                         tau_Re(2, 2) = (grad_x_vf(1)%sf(j, k, l) + &
                                         grad_y_vf(2)%sf(j, k, l) + &
                                         q_prim_vf(momxb + 1)%sf(j, k, l)/y_cc(k))/ &
-                                    Re_visc(2)
+                                       Re_visc(2)
 
                         tau_Re_vf(momxb + 1)%sf(j, k, l) = &
                             tau_Re_vf(momxb + 1)%sf(j, k, l) - &
@@ -302,17 +300,17 @@ module m_viscous
         if (p == 0) return
 
         if (Re_size(1) > 0) then    ! Shear stresses
-    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = iz%beg, iz%end
                 do k = -1, 1
                     do j = ix%beg, ix%end
 
-    !$acc loop seq
+                        !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
-                            else                                
+                            else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
@@ -323,14 +321,14 @@ module m_viscous
                             pi_inf_visc = 0d0
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                     pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                 end do
                             else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids - 1
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -349,7 +347,7 @@ module m_viscous
                             alpha_visc_sum = 0d0
 
                             if (mpp_lim) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_rho_visc(i) = max(0d0, alpha_rho_visc(i))
                                     alpha_visc(i) = min(max(0d0, alpha_visc(i)), 1d0)
@@ -360,7 +358,7 @@ module m_viscous
 
                             end if
 
-    !$acc loop seq
+                            !$acc loop seq
                             do i = 1, num_fluids
                                 rho_visc = rho_visc + alpha_rho_visc(i)
                                 gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -368,15 +366,15 @@ module m_viscous
                             end do
 
                             if (any(Re_size > 0)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
-    !$acc loop seq
+                                    !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i, q) &
-                                                    + Re_visc(i)
+                                                     + Re_visc(i)
                                     end do
 
                                     Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
@@ -386,14 +384,14 @@ module m_viscous
                         end if
 
                         tau_Re(2, 2) = -(2d0/3d0)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/ &
-                                    Re_visc(1)
+                                       Re_visc(1)
 
                         tau_Re(2, 3) = ((grad_z_vf(2)%sf(j, k, l) - &
-                                        q_prim_vf(momxe)%sf(j, k, l))/ &
+                                         q_prim_vf(momxe)%sf(j, k, l))/ &
                                         y_cc(k) + grad_y_vf(3)%sf(j, k, l))/ &
-                                    Re_visc(1)
+                                       Re_visc(1)
 
-    !$acc loop seq
+                        !$acc loop seq
                         do i = 2, 3
                             tau_Re_vf(contxe + i)%sf(j, k, l) = &
                                 tau_Re_vf(contxe + i)%sf(j, k, l) - &
@@ -410,17 +408,17 @@ module m_viscous
         end if
 
         if (Re_size(2) > 0) then    ! Bulk stresses
-    !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
             do l = iz%beg, iz%end
                 do k = -1, 1
                     do j = ix%beg, ix%end
 
-    !$acc loop seq
+                        !$acc loop seq
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles .and. num_fluids == 1) then
                                 alpha_visc(i) = 1d0 - q_prim_vf(E_idx + i)%sf(j, k, l)
-                            else                                
+                            else
                                 alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                             end if
                         end do
@@ -431,14 +429,14 @@ module m_viscous
                             pi_inf_visc = 0d0
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                     pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                 end do
                             else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids - 1
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -457,7 +455,7 @@ module m_viscous
                             alpha_visc_sum = 0d0
 
                             if (mpp_lim) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_rho_visc(i) = max(0d0, alpha_rho_visc(i))
                                     alpha_visc(i) = min(max(0d0, alpha_visc(i)), 1d0)
@@ -468,7 +466,7 @@ module m_viscous
 
                             end if
 
-    !$acc loop seq
+                            !$acc loop seq
                             do i = 1, num_fluids
                                 rho_visc = rho_visc + alpha_rho_visc(i)
                                 gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -476,15 +474,15 @@ module m_viscous
                             end do
 
                             if (any(Re_size > 0)) then
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
                                     if (Re_size(i) > 0) Re_visc(i) = 0d0
-    !$acc loop seq
+                                    !$acc loop seq
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res(i, q) &
-                                                    + Re_visc(i)
+                                                     + Re_visc(i)
                                     end do
 
                                     Re_visc(i) = 1d0/max(Re_visc(i), sgm_eps)
@@ -494,7 +492,7 @@ module m_viscous
                         end if
 
                         tau_Re(2, 2) = grad_z_vf(3)%sf(j, k, l)/y_cc(k)/ &
-                                    Re_visc(2)
+                                       Re_visc(2)
 
                         tau_Re_vf(momxb + 1)%sf(j, k, l) = &
                             tau_Re_vf(momxb + 1)%sf(j, k, l) - &
@@ -516,20 +514,20 @@ module m_viscous
     !!  @param rhs_vf Cell-averaged RHS variables
     subroutine s_get_viscous(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, &
                              dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-                             qL_prim, & 
+                             qL_prim, &
                              qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
                              dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
                              qR_prim, &
                              q_prim_qp, &
-                             dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp,  &
+                             dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
                              ix, iy, iz)
 
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), &
-             intent(INOUT) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
-                              qL_prim_rsy_vf, qR_prim_rsy_vf, &
-                              qL_prim_rsz_vf, qR_prim_rsz_vf
+            intent(INOUT) :: qL_prim_rsx_vf, qR_prim_rsx_vf, &
+                             qL_prim_rsy_vf, qR_prim_rsy_vf, &
+                             qL_prim_rsz_vf, qR_prim_rsz_vf
 
-        type(vector_field), dimension(sys_size) :: qL_prim, qR_prim
+        type(vector_field), dimension(1:num_dims) :: qL_prim, qR_prim
 
         type(vector_field) :: q_prim_qp
 
@@ -588,30 +586,30 @@ module m_viscous
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
             !$acc update device(iv)
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = iz%beg, iz%end
                 do k = iy%beg, iy%end
                     do j = ix%beg + 1, ix%end
-    !$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
                             dqL_prim_dx_n(1)%vf(i)%sf(j, k, l) = &
                                 (q_prim_qp%vf(i)%sf(j, k, l) - &
-                                q_prim_qp%vf(i)%sf(j - 1, k, l))/ &
+                                 q_prim_qp%vf(i)%sf(j - 1, k, l))/ &
                                 (x_cc(j) - x_cc(j - 1))
                         end do
                     end do
                 end do
             end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = iz%beg, iz%end
                 do k = iy%beg, iy%end
                     do j = ix%beg, ix%end - 1
-    !$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
                             dqR_prim_dx_n(1)%vf(i)%sf(j, k, l) = &
                                 (q_prim_qp%vf(i)%sf(j + 1, k, l) - &
-                                q_prim_qp%vf(i)%sf(j, k, l))/ &
+                                 q_prim_qp%vf(i)%sf(j, k, l))/ &
                                 (x_cc(j + 1) - x_cc(j))
                         end do
                     end do
@@ -620,22 +618,22 @@ module m_viscous
 
             if (n > 0) then
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = iz%beg, iz%end
                     do j = iy%beg + 1, iy%end
                         do k = ix%beg, ix%end
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqL_prim_dy_n(2)%vf(i)%sf(k, j, l) = &
                                     (q_prim_qp%vf(i)%sf(k, j, l) - &
-                                    q_prim_qp%vf(i)%sf(k, j - 1, l))/ &
+                                     q_prim_qp%vf(i)%sf(k, j - 1, l))/ &
                                     (y_cc(j) - y_cc(j - 1))
                             end do
                         end do
                     end do
                 end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = iz%beg, iz%end
                     do j = iy%beg, iy%end - 1
                         do k = ix%beg, ix%end
@@ -643,86 +641,86 @@ module m_viscous
                             do i = iv%beg, iv%end
                                 dqR_prim_dy_n(2)%vf(i)%sf(k, j, l) = &
                                     (q_prim_qp%vf(i)%sf(k, j + 1, l) - &
-                                    q_prim_qp%vf(i)%sf(k, j, l))/ &
+                                     q_prim_qp%vf(i)%sf(k, j, l))/ &
                                     (y_cc(j + 1) - y_cc(j))
                             end do
                         end do
                     end do
                 end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = iz%beg, iz%end
                     do j = iy%beg + 1, iy%end
                         do k = ix%beg + 1, ix%end - 1
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = &
                                     (dqL_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
-                                    dqR_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
-                                    dqL_prim_dx_n(1)%vf(i)%sf(k, j - 1, l) + &
-                                    dqR_prim_dx_n(1)%vf(i)%sf(k, j - 1, l))
+                                     dqR_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
+                                     dqL_prim_dx_n(1)%vf(i)%sf(k, j - 1, l) + &
+                                     dqR_prim_dx_n(1)%vf(i)%sf(k, j - 1, l))
 
                                 dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25d-2* &
-                                                                    dqL_prim_dx_n(2)%vf(i)%sf(k, j, l)
+                                                                     dqL_prim_dx_n(2)%vf(i)%sf(k, j, l)
                             end do
                         end do
                     end do
                 end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = iz%beg, iz%end
                     do j = iy%beg, iy%end - 1
                         do k = ix%beg + 1, ix%end - 1
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = &
                                     (dqL_prim_dx_n(1)%vf(i)%sf(k, j + 1, l) + &
-                                    dqR_prim_dx_n(1)%vf(i)%sf(k, j + 1, l) + &
-                                    dqL_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
-                                    dqR_prim_dx_n(1)%vf(i)%sf(k, j, l))
+                                     dqR_prim_dx_n(1)%vf(i)%sf(k, j + 1, l) + &
+                                     dqL_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
+                                     dqR_prim_dx_n(1)%vf(i)%sf(k, j, l))
 
                                 dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25d-2* &
-                                                                    dqR_prim_dx_n(2)%vf(i)%sf(k, j, l)
+                                                                     dqR_prim_dx_n(2)%vf(i)%sf(k, j, l)
 
                             end do
                         end do
                     end do
                 end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = iz%beg, iz%end
                     do k = iy%beg + 1, iy%end - 1
                         do j = ix%beg + 1, ix%end
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = &
                                     (dqL_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
-                                    dqR_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
-                                    dqL_prim_dy_n(2)%vf(i)%sf(j - 1, k, l) + &
-                                    dqR_prim_dy_n(2)%vf(i)%sf(j - 1, k, l))
+                                     dqR_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
+                                     dqL_prim_dy_n(2)%vf(i)%sf(j - 1, k, l) + &
+                                     dqR_prim_dy_n(2)%vf(i)%sf(j - 1, k, l))
 
                                 dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25d-2* &
-                                                                    dqL_prim_dy_n(1)%vf(i)%sf(j, k, l)
+                                                                     dqL_prim_dy_n(1)%vf(i)%sf(j, k, l)
 
                             end do
                         end do
                     end do
                 end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = iz%beg, iz%end
                     do k = iy%beg + 1, iy%end - 1
                         do j = ix%beg, ix%end - 1
-    !$acc loop seq
+                            !$acc loop seq
                             do i = iv%beg, iv%end
                                 dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = &
                                     (dqL_prim_dy_n(2)%vf(i)%sf(j + 1, k, l) + &
-                                    dqR_prim_dy_n(2)%vf(i)%sf(j + 1, k, l) + &
-                                    dqL_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
-                                    dqR_prim_dy_n(2)%vf(i)%sf(j, k, l))
+                                     dqR_prim_dy_n(2)%vf(i)%sf(j + 1, k, l) + &
+                                     dqL_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
+                                     dqR_prim_dy_n(2)%vf(i)%sf(j, k, l))
 
                                 dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25d-2* &
-                                                                    dqR_prim_dy_n(1)%vf(i)%sf(j, k, l)
+                                                                     dqR_prim_dy_n(1)%vf(i)%sf(j, k, l)
 
                             end do
                         end do
@@ -731,81 +729,81 @@ module m_viscous
 
                 if (p > 0) then
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = iz%beg + 1, iz%end
                         do l = iy%beg, iy%end
                             do k = ix%beg, ix%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqL_prim_dz_n(3)%vf(i)%sf(k, l, j) = &
                                         (q_prim_qp%vf(i)%sf(k, l, j) - &
-                                        q_prim_qp%vf(i)%sf(k, l, j - 1))/ &
+                                         q_prim_qp%vf(i)%sf(k, l, j - 1))/ &
                                         (z_cc(j) - z_cc(j - 1))
                                 end do
                             end do
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = iz%beg, iz%end - 1
                         do l = iy%beg, iy%end
                             do k = ix%beg, ix%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqR_prim_dz_n(3)%vf(i)%sf(k, l, j) = &
                                         (q_prim_qp%vf(i)%sf(k, l, j + 1) - &
-                                        q_prim_qp%vf(i)%sf(k, l, j))/ &
+                                         q_prim_qp%vf(i)%sf(k, l, j))/ &
                                         (z_cc(j + 1) - z_cc(j))
                                 end do
                             end do
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = iz%beg + 1, iz%end - 1
                         do k = iy%beg, iy%end
                             do j = ix%beg + 1, ix%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = &
                                         (dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
-                                        dqR_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
-                                        dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, l) + &
-                                        dqR_prim_dz_n(3)%vf(i)%sf(j - 1, k, l))
+                                         dqR_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
+                                         dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, l) + &
+                                         dqR_prim_dz_n(3)%vf(i)%sf(j - 1, k, l))
 
                                     dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25d-2* &
-                                                                        dqL_prim_dz_n(1)%vf(i)%sf(j, k, l)
+                                                                         dqL_prim_dz_n(1)%vf(i)%sf(j, k, l)
 
                                 end do
                             end do
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = iz%beg + 1, iz%end - 1
                         do k = iy%beg, iy%end
                             do j = ix%beg, ix%end - 1
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = &
                                         (dqL_prim_dz_n(3)%vf(i)%sf(j + 1, k, l) + &
-                                        dqR_prim_dz_n(3)%vf(i)%sf(j + 1, k, l) + &
-                                        dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
-                                        dqR_prim_dz_n(3)%vf(i)%sf(j, k, l))
+                                         dqR_prim_dz_n(3)%vf(i)%sf(j + 1, k, l) + &
+                                         dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
+                                         dqR_prim_dz_n(3)%vf(i)%sf(j, k, l))
 
                                     dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25d-2* &
-                                                                        dqR_prim_dz_n(1)%vf(i)%sf(j, k, l)
+                                                                         dqR_prim_dz_n(1)%vf(i)%sf(j, k, l)
 
                                 end do
                             end do
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = iz%beg + 1, iz%end - 1
                         do j = iy%beg + 1, iy%end
                             do k = ix%beg, ix%end
@@ -814,19 +812,19 @@ module m_viscous
 
                                     dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = &
                                         (dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
-                                        dqR_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
-                                        dqL_prim_dz_n(3)%vf(i)%sf(k, j - 1, l) + &
-                                        dqR_prim_dz_n(3)%vf(i)%sf(k, j - 1, l))
+                                         dqR_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
+                                         dqL_prim_dz_n(3)%vf(i)%sf(k, j - 1, l) + &
+                                         dqR_prim_dz_n(3)%vf(i)%sf(k, j - 1, l))
 
                                     dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25d-2* &
-                                                                        dqL_prim_dz_n(2)%vf(i)%sf(k, j, l)
+                                                                         dqL_prim_dz_n(2)%vf(i)%sf(k, j, l)
 
                                 end do
                             end do
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do l = iz%beg + 1, iz%end - 1
                         do j = iy%beg, iy%end - 1
                             do k = ix%beg, ix%end
@@ -835,95 +833,95 @@ module m_viscous
 
                                     dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = &
                                         (dqL_prim_dz_n(3)%vf(i)%sf(k, j + 1, l) + &
-                                        dqR_prim_dz_n(3)%vf(i)%sf(k, j + 1, l) + &
-                                        dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
-                                        dqR_prim_dz_n(3)%vf(i)%sf(k, j, l))
+                                         dqR_prim_dz_n(3)%vf(i)%sf(k, j + 1, l) + &
+                                         dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
+                                         dqR_prim_dz_n(3)%vf(i)%sf(k, j, l))
 
                                     dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25d-2* &
-                                                                        dqR_prim_dz_n(2)%vf(i)%sf(k, j, l)
+                                                                         dqR_prim_dz_n(2)%vf(i)%sf(k, j, l)
 
                                 end do
                             end do
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = iz%beg + 1, iz%end
                         do l = iy%beg + 1, iy%end - 1
                             do k = ix%beg, ix%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = &
                                         (dqL_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
-                                        dqR_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
-                                        dqL_prim_dy_n(2)%vf(i)%sf(k, l, j - 1) + &
-                                        dqR_prim_dy_n(2)%vf(i)%sf(k, l, j - 1))
+                                         dqR_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
+                                         dqL_prim_dy_n(2)%vf(i)%sf(k, l, j - 1) + &
+                                         dqR_prim_dy_n(2)%vf(i)%sf(k, l, j - 1))
 
                                     dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25d-2* &
-                                                                        dqL_prim_dy_n(3)%vf(i)%sf(k, l, j)
+                                                                         dqL_prim_dy_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
                             end do
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = iz%beg, iz%end - 1
                         do l = iy%beg + 1, iy%end - 1
                             do k = ix%beg, ix%end
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = &
                                         (dqL_prim_dy_n(2)%vf(i)%sf(k, l, j + 1) + &
-                                        dqR_prim_dy_n(2)%vf(i)%sf(k, l, j + 1) + &
-                                        dqL_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
-                                        dqR_prim_dy_n(2)%vf(i)%sf(k, l, j))
+                                         dqR_prim_dy_n(2)%vf(i)%sf(k, l, j + 1) + &
+                                         dqL_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
+                                         dqR_prim_dy_n(2)%vf(i)%sf(k, l, j))
 
                                     dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25d-2* &
-                                                                        dqR_prim_dy_n(3)%vf(i)%sf(k, l, j)
+                                                                         dqR_prim_dy_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
                             end do
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = iz%beg + 1, iz%end
                         do l = iy%beg, iy%end
                             do k = ix%beg + 1, ix%end - 1
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
 
                                     dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = &
                                         (dqL_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
-                                        dqR_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
-                                        dqL_prim_dx_n(1)%vf(i)%sf(k, l, j - 1) + &
-                                        dqR_prim_dx_n(1)%vf(i)%sf(k, l, j - 1))
+                                         dqR_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
+                                         dqL_prim_dx_n(1)%vf(i)%sf(k, l, j - 1) + &
+                                         dqR_prim_dx_n(1)%vf(i)%sf(k, l, j - 1))
 
                                     dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25d-2* &
-                                                                        dqL_prim_dx_n(3)%vf(i)%sf(k, l, j)
+                                                                         dqL_prim_dx_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
                             end do
                         end do
                     end do
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+                    !$acc parallel loop collapse(3) gang vector default(present)
                     do j = iz%beg, iz%end - 1
                         do l = iy%beg, iy%end
                             do k = ix%beg + 1, ix%end - 1
-    !$acc loop seq
+                                !$acc loop seq
                                 do i = iv%beg, iv%end
                                     dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = &
                                         (dqL_prim_dx_n(1)%vf(i)%sf(k, l, j + 1) + &
-                                        dqR_prim_dx_n(1)%vf(i)%sf(k, l, j + 1) + &
-                                        dqL_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
-                                        dqR_prim_dx_n(1)%vf(i)%sf(k, l, j))
+                                         dqR_prim_dx_n(1)%vf(i)%sf(k, l, j + 1) + &
+                                         dqL_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
+                                         dqR_prim_dx_n(1)%vf(i)%sf(k, l, j))
 
                                     dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25d-2* &
-                                                                        dqR_prim_dx_n(3)%vf(i)%sf(k, l, j)
+                                                                         dqR_prim_dx_n(3)%vf(i)%sf(k, l, j)
 
                                 end do
                             end do
@@ -932,20 +930,20 @@ module m_viscous
 
                     do i = iv%beg, iv%end
                         call s_compute_fd_gradient(q_prim_qp%vf(i), &
-                                                dq_prim_dx_qp%vf(i), &
-                                                dq_prim_dy_qp%vf(i), &
-                                                dq_prim_dz_qp%vf(i), &
-                                                ix, iy, iz, buff_size)
+                                                   dq_prim_dx_qp%vf(i), &
+                                                   dq_prim_dy_qp%vf(i), &
+                                                   dq_prim_dz_qp%vf(i), &
+                                                   ix, iy, iz, buff_size)
                     end do
 
                 else
 
                     do i = iv%beg, iv%end
                         call s_compute_fd_gradient(q_prim_qp%vf(i), &
-                                                dq_prim_dx_qp%vf(i), &
-                                                dq_prim_dy_qp%vf(i), &
-                                                dq_prim_dy_qp%vf(i), &
-                                                ix, iy, iz, buff_size)
+                                                   dq_prim_dx_qp%vf(i), &
+                                                   dq_prim_dy_qp%vf(i), &
+                                                   dq_prim_dy_qp%vf(i), &
+                                                   ix, iy, iz, buff_size)
                     end do
 
                 end if
@@ -953,10 +951,10 @@ module m_viscous
             else
                 do i = iv%beg, iv%end
                     call s_compute_fd_gradient(q_prim_qp%vf(i), &
-                                            dq_prim_dx_qp%vf(i), &
-                                            dq_prim_dx_qp%vf(i), &
-                                            dq_prim_dx_qp%vf(i), &
-                                            ix, iy, iz, buff_size)
+                                               dq_prim_dx_qp%vf(i), &
+                                               dq_prim_dx_qp%vf(i), &
+                                               dq_prim_dx_qp%vf(i), &
+                                               ix, iy, iz, buff_size)
                 end do
 
             end if
@@ -971,7 +969,7 @@ module m_viscous
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
         type(scalar_field), dimension(iv%beg:iv%end), intent(INOUT) :: vL_prim_vf, vR_prim_vf
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
 
         integer, intent(IN) :: norm_dir
 
@@ -1029,7 +1027,7 @@ module m_viscous
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
                         do l = is3%beg, is3%end
                             do j = is1%beg, is1%end
@@ -1041,7 +1039,7 @@ module m_viscous
                         end do
                     end do
                 elseif (norm_dir == 3) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
@@ -1053,7 +1051,7 @@ module m_viscous
                         end do
                     end do
                 elseif (norm_dir == 1) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
@@ -1080,7 +1078,7 @@ module m_viscous
 
         type(int_bounds_info) :: ix, iy, iz
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z 
+        real(kind(0d0)), dimension(startx:, starty:, startz:, iv%beg:), intent(INOUT) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
 
         integer, intent(IN) :: norm_dir
 
@@ -1136,7 +1134,7 @@ module m_viscous
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then
                 if (norm_dir == 2) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
                         do l = is3%beg, is3%end
                             do j = is1%beg, is1%end
@@ -1146,9 +1144,9 @@ module m_viscous
                                 end do
                             end do
                         end do
-                    end do        
+                    end do
                 elseif (norm_dir == 3) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
@@ -1160,7 +1158,7 @@ module m_viscous
                         end do
                     end do
                 elseif (norm_dir == 1) then
-!$acc parallel loop collapse(4) gang vector default(present)
+                    !$acc parallel loop collapse(4) gang vector default(present)
                     do i = iv%beg, iv%end
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
@@ -1178,7 +1176,7 @@ module m_viscous
 
     end subroutine s_reconstruct_cell_boundary_values_visc_deriv ! --------------------
 
-            !>  The purpose of this subroutine is to employ the inputted
+    !>  The purpose of this subroutine is to employ the inputted
         !!      left and right cell-boundary integral-averaged variables
         !!      to compute the relevant cell-average first-order spatial
         !!      derivatives in the x-, y- or z-direction by means of the
@@ -1194,7 +1192,7 @@ module m_viscous
                                                  dL, dim, buff_size_in)
 
         type(int_bounds_info) :: ix, iy, iz, iv
-            
+
         integer :: buff_size_in, dim
 
         real(kind(0d0)), dimension(-buff_size_in:dim + buff_size_in) :: dL
@@ -1223,18 +1221,18 @@ module m_viscous
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-!$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = iz%beg, iz%end
                 do k = iy%beg, iy%end
                     do j = ix%beg + 1, ix%end - 1
-!$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
-                            dv_ds_vf(i)%sf(j,k,l) = &
-                                        1d0/((1d0+wa_flg)*dL(j)) &
-                                       *( wa_flg*vL_vf(i)%sf(j+1,k,l) &
-                                        +        vR_vf(i)%sf( j ,k,l) &
-                                        -        vL_vf(i)%sf( j ,k,l) &
-                                        - wa_flg*vR_vf(i)%sf(j-1,k,l) )
+                            dv_ds_vf(i)%sf(j, k, l) = &
+                                1d0/((1d0 + wa_flg)*dL(j)) &
+                                *(wa_flg*vL_vf(i)%sf(j + 1, k, l) &
+                                  + vR_vf(i)%sf(j, k, l) &
+                                  - vL_vf(i)%sf(j, k, l) &
+                                  - wa_flg*vR_vf(i)%sf(j - 1, k, l))
                         end do
                     end do
                 end do
@@ -1251,19 +1249,18 @@ module m_viscous
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-!$acc parallel loop collapse(3) gang vector default(present)
-
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = iz%beg, iz%end
                 do k = iy%beg + 1, iy%end - 1
                     do j = ix%beg, ix%end
-!$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
-                            dv_ds_vf(i)%sf(j,k,l) = &
-                                             1d0/((1d0+wa_flg)*dL(k)) &
-                                       *( wa_flg*vL_vf(i)%sf(j,k+1,l) &
-                                        +        vR_vf(i)%sf(j, k ,l) &
-                                        -        vL_vf(i)%sf(j, k ,l) &
-                                        - wa_flg*vR_vf(i)%sf(j,k-1,l) )
+                            dv_ds_vf(i)%sf(j, k, l) = &
+                                1d0/((1d0 + wa_flg)*dL(k)) &
+                                *(wa_flg*vL_vf(i)%sf(j, k + 1, l) &
+                                  + vR_vf(i)%sf(j, k, l) &
+                                  - vL_vf(i)%sf(j, k, l) &
+                                  - wa_flg*vR_vf(i)%sf(j, k - 1, l))
                         end do
                     end do
                 end do
@@ -1280,18 +1277,18 @@ module m_viscous
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-!$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do l = iz%beg + 1, iz%end - 1
                 do k = iy%beg, iy%end
                     do j = ix%beg, ix%end
-!$acc loop seq
+                        !$acc loop seq
                         do i = iv%beg, iv%end
-                            dv_ds_vf(i)%sf(j,k,l) = &
-                                             1d0/((1d0+wa_flg)*dL(l)) &
-                                       *( wa_flg*vL_vf(i)%sf(j,k,l+1) &
-                                        +        vR_vf(i)%sf(j,k, l ) &
-                                        -        vL_vf(i)%sf(j,k, l ) &
-                                        - wa_flg*vR_vf(i)%sf(j,k,l-1) )
+                            dv_ds_vf(i)%sf(j, k, l) = &
+                                1d0/((1d0 + wa_flg)*dL(l)) &
+                                *(wa_flg*vL_vf(i)%sf(j, k, l + 1) &
+                                  + vR_vf(i)%sf(j, k, l) &
+                                  - vL_vf(i)%sf(j, k, l) &
+                                  - wa_flg*vR_vf(i)%sf(j, k, l - 1))
                         end do
                     end do
                 end do
@@ -1337,7 +1334,7 @@ module m_viscous
 
         !$acc update device(ix, iy, iz)
 
-    !$acc parallel loop collapse(3) gang vector default(present)
+        !$acc parallel loop collapse(3) gang vector default(present)
         do l = iz%beg + 1, iz%end - 1
             do k = iy%beg + 1, iy%end - 1
                 do j = ix%beg + 1, ix%end - 1
@@ -1349,7 +1346,7 @@ module m_viscous
         end do
 
         if (n > 0) then
-    !$acc parallel loop collapse(3) gang vector
+            !$acc parallel loop collapse(3) gang vector
             do l = iz%beg + 1, iz%end - 1
                 do k = iy%beg + 1, iy%end - 1
                     do j = ix%beg + 1, ix%end - 1
@@ -1362,7 +1359,7 @@ module m_viscous
         end if
 
         if (p > 0) then
-    !$acc parallel loop collapse(3) gang vector
+            !$acc parallel loop collapse(3) gang vector
             do l = iz%beg + 1, iz%end - 1
                 do k = iy%beg + 1, iy%end - 1
                     do j = ix%beg + 1, ix%end - 1
@@ -1389,7 +1386,7 @@ module m_viscous
 
         !$acc update device(ix, iy, iz)
 
-    !$acc parallel loop collapse(2) gang vector default(present)
+        !$acc parallel loop collapse(2) gang vector default(present)
         do l = iz%beg, iz%end
             do k = iy%beg, iy%end
                 grad_x%sf(ix%beg, k, l) = &
@@ -1401,7 +1398,7 @@ module m_viscous
             end do
         end do
         if (n > 0) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+            !$acc parallel loop collapse(2) gang vector default(present)
             do l = iz%beg, iz%end
                 do j = ix%beg, ix%end
                     grad_y%sf(j, iy%beg, l) = &
@@ -1413,7 +1410,7 @@ module m_viscous
                 end do
             end do
             if (p > 0) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                !$acc parallel loop collapse(2) gang vector default(present)
                 do k = iy%beg, iy%end
                     do j = ix%beg, ix%end
                         grad_z%sf(j, k, iz%beg) = &
@@ -1428,45 +1425,45 @@ module m_viscous
         end if
 
         if (bc_x%beg <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+            !$acc parallel loop collapse(2) gang vector default(present)
             do l = iz%beg, iz%end
                 do k = iy%beg, iy%end
                     grad_x%sf(0, k, l) = (-3d0*var%sf(0, k, l) + 4d0*var%sf(1, k, l) - var%sf(2, k, l))/ &
-                                        (x_cc(2) - x_cc(0))
+                                         (x_cc(2) - x_cc(0))
                 end do
             end do
         end if
         if (bc_x%end <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+            !$acc parallel loop collapse(2) gang vector default(present)
             do l = iz%beg, iz%end
                 do k = iy%beg, iy%end
                     grad_x%sf(m, k, l) = (3d0*var%sf(m, k, l) - 4d0*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
-                                        (x_cc(m) - x_cc(m - 2))
+                                         (x_cc(m) - x_cc(m - 2))
                 end do
             end do
         end if
         if (n > 0) then
             if (bc_y%beg <= -3 .and. bc_y%beg /= -14) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                !$acc parallel loop collapse(2) gang vector default(present)
                 do l = iz%beg, iz%end
                     do j = ix%beg, ix%end
                         grad_y%sf(j, 0, l) = (-3d0*var%sf(j, 0, l) + 4d0*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
-                                            (y_cc(2) - y_cc(0))
+                                             (y_cc(2) - y_cc(0))
                     end do
                 end do
             end if
             if (bc_y%end <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                !$acc parallel loop collapse(2) gang vector default(present)
                 do l = iz%beg, iz%end
                     do j = ix%beg, ix%end
                         grad_y%sf(j, n, l) = (3d0*var%sf(j, n, l) - 4d0*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
-                                            (y_cc(n) - y_cc(n - 2))
+                                             (y_cc(n) - y_cc(n - 2))
                     end do
                 end do
             end if
             if (p > 0) then
                 if (bc_z%beg <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                    !$acc parallel loop collapse(2) gang vector default(present)
                     do k = iy%beg, iy%end
                         do j = ix%beg, ix%end
                             grad_z%sf(j, k, 0) = &
@@ -1476,7 +1473,7 @@ module m_viscous
                     end do
                 end if
                 if (bc_z%end <= -3) then
-    !$acc parallel loop collapse(2) gang vector default(present)
+                    !$acc parallel loop collapse(2) gang vector default(present)
                     do k = iy%beg, iy%end
                         do j = ix%beg, ix%end
                             grad_z%sf(j, k, p) = &

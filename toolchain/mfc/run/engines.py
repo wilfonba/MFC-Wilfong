@@ -1,36 +1,44 @@
-import re, os, time, copy, queue, typing, datetime, subprocess, dataclasses, multiprocessing
+import re, os, time, copy, typing, datetime, subprocess, dataclasses, multiprocessing
 
 from ..state     import ARG, ARGS
 from ..printer   import cons
-from ..          import build, common
+from ..build     import MFCTarget, SYSCHECK
+from ..common    import MFCException, does_command_exist, isspace, system
+from ..common    import format_list_to_string, does_system_use_modules
+from ..common    import get_loaded_modules, file_write
 from ..run       import queues, mpi_bins
 from ..run.input import MFCInputFile
 
 
 def profiler_prepend():
     if ARG("ncu") is not None:
-        if not common.does_command_exist("ncu"):
-            raise common.MFCException("Failed to locate [bold green]NVIDIA Nsight Compute[/bold green] (ncu).")
+        if not does_command_exist("ncu"):
+            raise MFCException("Failed to locate [bold green]NVIDIA Nsight Compute[/bold green] (ncu).")
 
         return ["ncu", "--nvtx", "--mode=launch-and-attach",
                        "--cache-control=none", "--clock-control=none"] + ARG("ncu")
 
     if ARG("nsys") is not None:
-        if not common.does_command_exist("nsys"):
-            raise common.MFCException("Failed to locate [bold green]NVIDIA Nsight Systems[/bold green] (nsys).")
+        if not does_command_exist("nsys"):
+            raise MFCException("Failed to locate [bold green]NVIDIA Nsight Systems[/bold green] (nsys).")
 
         return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
 
     return []
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(init=False)
 class Engine:
-    name: str
-    slug: str
+    name:  str
+    slug:  str
+    input: MFCInputFile
 
-    def init(self, input: MFCInputFile) -> None:
-        self.input = input
+    def __init__(self, name: str, slug: str) -> None:
+        self.name = name
+        self.slug = slug
+
+    def init(self, _input: MFCInputFile) -> None:
+        self.input = _input
 
         self._init()
 
@@ -38,15 +46,10 @@ class Engine:
         pass
 
     def get_args(self) -> typing.List[str]:
-        raise common.MFCException(f"MFCEngine::get_args: not implemented for {self.name}.")
+        raise MFCException(f"MFCEngine::get_args: not implemented for {self.name}.")
 
-    def run(self, names: typing.List[str]) -> None:
-        raise common.MFCException(f"MFCEngine::run: not implemented for {self.name}.")
-
-    def get_binpath(self, target: str) -> str:
-        # <root>/install/<slug>/bin/<target>
-        prefix = build.get_install_dirpath(build.get_target(target))
-        return os.sep.join([prefix, "bin", target])
+    def run(self, targets: typing.List[MFCTarget]) -> None:
+        raise MFCException(f"MFCEngine::run: not implemented for {self.name}.")
 
 
 def _interactive_working_worker(cmd: typing.List[str], q: multiprocessing.Queue):
@@ -54,13 +57,14 @@ def _interactive_working_worker(cmd: typing.List[str], q: multiprocessing.Queue)
     cmd = [ str(_) for _ in cmd ]
     cons.print(f"$ {' '.join(cmd)}")
     result = subprocess.run(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
     q.put(result)
 
 class InteractiveEngine(Engine):
     def __init__(self) -> None:
         super().__init__("Interactive", "interactive")
 
+    # pylint: disable=attribute-defined-outside-init
     def _init(self) -> None:
         self.mpibin = mpi_bins.get_binary()
 
@@ -74,20 +78,19 @@ Tasks (/node) (-n)  {ARG('tasks_per_node')}
 MPI Binary    (-b)  {self.mpibin.bin}\
 """
 
-    def get_exec_cmd(self, target_name: str) -> typing.List[str]:
+    def get_exec_cmd(self, target: MFCTarget) -> typing.List[str]:
         cmd = []
-
         if ARG("mpi"):
             cmd += [self.mpibin.bin] + self.mpibin.gen_params() + ARG("flags")[:]
 
         cmd += profiler_prepend()
 
-        cmd.append(self.get_binpath(target_name))
+        cmd.append(target.get_install_binpath())
 
         return cmd
 
 
-    def run(self, names: typing.List[str]) -> None:
+    def run(self, targets: typing.List[MFCTarget]) -> None:
         if not self.bKnowWorks:
             # Fix MFlowCode/MFC#21: Check whether attempting to run a job will hang
             # forever. This can happen when using the wrong queue system.
@@ -102,7 +105,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             p = multiprocessing.Process(
                 target=_interactive_working_worker,
                 args=(
-                    [self.mpibin.bin] + self.mpibin.gen_params() + [os.sep.join([build.get_install_dirpath(build.SYSCHECK), "bin", "syscheck"])],
+                    [self.mpibin.bin] + self.mpibin.gen_params() + [os.sep.join([SYSCHECK.get_install_dirpath(), "bin", "syscheck"])],
                     q,
                 ))
 
@@ -110,7 +113,7 @@ MPI Binary    (-b)  {self.mpibin.bin}\
             p.join(work_timeout)
 
             if p.is_alive():
-                raise common.MFCException("""\
+                raise MFCException("""\
 The [bold magenta]Interactive Engine[/bold magenta] appears to hang.
 This may indicate that the wrong MPI binary is being used to launch parallel jobs. You can specify the correct one for your system
 using the <-b,--binary> option. For example:
@@ -122,7 +125,7 @@ using the <-b,--binary> option. For example:
             self.bKnowWorks = result.returncode == 0
 
             if not self.bKnowWorks:
-                error_txt = f"""\
+                error_txt = """\
 MFC's [bold magenta]syscheck[/bold magenta] (system check) failed to run successfully.
 Please review the output bellow and ensure that your system is configured correctly:
 
@@ -139,23 +142,31 @@ STDERR:
                 else:
                     error_txt += f"Evaluation timed out after {work_timeout}s."
 
-                raise common.MFCException(error_txt)
+                raise MFCException(error_txt)
 
             cons.print()
             cons.unindent()
 
-        for name in names:
-            cons.print(f"[bold]Running [magenta]{name}[/magenta][/bold]:")
+        for target in targets:
+            cons.print(f"[bold]Running [magenta]{target.name}[/magenta][/bold]:")
             cons.indent()
 
             if not ARG("dry_run"):
                 start_time = time.monotonic()
-                common.system(self.get_exec_cmd(name), cwd=self.input.case_dirpath)
-                end_time   = time.monotonic()
+                env = os.environ.copy()
+                if ARG('gpus') is not None:
+                    env['CUDA_VISIBLE_DEVICES'] = ','.join([str(_) for _ in ARG('gpus')])
+
+                system(
+                    self.get_exec_cmd(target), cwd=self.input.case_dirpath,
+                    env=env
+                )
+                end_time = time.monotonic()
                 cons.print(no_indent=True)
 
                 cons.print(f"[bold green]Done[/bold green] (in {datetime.timedelta(seconds=end_time - start_time)})")
 
+            cons.print()
             cons.unindent()
 
 
@@ -173,17 +184,19 @@ Account       (-a)  {ARG("account")}
 Email         (-@)  {ARG("email")}
 """
 
-    def run(self, names: typing.List[str]) -> None:
-        system = queues.get_system()
-        cons.print(f"Detected the [bold magenta]{system.name}[/bold magenta] queue system.")
+    def run(self, targets: typing.List[MFCTarget]) -> None:
+        qsystem = queues.get_system()
+        cons.print(f"Detected the [bold magenta]{qsystem.name}[/bold magenta] queue system.")
 
-        cons.print(f"Running {common.format_list_to_string(names, 'bold magenta')}:")
+        targets = [SYSCHECK] + targets
+
+        cons.print(f"Running {format_list_to_string([_.name for _ in targets], 'bold magenta')}:")
         cons.indent()
 
-        self.__create_batch_file(system, names)
+        self.__create_batch_file(qsystem, targets)
 
         if not ARG("dry_run"):
-            self.__execute_batch_file(system, names)
+            self.__execute_batch_file(qsystem)
 
             cons.print("[bold yellow]INFO:[/bold yellow] Batch file submitted! Please check your queue system for the job status.")
             cons.print("[bold yellow]INFO:[/bold yellow] If an error occurs, please check the generated batch file and error logs for more information.")
@@ -194,24 +207,24 @@ Email         (-@)  {ARG("email")}
     def __get_batch_dirpath(self) -> str:
         return copy.copy(self.input.case_dirpath)
 
-    def __get_batch_filename(self, names: typing.List[str]) -> str:
+    def __get_batch_filename(self) -> str:
         return f"{ARG('name')}.sh"
 
-    def __get_batch_filepath(self, names: typing.List[str]):
+    def __get_batch_filepath(self):
         return os.path.abspath(os.sep.join([
             self.__get_batch_dirpath(),
-            self.__get_batch_filename(names)
+            self.__get_batch_filename()
         ]))
 
-    def __generate_prologue(self, system: queues.QueueSystem, names: typing.List[str]) -> str:
+    def __generate_prologue(self, qsystem: queues.QueueSystem) -> str:
         modules = f""
 
-        if common.does_system_use_modules():
+        if does_system_use_modules():
             modules = f"""\
 printf ":) Loading modules...\\n"
 
 module purge
-module load {' '.join(common.get_loaded_modules())}
+module load {' '.join(get_loaded_modules())}
 """
 
         return f"""\
@@ -224,7 +237,7 @@ $(printf "$TABLE_FORMAT_LINE" "Start-time:"    "$(date +%T)"                    
 $(printf "$TABLE_FORMAT_LINE" "Partition:"     "{ARG("partition")}"      "Walltime:"      "{ARG("walltime")}")
 $(printf "$TABLE_FORMAT_LINE" "Account:"       "{ARG("account")}"        "Nodes:"         "{ARG("nodes")}")
 $(printf "$TABLE_FORMAT_LINE" "Job Name:"      "{ARG("name")}"           "Engine"         "{ARG("engine")}")
-$(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{system.name}"                     "Email:"         "{ARG("email")}")
+$(printf "$TABLE_FORMAT_LINE" "Queue System:"  "{qsystem.name}"                     "Email:"         "{ARG("email")}")
 END
 )
 
@@ -259,17 +272,18 @@ exit $code
         # See if it computable
         try:
             # We assume eval is safe because we control the expression.
+            # pylint: disable=eval-used
             r = str(eval(expr, ARGS()))
-            return r if not common.isspace(r) else None
+            return r if not isspace(r) else None
         except Exception as exc:
-            raise common.MFCException(f"BatchEngine: '{expr}' is not a valid expression in the template file. Please check your spelling.")
+            raise MFCException(f"BatchEngine: '{expr}' is not a valid expression in the template file. Please check your spelling.") from exc
 
-    def __batch_evaluate(self, s: str, system: queues.QueueSystem, names: typing.List[str]):
+    def __batch_evaluate(self, s: str, qsystem: queues.QueueSystem, targets: typing.List[MFCTarget]):
         replace_list = [
-            ("{MFC::PROLOGUE}", self.__generate_prologue(system, names)),
+            ("{MFC::PROLOGUE}", self.__generate_prologue(qsystem)),
             ("{MFC::PROFILER}", ' '.join(profiler_prepend())),
             ("{MFC::EPILOGUE}", self.__generate_epilogue()),
-            ("{MFC::BINARIES}", ' '.join([f"'{self.get_binpath(x)}'" for x in ["syscheck"] + names])),
+            ("{MFC::BINARIES}", ' '.join([f"'{target.get_install_binpath()}'" for target in targets])),
         ]
 
         for (key, value) in replace_list:
@@ -287,29 +301,29 @@ exit $code
                 s = s.replace(match, repl)
             else:
                 # If not specified, then remove the line it appears on
-                s = re.sub(f"^.*\{match}.*$\n", "", s, flags=re.MULTILINE)
+                s = re.sub(rf"^.*{match}.*$\n", "", s, flags=re.MULTILINE)
 
                 cons.print(f"> > [bold yellow]Warning:[/bold yellow] [magenta]{match[1:-1]}[/magenta] was not specified. Thus, any line it appears on will be discarded.")
 
         return s
 
-    def __create_batch_file(self, system: queues.QueueSystem, names: typing.List[str]):
+    def __create_batch_file(self, qsystem: queues.QueueSystem, targets: typing.List[MFCTarget]):
         cons.print("> Generating batch file...")
-        filepath = self.__get_batch_filepath(names)
+        filepath = self.__get_batch_filepath()
         cons.print("> Evaluating template file...")
-        content = self.__batch_evaluate(system.template, system, names)
+        content = self.__batch_evaluate(qsystem.template, qsystem, targets)
 
         cons.print("> Writing batch file...")
-        common.file_write(filepath, content)
+        file_write(filepath, content)
 
-    def __execute_batch_file(self, system: queues.QueueSystem, names: typing.List[str]):
+    def __execute_batch_file(self, qsystem: queues.QueueSystem):
         # We CD to the case directory before executing the batch file so that
         # any files the queue system generates (like .err and .out) are created
         # in the correct directory.
-        cmd = system.gen_submit_cmd(self.__get_batch_filename(names))
+        cmd = qsystem.gen_submit_cmd(self.__get_batch_filename())
 
-        if common.system(cmd, cwd=self.__get_batch_dirpath()) != 0:
-            raise common.MFCException(f"Submitting batch file for {system.name} failed. It can be found here: {self.__get_batch_filepath(target_name)}. Please check the file for errors.")
+        if system(cmd, cwd=self.__get_batch_dirpath()) != 0:
+            raise MFCException(f"Submitting batch file for {qsystem.name} failed. It can be found here: {self.__get_batch_filepath()}. Please check the file for errors.")
 
 
 ENGINES = [ InteractiveEngine(), BatchEngine() ]
@@ -323,7 +337,7 @@ def get_engine(slug: str) -> Engine:
             engine = candidate
             break
 
-    if engine == None:
-        raise common.MFCException(f"Unsupported engine {slug}.")
+    if engine is None:
+        raise MFCException(f"Unsupported engine {slug}.")
 
     return engine

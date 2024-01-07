@@ -11,7 +11,6 @@
 
 #:enddef arithmetic_avg
 
-
 #:def roe_avg()
     rho_avg = sqrt(rho_L*rho_R)
     vel_avg_rms = 0d0
@@ -35,13 +34,13 @@
 
 #:def compute_average_state()
 
-if (avg_state == 1) then
-    @:roe_avg()
-end if
+    if (avg_state == 1) then
+        @:roe_avg()
+    end if
 
-if (avg_state == 2) then
-    @:arithmetic_avg()
-end if
+    if (avg_state == 2) then
+        @:arithmetic_avg()
+    end if
 
 #:enddef compute_average_state
 

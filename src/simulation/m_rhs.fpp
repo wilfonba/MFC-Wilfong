@@ -42,7 +42,7 @@ module m_rhs
     use m_monopole
 
     use m_viscous
-    
+
     use m_nvtx
 
     use m_body_forces
@@ -63,7 +63,6 @@ module m_rhs
  s_pressure_relaxation_procedure, &
  s_finalize_rhs_module
 
-
     type(vector_field) :: q_cons_qp !<
     !! This variable contains the WENO-reconstructed values of the cell-average
     !! conservative variables, which are located in q_cons_vf, at cell-interior
@@ -75,7 +74,7 @@ module m_rhs
     !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
 
     !> @name The first-order spatial derivatives of the primitive variables at cell-
-    !! interior Guassian quadrature points. These are WENO-reconstructed from
+    !! interior Gaussian quadrature points. These are WENO-reconstructed from
     !! their respective cell-average values, obtained through the application
     !! of the divergence theorem on the integral-average cell-boundary values
     !! of the primitive variables, located in qK_prim_n, where K = L or R.
@@ -167,20 +166,18 @@ module m_rhs
     real(kind(0d0)), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
 
-    integer, public :: MHStage
-
-!$acc declare create(q_cons_qp,q_prim_qp,  &
-!$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
-!$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
-!$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
-!$acc   tau_Re_vf,qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &
-!$acc   bub_mom_src,alf_sum, &
-!$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, divu, qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-!$acc   dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
-!$acc   ixt, iyt, izt)
+    !$acc declare create(q_cons_qp,q_prim_qp,  &
+    !$acc   dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp,dqL_prim_dx_n,dqL_prim_dy_n, &
+    !$acc   dqL_prim_dz_n,dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n,gm_alpha_qp,       &
+    !$acc   gm_alphaL_n,gm_alphaR_n,flux_n,flux_src_n,flux_gsrc_n,       &
+    !$acc   tau_Re_vf,qL_prim, qR_prim, iv,ix, iy, iz,is1,is2,is3,bub_adv_src,bub_r_src,bub_v_src, bub_p_src, bub_m_src, &
+    !$acc   bub_mom_src,alf_sum, &
+    !$acc   blkmod1, blkmod2, alpha1, alpha2, Kterm, divu, qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+    !$acc   dqL_rsx_vf, dqL_rsy_vf, dqL_rsz_vf, dqR_rsx_vf, dqR_rsy_vf, dqR_rsz_vf, &
+    !$acc   ixt, iyt, izt)
 
     real(kind(0d0)), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
-!$acc declare create(nbub)
+    !$acc declare create(nbub)
 
 contains
 
@@ -199,7 +196,7 @@ contains
         ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
         ! ==================================================================
 
-!$acc update device(ix, iy, iz)
+        !$acc update device(ix, iy, iz)
 
         if (any(Re_size > 0) .and. cyl_coord) then
             @:ALLOCATE(tau_Re_vf(1:sys_size))
@@ -212,7 +209,7 @@ contains
                                          & iy%beg:iy%end, &
                                          & iz%beg:iz%end))
         end if
-        
+
         ixt = ix; iyt = iy; izt = iz
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
@@ -303,33 +300,33 @@ contains
         ! END: Allocation/Association of qK_cons_n and qK_prim_n ======
 
         @:ALLOCATE(qL_rsx_vf(ix%beg:ix%end, &
-                                 iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+            iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
         @:ALLOCATE(qR_rsx_vf(ix%beg:ix%end, &
-                                 iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+            iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         if (n > 0) then
 
             @:ALLOCATE(qL_rsy_vf(iy%beg:iy%end, &
-                                     ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
+                ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
             @:ALLOCATE(qR_rsy_vf(iy%beg:iy%end, &
-                                     ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
+                ix%beg:ix%end, iz%beg:iz%end, 1:sys_size))
         else
             @:ALLOCATE(qL_rsy_vf(ix%beg:ix%end, &
-                                     iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+                iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
             @:ALLOCATE(qR_rsy_vf(ix%beg:ix%end, &
-                                     iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+                iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
         end if
 
         if (p > 0) then
             @:ALLOCATE(qL_rsz_vf(iz%beg:iz%end, &
-                                     iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
+                iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
             @:ALLOCATE(qR_rsz_vf(iz%beg:iz%end, &
-                                     iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
+                iy%beg:iy%end, ix%beg:ix%end, 1:sys_size))
         else
             @:ALLOCATE(qL_rsz_vf(ix%beg:ix%end, &
-                                     iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+                iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
             @:ALLOCATE(qR_rsz_vf(ix%beg:ix%end, &
-                                     iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
+                iy%beg:iy%end, iz%beg:iz%end, 1:sys_size))
 
         end if
 
@@ -340,7 +337,7 @@ contains
             @:ALLOCATE(dq_prim_dx_qp%vf(1:sys_size))
             @:ALLOCATE(dq_prim_dy_qp%vf(1:sys_size))
             @:ALLOCATE(dq_prim_dz_qp%vf(1:sys_size))
-            
+
             if (any(Re_size > 0)) then
 
                 do l = mom_idx%beg, mom_idx%end
@@ -391,7 +388,7 @@ contains
                 @:ALLOCATE(dqR_prim_dx_n(i)%vf(1:sys_size))
                 @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:sys_size))
                 @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:sys_size))
-                
+
                 if (any(Re_size > 0)) then
 
                     do l = mom_idx%beg, mom_idx%end
@@ -440,34 +437,34 @@ contains
         if (any(Re_size > 0)) then
             if (weno_Re_flux) then
                 @:ALLOCATE(dqL_rsx_vf(ix%beg:ix%end, &
-                                          iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                    iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                 @:ALLOCATE(dqR_rsx_vf(ix%beg:ix%end, &
-                                          iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                    iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
 
                 if (n > 0) then
 
                     @:ALLOCATE(dqL_rsy_vf(iy%beg:iy%end, &
-                                              ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                     @:ALLOCATE(dqR_rsy_vf(iy%beg:iy%end, &
-                                              ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        ix%beg:ix%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                 else
                     @:ALLOCATE(dqL_rsy_vf(ix%beg:ix%end, &
-                                              iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                     @:ALLOCATE(dqR_rsy_vf(ix%beg:ix%end, &
-                                              iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
 
                 end if
 
                 if (p > 0) then
                     @:ALLOCATE(dqL_rsz_vf(iz%beg:iz%end, &
-                                              iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
                     @:ALLOCATE(dqR_rsz_vf(iz%beg:iz%end, &
-                                              iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, ix%beg:ix%end, mom_idx%beg:mom_idx%end))
                 else
                     @:ALLOCATE(dqL_rsz_vf(ix%beg:ix%end, &
-                                              iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
                     @:ALLOCATE(dqR_rsz_vf(ix%beg:ix%end, &
-                                              iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
+                        iy%beg:iy%end, iz%beg:iz%end, mom_idx%beg:mom_idx%end))
 
                 end if
             end if
@@ -493,9 +490,9 @@ contains
         end if
 
         if (monopole) then
-           @:ALLOCATE(mono_mass_src(0:m, 0:n, 0:p))
-           @:ALLOCATE(mono_mom_src(1:num_dims, 0:m, 0:n, 0:p))
-           @:ALLOCATE(mono_E_src(0:m, 0:n, 0:p))
+            @:ALLOCATE(mono_mass_src(0:m, 0:n, 0:p))
+            @:ALLOCATE(mono_mom_src(1:num_dims, 0:m, 0:n, 0:p))
+            @:ALLOCATE(mono_E_src(0:m, 0:n, 0:p))
         end if
 
         @:ALLOCATE(divu%sf(ix%beg:ix%end, iy%beg:iy%end, iz%beg:iz%end))
@@ -556,9 +553,9 @@ contains
             else
                 do l = 1, sys_size
                     @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
-                              ix%beg:ix%end, &
-                              iy%beg:iy%end, &
-                              iz%beg:iz%end))
+                        ix%beg:ix%end, &
+                        iy%beg:iy%end, &
+                        iz%beg:iz%end))
                 end do
                 do l = 1, sys_size
                     flux_n(i)%vf(l)%sf => &
@@ -584,7 +581,7 @@ contains
             gamma_min(i) = 1d0/fluid_pp(i)%gamma + 1d0
             pres_inf(i) = fluid_pp(i)%pi_inf/(1d0 + fluid_pp(i)%gamma)
         end do
-!$acc update device(gamma_min, pres_inf)
+        !$acc update device(gamma_min, pres_inf)
 
         if (any(Re_size > 0)) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
@@ -596,9 +593,8 @@ contains
                     Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-!$acc update device(Res, Re_idx, Re_size)
+            !$acc update device(Res, Re_idx, Re_size)
         end if
-
 
         ! Associating procedural pointer to the subroutine that will be
         ! utilized to calculate the solution of a given Riemann problem
@@ -621,9 +617,7 @@ contains
                 s_convert_species_to_mixture_variables
         end if
 
-
-
-!$acc parallel loop collapse(4) gang vector default(present)
+        !$acc parallel loop collapse(4) gang vector default(present)
         do id = 1, num_dims
             do i = 1, sys_size
                 do l = startz, p - startz
@@ -647,10 +641,10 @@ contains
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: pb, mv
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent (INOUT) :: rhs_pb, rhs_mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: rhs_pb, rhs_mv
         integer, intent(IN) :: t_step
-        
+
         real(kind(0d0)) :: top, bottom  !< Numerator and denominator when evaluating flux limiter function
         real(kind(0d0)), dimension(num_fluids) :: myalpha_rho, myalpha
 
@@ -670,7 +664,7 @@ contains
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: s2, const_sos, s1
 
-        integer :: i, j, k, l,  q, ii, id !< Generic loop iterators
+        integer :: i, j, k, l, q, ii, id !< Generic loop iterators
         integer :: term_index
 
         ! Configuring Coordinate Direction Indexes =========================
@@ -698,7 +692,7 @@ contains
         call nvtxStartRange("RHS-MPI")
         call s_populate_conservative_variables_buffers(Q_CONS_QP%VF, pb, mv)
         call nvtxEndRange
-        
+
         ! ==================================================================
 
         ! Converting Conservative to Primitive Variables ==================
@@ -737,18 +731,16 @@ contains
 
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz, nbub)
 
-
-
         call nvtxStartRange("Viscous")
         if (any(Re_size > 0)) call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
-                                            dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
-                                            qL_prim, &
-                                            qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
-                                            dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
-                                            qR_prim, &
-                                            q_prim_qp, &
-                                            dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
-                                            ix, iy, iz)
+                                                 dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
+                                                 qL_prim, &
+                                                 qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
+                                                 dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n, &
+                                                 qR_prim, &
+                                                 q_prim_qp, &
+                                                 dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
+                                                 ix, iy, iz)
         call nvtxEndRange()
 
         call nvtxStartRange("Surface_Tensions")
@@ -831,7 +823,7 @@ contains
                         qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                         id)
                 end if
-                                    
+
                 iv%beg = mom_idx%beg; iv%end = mom_idx%end
                 if (weno_Re_flux) then
                     call s_reconstruct_cell_boundary_values_visc_deriv( &
@@ -892,7 +884,7 @@ contains
             ! ===============================================================
 
             if (alt_soundspeed) then
-!$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -941,46 +933,46 @@ contains
                     end do
                 end do
 
-                !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
-                if(qbmm .and. (.not. polytropic) ) then
+                !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
+                if (qbmm .and. (.not. polytropic)) then
                     !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                     do i = 1, nb
                         do q = 1, nnode
                             do l = 0, p
                                 do k = 0, n
                                     do j = 0, m
-                                        nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
-                                        nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
-                                        nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+                                        nb_q = q_cons_qp%vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_qp%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_qp%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                        R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
-                                        R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+                                        R = q_prim_qp%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_qp%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                        nb_dot = flux_n(1)%vf(bubxb  + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l)
-                                        nR_dot = flux_n(1)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l)
-                                        nR2_dot = flux_n(1)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
+                                        nb_dot = flux_n(1)%vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR_dot = flux_n(1)%vf(bubxb + 1 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2_dot = flux_n(1)%vf(bubxb + 3 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n(1)%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 )* &
-                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dx(j)*R*nb_q**2)* &
+                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
-                                        if(R2 - R**2d0 > 0d0) then
+                                        if (R2 - R**2d0 > 0d0) then
                                             var = R2 - R**2d0
                                         else
                                             var = verysmall
                                         end if
-                                        
-                                        if(q <= 2) then
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+
+                                        if (q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dx(j)*R*nb_q**2*dsqrt(var))* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dx(j)*R*nb_q**2*dsqrt(var))* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
                                         else
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dx(j) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
-                                        end if                                         
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dx(j)*R*nb_q**2*dsqrt(var))* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dx(j)*R*nb_q**2*dsqrt(var))* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        end if
 
                                     end do
                                 end do
@@ -1083,8 +1075,8 @@ contains
                                 end do
                             end do
                         end do
-                   else
-!$acc parallel loop collapse(3) gang vector default(present)
+                    else
+                        !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -1099,19 +1091,19 @@ contains
 
                         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
-                        if (id == ndirs) then                        
+                        if (id == ndirs) then
                             call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
-                                                 q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
+                                                         q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                         end if
                     end if
-                end if    
+                end if
 
                 if (monopole) then
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then 
+                    if (id == ndirs) then
                         call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, &
-                                             q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
-                                             rhs_vf)
+                                                     q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
+                                                     rhs_vf)
                     end if
                 end if
                 
@@ -1192,46 +1184,46 @@ contains
                         end do
                     end do
                 end do
-                !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
-                if(qbmm .and. (.not. polytropic) ) then
-                !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
+                if (qbmm .and. (.not. polytropic)) then
+                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                     do i = 1, nb
                         do q = 1, nnode
                             do l = 0, p
                                 do k = 0, n
                                     do j = 0, m
-                                        nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
-                                        nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
-                                        nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+                                        nb_q = q_cons_qp%vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR = q_cons_qp%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2 = q_cons_qp%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                        R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
-                                        R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+                                        R = q_prim_qp%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        R2 = q_prim_qp%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                        nb_dot = flux_n(2)%vf(bubxb  + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l)
-                                        nR_dot = flux_n(2)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l)
-                                        nR2_dot = flux_n(2)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
+                                        nb_dot = flux_n(2)%vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR_dot = flux_n(2)%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2_dot = flux_n(2)%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n(2)%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dy(k) * R * nb_q ** 2 )* &
-                                                                (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*R*nb_q**2)* &
+                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
-                                        if(R2 - R**2d0 > 0d0) then
+                                        if (R2 - R**2d0 > 0d0) then
                                             var = R2 - R**2d0
                                         else
                                             var = verysmall
                                         end if
-                                        
-                                        if(q <= 2) then
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dy(k) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dy(k) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+
+                                        if (q <= 2) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dy(k)*R*nb_q**2*dsqrt(var))* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dy(k)*R*nb_q**2*dsqrt(var))* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
                                         else
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dy(k) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                    (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dy(k) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                    ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
-                                        end if 
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*R*nb_q**2*dsqrt(var))* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dy(k)*R*nb_q**2*dsqrt(var))* &
+                                                                    (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        end if
 
                                     end do
                                 end do
@@ -1318,7 +1310,7 @@ contains
                             end if
                         end do
                     else
-!$acc parallel loop collapse(4) gang vector default(present)
+                        !$acc parallel loop collapse(4) gang vector default(present)
                         do j = advxb, advxe
                             do l = 0, p
                                 do k = 0, n
@@ -1350,21 +1342,19 @@ contains
                     end do
 
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then                        
+                    if (id == ndirs) then
                         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
-                                             q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
+                                                     q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                     end if
 
                 end if
 
-
-
                 if (monopole) then
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then 
+                    if (id == ndirs) then
                         call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, &
-                                             q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
-                                             rhs_vf)
+                                                     q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
+                                                     rhs_vf)
                     end if
                 end if
 
@@ -1580,51 +1570,51 @@ contains
                             end do
                         end do
                     end do
-                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
-                    if(qbmm .and. (.not. polytropic)) then
-                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
+                    if (qbmm .and. (.not. polytropic)) then
+                        !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                         do i = 1, nb
                             do q = 1, nnode
                                 do l = 0, p
                                     do k = 0, n
                                         do j = 0, m
-                                            nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
-                                            nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
-                                            nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+                                            nb_q = q_cons_qp%vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                            nR = q_cons_qp%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                            nR2 = q_cons_qp%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
-                                            R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+                                            R = q_prim_qp%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                            R2 = q_prim_qp%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            nb_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l))
-                                            nR_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l))
-                                            nR2_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l) * (flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k, l - 1 ) - flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l))
+                                            nb_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l)*(flux_n(3)%vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
+                                            nR_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l)*(flux_n(3)%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))
+                                            nR2_dot = q_prim_qp%vf(contxe + id)%sf(j, k, l)*(flux_n(3)%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l))
 
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 )* &
-                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
-                                            if(R2 - R**2d0 > 0d0) then
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2)* &
+                                                                    (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+                                            if (R2 - R**2d0 > 0d0) then
                                                 var = R2 - R**2d0
                                             else
                                                 var = verysmall
                                             end if
-                                            
-                                            if(q <= 2) then
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+
+                                            if (q <= 2) then
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2*dsqrt(var))* &
+                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2*dsqrt(var))* &
+                                                                        (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
                                             else
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * y_cc(k) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
-                                            end if 
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2*dsqrt(var))* &
+                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*y_cc(k)*R*nb_q**2*dsqrt(var))* &
+                                                                        (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                            end if
                                         end do
                                     end do
                                 end do
                             end do
                         end do
-                    end if                    
+                    end if
 
                     if (riemann_solver == 1) then
                         do j = advxb, advxe
@@ -1718,46 +1708,46 @@ contains
                             end do
                         end do
                     end do
-                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb 
-                    if(qbmm .and. (.not. polytropic) ) then
-                    !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
+                    !Non-polytropic qbmm needs to account for change in bubble radius due to a change in nb
+                    if (qbmm .and. (.not. polytropic)) then
+                        !$acc parallel loop collapse(5) gang vector default(present) private(nb_q, nR, nR2, R, R2, nb_dot, nR_dot, nR2_dot, var)
                         do i = 1, nb
                             do q = 1, nnode
                                 do l = 0, p
                                     do k = 0, n
                                         do j = 0, m
-                                            nb_q = q_cons_qp%vf(bubxb + (i-1)*nmom)%sf(j, k, l)
-                                            nR = q_cons_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
-                                            nR2 = q_cons_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+                                            nb_q = q_cons_qp%vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                            nR = q_cons_qp%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                            nR2 = q_cons_qp%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            R = q_prim_qp%vf(bubxb + 1 + (i-1)*nmom)%sf(j, k, l)
-                                            R2 = q_prim_qp%vf(bubxb + 3 + (i-1)*nmom)%sf(j, k, l)
+                                            R = q_prim_qp%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                            R2 = q_prim_qp%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            nb_dot = flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + (i-1)*nmom)%sf(j , k, l)
-                                            nR_dot = flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb  + 1 + (i-1)*nmom)%sf(j , k, l)
-                                            nR2_dot = flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j, k, l - 1 ) - flux_n(3)%vf(bubxb  + 3 + (i-1)*nmom)%sf(j , k, l)
+                                            nb_dot = flux_n(3)%vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                            nR_dot = flux_n(3)%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                            nR2_dot = flux_n(3)%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n(3)%vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
 
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * R * nb_q ** 2 )* &
-                                                                    (nR_dot * nb_q - nR * nb_dot) * (pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*R*nb_q**2)* &
+                                                                    (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
 
-                                            if(R2 - R**2d0 > 0d0) then
+                                            if (R2 - R**2d0 > 0d0) then
                                                 var = R2 - R**2d0
                                             else
                                                 var = verysmall
                                             end if
-                                            
-                                            if(q <= 2) then
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dz(l) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  +  3d0 * gam/ (dz(l) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
+
+                                            if (q <= 2) then
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*R*nb_q**2*dsqrt(var))* &
+                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3d0*gam/(dz(l)*R*nb_q**2*dsqrt(var))* &
+                                                                        (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
 
                                             else
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                        (nR2_dot * nb_q - nR2 * nb_dot ) * (pb(j, k, l, q, i))
-                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i)  -  3d0 * gam/ (dz(l) * R * nb_q ** 2 * dsqrt(var)) * &
-                                                                        ( - 2d0 * (nR / nb_q) * (nR_dot * nb_q - nR * nb_dot )) * (pb(j, k, l, q, i))
-                                            end if 
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*R*nb_q**2*dsqrt(var))* &
+                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3d0*gam/(dz(l)*R*nb_q**2*dsqrt(var))* &
+                                                                        (-2d0*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                            end if
 
                                         end do
                                     end do
@@ -1848,9 +1838,9 @@ contains
                     end do
 
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then                        
+                    if (id == ndirs) then
                         call s_compute_bubble_source(bub_adv_src, bub_r_src, bub_v_src, bub_p_src, bub_m_src, divu, nbub, &
-                                             q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
+                                                     q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, rhs_vf)
                     end if
 
                 end if
@@ -1860,10 +1850,10 @@ contains
 
                 if (monopole) then
                     ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
-                    if (id == ndirs) then 
+                    if (id == ndirs) then
                         call s_monopole_calculations(mono_mass_src, mono_mom_src, mono_e_src, &
-                                             q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
-                                             rhs_vf)
+                                                     q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), t_step, id, &
+                                                     rhs_vf)
                     end if
                 end if
 
@@ -1961,7 +1951,6 @@ contains
         ! ==================================================================
 
     end subroutine s_compute_rhs ! -----------------------------------------
-
 
     !>  The purpose of this procedure is to infinitely relax
         !!      the pressures from the internal-energy equations to a
@@ -2308,7 +2297,7 @@ contains
         !!          the values at the quadrature points, of the cell-average variables
         !!  @param norm_dir Splitting coordinate direction
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, & ! -
-                                                      norm_dir)
+                                                  norm_dir)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(IN) :: v_vf
 
