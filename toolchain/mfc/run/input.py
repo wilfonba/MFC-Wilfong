@@ -178,14 +178,30 @@ class MFCInputFile:
             elif bubble_model == 3:
                 nterms = 7
 
-            return f"""\
-#:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
-#:set weno_order            = {int(self.case_dict["weno_order"])}
-#:set weno_polyn            = {int((self.case_dict["weno_order"] - 1) / 2)}
-#:set nb                    = {int(self.case_dict.get("nb", 1))}
-#:set num_dims              = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
-#:set nterms                = {nterms}
-"""
+            if (self.case_dict["recon_type"] == 1):
+                return f"""\
+    #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
+    #:set weno_order            = {int(self.case_dict["weno_order"])}
+    #:set weno_polyn            = {int((self.case_dict["weno_order"] - 1) / 2)}
+    #:set muscl_order           = {-100}
+    #:set muscl_lim             = {-100}
+    #:set muscl_polyn           = {-100}
+    #:set nb                    = {int(self.case_dict.get("nb", 1))}
+    #:set num_dims              = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
+    #:set nterms                = {nterms}
+    """
+            else:
+                return f"""\
+    #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
+    #:set weno_order            = {-100}
+    #:set weno_polyn            = {-100}
+    #:set muscl_order           = {int(self.case_dict["muscl_order"])}
+    #:set muscl_lim             = {int(self.case_dict["muscl_lim"])}
+    #:set muscl_polyn           = {int(self.case_dict["muscl_order"] - 1)}
+    #:set nb                    = {int(self.case_dict.get("nb", 1))}
+    #:set num_dims              = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
+    #:set nterms                = {nterms}
+    """
 
         return """\
 ! This file is purposefully empty. It is only important for builds that make use

@@ -82,7 +82,7 @@
         case(203) ! 2D Interface
 
             !ih =  3.5 + 0.005*(sin(5d0*pi*x_cc(i)) + sin(15d0*pi*x_cc(i)) + sin(45d0*pi*x_cc(i)) + sin(135*pi*x_cc(i)))**2d0
-            ih = 3.0 - 0.025*sin(2*pi*x_cc(i)-pi/2)
+            ih = 3.0 - 0.005*(sin(2*pi*x_cc(i)-pi/2) + sin(6*pi*x_cc(i)-pi/2) + sin(18*pi*x_cc(i)-pi/2) + sin(54*pi*x_cc(i)-pi/2))
             alph = 5d-1*(1 + tanh((y_cc(j) - ih)/0.01))
 
             if (alph < 1e-5) alph = 1e-6

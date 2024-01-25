@@ -516,8 +516,8 @@ contains
                 ! Read the data for each variable
                 if (bubbles .or. hypoelasticity) then
 
-            ! Read the data for each variable
-            if (bubbles .or. hypoelasticity .or. sigma .ne. dflt_real) then
+                    do i = 1, sys_size!adv_idx%end
+                        var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                            MPI_DOUBLE_PRECISION, status, ierr)
@@ -618,6 +618,7 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting...')
             end if
         end if
+
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
