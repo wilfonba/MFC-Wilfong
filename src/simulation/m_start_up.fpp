@@ -68,6 +68,12 @@ module m_start_up
     use m_compile_specific
 
     use m_checker
+
+    use m_muscl
+
+    use m_body_forces
+
+    use m_surface_tension
     ! ==========================================================================
 
     implicit none
@@ -138,14 +144,17 @@ contains
             rhoref, pref, bubbles, bubble_model, &
             R0ref, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, weno_order, &
+            nb, weno_order, muscl_order, muscl_lim, &
 #:endif
             Ca, Web, Re_inv, &
             monopole, mono, num_mono, &
             polytropic, thermal, &
             integral, integral_wrt, num_integrals, &
             polydisperse, poly_sigma, qbmm, &
-            R0_type, file_per_process, relax, relax_model, &
+            R0_type, sigma, &
+            bf_x, bf_y, bf_z, k_x, k_y, k_z, &
+            w_x, w_y, w_z, p_x, p_y, p_z, recon_type, int_comp, &
+            g_x, g_y, g_z, file_per_process, relax, relax_model, &
             palpha_eps, ptgalpha_eps
 
         ! Checking that an input file has been provided by the user. If it
@@ -173,6 +182,11 @@ contains
             m_glb = m
             n_glb = n
             p_glb = p
+
+            if ((bf_x .ne. dflt_int) .or. (bf_y .ne. dflt_int) .or. &
+                (bf_z .ne. dflt_int)) then
+                bodyForces = .true.
+            endif
 
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -502,8 +516,8 @@ contains
                 ! Read the data for each variable
                 if (bubbles .or. hypoelasticity) then
 
-                    do i = 1, sys_size!adv_idx%end
-                        var_MOK = int(i, MPI_OFFSET_KIND)
+            ! Read the data for each variable
+            if (bubbles .or. hypoelasticity .or. sigma .ne. dflt_real) then
 
                         call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                            MPI_DOUBLE_PRECISION, status, ierr)
@@ -1088,10 +1102,14 @@ contains
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
 
-        ! Computation of parameters, allocation of memory, association of pointers,
-        ! and/or execution of any other tasks that are needed to properly configure
-        ! the modules. The preparations below DO DEPEND on the grid being complete.
-        call s_initialize_weno_module()
+        if (recon_type == 1) then
+            ! Computation of parameters, allocation of memory, association of pointers,
+            ! and/or execution of any other tasks that are needed to properly configure
+            ! the modules. The preparations below DO DEPEND on the grid being complete.
+            call s_initialize_weno_module()
+        elseif (recon_type == 2) then
+            call s_initialize_muscl_module()
+        endif
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         print *, "[MEM-INST] After: s_initialize_weno_module"
@@ -1101,6 +1119,9 @@ contains
         call s_initialize_cbc_module()
 
         call s_initialize_derived_variables()
+
+        if (bodyForces) call s_initialize_body_forces_module()
+        if (sigma .ne. dflt_real) call s_initialize_surface_tension_module()
 
     end subroutine s_initialize_modules
 
@@ -1166,7 +1187,7 @@ contains
         !$acc update device(dt, dx, dy, dz, x_cc, y_cc, z_cc, x_cb, y_cb, z_cb)
         !$acc update device(sys_size, buff_size)
         !$acc update device(m, n, p)
-        !$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe)
+        !$acc update device(momxb, momxe, bubxb, bubxe, advxb, advxe, contxb, contxe, strxb, strxe, c_idx)
         do i = 1, sys_size
             !$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
@@ -1177,6 +1198,8 @@ contains
         !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
         !$acc update device(monopole, num_mono)
+        !$acc update device(sigma)
+        !$acc update device(muscl_lim)
         !$acc update device(relax)
         if (relax) then
             !$acc update device(palpha_eps, ptgalpha_eps)
@@ -1194,7 +1217,11 @@ contains
         call s_finalize_rhs_module()
         call s_finalize_cbc_module()
         call s_finalize_riemann_solvers_module()
-        call s_finalize_weno_module()
+        if (recon_type == 1) then
+            call s_finalize_weno_module()
+        elseif (recon_type == 2) then
+            call s_finalize_muscl_module()
+        endif
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
@@ -1204,6 +1231,9 @@ contains
         if (any(Re_size > 0)) then
             call s_finalize_viscous_module()
         end if
+
+        if (bodyForces) call s_finalize_body_forces_module()
+        if (sigma .ne. dflt_real) call s_finalize_surface_tension_module()
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()
