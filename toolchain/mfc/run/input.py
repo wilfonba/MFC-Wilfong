@@ -30,6 +30,8 @@ class MFCInputFile:
         return False
 
     def generate_inp(self, target) -> None:
+        target = build.get_target(target)
+
         cons.print(f"Generating [magenta]{target.name}.inp[/magenta]:")
         cons.indent()
 
@@ -72,10 +74,10 @@ class MFCInputFile:
 
             return lhs == rhs
 
-        inc_dir = os.path.join(target.get_build_dirpath(), "include")
+        inc_dir = os.path.join(target.get_build_dirpath(), "include", target.name)
         common.create_directory(inc_dir)
 
-        fpp_path = os.path.join(inc_dir, f"case.fpp")
+        fpp_path = os.path.join(inc_dir, "case.fpp")
         opt_fpp  = common.file_read(fpp_path) if os.path.exists(fpp_path) else ""
 
         if __contents_equal(contents, opt_fpp):
@@ -178,30 +180,18 @@ class MFCInputFile:
             elif bubble_model == 3:
                 nterms = 7
 
-            if (self.case_dict["recon_type"] == 1):
-                return f"""\
-    #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
-    #:set weno_order            = {int(self.case_dict["weno_order"])}
-    #:set weno_polyn            = {int((self.case_dict["weno_order"] - 1) / 2)}
-    #:set muscl_order           = {-100}
-    #:set muscl_lim             = {-100}
-    #:set muscl_polyn           = {-100}
-    #:set nb                    = {int(self.case_dict.get("nb", 1))}
-    #:set num_dims              = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
-    #:set nterms                = {nterms}
-    """
-            else:
-                return f"""\
-    #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
-    #:set weno_order            = {-100}
-    #:set weno_polyn            = {-100}
-    #:set muscl_order           = {int(self.case_dict["muscl_order"])}
-    #:set muscl_lim             = {int(self.case_dict["muscl_lim"])}
-    #:set muscl_polyn           = {int(self.case_dict["muscl_order"] - 1)}
-    #:set nb                    = {int(self.case_dict.get("nb", 1))}
-    #:set num_dims              = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
-    #:set nterms                = {nterms}
-    """
+            return f"""\
+#:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
+#:set weno_order            = {int(self.case_dict.get("weno_order",-100))}
+#:set weno_polyn            = {int((self.case_dict.get("weno_order",-199) - 1) / 2)}
+#:set muscl_order           = {int(self.case_dict.get("muscl_order",-100))}
+#:set muscl_lim             = {int(self.case_dict.get("muscl_lim",-100))}
+#:set muscl_polyn           = {int(self.case_dict.get("muscl_order",-100))}
+#:set nb                    = {int(self.case_dict.get("nb", 1))}
+#:set num_dims              = {1 + min(int(self.case_dict.get("n", 0)), 1) + min(int(self.case_dict.get("p", 0)), 1)}
+#:set nterms                = {nterms}
+"""
+
 
         return """\
 ! This file is purposefully empty. It is only important for builds that make use
@@ -226,7 +216,10 @@ class MFCInputFile:
         return result
 
     def generate_fpp(self, target) -> None:
-        cons.print(f"Generating [magenta]{build.get_target(target).name}/include/case.fpp[/magenta].")
+        if target.isDependency:
+            return
+
+        cons.print(f"Generating [magenta]case.fpp[/magenta].")
         cons.indent()
 
         self.__save_fpp(target, self.get_fpp(target))

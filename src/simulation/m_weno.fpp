@@ -701,6 +701,12 @@ contains
             #:endfor
         end if
 
+        if (int_comp) then
+            call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
+                vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
+                norm_dir, weno_dir, is1_d, is2_d, is3_d)
+        endif
+
     end subroutine s_weno
 
     !> The computation of parameters, the allocation of memory,
@@ -1041,5 +1047,90 @@ contains
         ! ==================================================================
 
     end subroutine s_finalize_weno_module ! --------------------------------
+
+    subroutine s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, & 
+            norm_dir, muscl_dir, &
+            is1_d, is2_d, is3_d)
+
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:), intent(INOUT) :: &
+            vL_rs_vf_x, vL_rs_vf_y, &
+            vL_rs_vf_z, vR_rs_vf_x, &
+            vR_rs_vf_y, vR_rs_vf_z
+        integer, intent(IN) :: norm_dir
+        integer, intent(IN) :: muscl_dir
+        type(int_bounds_info), intent(IN) :: is1_d, is2_d, is3_d
+
+        integer :: j, k, l, i, q
+
+        real(kind(0d0)) :: iceps, aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C, beta, sign, moncon
+
+        iceps = 1d-4; beta = 1.6d0
+
+        is1 = is1_d
+        is2 = is2_d
+        is3 = is3_d
+!$acc update device(is1, is2, is3)
+
+        #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (muscl_dir == ${MUSCL_DIR}$) then
+                
+!$acc parallel loop collapse(3) gang vector default(present) private(aCL, aC, &
+!$acc aCR, aTHINC, moncon, sign, qmin, qmax)
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            
+                            aCL = v_rs_ws_${XYZ}$(j - 1, k, l, advxb)
+                            aC = v_rs_ws_${XYZ}$(j, k, l, advxb)
+                            aCR = v_rs_ws_${XYZ}$(j + 1, k, l, advxb)
+
+                            moncon = (aCR - aC)*(aC - aCL)
+
+                            if (aC >= iceps .and. aC <= 1d0 - iceps .and. moncon > 1d-8) then ! Interface cell
+                                     
+                                if (aCR - aCL > 0d0) then
+                                    sign = 1d0
+                                else
+                                    sign = -1d0
+                                endif
+
+                                qmin = min(aCR, aCL)
+                                qmax = max(aCR, aCL) - qmin
+
+                                C = (aC - qmin + sgm_eps) / (qmax + sgm_eps)
+                                B = exp(sign*beta*(2d0*C - 1d0))
+                                A = (B / cosh(beta) - 1d0) / tanh(beta)
+
+                                ! Left reconstruction
+                                aTHINC = qmin + 5d-1*qmax*(1d0 + sign * A)
+                                if (aTHINC < iceps) aTHINC = iceps
+                                if (aTHINC > 1 - iceps) aTHINC = 1 - iceps
+                                vL_rs_vf_${XYZ}$(j, k, l, contxb) = vL_rs_vf_${XYZ}$(j, k, l, contxb) / &
+                                    vL_rs_vf_${XYZ}$(j, k, l, advxb) * aTHINC
+                                vL_rs_vf_${XYZ}$(j, k, l, contxe) = vL_rs_vf_${XYZ}$(j, k, l, contxe) / &
+                                    (1d0 - vL_rs_vf_${XYZ}$(j, k, l, advxb)) * (1d0 - aTHINC)
+                                vL_rs_vf_${XYZ}$(j, k, l, advxb) = aTHINC
+                                vL_rs_vf_${XYZ}$(j, k, l, advxe) = 1 - aTHINC
+
+                                ! Right reconstruction
+                                aTHINC = qmin + 5d-1*qmax*(1d0 + sign*(tanh(beta) + A) / (1d0 + A*tanh(beta)))
+                                if (aTHINC < iceps) aTHINC = iceps
+                                if (aTHINC > 1 - iceps) aTHINC = 1 - iceps
+                                vR_rs_vf_${XYZ}$(j, k, l, contxb) = vL_rs_vf_${XYZ}$(j, k, l, contxb) / &
+                                    vL_rs_vf_${XYZ}$(j, k, l, advxb) * aTHINC
+                                vR_rs_vf_${XYZ}$(j, k, l, contxe) = vL_rs_vf_${XYZ}$(j, k, l, contxe) / &
+                                    (1d0 - vL_rs_vf_${XYZ}$(j, k, l, advxb)) * (1d0 - aTHINC)
+                                vR_rs_vf_${XYZ}$(j, k, l, advxb) = aTHINC
+                                vR_rs_vf_${XYZ}$(j, k, l, advxe) = 1 - aTHINC
+
+                            end if
+
+                        end do
+                    end do
+                end do
+            end if
+            #:endfor
+
+    end subroutine s_interface_compression
 
 end module m_weno

@@ -373,7 +373,7 @@ contains
             !$acc end kernels
         end if
 
-        !$acc update host(icfl_max_loc, vcfl_max_loc, Rc_min_loc)
+        !!$acc update host(icfl_max_loc, vcfl_max_loc, Rc_min_loc)
 
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
