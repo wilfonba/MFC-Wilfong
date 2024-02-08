@@ -186,7 +186,7 @@ contains
                                     if (slopeL < 0 ) slope = -slope
                                 elseif (muscl_lim == 2) then ! MC
                                     if (slopeL*slopeR > 0d0) then
-                                        slope = min(2d0*abs(slope1), 2d0*abs(slopeR))
+                                        slope = min(2d0*abs(slopeL), 2d0*abs(slopeR))
                                         slope = min(slope, 5d-1*(abs(slopeL + slopeR)))
                                     end if
                                     if (slopeL < 0 ) slope = -slope

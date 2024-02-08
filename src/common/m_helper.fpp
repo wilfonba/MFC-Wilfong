@@ -310,33 +310,6 @@ contains
         res = trim(res)
     end subroutine
 
-    subroutine s_print_2D_array(A, div)
-
-        real(kind(0d0)), dimension(:,:) :: A
-        integer :: i, j
-        integer :: m, n
-        real :: c
-        real, optional :: div
-
-        m = size(A,1)
-        n = size(A,2)
-
-        if (present(div)) then 
-            c = div
-        else
-            c = 1
-        endif
-        
-        do i = 1,m
-            do j = 1,n
-                write(*,fmt="(F12.4)",advance="no") A(i,j)/c
-            end do
-            write(*, fmt="(A1)") " "
-        end do
-        write(*, fmt="(A1)") " "
-
-    end subroutine
-
     !> Computes the Simpson weights for quadrature
     subroutine s_simpson
 
