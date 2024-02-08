@@ -79,28 +79,90 @@
                 q_prim_vf(E_idx)%sf(i, j, 0) = 1000d0
             end if
 
-        case(203) ! 2D Interface
+        case(2300) ! 2D Interface
 
-            !ih =  3.5 + 0.005*(sin(5d0*pi*x_cc(i)) + sin(15d0*pi*x_cc(i)) + sin(45d0*pi*x_cc(i)) + sin(135*pi*x_cc(i)))**2d0
-            ih = 0.30 - 0.0008*(sin(20*pi*x_cc(i)-pi/2) + sin(60*pi*x_cc(i)-pi/2) + sin(180*pi*x_cc(i)-pi/2) + sin(540*pi*x_cc(i)-pi/2) + sin(1620*pi*x_cc(i) - pi/2))
-            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/0.000001))
+            ih = 0.016 - 0.00186/20*(sin((2*pi/1.86d-3)*x_cc(i)+pi/2))
+            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-16))
 
-            if (alph < 1e-5) alph = 1e-6
-            if (alph > 1 - 1e-5) alph = 1 - 1e-5
+            if (alph < 1e-6) alph = 1e-6
+            if (alph > 1 - 1e-6) alph = 1 - 1e-6
 
             if (sigma .ne. dflt_real) q_prim_vf(c_idx)%sf(i, j, 0) = alph
-            q_prim_vf(advxb)%sf(i, j, 0) = alph
-            q_prim_vf(advxe)%sf(i, j, 0) = 1 - alph
-            q_prim_vf(contxb)%sf(i, j, 0) = alph*1000d0
-            q_prim_vf(contxe)%sf(i, j, 0) = (1-alph)*1d0
+            q_prim_vf(advxb)%sf(i, j, 0) = 1 - alph
+            q_prim_vf(advxe)%sf(i, j, 0) = alph
+            q_prim_vf(contxb)%sf(i, j, 0) = (1 - alph)*950d0
+            q_prim_vf(contxe)%sf(i, j, 0) = alph*1d0
 
-            !if (y_cc(j)  > ih) then
-            !    q_prim_vf(E_idx)%sf(i, j, 0) = 1d5 + 1000*30*9.81*(4 - y_cc(j))
-            !else
-            !    pInterface = 1d5 + 1000*30*9.81*(4 - ih)
-            !    q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1d0*30*9.81*(ih - y_cc(j))
-            !end if
-            
+            if (y_cc(j)  > 0.016) then
+                pInterface = 1d5 + 950*37.2*9.81*0.0016
+                q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1*37.2*9.81*(y_cc(j) - 0.016)
+            else
+                q_prim_vf(E_idx)%sf(i, j, 0) = 1d5 + 950d0*37.2*9.81*(y_cc(j))
+            end if
+        
+        case(23002) ! 2D Interface
+
+            ih = 0.0436 - 0.00186/20*(sin((2*pi/1.86d-3)*x_cc(i)+pi/2))
+            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-16))
+
+            if (alph < 1e-6) alph = 1e-6
+            if (alph > 1 - 1e-6) alph = 1 - 1e-6
+
+            if (sigma .ne. dflt_real) q_prim_vf(c_idx)%sf(i, j, 0) = alph
+            q_prim_vf(advxb)%sf(i, j, 0) = 1 - alph
+            q_prim_vf(advxe)%sf(i, j, 0) = alph
+            q_prim_vf(contxb)%sf(i, j, 0) = (1 - alph)*950d0
+            q_prim_vf(contxe)%sf(i, j, 0) = alph*1d0
+
+            if (y_cc(j)  > 0.0436) then
+                pInterface = 1d5 + 950*37.2*9.81*0.0439
+                q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1*37.2*9.81*(y_cc(j) - 0.0436)
+            else
+                q_prim_vf(E_idx)%sf(i, j, 0) = 1d5 + 950d0*37.2*9.81*(y_cc(j))
+            end if
+
+        case(23003) ! 2D Interface
+
+            ih = 0.02065 - 0.00186/20*(sin((2*pi/1.86d-3)*x_cc(i)+pi/2))
+            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-16))
+
+            if (alph < 1e-6) alph = 1e-6
+            if (alph > 1 - 1e-6) alph = 1 - 1e-6
+
+            if (sigma .ne. dflt_real) q_prim_vf(c_idx)%sf(i, j, 0) = alph
+            q_prim_vf(advxb)%sf(i, j, 0) = 1 - alph
+            q_prim_vf(advxe)%sf(i, j, 0) = alph
+            q_prim_vf(contxb)%sf(i, j, 0) = (1 - alph)*950d0
+            q_prim_vf(contxe)%sf(i, j, 0) = alph*1d0
+
+            if (y_cc(j)  > 0.02065) then
+                pInterface = 1d5 + 950*37.2*9.81*(0.02065 + 0.13274)
+                q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1*37.2*9.81*(y_cc(j) - 0.02065)
+            else
+                q_prim_vf(E_idx)%sf(i, j, 0) = 1d5 + 950d0*37.2*9.81*(y_cc(j) + 0.13274)
+            end if
+
+        case(23004) ! 2D Interface
+
+            ih = 0.0436 - 0.00186/20*(sin((2*pi/1.86d-3)*x_cc(i)+pi/2))
+            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-16))
+
+            if (alph < 1e-6) alph = 1e-6
+            if (alph > 1 - 1e-6) alph = 1 - 1e-6
+
+            if (sigma .ne. dflt_real) q_prim_vf(c_idx)%sf(i, j, 0) = alph
+            q_prim_vf(advxb)%sf(i, j, 0) = 1 - alph
+            q_prim_vf(advxe)%sf(i, j, 0) = alph
+            q_prim_vf(contxb)%sf(i, j, 0) = (1 - alph)*950d0
+            q_prim_vf(contxe)%sf(i, j, 0) = alph*1d0
+
+            if (y_cc(j)  > 0.0436) then
+                pInterface = 1d5 + 950**9.81*0.0439
+                q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1d0*9.81*(y_cc(j) - 0.0436)
+            else
+                q_prim_vf(E_idx)%sf(i, j, 0) = 1d5 + 950d0*9.81*(y_cc(j))
+            end if
+
 
         case default
             
