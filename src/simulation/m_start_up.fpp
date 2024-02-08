@@ -1091,6 +1091,7 @@ contains
                 t_step
         end if
         mytime = mytime + dt
+        !$acc update device(mytime)
 
         if (probe_wrt) then
             do i = 1, sys_size

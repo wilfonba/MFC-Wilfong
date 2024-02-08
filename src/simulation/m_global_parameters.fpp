@@ -375,7 +375,8 @@ module m_global_parameters
 
     real(kind(0d0)) :: mytime       !< Current simulation time
     real(kind(0d0)) :: finaltime    !< Final simulation time
-
+    !$acc declare create(mytime)
+        
     logical :: weno_flat, riemann_flat, cu_mpi
 
     type(pres_field), allocatable, dimension(:) :: pb_ts

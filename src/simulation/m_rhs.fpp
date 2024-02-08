@@ -664,7 +664,7 @@ contains
         real(kind(0d0)) :: myR, myV, alf, myP, myRho, R2Vav
         integer :: ndirs
 
-        real(kind(0d0)) :: mytime, sound
+        real(kind(0d0)) :: sound
         real(kind(0d0)) :: start, finish
         real(kind(0d0)) :: s2, const_sos, s1
 
@@ -727,7 +727,7 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("RHS-MPI")
-        call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
+        call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv, mytime)
         call nvtxEndRange
 
         if (t_step == t_step_stop) return

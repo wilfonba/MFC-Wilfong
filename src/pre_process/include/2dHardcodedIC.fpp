@@ -157,7 +157,7 @@
             q_prim_vf(contxe)%sf(i, j, 0) = alph*1d0
 
             if (y_cc(j)  > 0.0436) then
-                pInterface = 1d5 + 950**9.81*0.0439
+                pInterface = 1d5 + 950*9.81*0.0439
                 q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1d0*9.81*(y_cc(j) - 0.0436)
             else
                 q_prim_vf(E_idx)%sf(i, j, 0) = 1d5 + 950d0*9.81*(y_cc(j))

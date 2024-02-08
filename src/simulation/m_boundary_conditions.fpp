@@ -25,11 +25,12 @@ contains
     !>  The purpose of this procedure is to populate the buffers
     !!      of the conservative variables, depending on the selected
     !!      boundary conditions.
-    subroutine s_populate_primitive_variables_buffers(q_prim_vf, pb, mv)
+    subroutine s_populate_primitive_variables_buffers(q_prim_vf, pb, mv, mytime)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_loc, bc_dir
+        real(kind(0d0)) :: mytime
 
         ! Population of Buffers in x-direction =============================
 
@@ -43,7 +44,7 @@ contains
         case (-15)    ! Slip wall BC at beginning
             call s_slip_wall(q_prim_vf, pb, mv, 1, -1)
         case (-16)    ! No-slip wall BC at beginning
-            call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1)
+            call s_no_slip_wall(q_prim_vf, pb, mv, 1, -1, mytime)
         case default ! Processor BC at beginning
             call s_mpi_sendrecv_conservative_variables_buffers( &
                 q_prim_vf, pb, mv, 1, -1)
@@ -59,7 +60,7 @@ contains
         case (-15)    ! Slip wall BC at end
             call s_slip_wall(q_prim_vf, pb, mv, 1, 1)
         case (-16)    ! No-slip wall bc at end
-            call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1)
+            call s_no_slip_wall(q_prim_vf, pb, mv, 1, 1, mytime)
         case default ! Processor BC at end
             call s_mpi_sendrecv_conservative_variables_buffers( &
                 q_prim_vf, pb, mv, 1, 1)
@@ -103,7 +104,7 @@ contains
         case (-15)    ! Slip wall BC at beginning
             call s_slip_wall(q_prim_vf, pb, mv, 2, -1)
         case (-16)    ! No-slip wall BC at beginning
-            call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1)
+            call s_no_slip_wall(q_prim_vf, pb, mv, 2, -1, mytime)
         case default ! Processor BC at beginning
             call s_mpi_sendrecv_conservative_variables_buffers( &
                 q_prim_vf, pb, mv, 2, -1)
@@ -119,7 +120,7 @@ contains
         case (-15)    ! Slip wall BC at end
             call s_slip_wall(q_prim_vf, pb, mv, 2, 1)
         case (-16)    ! No-slip wall BC at end
-            call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1)
+            call s_no_slip_wall(q_prim_vf, pb, mv, 2, 1, mytime)
         case default ! Processor BC at end
             call s_mpi_sendrecv_conservative_variables_buffers( &
                 q_prim_vf, pb, mv, 2, 1)
@@ -163,7 +164,7 @@ contains
         case (-15)    ! Slip wall BC at beginning
             call s_slip_wall(q_prim_vf, pb, mv, 3, -1)
         case (-16)    ! No-slip wall BC at beginning
-            call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1)
+            call s_no_slip_wall(q_prim_vf, pb, mv, 3, -1, mytime)
         case default ! Processor BC at beginning
             call s_mpi_sendrecv_conservative_variables_buffers( &
                 q_prim_vf, pb, mv, 3, -1)
@@ -179,7 +180,7 @@ contains
         case (-15)    ! Slip wall BC at end
             call s_slip_wall(q_prim_vf, pb, mv, 3, 1)
         case (-16)    ! No-slip wall BC at end
-            call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1)
+            call s_no_slip_wall(q_prim_vf, pb, mv, 3, 1, mytime)
         case default ! Processor BC at end
             call s_mpi_sendrecv_conservative_variables_buffers( &
                 q_prim_vf, pb, mv, 3, 1)
@@ -1035,12 +1036,13 @@ contains
 
     end subroutine s_slip_wall
 
-    subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc)
+    subroutine s_no_slip_wall(q_prim_vf, pb, mv, bc_dir, bc_loc, t)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
         integer :: bc_dir, bc_loc
         integer :: j, k, l, q, i
+        real(kind(0d0)) :: t
 
         !< x-direction =========================================================
         if (bc_dir == 1) then
@@ -1101,7 +1103,7 @@ contains
         elseif (bc_dir == 2) then
 
             if (bc_loc == -1) then !< bc_y%beg
-
+             
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size
                     do k = 0, p
@@ -1112,7 +1114,7 @@ contains
                                         -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
                                     q_prim_vf(i)%sf(l, -j, k) = &
-                                        -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb2
+                                        -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*(0.5*sin(600*pi*t))
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
                                     q_prim_vf(i)%sf(l, -j, k) = &
                                         -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb3
@@ -1136,7 +1138,7 @@ contains
                                         -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
                                     q_prim_vf(i)%sf(l, n + j, k) = &
-                                        -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve2
+                                        -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*(0.5*sin(600*pi*t))
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
                                     q_prim_vf(i)%sf(l, n + j, k) = &
                                         -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve3

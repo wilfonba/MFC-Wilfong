@@ -9,7 +9,7 @@
     real(kind(0d0)) :: minValX300, minValZ300
     integer :: q300, p300
 
-    real(kind(0d0)) :: ih3, alph3
+    real(kind(0d0)) :: ih3, alph3, ih, alph, pInterface
 
     integer :: i1, i2
     real(kind(0d0)), dimension(0:199,0:199) :: ihPerlin
@@ -102,6 +102,28 @@
             !     q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 1d0*9.8*(2 - ih3) + &
             !         1000d0*9.8*(ih3 - y_cc(j))
             ! end if
+
+        case(3300) ! 3D Interface
+
+            ih = 0.00186 - 0.00186/40*(sin(2*pi/1.86d-3*z_cc(k) + pi/2) + sin((2*pi/1.86d-3)*x_cc(i)+pi/2))
+            alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-16))
+
+            if (alph < 1e-6) alph = 1e-6
+            if (alph > 1 - 1e-6) alph = 1 - 1e-6
+
+            if (sigma .ne. dflt_real) q_prim_vf(c_idx)%sf(i, j, 0) = alph
+            q_prim_vf(advxb)%sf(i, j, k) = 1 - alph
+            q_prim_vf(advxe)%sf(i, j, k) = alph
+            q_prim_vf(contxb)%sf(i, j, k) = (1 - alph)*950d0
+            q_prim_vf(contxe)%sf(i, j, k) = alph*1d0
+
+            if (y_cc(j)  > 0.00186) then
+                pInterface = 1d5 + 950*9.81*0.00186
+                q_prim_vf(E_idx)%sf(i, j, k) = pInterface + 1d0*9.81*(y_cc(j) - 0.00186)
+            else
+                q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 950d0*9.81*(y_cc(j))
+            end if
+
 
         case default
             call s_int_to_str(patch_id, iStr)
