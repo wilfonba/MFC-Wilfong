@@ -1114,7 +1114,7 @@ contains
                                         -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
                                     q_prim_vf(i)%sf(l, -j, k) = &
-                                        -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*(0.5*sin(600*pi*t))
+                                        -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb1
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
                                     q_prim_vf(i)%sf(l, -j, k) = &
                                         -q_prim_vf(i)%sf(l, j - 1, k) + 2d0*bc_y%vb3
@@ -1138,7 +1138,7 @@ contains
                                         -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve1
                                 elseif (i == momxb + 1 .and. num_dims > 1) then
                                     q_prim_vf(i)%sf(l, n + j, k) = &
-                                        -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*(0.5*sin(600*pi*t))
+                                        -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve2
                                 elseif (i == momxb + 2 .and. num_dims > 2) then
                                     q_prim_vf(i)%sf(l, n + j, k) = &
                                         -q_prim_vf(i)%sf(l, n - (j - 1), k) + 2d0*bc_y%ve3

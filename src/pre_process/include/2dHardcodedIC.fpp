@@ -144,7 +144,7 @@
 
         case(23004) ! 2D Interface
 
-            ih = 0.0436 - 0.00186/20*(sin((2*pi/1.86d-3)*x_cc(i)+pi/2))
+            ih = 0.01116 - 0.00186/20*(sin((2*pi/1.86d-3)*x_cc(i)+pi/2))
             alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-16))
 
             if (alph < 1e-6) alph = 1e-6
@@ -156,9 +156,9 @@
             q_prim_vf(contxb)%sf(i, j, 0) = (1 - alph)*950d0
             q_prim_vf(contxe)%sf(i, j, 0) = alph*1d0
 
-            if (y_cc(j)  > 0.0436) then
-                pInterface = 1d5 + 950*9.81*0.0439
-                q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1d0*9.81*(y_cc(j) - 0.0436)
+            if (y_cc(j)  > 0.01116) then
+                pInterface = 1d5 + 950*9.81*0.01116
+                q_prim_vf(E_idx)%sf(i, j, 0) = pInterface + 1d0*9.81*(y_cc(j) - 0.01116)
             else
                 q_prim_vf(E_idx)%sf(i, j, 0) = 1d5 + 950d0*9.81*(y_cc(j))
             end if
