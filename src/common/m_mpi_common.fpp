@@ -81,7 +81,8 @@ contains
         do i = 1, sys_size
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(0:m, 0:n, 0:p)
         end do
-
+        print*, "Printing"
+        
         !Additional variables pb and mv for non-polytropic qbmm
 #ifdef MFC_PRE_PROCESS
         if (qbmm .and. .not. polytropic) then

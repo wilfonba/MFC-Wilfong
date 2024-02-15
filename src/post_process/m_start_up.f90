@@ -424,7 +424,7 @@ contains
             q_sf = q_cons_vf(c_idx)%sf(-offset_x%beg:m + offset_x%end, &
                              -offset_y%beg:n + offset_y%end, &
                              -offset_z%beg:p + offset_z%end)
-
+            
             write (varname, '(A)') 'color_func'
             call s_write_variable_to_formatted_database_file(varname, t_step)
 

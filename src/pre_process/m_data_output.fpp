@@ -561,13 +561,14 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
 
         else
+            
             ! Initialize MPI data I/O
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
-
+            
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A)') t_step_start, '.dat'
             file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
@@ -621,7 +622,7 @@ contains
                 do i = 1, sys_size !TODO: check if this is right
                     !            do i = 1, adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
-
+                    
                     ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
