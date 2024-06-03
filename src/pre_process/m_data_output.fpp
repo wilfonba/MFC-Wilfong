@@ -573,8 +573,13 @@ contains
             end if
 
             ! Open the file to write all flow variables
-            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            if (cfl_dt) then
+                 write (file_loc, '(I0,A)') t_start, '.dat'
+            else
+                write (file_loc, '(I0,A)') t_step_start, '.dat'
+            end if
             file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
@@ -623,7 +628,6 @@ contains
                 end if
             else
                 do i = 1, sys_size !TODO: check if this is right
-                    !            do i = 1, adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file

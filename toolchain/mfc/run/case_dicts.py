@@ -67,6 +67,8 @@ PRE_PROCESS.update({
     'pi_fac': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'cfl_dt': ParamType.LOG,
+    't_start': ParamType.INT
 })
 
 for ib_id in range(1, 10+1):
@@ -194,7 +196,8 @@ SIMULATION.update({
     't_stop': ParamType.REAL,
     'n_save': ParamType.INT,
     'cfl_dt': ParamType.LOG,
-    'cfl': ParamType.REAL
+    'cfl': ParamType.REAL,
+    't_start': ParamType.INT
 })
 
 # NOTE: Not currently present

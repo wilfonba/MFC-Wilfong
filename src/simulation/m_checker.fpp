@@ -54,18 +54,34 @@ contains
         elseif (n == 0 .and. p > 0) then
             call s_mpi_abort('Unsupported combination of values of '// &
                              'n and p. Exiting ...')
-        elseif (dt <= 0) then
-            call s_mpi_abort('Unsupported value of dt. Exiting ...')
-        elseif (t_step_start < 0) then
-            call s_mpi_abort('Unsupported value of t_step_start. Exiting ...')
-        elseif (t_step_stop <= t_step_start) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                             't_step_start and t_step_stop. '// &
-                             'Exiting ...')
-        elseif (t_step_save > t_step_stop - t_step_start) then
-            call s_mpi_abort('Unsupported combination of values of '// &
-                             't_step_start, t_step_stop and '// &
-                             't_step_save. Exiting ...')
+        end if
+
+        if (cfl_dt) then
+            if (cfl <= 0) then
+                call s_mpi_abort('Unsupported value of cfl. Exiting ...')
+            elseif (cfl >= 1) then
+                call s_mpi_abort('Unsupported value of cfl. Exiting ...')
+            elseif ((n_save == dflt_int) .or. (n_save < 1)) then
+                call s_mpi_abort('Unsupported value of n_save. Exiting ...')
+            elseif ((t_stop <= 0) .or. (t_stop == dflt_real)) then
+                call s_mpi_abort('Unsupported value of t_stop. Exiting ...')
+            elseif ((t_start == dflt_int) .or. (t_start < 0)) then
+                call s_mpi_abort('Unsupported value of t_start. Exiting ...')
+            end if
+        else
+            if (dt <= 0) then
+                call s_mpi_abort('Unsupported value of dt. Exiting ...')
+            elseif (t_step_start < 0) then
+                call s_mpi_abort('Unsupported value of t_step_start. Exiting ...')
+            elseif (t_step_stop <= t_step_start) then
+                call s_mpi_abort('Unsupported combination of values of '// &
+                                 't_step_start and t_step_stop. '// &
+                                 'Exiting ...')
+            elseif (t_step_save > t_step_stop - t_step_start) then
+                call s_mpi_abort('Unsupported combination of values of '// &
+                                 't_step_start, t_step_stop and '// &
+                                 't_step_save. Exiting ...')
+            end if
         end if
         ! ==================================================================
 

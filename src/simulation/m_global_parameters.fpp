@@ -102,7 +102,8 @@ module m_global_parameters
     !> @name Starting time, stopping time, and time between backups, simulation time,
     !! and prescribed cfl respectively
     !> @{
-    real(kind(0d0)) :: t_start, t_stop, t_save, n_save, cfl
+    real(kind(0d0)) :: t_stop, t_save, n_save, cfl
+    integer :: t_start
     !> @}
 
     logical :: cfl_dt
@@ -491,7 +492,7 @@ contains
         t_step_save = dflt_int
         t_step_print = 1
 
-        t_start = dflt_real
+        t_start = dflt_int
         t_stop = dflt_real
         t_save = dflt_real
         n_save = dflt_int

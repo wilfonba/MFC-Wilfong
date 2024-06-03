@@ -160,7 +160,7 @@ contains
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, t_start, t_stop, n_save, &
-            cfl_dt, cfl
+            cfl_dt, cfl, t_start
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -559,7 +559,11 @@ contains
         if (file_per_process) then
             call s_int_to_str(t_step_start, t_step_start_string)
             ! Open the file to read conservative variables
-            write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            if (cfl_dt) then
+                 write (file_loc, '(I0,A1,I7.7,A)') t_start, '_', proc_rank, '.dat'
+            else
+                write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
+            end if
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -646,7 +650,11 @@ contains
         else
 
             ! Open the file to read conservative variables
-            write (file_loc, '(I0,A)') t_step_start, '.dat'
+            if (cfl_dt) then
+                 write (file_loc, '(I0,A)') t_start, '.dat'
+            else
+                write (file_loc, '(I0,A)') t_step_start, '.dat'
+            end if
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
