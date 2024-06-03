@@ -53,6 +53,7 @@ module m_global_parameters
     !> @{
     logical :: cfl_dt
     integer :: n_save
+    integer :: t_start
     !> @}
 
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
@@ -362,6 +363,7 @@ contains
 
         cfl_dt = .false.
         n_save = dflt_int
+        t_start = dflt_int
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 

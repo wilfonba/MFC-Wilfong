@@ -72,7 +72,7 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model, cf_wrt, sigma, adv_n, cfl_dt, n_save
+            relax_model, cf_wrt, sigma, adv_n, cfl_dt, n_save, t_start
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -138,12 +138,12 @@ contains
     subroutine s_perform_time_step(t_step)
 
         integer, intent(INOUT) :: t_step
+
         if (proc_rank == 0) then
             if (cfl_dt) then
                 print '(" ["I3"%]  Saving "I8" of "I0"")', &
-                    int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                    t_step, &
-                    n_save
+                    int(ceiling(100d0*(real(t_step - t_start)/(n_save)))), &
+                        t_step, n_save
             else
                 print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
                     int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &

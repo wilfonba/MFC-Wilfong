@@ -35,7 +35,11 @@ program p_main
     call s_initialize_modules()
 
     ! Setting the time-step iterator to the first time step to be post-processed
-    t_step = t_step_start
+    if (cfl_dt) then
+        t_step = t_start
+    else
+        t_step = t_step_start
+    end if
 
     ! Time-Marching Loop =======================================================
     do

@@ -1097,7 +1097,7 @@ contains
         end if
 
         if (cfl_dt) then
-             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
+            if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
                 print '(" ["I3"%] Time "E16.6" @ dt = "E16.6" Time Step = "I8"")', &
                     int(ceiling(100d0*(mytime/t_stop))), &
                     mytime, &
