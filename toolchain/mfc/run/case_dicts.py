@@ -190,6 +190,11 @@ SIMULATION.update({
     'adap_dt': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    't_start': ParamType.REAL,
+    't_stop': ParamType.REAL,
+    'n_save': ParamType.INT,
+    'cfl_dt': ParamType.LOG,
+    'cfl': ParamType.REAL
 })
 
 # NOTE: Not currently present
@@ -294,7 +299,8 @@ POST_PROCESS.update({
     'omega_wrt': ParamType.LOG,
     'qbmm': ParamType.LOG,
     'qm_wrt': ParamType.LOG,
-    'cf_wrt': ParamType.LOG
+    'cfl_dt': ParamType.LOG,
+    'n_save': ParamType.REAL
 })
 
 for cmp_id in range(1,3+1):

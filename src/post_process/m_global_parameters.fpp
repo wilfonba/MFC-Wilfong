@@ -49,6 +49,12 @@ module m_global_parameters
 
     integer :: num_dims !< Number of spatial dimensions
 
+    !> @name IO options for adaptive time-stepping
+    !> @{
+    logical :: cfl_dt
+    integer :: n_save
+    !> @}
+
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
     real(kind(0d0)), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
@@ -353,6 +359,9 @@ contains
         sigR = dflt_real
         sigma = dflt_real
         adv_n = .false.
+
+        cfl_dt = .false.
+        n_save = dflt_int
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 

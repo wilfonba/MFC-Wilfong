@@ -259,6 +259,16 @@ contains
 
     end subroutine s_mpi_reduce_stability_criteria_extrema ! ---------------
 
+    subroutine s_mpi_allreduce_dt(dtLocal, dtGlobal)
+
+        real(kind(0d0)) :: dtLocal, dtGlobal
+
+        call MPI_ALLREDUCE(dtLocal, dtGlobal, 1, &
+                           MPI_DOUBLE_PRECISION, MPI_MIN, &
+                           MPI_COMM_WORLD, ierr)
+
+    end subroutine s_mpi_allreduce_dt
+
     !>  The following subroutine takes the input local variable
         !!      from all processors and reduces to the sum of all
         !!      values. The reduced variable is recorded back onto the

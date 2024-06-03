@@ -658,7 +658,12 @@ contains
         integer :: i
 
         ! Open the file to read
-        write (file_loc, '(I0,A)') t_step_start, '.dat'
+        if (cfl_dt) then
+            write (file_loc, '(I0,A)') t_start, '.dat'
+        else
+            write (file_loc, '(I0,A)') t_step_start, '.dat'
+        end if
+
         file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 

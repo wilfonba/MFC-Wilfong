@@ -99,6 +99,14 @@ module m_global_parameters
     integer :: t_step_start, t_step_stop, t_step_save
     !> @}
 
+    !> @name Starting time, stopping time, and time between backups, simulation time,
+    !! and prescribed cfl respectively
+    !> @{
+    real(kind(0d0)) :: t_start, t_stop, t_save, n_save, cfl
+    !> @}
+
+    logical :: cfl_dt
+
     integer :: t_step_print !< Number of time-steps between printouts
 
     ! ==========================================================================
@@ -475,10 +483,18 @@ contains
 
         dt = dflt_real
 
+        cfl_dt = .false.
+        cfl = dflt_real
+
         t_step_start = dflt_int
         t_step_stop = dflt_int
         t_step_save = dflt_int
         t_step_print = 1
+
+        t_start = dflt_real
+        t_stop = dflt_real
+        t_save = dflt_real
+        n_save = dflt_int
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
