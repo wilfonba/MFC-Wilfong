@@ -557,11 +557,12 @@ contains
         end if
 
         if (file_per_process) then
-            call s_int_to_str(t_step_start, t_step_start_string)
             ! Open the file to read conservative variables
             if (cfl_dt) then
-                 write (file_loc, '(I0,A1,I7.7,A)') t_start, '_', proc_rank, '.dat'
+                call s_int_to_str(t_start, t_step_start_string)
+                write (file_loc, '(I0,A1,I7.7,A)') t_start, '_', proc_rank, '.dat'
             else
+                call s_int_to_str(t_step_start, t_step_start_string)
                 write (file_loc, '(I0,A1,I7.7,A)') t_step_start, '_', proc_rank, '.dat'
             end if
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_start_string)//trim(mpiiofs)//trim(file_loc)
