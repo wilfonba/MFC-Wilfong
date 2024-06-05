@@ -898,7 +898,11 @@ contains
             call s_initialize_mpi_data(q_cons_vf)
 
             ! Open the file to write all flow variables
-            write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
+            if (cfl_dt) then
+                write (file_loc, '(I0,A,i7.7,A)') int(mytime/t_save), '_', proc_rank, '.dat'
+            else
+                write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
+            end if
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_string)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then
