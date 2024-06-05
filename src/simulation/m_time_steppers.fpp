@@ -58,10 +58,12 @@ module m_time_steppers
 
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
 
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension( :, :, :), max_dt)
+
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
+    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb, max_dt)
 #else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
@@ -78,6 +80,8 @@ module m_time_steppers
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_pb
 
     real(kind(0d0)), allocatable, dimension(:, :, :, :, :) :: rhs_mv
+
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: max_dt
 
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
@@ -288,6 +292,10 @@ contains
             call s_open_run_time_information_file()
         end if
 
+        if (cfl_dt) then
+            @:ALLOCATE_GLOBAL(max_dt(0:m, 0:n, 0:p))
+        end if
+
     end subroutine s_initialize_time_steppers_module ! ---------------------
 
     !> 1st order TVD RK time-stepping algorithm
@@ -330,7 +338,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -439,7 +451,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -631,7 +647,11 @@ contains
             call s_time_step_cycling(t_step)
         end if
 
-        if (t_step == t_step_stop) return
+        if (cfl_dt) then
+            if (mytime >= t_stop) return
+        else
+            if (t_step == t_step_stop) return
+        end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, sys_size
@@ -935,7 +955,6 @@ contains
         real(kind(0d0)) :: E          !< Cell-avg. energy
         real(kind(0d0)) :: H          !< Cell-avg. enthalpy
         real(kind(0d0)), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
-        real(kind(0d0)), dimension(0:m, 0:n, 0:p) :: max_dt
         real(kind(0d0)) :: blkmod1, blkmod2 !<
             !! Fluid bulk modulus for Woods mixture sound speed
         type(int_bounds_info) :: ix, iy, iz
@@ -1019,19 +1038,24 @@ contains
                         !2D
                         max_dt(j, k, l) = cfl*min(dx(j)/(abs(vel(1)) + c), &
                                                   dy(k)/(abs(vel(2)) + c))
-
                     else
                         !1D
                         max_dt(j, k, l) = cfl*(dx(j)/(abs(vel(1)) + c))
 
                     end if
-
                 end do
             end do
         end do
         ! END: Computing Stability Criteria at Current Time-step ===========
 
+#ifdef CRAY_ACC_WAR
+        !$acc update host(max_dt)
         dt_local = minval(max_dt)
+#else
+        !$acc kernels
+        dt_local = minval(max_dt)
+        !$acc end kernels
+#endif
 
         if (num_procs == 1) then
             dt = dt_local

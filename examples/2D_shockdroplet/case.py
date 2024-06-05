@@ -20,7 +20,7 @@ Ny = 299.
 Nx =1199.
 dx = 0.25/Nx #8.3e-6
 
-time_end = 0.005#50us
+time_end = 0.020#50us
 cfl = 0.25
 
 dt = cfl * dx/c_l #5.3E-9
@@ -28,7 +28,7 @@ Nt = int(time_end/dt)#10000
 
 print(json.dumps({
     # Logistics ================================================
-    'run_time_info'                : 'F',
+    'run_time_info'                : 'T',
     # ==========================================================
 
     # Computational Domain Parameters ==========================
@@ -47,7 +47,7 @@ print(json.dumps({
     'dt'                           : dt,
     't_step_start'                 : 0,
     't_step_stop'                  : Nt,
-    't_step_save'                  : Nt, #math.ceil(Nt/100),
+    't_step_save'                  : math.ceil(Nt/100),
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
@@ -61,7 +61,7 @@ print(json.dumps({
     'time_stepper'                 : 3,
     'weno_order'                   : 5,
     'weno_eps'                     : 1.E-16,
-    'weno_Re_flux'                 : 'F',  
+    'weno_Re_flux'                 : 'F',
     'weno_avg'                     : 'F',
     'mapped_weno'                  : 'T',
     'null_weights'                 : 'F',
@@ -80,6 +80,10 @@ print(json.dumps({
     'precision'                    : 2,
     'prim_vars_wrt'                :'T',
     'parallel_io'                  :'T',
+    'schlieren_wrt'                :'T',
+    'schlieren_alpha(1)'           : 0.5,
+    'schlieren_alpha(2)'           : 0.5,
+    'fd_order'                     : 4,
     # ==========================================================
 
     # Patch 1: Background  ============================

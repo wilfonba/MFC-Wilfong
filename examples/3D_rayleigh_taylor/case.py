@@ -27,7 +27,7 @@ c = math.sqrt(1.4*1e5/1)
 cfl = 0.4
 dt = cfl*dx/c
 
-Nt = math.ceil(0.2/dt)
+Nt = math.ceil(0.4/dt)
 Ns = math.ceil(Nt/100)
 
 #Configuration case dictionary

@@ -574,7 +574,7 @@ contains
 
             ! Open the file to write all flow variables
             if (cfl_dt) then
-                 write (file_loc, '(I0,A)') t_start, '.dat'
+                write (file_loc, '(I0,A)') t_start, '.dat'
             else
                 write (file_loc, '(I0,A)') t_step_start, '.dat'
             end if

@@ -105,6 +105,7 @@ module m_global_parameters
     real(kind(0d0)) :: t_stop, t_save, n_save, cfl
     integer :: t_start
     !> @}
+    !$acc declare create(cfl)
 
     logical :: cfl_dt
 

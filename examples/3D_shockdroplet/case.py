@@ -116,7 +116,7 @@ StF = 4.0
 Ny = 100
 
 # number of elements into z direction
-Nz = 100
+Nz = 2000
 
 # number of elements into x direction
 Nx = Ny * 2

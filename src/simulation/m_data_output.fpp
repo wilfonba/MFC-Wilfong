@@ -957,6 +957,7 @@ contains
             else
                 write (file_loc, '(I0,A)') t_step, '.dat'
             end if
+
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist .and. proc_rank == 0) then

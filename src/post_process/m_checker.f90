@@ -23,7 +23,7 @@ contains
         integer :: i
         character(len=5) :: iStr
 
-        bub_fac = 0;
+        bub_fac = 0; 
         if (bubbles .and. (num_fluids == 1)) bub_fac = 1
 
         ! Constraints on dimensionality and the number of cells for the grid
@@ -47,29 +47,29 @@ contains
                              'values for num_procs, m, n and p. '// &
                              'Exiting ...')
         end if
-        print*, cfl_dt
+        print *, cfl_dt
         if (cfl_dt) then
             if (t_start < 0) then
                 call s_mpi_abort('Unsupported choice for the value '// &
-                    't_start. Exiting ...')
+                                 't_start. Exiting ...')
             elseif (t_start > n_save) then
-                call s_mpi_abort('Unsupported choice for the value '//&
-                    't_start. Exiting ...')
-        else
-            ! Constraints on the time-stepping parameters
-            !if (t_step_start < 0) then
+                call s_mpi_abort('Unsupported choice for the value '// &
+                                 't_start. Exiting ...')
+            else
+                ! Constraints on the time-stepping parameters
+                !if (t_step_start < 0) then
                 !call s_mpi_abort('Unsupported choice for the value of '// &
-                                 !'t_step_start. Exiting ...')
-            !elseif (t_step_stop < t_step_start) then
+                !'t_step_start. Exiting ...')
+                !elseif (t_step_stop < t_step_start) then
                 !call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 !'values for t_step_start and t_step_stop. '// &
-                                 !'Exiting ...')
-            !elseif (t_step_save > t_step_stop - t_step_start) then
+                !'values for t_step_start and t_step_stop. '// &
+                !'Exiting ...')
+                !elseif (t_step_save > t_step_stop - t_step_start) then
                 !call s_mpi_abort('Unsupported choice of the combination of '// &
-                                 !'values for t_step_start, t_step_stop and '// &
-                                 !'t_step_save. Exiting ...')
-            !end if
-        end if
+                !'values for t_step_start, t_step_stop and '// &
+                !'t_step_save. Exiting ...')
+                !end if
+            end if
 
             ! Constraints on model equations and number of fluids in the flow
         elseif (all(model_eqns /= (/1, 2, 3, 4/))) then

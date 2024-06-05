@@ -143,7 +143,7 @@ contains
             if (cfl_dt) then
                 print '(" ["I3"%]  Saving "I8" of "I0"")', &
                     int(ceiling(100d0*(real(t_step - t_start)/(n_save)))), &
-                        t_step, n_save
+                    t_step, n_save
             else
                 print '(" ["I3"%]  Saving "I8" of "I0" @ t_step = "I0"")', &
                     int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &

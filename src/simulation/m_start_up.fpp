@@ -1107,14 +1107,12 @@ contains
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
                 print '(" ["I3"%]  Time step "I8" of "I0" @ t_step = "I0"")', &
-                    int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
+                   int(ceiling(100d0*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     t_step - t_step_start + 1, &
                     t_step_stop - t_step_start + 1, &
                     t_step
             end if
         end if
-
-        mytime = mytime + dt
 
         if (probe_wrt) then
             do i = 1, sys_size
@@ -1141,6 +1139,7 @@ contains
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
         ! Time-stepping loop controls
 
+        mytime = mytime + dt
         t_step = t_step + 1
 
     end subroutine s_perform_time_step
@@ -1427,6 +1426,7 @@ contains
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
 
+        !$acc update device(cfl)
 
         !$acc update device(relax, relax_model)
         if (relax) then
