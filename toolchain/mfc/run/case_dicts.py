@@ -304,7 +304,8 @@ POST_PROCESS.update({
     'qm_wrt': ParamType.LOG,
     'cfl_dt': ParamType.LOG,
     'n_save': ParamType.REAL,
-    't_start': ParamType.INT
+    't_start': ParamType.INT,
+    'cf_wrt': ParamType.LOG
 })
 
 for cmp_id in range(1,3+1):

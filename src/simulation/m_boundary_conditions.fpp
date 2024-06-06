@@ -1594,6 +1594,7 @@ contains
                 end do
             end do
         elseif (bc_z%end == -2) then !< symmetry
+            print*, "HERE"
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, num_dims + 1
                 do j = 1, buff_size

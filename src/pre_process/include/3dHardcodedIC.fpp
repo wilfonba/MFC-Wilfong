@@ -47,7 +47,7 @@ case (300) ! Rayleigh-Taylor instability
 case (301) ! 3D interface shake
 
     lam = 0.01704
-    acc = 9.81*512
+    acc = 9.81
 
     ih = 5*lam - lam/40*(sin(2*pi/lam*z_cc(k) + pi/2) + sin((2*pi/lam)*x_cc(i)+pi/2))
         alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-3))
@@ -55,7 +55,7 @@ case (301) ! 3D interface shake
         if (alph < 1e-6) alph = 1e-6
         if (alph > 1 - 1e-6) alph = 1 - 1e-6
 
-        if (sigma .ne. dflt_real) q_prim_vf(c_idx)%sf(i, j, 0) = alph
+        if (sigma .ne. dflt_real) q_prim_vf(c_idx)%sf(i, j, k) = alph
         q_prim_vf(advxb)%sf(i, j, k) = 1 - alph
         q_prim_vf(advxe)%sf(i, j, k) = alph
         q_prim_vf(contxb)%sf(i, j, k) = (1 - alph)*950d0
