@@ -49,7 +49,7 @@ case (301) ! 3D interface shake
     lam = 0.01704
     acc = 9.81
 
-    ih = 5*lam - lam/40*(sin(2*pi/lam*z_cc(k) + pi/2) + sin((2*pi/lam)*x_cc(i)+pi/2))
+    ih = 5*lam - lam/20*(sin(2*pi/lam*z_cc(k) + pi/2) + sin((2*pi/lam)*x_cc(i)+pi/2))
         alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-3))
 
         if (alph < 1e-6) alph = 1e-6

@@ -760,7 +760,7 @@ contains
                         do l = -buff_size, n + buff_size
                             do k = -buff_size, m + buff_size
                                 q_prim_vf(i)%sf(k, l, -j) = &
-                                    q_prim_vf(i)%sf(k, l, p - (j - 1))
+                                    q_prim_vf(i)%sf(k, l, j - 1)
                             end do
                         end do
                     end do
@@ -792,7 +792,7 @@ contains
                         do l = -buff_size, n + buff_size
                             do k = -buff_size, m + buff_size
                                 q_prim_vf(i)%sf(k, l, p + j) = &
-                                    q_prim_vf(i)%sf(k, l, j - 1)
+                                    q_prim_vf(i)%sf(k, l, p - (j - 1))
                             end do
                         end do
                     end do
