@@ -102,8 +102,8 @@ module m_global_parameters
     !> @name Starting time, stopping time, and time between backups, simulation time,
     !! and prescribed cfl respectively
     !> @{
-    real(kind(0d0)) :: t_stop, t_save, n_save, cfl
-    integer :: t_start
+    real(kind(0d0)) :: t_stop, t_save, cfl
+    integer :: t_start, n_save
     !> @}
     !$acc declare create(cfl)
 
@@ -1039,7 +1039,7 @@ contains
         intxe = internalEnergies_idx%end
 
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe)
-        !$acc update device(m, n, p)
+        !$acc update device(cfl, m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)
         !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, mixture_err, grid_geometry, cyl_coord, mapped_weno, mp_weno, weno_eps)

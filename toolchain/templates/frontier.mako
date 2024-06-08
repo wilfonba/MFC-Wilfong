@@ -9,6 +9,7 @@
 #SBATCH --output="${name}.out"
 #SBATCH --time=${walltime}
 #SBATCH --cpus-per-task=7
+#SBATCH -C nvme
 % if gpu:
 #SBATCH --gpus-per-task=1
 #SBATCH --gpu-bind=closest
@@ -43,6 +44,10 @@ export MPICH_GPU_SUPPORT_ENABLED=1
 % for target in targets:
     ${helpers.run_prologue(target)}
 
+    % if engine != 'interactive':
+        sbcast -pf ${target.get_install_binpath(case)} /mnt/bb/$USER/${target.name}
+    % endif
+
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
@@ -53,8 +58,10 @@ export MPICH_GPU_SUPPORT_ENABLED=1
             % if gpu:
                 --gpus-per-task 1 --gpu-bind closest                 \
             % endif
+            ${profiler} "${target.get_install_binpath(case)}")
+        % else:
+            ${profiler} "/mnt/bb/$USER/${target.name}")
         % endif
-                ${profiler} "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}
