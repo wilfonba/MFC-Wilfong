@@ -16,10 +16,15 @@ print(json.dumps({
     'm'                            : 99,
     'n'                            : 99,
     'p'                            : 0,
-    'dt'                           : 5.E-07,
-    't_step_start'                 : 0,
-    't_step_stop'                  : 1000,
-    't_step_save'                  : 100,
+    'cfl_dt'                       : 'T',
+    't_start'                      : 0,
+    'cfl'                          : 0.8,
+    't_stop'                       : 5e-4,
+    'n_save'                       : 10,
+    # 'dt'                           : 5.E-07,
+    # 't_step_start'                 : 0,
+    # 't_step_stop'                  : 1000,
+    # 't_step_save'                  : 100,
     # ==========================================================
 
     # Simulation Algorithm Parameters ==========================
