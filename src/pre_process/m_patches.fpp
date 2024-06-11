@@ -24,6 +24,8 @@ module m_patches
     use m_assign_variables
 
     use m_mpi_common
+
+    use m_helper
     ! ==========================================================================
 
     implicit none

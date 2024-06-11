@@ -1026,7 +1026,7 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
-        call MPI_FILE_CLOSE(ifile, ierr)
+        !call MPI_FILE_CLOSE(ifile, ierr)
 
 #endif
 

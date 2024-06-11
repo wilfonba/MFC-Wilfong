@@ -1,0 +1,77 @@
+mfc: Found CMake: /fastscratch/bwilfong3/software/MFC-Wilfong/build/cmake/bin/cmake.
+mfc: OK > (venv) Entered the Python 3.8.10 virtual environment (>= 3.8).
+
+      .=++*:          -+*+=.        | bwilfong3@wingtip-gpu3 [Linux]
+     :+   -*-        ==   =* .      | ------------------------------
+   :*+      ==      ++    .+-       | --jobs 1
+  :*##-.....:*+   .#%+++=--+=:::.   | --mpi
+  -=-++-======#=--**+++==+*++=::-:. | --gpu
+ .:++=----------====+*= ==..:%..... | --no-debug
+  .:-=++++===--==+=-+=   +.  :=     | --targets simulation
+  +#=::::::::=%=. -+:    =+   *:    | ----------------------------------------------------------
+ .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, count, packer) --help
+
+ Acquiring /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_rayleigh_taylor/case.py...
+ Acquiring /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_rayleigh_taylor/case.py...
+ Build | syscheck, syscheck, and simulation | Case Optimized for /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_rayleigh_taylor/case.py
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/9759ddfda7 --target syscheck --parallel 1 --config Release
+
+[100%] Built target syscheck
+
+ $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/9759ddfda7
+
+-- Install configuration: "Release"
+-- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/9759ddfda7/bin/syscheck
+-- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/9759ddfda7/bin/syscheck" to ""
+
+ Generating case.fpp.
+   Case optimization is enabled.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/df4d684bd6 --target simulation --parallel 1 --config Release
+
+[100%] Built target simulation
+
+ $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/df4d684bd6
+
+-- Install configuration: "Release"
+-- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/df4d684bd6/bin/simulation
+-- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/df4d684bd6/bin/simulation" to ""
+
+ Run
+   Using queue system Interactive.
+   Using baked-in template for default.
+   Generating input files for syscheck...
+    
+     Generating syscheck.inp:
+       INFO: Forwarded 0/69 parameters.
+    
+   Generating input files for simulation...
+    
+     Generating simulation.inp:
+       INFO: Forwarded 49/69 parameters.
+    
+   $ /bin/bash /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_rayleigh_taylor/MFC.sh
+
++-----------------------------------------------------------------------------------------------------------+ 
+| MFC case # MFC @ /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_rayleigh_taylor/case.py:         |
++-----------------------------------------------------------------------------------------------------------+ 
+| * Start-time     20:11:02                            * Start-date     20:11:02                            |
+| * Partition      N/A                                 * Walltime       01:00:00                            |
+| * Account        N/A                                 * Nodes          1                                   |
+| * Job Name       MFC                                 * Engine         interactive                         |
+| * QoS            N/A                                 * Binary         N/A                                 |
+| * Queue System   Interactive                         * Email          N/A                                 |
++-----------------------------------------------------------------------------------------------------------+ 
+
+mfc: WARNING > This is the default template.
+mfc: WARNING > It is not intended to support all systems and execution engines.
+mfc: WARNING > Consider using a different template via the --computer option if you encounter problems.
+mfc: OK > :) Selected MPI launcher mpirun. Use --binary to override.
+mfc: OK > :) Running syscheck:
+
+
+mfc: ERROR > mfc.py finished with a 143 exit code.
+mfc: (venv) Exiting the Python virtual environment.

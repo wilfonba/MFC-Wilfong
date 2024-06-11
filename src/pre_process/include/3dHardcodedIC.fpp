@@ -7,9 +7,36 @@ real(kind(0d0)) :: eps
 
 real(kind(0d0)) :: acc, ih, pInterface, r, seed(10)
 
+real(kind(0d0)), dimension(0:m_glb, 0:p_glb) :: ihCsv
+
+real(kind(0d0)) :: w
+
+integer :: i1, i2, ios
+character(len=50) :: line
+real(kind(0d0)) :: r1
+
 eps = 1e-9
 
-seed(1:10) = (/123, 135, 531, 324, 654, 123456, 125236, 6643, 1298, 12451234 /)
+print*, "start_idx", start_idx
+print*, "n_glb", n_glb
+print*, "p_glb", p_glb
+
+open(unit=10, file='perlin.txt', status='old', action='read')
+
+do i = 0,(m_glb+1)*(p_glb + 1)
+
+    ! Read a line from the file into the 'line' variable
+    read(10, '(A)', iostat=ios) line
+    if (ios /= 0) exit  ! Exit the loop if end of file or error
+
+    ! Read two integers followed by a float from the line
+    read(line, *) i1, i2, r1
+
+    ihCsv(i1,i2) = 2e-2*r1
+end do
+
+close (10)
+
 #:enddef
 
 #:def Hardcoded3D()
@@ -51,9 +78,12 @@ case (301) ! 3D interface shake
     lam = 0.030
     acc = 9.81
 
-    ih = 5*lam - lam/20*(sin(2*pi/lam*z_cc(k) + pi/2) + sin((2*pi/lam)*x_cc(i)+pi/2)) + &
-        0.0005*(sin(pi/3*x_cc(i)/lam) + sin(pi/5*z_cc(k)/lam) + &
-                sin(pi/11*x_cc(i)/lam + sin(pi/7*z_cc(k)/lam)))
+    !ih = 5*lam - lam/20*(sin(2*pi/lam*z_cc(k) + pi/2) + sin((2*pi/lam)*x_cc(i)+pi/2)) + &
+        !0.0005*(sin(pi/3*x_cc(i)/lam) + sin(pi/5*z_cc(k)/lam) + &
+                !sin(pi/11*x_cc(i)/lam + sin(pi/7*z_cc(k)/lam)))
+
+    ih = 5*lam + ihCsv(start_idx(1) + i, start_idx(3) + k)
+
     alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-3))
 
     if (alph < 1e-6) alph = 1e-6
@@ -68,38 +98,6 @@ case (301) ! 3D interface shake
     if (y_cc(j)  > ih) then
         q_prim_vf(E_idx)%sf(i, j, k) = 1d5 - 1d0*acc*(y_cc(j) - ih)
     else
-        q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 5d0*acc*(ih - y_cc(j))
-    end if
-
-    if ((y_cc(j) < ih + lam/20) .and. (y_cc(j) > ih - lam/20)) then
-       call random_number(r)
-       q_prim_vf(momxb)%sf(i, j, k) = (r - 0.5)/4
-       call random_number(r)
-       q_prim_vf(momxe)%sf(i, j, k) = (r - 0.5)/4
-    end if
-
-case (302) ! 3D interface wtih exponential perturbation
-
-    lam = 0.030
-    acc = 9.81
-
-    ih = 5*lam + 0.00075*exp(sin(2*pi*x_cc(i)/lam - pi/2) + sin(2*pi*z_cc(k)/lam - pi/2)) + &
-        0.000125*(sin(13*pi*x_cc(i)/lam) + sin(11*pi*z_cc(k)/lam) + sin(5*pi*x_cc(i)/lam) + sin(7*pi*y_cc(k)/lam))
-    alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-3))
-
-    if (alph < 1e-6) alph = 1e-6
-    if (alph > 1 - 1e-6) alph = 1 - 1e-6
-
-    if (sigma .ne. dflt_real) q_prim_vf(c_idx)%sf(i, j, k) = alph
-    q_prim_vf(advxb)%sf(i, j, k) = 1 - alph
-    q_prim_vf(advxe)%sf(i, j, k) = alph
-    q_prim_vf(contxb)%sf(i, j, k) = (1 - alph)*5d0
-    q_prim_vf(contxe)%sf(i, j, k) = alph*1d0
-
-    if (y_cc(j)  > ih) then
-        q_prim_vf(E_idx)%sf(i, j, k) = 1d5 - 1d0*acc*(y_cc(j) - ih)
-    else
-        q_prim_vf(momxb)%sf(i, j, k) = 0.01
         q_prim_vf(E_idx)%sf(i, j, k) = 1d5 + 5d0*acc*(ih - y_cc(j))
     end if
 
