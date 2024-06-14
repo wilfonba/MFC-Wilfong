@@ -386,7 +386,7 @@ contains
         dist_type = dflt_int
         R0_type = dflt_int
 
-        perlinNoise = false
+        perlinNoise = .false.
 
         R_n = dflt_real
         R_v = dflt_real

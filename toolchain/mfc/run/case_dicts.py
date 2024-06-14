@@ -69,7 +69,7 @@ PRE_PROCESS.update({
     'num_ibs': ParamType.INT,
     'cfl_dt': ParamType.LOG,
     't_start': ParamType.INT,
-    'perlinNoise': ParamType.LOG
+    'perlinNoise':ParamType.LOG
 })
 
 for ib_id in range(1, 10+1):
