@@ -32,7 +32,7 @@ module m_global_parameters
     ! Computational Domain Parameters ==========================================
 
     integer :: proc_rank !< Rank of the local processor
-
+    logical :: perlinNoise
     integer :: m
     integer :: n
     integer :: p !<
@@ -385,6 +385,8 @@ contains
         rhoRV = 0d0
         dist_type = dflt_int
         R0_type = dflt_int
+
+        perlinNoise = false
 
         R_n = dflt_real
         R_v = dflt_real

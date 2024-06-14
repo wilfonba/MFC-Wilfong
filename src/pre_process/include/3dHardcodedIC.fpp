@@ -82,7 +82,7 @@ case (301) ! 3D interface shake
         !0.0005*(sin(pi/3*x_cc(i)/lam) + sin(pi/5*z_cc(k)/lam) + &
                 !sin(pi/11*x_cc(i)/lam + sin(pi/7*z_cc(k)/lam)))
 
-    ih = 5*lam + ihCsv(start_idx(1) + i, start_idx(3) + k)
+    ih = 3*lam + ihCsv(start_idx(1) + i, start_idx(3) + k)
 
     alph = 5d-1*(1 + tanh((y_cc(j) - ih)/1d-3))
 
