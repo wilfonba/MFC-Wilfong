@@ -17,10 +17,6 @@ real(kind(0d0)) :: r1
 
 eps = 1e-9
 
-print*, "start_idx", start_idx
-print*, "n_glb", n_glb
-print*, "p_glb", p_glb
-
 open(unit=10, file='perlin.txt', status='old', action='read')
 
 do i = 0,(m_glb+1)*(p_glb + 1)
@@ -77,10 +73,6 @@ case (301) ! 3D interface shake
 
     lam = 0.030
     acc = 9.81
-
-    !ih = 5*lam - lam/20*(sin(2*pi/lam*z_cc(k) + pi/2) + sin((2*pi/lam)*x_cc(i)+pi/2)) + &
-        !0.0005*(sin(pi/3*x_cc(i)/lam) + sin(pi/5*z_cc(k)/lam) + &
-                !sin(pi/11*x_cc(i)/lam + sin(pi/7*z_cc(k)/lam)))
 
     ih = 3*lam + ihCsv(start_idx(1) + i, start_idx(3) + k)
 

@@ -2204,6 +2204,14 @@ contains
                                         *(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end do
 
+                                if (sigma /= dflt_real) then
+                                    flux_rs${XYZ}$_vf(j, k, l, c_idx) = &
+                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, c_idx) &
+                                        *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
+                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, c_idx) &
+                                        *(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                end if
+
                                 ! Source for volume fraction advection equation
                                 !$acc loop seq
                                 do i = 1, num_dims
