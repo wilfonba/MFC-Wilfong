@@ -19,6 +19,8 @@ module m_variables_conversion
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_helper
     ! ==========================================================================
 
@@ -216,7 +218,7 @@ contains
         qv_sf(i, j, k) = qv
 #endif
 
-    end subroutine s_convert_mixture_to_mixture_variables ! ----------------
+    end subroutine s_convert_mixture_to_mixture_variables
 
     !>  This procedure is used alongside with the gamma/pi_inf
         !!      model to transfer the density, the specific heat ratio
@@ -341,7 +343,7 @@ contains
         qv_sf(j, k, l) = qv
 #endif
 
-    end subroutine s_convert_species_to_mixture_variables_bubbles ! ----------------
+    end subroutine s_convert_species_to_mixture_variables_bubbles
 
     !>  This subroutine is designed for the volume fraction model
         !!              and provided a set of either conservative or primitive
@@ -440,7 +442,7 @@ contains
         qv_sf(k, l, r) = qv
 #endif
 
-    end subroutine s_convert_species_to_mixture_variables ! ----------------
+    end subroutine s_convert_species_to_mixture_variables
 
     subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
                                                           gamma_K, pi_inf_K, qv_K, &
@@ -523,7 +525,7 @@ contains
         end if
 #endif
 
-    end subroutine s_convert_species_to_mixture_variables_acc ! ----------------
+    end subroutine s_convert_species_to_mixture_variables_acc
 
     subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
                                                                   gamma_K, pi_inf_K, qv_K, &
@@ -596,7 +598,7 @@ contains
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_variables_conversion_module ! ----------------
+    subroutine s_initialize_variables_conversion_module
 
         integer :: i, j
 
@@ -752,7 +754,7 @@ contains
             s_convert_to_mixture_variables => &
                 s_convert_species_to_mixture_variables
         end if
-    end subroutine s_initialize_variables_conversion_module ! --------------
+    end subroutine s_initialize_variables_conversion_module
 
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
     subroutine s_initialize_mv(qK_cons_vf, mv)
@@ -1005,7 +1007,7 @@ contains
                         qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                     end do
 
-                    if (sigma /= dflt_real) then
+                    if (.not. f_is_default(sigma)) then
                         qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
                     end if
 
@@ -1014,7 +1016,7 @@ contains
         end do
         !$acc end parallel loop
 
-    end subroutine s_convert_conservative_to_primitive_variables ! ---------
+    end subroutine s_convert_conservative_to_primitive_variables
 
     !>  The following procedure handles the conversion between
         !!      the primitive variables and the conservative variables.
@@ -1159,7 +1161,7 @@ contains
                         end do
                     end if
 
-                    if (sigma /= dflt_real) then
+                    if (.not. f_is_default(sigma)) then
                         q_cons_vf(c_idx)%sf(j, k, l) = q_prim_vf(c_idx)%sf(j, k, l)
                     end if
 
@@ -1175,7 +1177,7 @@ contains
         end if
 #endif
 
-    end subroutine s_convert_primitive_to_conservative_variables ! ---------
+    end subroutine s_convert_primitive_to_conservative_variables
 
     !>  The following subroutine handles the conversion between
         !!      the primitive variables and the Eulerian flux variables.
@@ -1185,7 +1187,7 @@ contains
         !!  @param ix Index bounds in the first coordinate direction
         !!  @param iy Index bounds in the second coordinate direction
         !!  @param iz Index bounds in the third coordinate direction
-    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, & ! ------
+    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, &
                                                      FK_vf, &
                                                      FK_src_vf, &
                                                      is1, is2, is3, s2b, s3b)
@@ -1309,9 +1311,9 @@ contains
         end do
 #endif
 
-    end subroutine s_convert_primitive_to_flux_variables ! -----------------
+    end subroutine s_convert_primitive_to_flux_variables
 
-    subroutine s_finalize_variables_conversion_module ! ------------------
+    subroutine s_finalize_variables_conversion_module
 
         ! Deallocating the density, the specific heat ratio function and the
         ! liquid stiffness function
@@ -1335,6 +1337,6 @@ contains
         ! computing the mixture/species variables to the mixture variables
         s_convert_to_mixture_variables => null()
 
-    end subroutine s_finalize_variables_conversion_module ! ----------------
+    end subroutine s_finalize_variables_conversion_module
 
 end module m_variables_conversion

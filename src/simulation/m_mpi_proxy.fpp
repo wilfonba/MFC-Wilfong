@@ -17,6 +17,8 @@ module m_mpi_proxy
     use mpi                    !< Message passing interface (MPI) module
 #endif
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
     use m_helper
 
     use m_derived_types        !< Definitions of the derived types
@@ -93,7 +95,7 @@ contains
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
-    subroutine s_initialize_mpi_proxy_module() ! ---------------------------
+    subroutine s_initialize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
@@ -141,7 +143,7 @@ contains
             v_size = sys_size
         end if
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             nVars = num_dims + 1
             if (n > 0) then
                 if (p > 0) then
@@ -164,14 +166,14 @@ contains
 
 #endif
 
-    end subroutine s_initialize_mpi_proxy_module ! -------------------------
+    end subroutine s_initialize_mpi_proxy_module
 
     !>  Since only the processor with rank 0 reads and verifies
         !!      the consistency of user inputs, these are initially not
         !!      available to the other processors. Then, the purpose of
         !!      this subroutine is to distribute the user inputs to the
         !!      remaining processors in the communicator.
-    subroutine s_mpi_bcast_user_inputs() ! ---------------------------------
+    subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
 
@@ -205,7 +207,7 @@ contains
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
-        #:for VAR in [ 'dt','weno_eps','pref','rhoref','R0ref','Web','Ca', 'sigma', &
+        #:for VAR in [ 'dt','weno_eps','teno_CT','pref','rhoref','R0ref','Web','Ca', 'sigma', &
             & 'Re_inv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps', 'pi_fac',    &
             & 'bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1','bc_x%ve2','bc_x%ve2', &
             & 'bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1','bc_y%ve2','bc_y%ve3', &
@@ -216,6 +218,9 @@ contains
         #:endfor
 
         #:if not MFC_CASE_OPTIMIZATION
+            call MPI_BCAST(mapped_weno, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(wenoz, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(teno, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(weno_order, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(nb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(num_fluids, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
@@ -258,7 +263,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_bcast_user_inputs ! -------------------------------
+    end subroutine s_mpi_bcast_user_inputs
 
     !>  The purpose of this procedure is to optimally decompose
         !!      the computational domain among the available processors.
@@ -266,7 +271,7 @@ contains
         !!      in each of the coordinate directions, approximately the
         !!      same number of cells, and then recomputing the affected
         !!      global parameters.
-    subroutine s_mpi_decompose_computational_domain() ! --------------------
+    subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
 
@@ -634,7 +639,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_decompose_computational_domain ! ------------------
+    end subroutine s_mpi_decompose_computational_domain
 
     !>  The goal of this procedure is to populate the buffers of
         !!      the grid variables by communicating with the neighboring
@@ -644,10 +649,10 @@ contains
         !!      directly from those of the cell-width distributions.
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
-    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc) ! ---
+    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
 
-        integer, intent(IN) :: mpi_dir
-        integer, intent(IN) :: pbc_loc
+        integer, intent(in) :: mpi_dir
+        integer, intent(in) :: pbc_loc
 
         integer :: dst_proc(1:3)
 
@@ -819,7 +824,7 @@ contains
 
 #endif
 
-    end subroutine s_mpi_sendrecv_grid_variables_buffers ! -----------------
+    end subroutine s_mpi_sendrecv_grid_variables_buffers
 
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
@@ -832,10 +837,9 @@ contains
                                                 mpi_dir, &
                                                 pbc_loc)
 
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(INOUT) :: pb, mv
-
-        integer, intent(IN) :: mpi_dir, pbc_loc
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(kind(0d0)), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
+        integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
 
@@ -1240,19 +1244,15 @@ contains
 
 #endif
 
-    end subroutine s_mpi_sendrecv_variables_buffers ! ---------
+    end subroutine s_mpi_sendrecv_variables_buffers
 
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
         !!      with the neighboring processors.
-        !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param mpi_dir MPI communication coordinate direction
-        !!  @param pbc_loc Processor boundary condition (PBC) location
     subroutine s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
 
-        type(integer_field), intent(INOUT) :: ib_markers
-
-        integer, intent(IN) :: gp_layers
+        type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: gp_layers
 
         integer :: i, j, k, l, r !< Generic loop iterators
 
@@ -2032,13 +2032,12 @@ contains
 
 #endif
 
-    end subroutine s_mpi_sendrecv_ib_buffers ! ---------
+    end subroutine s_mpi_sendrecv_ib_buffers
 
     subroutine s_mpi_sendrecv_capilary_variables_buffers(c_divs_vf, mpi_dir, pbc_loc)
 
-        type(scalar_field), dimension(num_dims + 1), intent(INOUT) :: c_divs_vf
-
-        integer, intent(IN) :: mpi_dir, pbc_loc
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs_vf
+        integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
 
@@ -2242,7 +2241,7 @@ contains
     end subroutine s_mpi_sendrecv_capilary_variables_buffers
 
     !> Module deallocation and/or disassociation procedures
-    subroutine s_finalize_mpi_proxy_module() ! -----------------------------
+    subroutine s_finalize_mpi_proxy_module
 
 #ifdef MFC_MPI
 
@@ -2252,12 +2251,12 @@ contains
             @:DEALLOCATE_GLOBAL(ib_buff_send, ib_buff_recv)
         end if
 
-        if (sigma /= dflt_real) then
+        if (.not. f_is_default(sigma)) then
             @:DEALLOCATE_GLOBAL(c_divs_buff_send, c_divs_buff_recv)
         end if
 
 #endif
 
-    end subroutine s_finalize_mpi_proxy_module ! ---------------------------
+    end subroutine s_finalize_mpi_proxy_module
 
 end module m_mpi_proxy

@@ -279,17 +279,17 @@ See also `adv_alphan` in table [Simulation Algorithm Parameters](#5-simulation-a
 
 ### 4. Immersed Boundary Patches
 
-| Parameter            | Type    | Analytical Definition Description |
-| ---:                 | :----:  | :----:                | 
+| Parameter            | Type    | Description |
+| ---:                 | :----:  | :---                | 
 | `geometry`             | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`      | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`        | Real    | Length, if applicable, in the [x,y,z]-direction. |
 | `radius`               | Real    | Radius, if applicable, of the applied geometry. |
 | `theta`                | Real    | Angle of attach applied to airfoil IB patches |
-| `c`                    | Real    | 
-| `t`                    | Real    |
-| `m`                    | Real    | 
-| `p`                    | Real    |
+| `c`                    | Real    | NACA airfoil parameters (see below) | 
+| `t`                    | Real    | NACA airfoil parameters (see below) |
+| `m`                    | Real    | NACA airfoil parameters (see below) |
+| `p`                    | Real    | NACA airfoil parameters (see below) |
 | `slip`                 | Logical | Apply a slip boundary |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index. 
@@ -360,18 +360,21 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `time_stepper`         | Integer | Runge--Kutta order [1-3] |
 | `adap_dt`              | Logical | Strang splitting scheme with adaptive time stepping |
 | `weno_order`	         | Integer | WENO order [1,3,5] |
-| `weno_eps`	           | Real    | WENO perturbation (avoid division by zero) |
-| `mapped_weno`	         | Logical | WENO with mapping of nonlinear weights |
+| `weno_eps`	         | Real    | WENO perturbation (avoid division by zero) |
+| `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
+| `wenoz`	             | Logical | WENO-Z |
+| `teno`                 | Logical | TENO (Targeted ENO) |
+| `teno_CT`              | Real    | TENO threshold for smoothness detection | 
 | `null_weights`         | Logical | Null WENO weights at boundaries |
 | `mp_weno`              | Logical | Monotonicity preserving WENO |
 | `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*	 |
-| `avg_state`	           | Integer | Averaged state evaluation method: [1] Roe averagen*; [2] Arithmetic mean  |
+| `avg_state`	         | Integer | Averaged state evaluation method: [1] Roe averagen*; [2] Arithmetic mean  |
 | `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
-| `weno_Re_flux`          | Logical | Compute velocity gradient using scaler divergence theorem	 |
+| `weno_Re_flux`         | Logical | Compute velocity gradient using scaler divergence theorem	 |
 | `weno_avg`          	 | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 
 - \* Options that work only with `model_eqns =2`.
-- † Options that work only with `cyl_coord = 'F'`.
+- † Options that work only with ``cyl_coord = 'F'``.
 - ‡ Options that work only with `bc_[x,y,z]%[beg,end] = -15` and/or `bc_[x,y,z]%[beg,end] = -16`
 
 The table lists simulation algorithm parameters.
@@ -402,7 +405,7 @@ If this parameter is set false, the void fraction of $N$-th component is compute
 $$ \alpha_N=1-\sum^{N-1}_{i=1} \alpha_i $$
 
 where $\alpha_i$ is the void fraction of $i$-th component.
-When a single-component flow is simulated, it requires that `adv_alphan = 'T'`.
+When a single-component flow is simulated, it requires that ``adv_alphan = 'T'``.
 
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
 
@@ -413,14 +416,20 @@ When a single-component flow is simulated, it requires that `adv_alphan = 'T'`.
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer. 
 Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md#Gottlieb98)).
 
-- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires `bubbles = 'T'`, `polytropic = 'T'`, `adv_n = 'T'` and `time_stepper = 3`.
+- `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`.
 
 - `weno_order` specifies the order of WENO scheme that is used for spatial reconstruction of variables by an integer of 1, 3, and 5, that correspond to the 1st, 3rd, and 5th order, respectively.
 
 - `weno_eps` specifies the lower bound of the WENO nonlinear weights.
 Practically, `weno_eps` $<10^{-6}$ is used.
 
-- `mapped_weno` activates mapping of the nonlinear WENO weights to the more accurate nonlinear weights in order to reinstate the optimal order of accuracy of the reconstruction in the proximity of critical points ([Henrick et al., 2005](references.md#Henrick05)).
+- `mapped_weno` activates the WENO-M scheme in place of the default WENO-JS scheme ([Henrick et al., 2005](references.md#Henrick05)). WENO-M a variant of the WENO scheme that remaps the nonlinear WENO-JS weights by assigning larger weights to non-smooth stencils, reducing dissipation compared to the default WENO-JS scheme, at the expense of higher computational cost. Only one of `mapped_weno`, `wenoz`, and `teno` can be activated.
+
+- `wenoz` activates the WENO-Z scheme in place of the default WENO-JS scheme ([Borges et al., 2008](references.md#Borges08)). WENO-Z is a variant of the WENO scheme that further reduces the dissipation compared to the WENO-M scheme. It has similar computational cost to the WENO-JS scheme.
+
+- `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](references.md#Fu16)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5`. Requires `teno_CT` to be set.
+
+- `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. A recommended value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7`. 
 
 - `null_weights` activates nullification of the nonlinear WENO weights at the buffer regions outside the domain boundaries when the Riemann extrapolation boundary condition is specified (`bc_[x,y,z]\%beg[end]} = -4`).
 
@@ -648,7 +657,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `vel_profile` activates setting the mean streamwise velocity to hyperbolic tangent profile. This option works only for 2D and 3D cases.
 
-- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -5`, and `vel_profile = 'T'`.
+- `instability_wave` activates the perturbation of initial velocity by instability waves obtained from linear stability analysis for a mixing layer with hyperbolic tangent mean streamwise velocity profile. This option only works for `n > 0`, `bc_y%[beg,end] = -5`, and ``vel_profile = 'T'``.
 
 ### 11. Phase Change Model
 | Parameter              | Type    | Description                                    |
@@ -712,7 +721,7 @@ Positive accelerations are in the `x[y,z]` direction are in the positive `x[y,z]
 |  -15 | Normal         | Slip wall |
 |  -16 | Normal         | No-slip wall |
 
-*: This boundary condition is only used for `bc_y%beg` when using cylindrical coordinates (`cyl_coord = 'T'` and 3D). For axisymmetric problems, use `bc_y%beg = -2` with `cyl_coord = 'T'` in 2D.
+*: This boundary condition is only used for `bc_y%beg` when using cylindrical coordinates (``cyl_coord = 'T'`` and 3D). For axisymmetric problems, use `bc_y%beg = -2` with ``cyl_coord = 'T'`` in 2D.
 
 The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions).
 Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
