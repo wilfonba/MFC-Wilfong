@@ -72,7 +72,7 @@ PRE_PROCESS.update({
     'perlinNoise':ParamType.LOG
 })
 
-for ib_id in range(1, 10+1):
+for ib_id in range(1, 20+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
                           ("c", ParamType.REAL), ("p", ParamType.REAL),

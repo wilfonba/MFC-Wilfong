@@ -37,13 +37,13 @@ w-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 e     SDSC Expanse
 e-all python/3.8.5
-e-cpu cpu/0.15.4 gcc/9.2.0 openmpi/4.1.1 cmake/3.18.2
+e-cpu cpu/0.15.4 gcc/9.2.0 openmpi/4.1.1 cmake/3.19.8 fftw/3.3.8-w265bq
 e-gpu gpu/0.15.4 cuda/11.0.2 nvhpc/22.2 openmpi/4.0.5 cmake/3.19.8
 e-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 p     GT Phoenix
 p-all python/3.9.12-rkxvr6 
-p-cpu gcc/12.1.0-qgxpzk openmpi
+p-cpu gcc/12.1.0-qgxpzk openmpi cmake/3.23.1-327dbl
 p-gpu cmake/3.23.1-327dbl cuda/11.7.0-7sdye3 nvhpc/22.11
 p-gpu MFC_CUDA_CC=70,80 CC=nvc CXX=nvc++ FC=nvfortran
 

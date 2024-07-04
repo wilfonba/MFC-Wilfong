@@ -21,7 +21,8 @@ module m_body_forces
 
     private; public :: s_compute_body_forces_rhs, &
  s_initialize_body_forces_module, &
- s_finalize_body_forces_module
+ s_finalize_body_forces_module, &
+ s_compute_acceleration
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :), rhoM)
@@ -65,13 +66,33 @@ contains
         real(kind(0d0)) :: t
 
         if (m > 0) then
-            accel_bf(1) = g_x + k_x*sin(w_x*t - p_x)
+
+            if (bf_x == .true.) then
+                accel_bf(1) = g_x + k_x*sin(w_x*t - p_x)
+            else
+                accel_bf(1) = 0d0
+            endif
+
             if (n > 0) then
-                accel_bf(2) = g_y + k_y*sin(w_y*t - p_y)
-                if (p > 0) then
-                    accel_bf(3) = g_z + k_z*sin(w_z*t - p_z)
+
+                if (bf_y == .true.) then
+                    accel_bf(2) = g_y + k_y*sin(w_y*t - p_y)
+                else
+                    accel_bf(2) = 0d0
                 end if
+
+                if (p > 0) then
+
+                    if (bf_z == .true.) then
+                        accel_bf(3) = g_z + k_z*sin(w_z*t - p_z)
+                    else
+                        accel_bf(3) = 0d0
+                    end if
+
+                end if
+
             end if
+
         end if
 
         !$acc update device(accel_bf)

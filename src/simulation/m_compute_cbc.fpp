@@ -27,7 +27,7 @@ contains
         !!      Thompson (1990). At the slip wall (frictionless wall),
         !!      the normal component of velocity is zero at all times,
         !!      while the transverse velocities may be nonzero.
-    subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+    subroutine s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, g_s) ! --------------
 #ifdef CRAY_ACC_WAR
         !DIR$ INLINEALWAYS s_compute_slip_wall_L
 #else
@@ -38,6 +38,7 @@ contains
         real(kind(0d0)), dimension(num_dims), intent(IN) :: dvel_ds
         real(kind(0d0)), intent(IN) :: rho, c, dpres_ds
         real(kind(0d0)), dimension(sys_size), intent(INOUT) :: L
+        real(kind(0d0)) :: g_s
 
         integer :: i
 
@@ -47,7 +48,7 @@ contains
             L(i) = 0d0
         end do
 
-        L(advxe) = L(1)
+        L(advxe) = L(1) + 2*rho*c*g_s
 
     end subroutine s_compute_slip_wall_L ! ---------------------------------
 

@@ -61,7 +61,7 @@ c_w = math.sqrt( gamw * ( p0w + piw ) / rho0w )
 
 # Shock Mach number of interest. Note that the post-shock properties can be defined in terms of either 
 # Min or psOp0a. Just comment/uncomment appropriatelly
-Min = 2.4
+Min = 3
 
 ## Pos to pre shock ratios - AIR
 
@@ -158,6 +158,9 @@ Nt = AS * SF
 
 # total simulation time - s. Note that tend >= tendA
 tend = Nt * dt
+
+print(rhos, vel, ps)
+print(rho0a, p0a)
 
 # Configuring case dictionary
 print(json.dumps({

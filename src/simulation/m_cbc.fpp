@@ -31,6 +31,8 @@ module m_cbc
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_compute_cbc
+
+    use m_body_forces
     ! ==========================================================================
 
     implicit none
@@ -661,6 +663,8 @@ contains
 
         real(kind(0d0)) :: vel_K_sum, vel_dv_dt_sum
 
+        real(kind(0d0)) :: g_s
+
         integer :: i, j, k, r, q !< Generic loop iterators
 
         real(kind(0d0)) :: blkmod1, blkmod2 !< Fluid bulk modulus for Wood mixture sound speed
@@ -681,6 +685,13 @@ contains
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir == ${CBC_DIR}$) then
+
+                if (bodyforces) then
+                    call s_compute_acceleration(mytime)
+                    g_s = -1d0*accel_bf(cbc_dir)*cbc_loc
+                else
+                    g_s = 0d0
+                end if
 
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2 ==================
                 if (weno_order == 3) then
@@ -865,7 +876,7 @@ contains
                         lambda(3) = vel(dir_idx(1)) + c
 
                         if ((cbc_loc == -1 .and. bc${XYZ}$b == -5) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -5)) then
-                            call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
+                            call s_compute_slip_wall_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, g_s) ! --------------
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -6) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -6)) then
                             call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds) ! --------------
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == -7) .or. (cbc_loc == 1 .and. bc${XYZ}$e == -7)) then

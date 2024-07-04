@@ -17,8 +17,8 @@ x1 = l
 y0 = 0
 y1 = l
 
-Nx = 49
-Ny = 49
+Nx = 99
+Ny = 99
 
 eps = 1e-9
 
@@ -49,7 +49,7 @@ data = {
     # =======================================
 
     # Simulation Algorithm ==================
-        'model_eqns'        : 3,
+        'model_eqns'        : 2,
         'alt_soundspeed'    : 'F',
         'adv_alphan'        : 'T',
         'mixture_err'       : 'T',
