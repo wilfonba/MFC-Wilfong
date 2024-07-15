@@ -25,7 +25,11 @@ contains
 
         call s_check_inputs_compilers
 
-        call s_check_inputs_weno
+        if (recon_type == 1) then
+            call s_check_inputs_weno
+        elseif (recon_type == 2) then
+
+        end if
         call s_check_inputs_riemann_solver
         call s_check_inputs_time_stepping
         call s_check_inputs_model_eqns

@@ -125,6 +125,10 @@ module m_global_parameters
         logical, parameter :: mapped_weno = ${mapped_weno}$ !< WENO-M (WENO with mapping of nonlinear weights)
         logical, parameter :: wenoz = ${wenoz}$             !< WENO-Z
         logical, parameter :: teno = ${teno}$               !< TENO (Targeted ENO)
+        integer, parameter :: recon_type = ${recon_type}$   !< Reconstruction method to use
+        integer, parameter :: muscl_order = ${muscl_order}$ !< Order of MUSCL reconstruction
+        integer, parameter :: muscl_lim = ${muscl_lim}$     !< MUSCL slope limiter
+        integer, parameter :: muscl_polyn = ${muscl_polyn}$ !< Degree of MUSCL polynomials
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
@@ -133,6 +137,10 @@ module m_global_parameters
         logical :: mapped_weno    !< WENO-M (WENO with mapping of nonlinear weights)
         logical :: wenoz          !< WENO-Z
         logical :: teno           !< TENO (Targeted ENO)
+        integer :: recon_type     !< Reconstruction method to use
+        integer :: muscl_order    !< Order of MUSCL reconstruction
+        integer :: muscl_lim      !< MUSCL slope limiter
+        integer :: muscl_polyn   !< Degree of MUSCL polynomials
     #:endif
 
     real(kind(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -148,6 +156,7 @@ module m_global_parameters
     logical :: mixture_err    !< Mixture properties correction
     logical :: hypoelasticity !< hypoelasticity modeling
     logical :: cu_tensor
+    logical :: int_comp       !< THINC interface compression
 
     logical :: bodyForces
     logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
@@ -164,6 +173,7 @@ module m_global_parameters
 
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(num_dims, weno_polyn, weno_order, num_fluids, wenojs, mapped_weno, wenoz, teno)
+        !$acc declare create(recon_type, muscl_order, muscl_lim)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity)
@@ -518,6 +528,7 @@ contains
         weno_flat = .true.
         riemann_flat = .true.
         rdma_mpi = .false.
+        int_comp = .false.
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
@@ -578,6 +589,9 @@ contains
             nb = 1
             weno_order = dflt_int
             num_fluids = dflt_int
+            recon_type = 1 !< default to WENO
+            muscl_order = dflt_int
+            muscl_lim = dflt_int
         #:endif
 
         R0_type = dflt_int
@@ -669,7 +683,8 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             ! Determining the degree of the WENO polynomials
             weno_polyn = (weno_order - 1)/2
-            !$acc update device(weno_polyn)
+            muscl_polyn = muscl_order
+            !$acc update device(weno_polyn, muscl_polyn)
             !$acc update device(nb)
             !$acc update device(num_dims, num_fluids)
         #:endif
@@ -980,12 +995,18 @@ contains
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
         ! the next one
-        if (any(Re_size > 0)) then
-            buff_size = 2*weno_polyn + 2
-!        else if (hypoelasticity) then !TODO: check if necessary
-!            buff_size = 2*weno_polyn + 2
+        if (recon_type == 1) then
+            if (any(Re_size > 0)) then
+                buff_size = 2*weno_polyn + 2
+            else
+                buff_size = weno_polyn + 2
+            end if
         else
-            buff_size = weno_polyn + 2
+            if (any(Re_size > 0)) then
+                buff_size = 2*muscl_polyn + 2
+            else
+                buff_size = muscl_polyn + 2
+            end if
         end if
 
         ! Configuring Coordinate Direction Indexes =========================

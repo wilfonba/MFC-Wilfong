@@ -45,7 +45,11 @@ contains
         ! Run by all three stages
         call s_check_inputs_simulation_domain
         call s_check_inputs_model_eqns_and_num_fluids
-        call s_check_inputs_weno
+        if (recon_type == 1) then
+            call s_check_inputs_weno
+        else if (recon_type == 2) then
+
+        end if
         call s_check_inputs_bc
         call s_check_inputs_stiffened_eos
         call s_check_inputs_surface_tension

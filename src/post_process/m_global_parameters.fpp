@@ -92,6 +92,8 @@ module m_global_parameters
     logical :: mpp_lim         !< Maximum volume fraction limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order     !< Order of accuracy for the MUSCL reconstruction
+    integer :: recon_type
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: hypoelasticity  !< Turn hypoelasticity on
@@ -284,6 +286,8 @@ contains
         num_fluids = dflt_int
         adv_alphan = .false.
         weno_order = dflt_int
+        muscl_order = dflt_int
+        recon_type = 1 !< default to WENO reconstruction
         mixture_err = .false.
         alt_soundspeed = .false.
         relax = .false.

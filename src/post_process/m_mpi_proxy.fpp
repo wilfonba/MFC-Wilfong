@@ -158,7 +158,8 @@ contains
             & 't_step_start', 't_step_stop', 't_step_save', 'weno_order',      &
             & 'model_eqns', 'num_fluids', 'bc_x%beg', 'bc_x%end', 'bc_y%beg',  &
             & 'bc_y%end', 'bc_z%beg', 'bc_z%end', 'flux_lim', 'format',        &
-            & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model' ]
+            & 'precision', 'fd_order', 'thermal', 'nb', 'relax_model',         &
+            & 'recon_type', 'muscl_order' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -241,25 +242,213 @@ contains
 
         ! Generating 3D Cartesian Processor Topology =======================
 
-        if (n > 0) then
+        #:for SCHEME, NUM in [('weno',1),('muscl',2)] 
+        if (recon_type == ${NUM}$) then
+            if (n > 0) then
 
-            if (p > 0) then
+                if (p > 0) then
 
-                if (cyl_coord .and. p > 0) then
-                    ! Implement pencil processor blocking if using cylindrical coordinates so
-                    ! that all cells in azimuthal direction are stored on a single processor.
-                    ! This is necessary for efficient application of Fourier filter near axis.
+                    if (cyl_coord .and. p > 0) then
+                        ! Implement pencil processor blocking if using cylindrical coordinates so
+                        ! that all cells in azimuthal direction are stored on a single processor.
+                        ! This is necessary for efficient application of Fourier filter near axis.
+
+                        ! Initial values of the processor factorization optimization
+                        num_procs_x = 1
+                        num_procs_y = num_procs
+                        num_procs_z = 1
+                        ierr = -1
+
+                        ! Computing minimization variable for these initial values
+                        tmp_num_procs_x = num_procs_x
+                        tmp_num_procs_y = num_procs_y
+                        tmp_num_procs_z = num_procs_z
+                        fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
+                                           - (n + 1)/tmp_num_procs_y)
+
+                        ! Searching for optimal computational domain distribution
+                        do i = 1, num_procs
+
+                            if (mod(num_procs, i) == 0 &
+                                .and. &
+                                (m + 1)/i >= num_stcls_min*${SCHEME}$_order) then
+
+                                tmp_num_procs_x = i
+                                tmp_num_procs_y = num_procs/i
+
+                                if (fct_min >= abs((m + 1)/tmp_num_procs_x &
+                                                   - (n + 1)/tmp_num_procs_y) &
+                                    .and. &
+                                    (n + 1)/tmp_num_procs_y &
+                                    >= &
+                                    num_stcls_min*${SCHEME}$_order) then
+
+                                    num_procs_x = i
+                                    num_procs_y = num_procs/i
+                                    fct_min = abs((m + 1)/tmp_num_procs_x &
+                                                  - (n + 1)/tmp_num_procs_y)
+                                    ierr = 0
+
+                                end if
+
+                            end if
+
+                        end do
+
+                    else
+
+                        ! Initial values of the processor factorization optimization
+                        num_procs_x = 1
+                        num_procs_y = 1
+                        num_procs_z = num_procs
+                        ierr = -1
+
+                        ! Computing minimization variable for these initial values
+                        tmp_num_procs_x = num_procs_x
+                        tmp_num_procs_y = num_procs_y
+                        tmp_num_procs_z = num_procs_z
+                        fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
+                                           - (n + 1)/tmp_num_procs_y) &
+                                  + 10d0*abs((n + 1)/tmp_num_procs_y &
+                                             - (p + 1)/tmp_num_procs_z)
+
+                        ! Searching for optimal computational domain distribution
+                        do i = 1, num_procs
+
+                            if (mod(num_procs, i) == 0 &
+                                .and. &
+                                (m + 1)/i >= num_stcls_min*${SCHEME}$_order) then
+
+                                do j = 1, (num_procs/i)
+
+                                    if (mod(num_procs/i, j) == 0 &
+                                        .and. &
+                                        (n + 1)/j >= num_stcls_min*${SCHEME}$_order) then
+
+                                        tmp_num_procs_x = i
+                                        tmp_num_procs_y = j
+                                        tmp_num_procs_z = num_procs/(i*j)
+
+                                        if (fct_min >= abs((m + 1)/tmp_num_procs_x &
+                                                           - (n + 1)/tmp_num_procs_y) &
+                                            + abs((n + 1)/tmp_num_procs_y &
+                                                  - (p + 1)/tmp_num_procs_z) &
+                                            .and. &
+                                            (p + 1)/tmp_num_procs_z &
+                                            >= &
+                                            num_stcls_min*${SCHEME}$_order) &
+                                            then
+
+                                            num_procs_x = i
+                                            num_procs_y = j
+                                            num_procs_z = num_procs/(i*j)
+                                            fct_min = abs((m + 1)/tmp_num_procs_x &
+                                                          - (n + 1)/tmp_num_procs_y) &
+                                                      + abs((n + 1)/tmp_num_procs_y &
+                                                            - (p + 1)/tmp_num_procs_z)
+                                            ierr = 0
+
+                                        end if
+
+                                    end if
+
+                                end do
+
+                            end if
+
+                        end do
+
+                    end if
+
+                    ! Checking whether the decomposition of the computational
+                    ! domain was successful
+                    if (proc_rank == 0 .and. ierr == -1) then
+                        print '(A)', 'Unable to decompose computational '// &
+                            'domain for selected number of '// &
+                            'processors. Exiting ...'
+                        call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+                    end if
+
+                    ! Creating a new communicator using Cartesian topology
+                    call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, &
+                                                              num_procs_y, num_procs_z/), &
+                                         (/.true., .true., .true./), &
+                                         .false., MPI_COMM_CART, ierr)
+
+                    ! Finding corresponding Cartesian coordinates of the local
+                    ! processor rank in newly declared cartesian communicator
+                    call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, &
+                                         proc_coords, ierr)
+
+                    ! END: Generating 3D Cartesian Processor Topology ==================
+
+                    ! Sub-domain Global Parameters in z-direction ======================
+
+                    ! Number of remaining cells after majority is distributed
+                    rem_cells = mod(p + 1, num_procs_z)
+
+                    ! Optimal number of cells per processor
+                    p = (p + 1)/num_procs_z - 1
+
+                    ! Distributing any remaining cells
+                    do i = 1, rem_cells
+                        if (proc_coords(3) == i - 1) then
+                            p = p + 1
+                            exit
+                        end if
+                    end do
+
+                    ! Boundary condition at the beginning
+                    if (proc_coords(3) > 0 .or. bc_z%beg == -1) then
+                        proc_coords(3) = proc_coords(3) - 1
+                        call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                           bc_z%beg, ierr)
+                        proc_coords(3) = proc_coords(3) + 1
+                    end if
+
+                    ! Ghost zone at the beginning
+                    if (proc_coords(3) > 0 .and. format == 1) then
+                        offset_z%beg = 2
+                    else
+                        offset_z%beg = 0
+                    end if
+
+                    ! Boundary condition at the end
+                    if (proc_coords(3) < num_procs_z - 1 .or. bc_z%end == -1) then
+                        proc_coords(3) = proc_coords(3) + 1
+                        call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                           bc_z%end, ierr)
+                        proc_coords(3) = proc_coords(3) - 1
+                    end if
+
+                    ! Ghost zone at the end
+                    if (proc_coords(3) < num_procs_z - 1 .and. format == 1) then
+                        offset_z%end = 2
+                    else
+                        offset_z%end = 0
+                    end if
+
+                    if (parallel_io) then
+                        if (proc_coords(3) < rem_cells) then
+                            start_idx(3) = (p + 1)*proc_coords(3)
+                        else
+                            start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
+                        end if
+                    end if
+                    ! ==================================================================
+
+                    ! Generating 2D Cartesian Processor Topology =======================
+
+                else
 
                     ! Initial values of the processor factorization optimization
                     num_procs_x = 1
                     num_procs_y = num_procs
-                    num_procs_z = 1
                     ierr = -1
 
                     ! Computing minimization variable for these initial values
                     tmp_num_procs_x = num_procs_x
                     tmp_num_procs_y = num_procs_y
-                    tmp_num_procs_z = num_procs_z
                     fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
                                        - (n + 1)/tmp_num_procs_y)
 
@@ -268,7 +457,7 @@ contains
 
                         if (mod(num_procs, i) == 0 &
                             .and. &
-                            (m + 1)/i >= num_stcls_min*weno_order) then
+                            (m + 1)/i >= num_stcls_min*${SCHEME}$_order) then
 
                             tmp_num_procs_x = i
                             tmp_num_procs_y = num_procs/i
@@ -278,7 +467,7 @@ contains
                                 .and. &
                                 (n + 1)/tmp_num_procs_y &
                                 >= &
-                                num_stcls_min*weno_order) then
+                                num_stcls_min*${SCHEME}$_order) then
 
                                 num_procs_x = i
                                 num_procs_y = num_procs/i
@@ -292,294 +481,109 @@ contains
 
                     end do
 
-                else
+                    ! Checking whether the decomposition of the computational
+                    ! domain was successful
+                    if (proc_rank == 0 .and. ierr == -1) then
+                        print '(A)', 'Unable to decompose computational '// &
+                            'domain for selected number of '// &
+                            'processors. Exiting ...'
+                        call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+                    end if
 
-                    ! Initial values of the processor factorization optimization
-                    num_procs_x = 1
-                    num_procs_y = 1
-                    num_procs_z = num_procs
-                    ierr = -1
+                    ! Creating a new communicator using Cartesian topology
+                    call MPI_CART_CREATE(MPI_COMM_WORLD, 2, (/num_procs_x, &
+                                                              num_procs_y/), (/.true., &
+                                                                               .true./), .false., MPI_COMM_CART, &
+                                         ierr)
 
-                    ! Computing minimization variable for these initial values
-                    tmp_num_procs_x = num_procs_x
-                    tmp_num_procs_y = num_procs_y
-                    tmp_num_procs_z = num_procs_z
-                    fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
-                                       - (n + 1)/tmp_num_procs_y) &
-                              + 10d0*abs((n + 1)/tmp_num_procs_y &
-                                         - (p + 1)/tmp_num_procs_z)
-
-                    ! Searching for optimal computational domain distribution
-                    do i = 1, num_procs
-
-                        if (mod(num_procs, i) == 0 &
-                            .and. &
-                            (m + 1)/i >= num_stcls_min*weno_order) then
-
-                            do j = 1, (num_procs/i)
-
-                                if (mod(num_procs/i, j) == 0 &
-                                    .and. &
-                                    (n + 1)/j >= num_stcls_min*weno_order) then
-
-                                    tmp_num_procs_x = i
-                                    tmp_num_procs_y = j
-                                    tmp_num_procs_z = num_procs/(i*j)
-
-                                    if (fct_min >= abs((m + 1)/tmp_num_procs_x &
-                                                       - (n + 1)/tmp_num_procs_y) &
-                                        + abs((n + 1)/tmp_num_procs_y &
-                                              - (p + 1)/tmp_num_procs_z) &
-                                        .and. &
-                                        (p + 1)/tmp_num_procs_z &
-                                        >= &
-                                        num_stcls_min*weno_order) &
-                                        then
-
-                                        num_procs_x = i
-                                        num_procs_y = j
-                                        num_procs_z = num_procs/(i*j)
-                                        fct_min = abs((m + 1)/tmp_num_procs_x &
-                                                      - (n + 1)/tmp_num_procs_y) &
-                                                  + abs((n + 1)/tmp_num_procs_y &
-                                                        - (p + 1)/tmp_num_procs_z)
-                                        ierr = 0
-
-                                    end if
-
-                                end if
-
-                            end do
-
-                        end if
-
-                    end do
+                    ! Finding corresponding Cartesian coordinates of the local
+                    ! processor rank in newly declared cartesian communicator
+                    call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, &
+                                         proc_coords, ierr)
 
                 end if
+                ! END: Generating 2D Cartesian Processor Topology ==================
 
-                ! Checking whether the decomposition of the computational
-                ! domain was successful
-                if (proc_rank == 0 .and. ierr == -1) then
-                    print '(A)', 'Unable to decompose computational '// &
-                        'domain for selected number of '// &
-                        'processors. Exiting ...'
-                    call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-                end if
+                ! Sub-domain Global Parameters in y-direction ======================
 
-                ! Creating a new communicator using Cartesian topology
-                call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, &
-                                                          num_procs_y, num_procs_z/), &
-                                     (/.true., .true., .true./), &
-                                     .false., MPI_COMM_CART, ierr)
-
-                ! Finding corresponding Cartesian coordinates of the local
-                ! processor rank in newly declared cartesian communicator
-                call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, &
-                                     proc_coords, ierr)
-
-                ! END: Generating 3D Cartesian Processor Topology ==================
-
-                ! Sub-domain Global Parameters in z-direction ======================
-
-                ! Number of remaining cells after majority is distributed
-                rem_cells = mod(p + 1, num_procs_z)
+                ! Number of remaining cells after majority has been distributed
+                rem_cells = mod(n + 1, num_procs_y)
 
                 ! Optimal number of cells per processor
-                p = (p + 1)/num_procs_z - 1
+                n = (n + 1)/num_procs_y - 1
 
                 ! Distributing any remaining cells
                 do i = 1, rem_cells
-                    if (proc_coords(3) == i - 1) then
-                        p = p + 1
+                    if (proc_coords(2) == i - 1) then
+                        n = n + 1
                         exit
                     end if
                 end do
 
                 ! Boundary condition at the beginning
-                if (proc_coords(3) > 0 .or. bc_z%beg == -1) then
-                    proc_coords(3) = proc_coords(3) - 1
+                if (proc_coords(2) > 0 .or. bc_y%beg == -1) then
+                    proc_coords(2) = proc_coords(2) - 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
-                                       bc_z%beg, ierr)
-                    proc_coords(3) = proc_coords(3) + 1
+                                       bc_y%beg, ierr)
+                    proc_coords(2) = proc_coords(2) + 1
                 end if
 
                 ! Ghost zone at the beginning
-                if (proc_coords(3) > 0 .and. format == 1) then
-                    offset_z%beg = 2
+                if (proc_coords(2) > 0 .and. format == 1) then
+                    offset_y%beg = 2
                 else
-                    offset_z%beg = 0
+                    offset_y%beg = 0
                 end if
 
                 ! Boundary condition at the end
-                if (proc_coords(3) < num_procs_z - 1 .or. bc_z%end == -1) then
-                    proc_coords(3) = proc_coords(3) + 1
+                if (proc_coords(2) < num_procs_y - 1 .or. bc_y%end == -1) then
+                    proc_coords(2) = proc_coords(2) + 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
-                                       bc_z%end, ierr)
-                    proc_coords(3) = proc_coords(3) - 1
+                                       bc_y%end, ierr)
+                    proc_coords(2) = proc_coords(2) - 1
                 end if
 
                 ! Ghost zone at the end
-                if (proc_coords(3) < num_procs_z - 1 .and. format == 1) then
-                    offset_z%end = 2
+                if (proc_coords(2) < num_procs_y - 1 .and. format == 1) then
+                    offset_y%end = 2
                 else
-                    offset_z%end = 0
+                    offset_y%end = 0
                 end if
 
                 if (parallel_io) then
-                    if (proc_coords(3) < rem_cells) then
-                        start_idx(3) = (p + 1)*proc_coords(3)
+                    if (proc_coords(2) < rem_cells) then
+                        start_idx(2) = (n + 1)*proc_coords(2)
                     else
-                        start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
+                        start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
                     end if
                 end if
                 ! ==================================================================
 
-                ! Generating 2D Cartesian Processor Topology =======================
+                ! Generating 1D Cartesian Processor Topology =======================
 
             else
 
-                ! Initial values of the processor factorization optimization
-                num_procs_x = 1
-                num_procs_y = num_procs
-                ierr = -1
+                ! Number of processors in the coordinate direction is equal to
+                ! the total number of processors available
+                num_procs_x = num_procs
 
-                ! Computing minimization variable for these initial values
-                tmp_num_procs_x = num_procs_x
-                tmp_num_procs_y = num_procs_y
-                fct_min = 10d0*abs((m + 1)/tmp_num_procs_x &
-                                   - (n + 1)/tmp_num_procs_y)
-
-                ! Searching for optimal computational domain distribution
-                do i = 1, num_procs
-
-                    if (mod(num_procs, i) == 0 &
-                        .and. &
-                        (m + 1)/i >= num_stcls_min*weno_order) then
-
-                        tmp_num_procs_x = i
-                        tmp_num_procs_y = num_procs/i
-
-                        if (fct_min >= abs((m + 1)/tmp_num_procs_x &
-                                           - (n + 1)/tmp_num_procs_y) &
-                            .and. &
-                            (n + 1)/tmp_num_procs_y &
-                            >= &
-                            num_stcls_min*weno_order) then
-
-                            num_procs_x = i
-                            num_procs_y = num_procs/i
-                            fct_min = abs((m + 1)/tmp_num_procs_x &
-                                          - (n + 1)/tmp_num_procs_y)
-                            ierr = 0
-
-                        end if
-
-                    end if
-
-                end do
-
-                ! Checking whether the decomposition of the computational
-                ! domain was successful
-                if (proc_rank == 0 .and. ierr == -1) then
-                    print '(A)', 'Unable to decompose computational '// &
-                        'domain for selected number of '// &
-                        'processors. Exiting ...'
-                    call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-                end if
+                ! Number of cells in undecomposed computational domain needed
+                ! for sub-domain reassembly during formatted data output
+                m_root = m
 
                 ! Creating a new communicator using Cartesian topology
-                call MPI_CART_CREATE(MPI_COMM_WORLD, 2, (/num_procs_x, &
-                                                          num_procs_y/), (/.true., &
-                                                                           .true./), .false., MPI_COMM_CART, &
+                call MPI_CART_CREATE(MPI_COMM_WORLD, 1, (/num_procs_x/), &
+                                     (/.true./), .false., MPI_COMM_CART, &
                                      ierr)
 
-                ! Finding corresponding Cartesian coordinates of the local
-                ! processor rank in newly declared cartesian communicator
-                call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, &
+                ! Finding the corresponding Cartesian coordinates of the local
+                ! processor rank in the newly declared cartesian communicator
+                call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 1, &
                                      proc_coords, ierr)
 
             end if
-
-            ! END: Generating 2D Cartesian Processor Topology ==================
-
-            ! Sub-domain Global Parameters in y-direction ======================
-
-            ! Number of remaining cells after majority has been distributed
-            rem_cells = mod(n + 1, num_procs_y)
-
-            ! Optimal number of cells per processor
-            n = (n + 1)/num_procs_y - 1
-
-            ! Distributing any remaining cells
-            do i = 1, rem_cells
-                if (proc_coords(2) == i - 1) then
-                    n = n + 1
-                    exit
-                end if
-            end do
-
-            ! Boundary condition at the beginning
-            if (proc_coords(2) > 0 .or. bc_y%beg == -1) then
-                proc_coords(2) = proc_coords(2) - 1
-                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
-                                   bc_y%beg, ierr)
-                proc_coords(2) = proc_coords(2) + 1
-            end if
-
-            ! Ghost zone at the beginning
-            if (proc_coords(2) > 0 .and. format == 1) then
-                offset_y%beg = 2
-            else
-                offset_y%beg = 0
-            end if
-
-            ! Boundary condition at the end
-            if (proc_coords(2) < num_procs_y - 1 .or. bc_y%end == -1) then
-                proc_coords(2) = proc_coords(2) + 1
-                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
-                                   bc_y%end, ierr)
-                proc_coords(2) = proc_coords(2) - 1
-            end if
-
-            ! Ghost zone at the end
-            if (proc_coords(2) < num_procs_y - 1 .and. format == 1) then
-                offset_y%end = 2
-            else
-                offset_y%end = 0
-            end if
-
-            if (parallel_io) then
-                if (proc_coords(2) < rem_cells) then
-                    start_idx(2) = (n + 1)*proc_coords(2)
-                else
-                    start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
-                end if
-            end if
-            ! ==================================================================
-
-            ! Generating 1D Cartesian Processor Topology =======================
-
-        else
-
-            ! Number of processors in the coordinate direction is equal to
-            ! the total number of processors available
-            num_procs_x = num_procs
-
-            ! Number of cells in undecomposed computational domain needed
-            ! for sub-domain reassembly during formatted data output
-            m_root = m
-
-            ! Creating a new communicator using Cartesian topology
-            call MPI_CART_CREATE(MPI_COMM_WORLD, 1, (/num_procs_x/), &
-                                 (/.true./), .false., MPI_COMM_CART, &
-                                 ierr)
-
-            ! Finding the corresponding Cartesian coordinates of the local
-            ! processor rank in the newly declared cartesian communicator
-            call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 1, &
-                                 proc_coords, ierr)
-
         end if
+        #:endfor
 
         ! ==================================================================
 

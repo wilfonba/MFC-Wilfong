@@ -76,6 +76,8 @@ module m_start_up
     use m_surface_tension
 
     use m_body_forces
+
+    use m_muscl
     ! ==========================================================================
 
     implicit none
@@ -162,7 +164,8 @@ contains
             R0_type, file_per_process, sigma, &
             pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
-            g_x, g_y, g_z
+            g_x, g_y, g_z, recon_type, muscl_order, &
+            muscl_lim, int_comp
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -282,6 +285,7 @@ contains
                   FORM='unformatted', &
                   ACTION='read', &
                   STATUS='old')
+            print*, m
             read (2) x_cb(-1:m); close (2)
         else
             call s_mpi_abort(trim(file_path)//' is missing. Exiting ...')
@@ -1302,10 +1306,14 @@ contains
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
 
-        ! Computation of parameters, allocation of memory, association of pointers,
-        ! and/or execution of any other tasks that are needed to properly configure
-        ! the modules. The preparations below DO DEPEND on the grid being complete.
-        call s_initialize_weno_module()
+        if (recon_type == 1) then
+            ! Computation of parameters, allocation of memory, association of pointers,
+            ! and/or execution of any other tasks that are needed to properly configure
+            ! the modules. The preparations below DO DEPEND on the grid being complete.
+            call s_initialize_weno_module()
+        else if (recon_type == 2) then
+            call s_initialize_muscl_module()
+        end if
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         print *, "[MEM-INST] After: s_initialize_weno_module"
@@ -1430,7 +1438,11 @@ contains
         call s_finalize_rhs_module()
         call s_finalize_cbc_module()
         call s_finalize_riemann_solvers_module()
-        call s_finalize_weno_module()
+        if (recon_type == 1) then
+            call s_finalize_weno_module()
+        else if (recon_type == 2) then
+            call s_finalize_muscl_module()
+        end if
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()

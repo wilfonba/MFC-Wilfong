@@ -36,6 +36,7 @@ COMMON = {
     'model_eqns': ParamType.INT,
     'nb': ParamType.REAL,
     'weno_order': ParamType.INT,
+    'muscl_order': ParamType.INT,
     'rhoref': ParamType.REAL,
     'bubbles': ParamType.LOG,
     'Re_inv': ParamType.REAL,
@@ -48,6 +49,7 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
+    'recon_type': ParamType.INT,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -204,6 +206,8 @@ SIMULATION.update({
     'adap_dt': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'muscl_lim': ParamType.INT,
+    'int_comp': ParamType.LOG
 })
 
 # NOTE: Not currently present
@@ -341,7 +345,7 @@ ALL.update(PRE_PROCESS)
 ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
-CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "nb", "weno_order", "num_fluids" ]
+CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "nb", "weno_order", "num_fluids", "recon_type", "muscl_order", "muscl_lim" ]
 
 _properties = { k: v.value for k, v in ALL.items() }
 
