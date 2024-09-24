@@ -898,7 +898,8 @@ contains
                             dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))* &
                                                   (L(1) - L(advxe))/(2d0*rho*c) + &
                                                   (dir_flg(dir_idx(i)) - 1d0)* &
-                                                  L(momxb + i - 1)
+                                                  L(momxb + i - 1) - &
+                                                  dir_flg(dir_idx(i))*accel_bf(dir_idx(1))
                         end do
 
                         vel_dv_dt_sum = 0d0
@@ -948,7 +949,7 @@ contains
                         do i = momxb, momxe
                             flux_rs${XYZ}$_vf(-1, k, r, i) = flux_rs${XYZ}$_vf(0, k, r, i) &
                                                              + ds(0)*(vel(i - contxe)*drho_dt &
-                                                                      + rho*dvel_dt(i - contxe))
+                                                              + rho*dvel_dt(i - contxe))
                         end do
 
                         flux_rs${XYZ}$_vf(-1, k, r, E_idx) = flux_rs${XYZ}$_vf(0, k, r, E_idx) &

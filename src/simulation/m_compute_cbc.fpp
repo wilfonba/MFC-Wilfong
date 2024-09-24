@@ -49,7 +49,7 @@ contains
             L(i) = 0d0
         end do
 
-        L(advxe) = L(1)
+        L(advxe) = L(1) - 2*rho*c*accel_bf(dir_idx(1))
 
     end subroutine s_compute_slip_wall_L
 

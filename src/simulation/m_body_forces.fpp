@@ -19,7 +19,7 @@ module m_body_forces
 
     implicit none
 
-    private; 
+    private;
     public :: s_compute_body_forces_rhs, &
               s_initialize_body_forces_module, &
               s_finalize_body_forces_module
@@ -65,14 +65,19 @@ contains
 
         real(kind(0d0)), intent(in) :: t
 
-        if (m > 0) then
+        accel_bf(1) = 0d0
+        if (bf_x) then
             accel_bf(1) = g_x + k_x*sin(w_x*t - p_x)
-            if (n > 0) then
-                accel_bf(2) = g_y + k_y*sin(w_y*t - p_y)
-                if (p > 0) then
-                    accel_bf(3) = g_z + k_z*sin(w_z*t - p_z)
-                end if
-            end if
+        end if
+
+        accel_bf(2) = 0d0
+        if (bf_y) then
+            accel_bf(2) = g_y + k_y*sin(w_y*t - p_y)
+        end if
+
+        accel_bf(3) = 0d0
+        if (bf_z) then
+            accel_bf(3) = g_z + k_z*sin(w_z*t - p_z)
         end if
 
         !$acc update device(accel_bf)
@@ -147,7 +152,7 @@ contains
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0, p
-                do k = 0, n
+                do k = 1, n-1
                     do j = 0, m
                         rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
                                                         rhoM(j, k, l)*accel_bf(2)

@@ -1256,6 +1256,11 @@ contains
                                 rhs_vf(j)%sf(q, k, l) + 1d0/dy(k)* &
                                 (flux_n(2)%vf(j)%sf(q, k - 1, l) &
                                  - flux_n(2)%vf(j)%sf(q, k, l))
+                            !if (j == momxb + 1) then
+                                !if (k == 0) then
+                                    !print*, rhs_vf(j)%sf(q, k, l)
+                                !end if
+                            !end if
                         end do
                     end do
                 end do
