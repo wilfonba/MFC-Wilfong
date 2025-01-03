@@ -81,6 +81,8 @@ module m_start_up
 
     use m_body_forces
 
+    use m_igr
+
     implicit none
 
     private; public :: s_read_input_file, &
@@ -171,7 +173,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref
+            hyperelasticity, R0ref, igr, igr_order
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -645,7 +647,7 @@ contains
                                            mpi_p, status, ierr)
                     end do
                 end if
-                
+
 
                 call s_mpi_barrier()
 
@@ -1282,8 +1284,10 @@ contains
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         elseif (time_stepper == 4) then
-            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)         
+            ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)
             call s_4th_5th_order_rkck(t_step, time_avg)
+        else if(time_stepper == 6) then
+            call s_rlw_rk3(t_step, time_avg)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
@@ -1291,7 +1295,7 @@ contains
         ! Time-stepping loop controls
 
         t_step = t_step + 1
-        
+
     end subroutine s_perform_time_step
 
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
@@ -1396,7 +1400,7 @@ contains
             !$acc update host(q_beta%vf(1)%sf)
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, q_beta%vf(1))
             !$acc update host(Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_rad, intfc_vel)
-            call s_write_restart_lag_bubbles(save_count) !parallel 
+            call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count)
@@ -1443,7 +1447,7 @@ contains
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
         if (grid_geometry == 3) call s_initialize_fftw_module()
-        call s_initialize_riemann_solvers_module()
+        if (.not. igr) call s_initialize_riemann_solvers_module()
 
         if(bubbles_euler) call s_initialize_bubbles_EE_module()
         if (ib) call s_initialize_ibm_module()
@@ -1457,7 +1461,7 @@ contains
             call s_initialize_acoustic_src()
         end if
 
-        if (viscous) then
+        if (viscous .and. .not. igr) then
             call s_initialize_viscous_module()
         end if
 
@@ -1496,14 +1500,15 @@ contains
         ! Computation of parameters, allocation of memory, association of pointers,
         ! and/or execution of any other tasks that are needed to properly configure
         ! the modules. The preparations below DO DEPEND on the grid being complete.
-        call s_initialize_weno_module()
+        if (.not. igr) call s_initialize_weno_module()
+        if (igr) call s_initialize_igr_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         print *, "[MEM-INST] After: s_initialize_weno_module"
         call acc_present_dump()
 #endif
 
-        call s_initialize_cbc_module()
+        if (.not. igr) call s_initialize_cbc_module()
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
@@ -1604,7 +1609,7 @@ contains
         !$acc update device(sigma, surface_tension)
 
         !$acc update device(dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc)
-   
+
         !$acc update device(bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3)
         !$acc update device(bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3)
         !$acc update device(bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3)
@@ -1627,21 +1632,23 @@ contains
     subroutine s_finalize_modules
 
         call s_finalize_time_steppers_module()
-        if (hypoelasticity) call s_finalize_hypoelastic_module() 
-        if (hyperelasticity) call s_finalize_hyperelastic_module() 
+        if (hypoelasticity) call s_finalize_hypoelastic_module()
+        if (hyperelasticity) call s_finalize_hyperelastic_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()
-        call s_finalize_cbc_module()
-        call s_finalize_riemann_solvers_module()
-        call s_finalize_weno_module()
+        if (.not. igr) then
+            call s_finalize_cbc_module()
+            call s_finalize_riemann_solvers_module()
+            call s_finalize_weno_module()
+        end if
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
         call s_finalize_global_parameters_module()
         if (relax) call s_finalize_relaxation_solver_module()
-        if (bubbles_lagrange) call s_finalize_lagrangian_solver() 
-        if (viscous) then
+        if (bubbles_lagrange) call s_finalize_lagrangian_solver()
+        if (viscous .and. .not. igr) then
             call s_finalize_viscous_module()
         end if
 

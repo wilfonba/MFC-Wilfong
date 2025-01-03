@@ -110,6 +110,7 @@ module m_global_parameters
     #:if MFC_CASE_OPTIMIZATION
         integer, parameter :: weno_polyn = ${weno_polyn}$ !< Degree of the WENO polynomials (polyn)
         integer, parameter :: weno_order = ${weno_order}$ !< Order of the WENO reconstruction
+        integer, parameter :: igr_order                   !< Order of the IGR reconstructions
         integer, parameter :: weno_num_stencils = ${weno_num_stencils}$ !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
         integer, parameter :: num_fluids = ${num_fluids}$ !< number of fluids in the simulation
         logical, parameter :: wenojs = (${wenojs}$ /= 0)            !< WENO-JS (default)
@@ -120,6 +121,7 @@ module m_global_parameters
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
+        integer :: igr_order      !< Order of the IGR reconstructions
         integer :: weno_num_stencils    !< Number of stencils for WENO reconstruction (only different from weno_polyn for TENO(>5))
         integer :: num_fluids     !< number of fluids in the simulation
         logical :: wenojs         !< WENO-JS (default)
@@ -150,8 +152,9 @@ module m_global_parameters
     logical :: viscous       !< Viscous effects
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
+    logical :: igr           !< Use information geometric regularization
 
-    !$acc declare create(chemistry)
+    !$acc declare create(chemistry, igr)
 
     logical :: bodyForces
     logical :: bf_x, bf_y, bf_z !< body force toggle in three directions
@@ -167,7 +170,7 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
+        !$acc declare create(num_dims, weno_polyn, weno_order, igr_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
@@ -537,6 +540,7 @@ contains
         viscous = .false.
         shear_stress = .false.
         bulk_stress = .false.
+        igr = .false.
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
@@ -602,6 +606,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             nb = 1
             weno_order = dflt_int
+            igr_order = dflt_int
             num_fluids = dflt_int
         #:endif
 
@@ -1110,13 +1115,17 @@ contains
             !buff_size = buff_size + fd_number
         end if
 
-        if (probe_wrt) then
-            fd_number = max(1, fd_order/2)
-        end if
-
         ! Correction for smearing function in the lagrangian subgrid bubble model
         if (bubbles_lagrange) then
             buff_size = max(buff_size, 6)
+        end if
+
+        if (igr) then
+            buff_size = max(4,(igr_order - 1)/2)
+        end if
+
+        if (probe_wrt) then
+            fd_number = max(1, fd_order/2)
         end if
 
         ! Configuring Coordinate Direction Indexes

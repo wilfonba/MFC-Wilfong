@@ -52,6 +52,8 @@ module m_time_steppers
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf !<
     !! Cell-average primitive variables at the current time-stage
 
+    type(scalar_field), allocatable, dimension(:) :: k1, k2, k3, q_cons_init
+
     type(scalar_field), allocatable, dimension(:) :: rhs_vf !<
     !! Cell-average RHS variables at the current time-stage
 
@@ -75,6 +77,7 @@ module m_time_steppers
     !! Number of time stages in the time-stepping scheme
 
     !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, rhs_ts_rkck, q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    !$acc declare create(k1, k2, k3, q_cons_init)
 
 contains
 
@@ -88,7 +91,7 @@ contains
         ! Setting number of time-stages for selected time-stepping scheme
         if (time_stepper == 1) then
             num_ts = 1
-        elseif (any(time_stepper == (/2, 3, 4/))) then
+        elseif (any(time_stepper == (/2, 3, 4, 6/))) then
             num_ts = 2
         end if
 
@@ -286,6 +289,32 @@ contains
             do i = 1, sys_size
                 @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
                 @:ACC_SETUP_SFs(rhs_vf(i))
+            end do
+        end if
+
+        @:ALLOCATE(k1(1:sys_size), k2(1:sys_size), k3(1:sys_size), q_cons_init(1:sys_size))
+
+        if(time_stepper == 6) then
+            do i = 1, sys_size
+            @:ALLOCATE(k1(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                idwbuff(2)%beg:idwbuff(2)%end, &
+                                idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(k1)
+
+                @:ALLOCATE(k2(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                    idwbuff(2)%beg:idwbuff(2)%end, &
+                                    idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(k2)
+
+                @:ALLOCATE(k3(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                    idwbuff(2)%beg:idwbuff(2)%end, &
+                                    idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(k3)
+
+                @:ALLOCATE(q_cons_init(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                             idwbuff(2)%beg:idwbuff(2)%end, &
+                                             idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_cons_init)
             end do
         end if
 
@@ -864,6 +893,185 @@ contains
             time = time + (finish - start)
         end if
     end subroutine s_3rd_order_tvd_rk
+
+    subroutine s_rlw_rk3(t_step, time_avg)
+
+        integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
+
+        integer :: i, j, k, l, q!< Generic loop iterator
+        real(kind(0d0)) :: start, finish
+
+        call cpu_time(start)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size - 1
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                         q_cons_init(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+
+        if (run_time_info) then
+            call s_write_run_time_information(q_prim_vf, t_step)
+        end if
+
+        if (probe_wrt) then
+            call s_time_step_cycling(t_step)
+        end if
+
+        if (t_step == t_step_stop) return
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size - 1
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if(p == 0) then
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                0.25d0*(q_cons_ts(1)%vf(i)%sf(j, k, l) + q_cons_ts(1)%vf(i)%sf(j + 1, k, l) + &
+                                q_cons_ts(1)%vf(i)%sf(j , k + 1, l) + q_cons_ts(1)%vf(i)%sf(j + 1 ,k + 1, l)) &
+                                + dt*0.5d0*rhs_vf(i)%sf(j, k, l)
+                        else
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                0.125d0*(q_cons_ts(1)%vf(i)%sf(j, k, l) + q_cons_ts(1)%vf(i)%sf(j + 1, k, l) + &
+                                q_cons_ts(1)%vf(i)%sf(j , k + 1, l) + q_cons_ts(1)%vf(i)%sf(j + 1 ,k + 1, l) + &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l + 1) + q_cons_ts(1)%vf(i)%sf(j + 1, k, l + 1) + &
+                                q_cons_ts(1)%vf(i)%sf(j , k + 1, l + 1) + q_cons_ts(1)%vf(i)%sf(j + 1 ,k + 1, l + 1) ) &
+                                + dt*0.5d0*rhs_vf(i)%sf(j, k, l)
+                        end if
+
+                        q_cons_ts(2)%vf(advxb)%sf(j, k, l) = rhs_vf(advxb)%sf(j, k, l)
+
+                    end do
+                end do
+            end do
+        end do
+
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size - 1
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        k1(i)%sf(j, k, l) = dt*rhs_vf(i)%sf(j, k, l)
+
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (q_cons_init(i)%sf(j, k, l) &
+                             + k1(i)%sf(j, k, l))
+
+                        q_cons_ts(1)%vf(advxb)%sf(j, k, l) = rhs_vf(advxb)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size - 1
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if(p == 0) then
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                0.25d0*(q_cons_ts(1)%vf(i)%sf(j, k, l) + q_cons_ts(1)%vf(i)%sf(j + 1, k, l) + &
+                                q_cons_ts(1)%vf(i)%sf(j , k + 1, l) + q_cons_ts(1)%vf(i)%sf(j + 1 ,k + 1, l)) &
+                                + dt*0.5d0*rhs_vf(i)%sf(j, k, l)
+                        else
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                0.125d0*(q_cons_ts(1)%vf(i)%sf(j, k, l) + q_cons_ts(1)%vf(i)%sf(j + 1, k, l) + &
+                                q_cons_ts(1)%vf(i)%sf(j , k + 1, l) + q_cons_ts(1)%vf(i)%sf(j + 1 ,k + 1, l) + &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l + 1) + q_cons_ts(1)%vf(i)%sf(j + 1, k, l + 1) + &
+                                q_cons_ts(1)%vf(i)%sf(j , k + 1, l + 1) + q_cons_ts(1)%vf(i)%sf(j + 1 ,k + 1, l + 1) ) &
+                                + dt*0.5d0*rhs_vf(i)%sf(j, k, l)
+                        end if
+
+                        q_cons_ts(2)%vf(advxb)%sf(j, k, l) = rhs_vf(advxb)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size - 1
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        k2(i)%sf(j, k, l) = dt*rhs_vf(i)%sf(j, k, l)
+
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = q_cons_init(i)%sf(j, k, l) + &
+                                        0.25d0*(k1(i)%sf(j, k, l) + k2(i)%sf(j, k, l))
+
+                        q_cons_ts(1)%vf(advxb)%sf(j, k, l) = rhs_vf(advxb)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size - 1
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if(p == 0) then
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                0.25d0*(q_cons_ts(1)%vf(i)%sf(j, k, l) + q_cons_ts(1)%vf(i)%sf(j + 1, k, l) + &
+                                q_cons_ts(1)%vf(i)%sf(j , k + 1, l) + q_cons_ts(1)%vf(i)%sf(j + 1 ,k + 1, l)) &
+                                + dt*0.5d0*rhs_vf(i)%sf(j, k, l)
+                        else
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                0.125d0*(q_cons_ts(1)%vf(i)%sf(j, k, l) + q_cons_ts(1)%vf(i)%sf(j + 1, k, l) + &
+                                q_cons_ts(1)%vf(i)%sf(j , k + 1, l) + q_cons_ts(1)%vf(i)%sf(j + 1 ,k + 1, l) + &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l + 1) + q_cons_ts(1)%vf(i)%sf(j + 1, k, l + 1) + &
+                                q_cons_ts(1)%vf(i)%sf(j , k + 1, l + 1) + q_cons_ts(1)%vf(i)%sf(j + 1 ,k + 1, l + 1) ) &
+                                + dt*0.5d0*rhs_vf(i)%sf(j, k, l)
+                        end if
+
+                        q_cons_ts(2)%vf(advxb)%sf(j, k, l) = rhs_vf(advxb)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do i = 1, sys_size - 1
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+
+                        k3(i)%sf(j, k, l) = dt*rhs_vf(i)%sf(j, k, l)
+
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = q_cons_init(i)%sf(j, k, l) &
+                         + (k1(i)%sf(j, k, l) + k2(i)%sf(j, k, l) + 4d0*k3(i)%sf(j, k, l))/6d0
+
+                         q_cons_ts(1)%vf(advxb)%sf(j, k, l) = rhs_vf(advxb)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+
+        call cpu_time(finish)
+
+        if (t_step >= 4) then
+            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if
+
+    end subroutine s_rlw_rk3
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
         !!      the flux term and adaptive time stepping algorithm for
