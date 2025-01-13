@@ -49,11 +49,6 @@ contains
         !bcxb = -1; bcxe = -1; bcyb = -1; bcye = -1; bczb = -1; bcze = -1
         !$acc update device(bcxb, bcxe, bcyb, bcye, bczb, bcze)
 
-        ! Configuring coordinate direction indices
-        ix%beg = -buff_size; iy%beg = 0; iz%beg = 0
-        if (n > 0) iy%beg = -buff_size; if (p > 0) iz%beg = -buff_size
-        ix%end = m - ix%beg; iy%end = n - iy%beg; iz%end = p - iz%beg
-
 
         #:for VAR in ['rho_igr', 'dux', 'duy', 'duz', 'dvx', 'dvy', 'dvz', &
                     & 'dwx', 'dwy', 'dwz', 'jac', 'jac_rhs', 'jac_old',     &
@@ -115,302 +110,60 @@ contains
             intent(INOUT) :: qL, qR, q_prim
         integer, intent(IN) :: idir
 
-        if (igr_order == 5) then
-            if(idir == 1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j-2, k, l) + &
-                                                        27d0 * q_prim(j-1, k, l) + &
-                                                        47d0 * q_prim(j, k, l) -   &
-                                                        13d0 * q_prim(j+1, k, l) + &
-                                                        2d0 * q_prim(j+2, k, l))
-                            qR(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j+2, k, l) + &
-                                                        27d0 * q_prim(j+1, k, l) + &
-                                                        47d0 * q_prim(j, k, l) -   &
-                                                        13d0 * q_prim(j-1, k, l) + &
-                                                        2d0 * q_prim(j-2, k, l))
-                        end do
+        if(idir == 1) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                        qL(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j-2, k, l) + &
+                                                    27d0 * q_prim(j-1, k, l) + &
+                                                    47d0 * q_prim(j, k, l) -   &
+                                                    13d0 * q_prim(j+1, k, l) + &
+                                                    2d0 * q_prim(j+2, k, l))
+                        qR(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j+2, k, l) + &
+                                                    27d0 * q_prim(j+1, k, l) + &
+                                                    47d0 * q_prim(j, k, l) -   &
+                                                    13d0 * q_prim(j-1, k, l) + &
+                                                    2d0 * q_prim(j-2, k, l))
                     end do
                 end do
-            else if(idir == 2) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k-2, l) + &
-                                                        27d0 * q_prim(j, k-1, l) + &
-                                                        47d0 * q_prim(j, k, l) -   &
-                                                        13d0 * q_prim(j, k+1, l) + &
-                                                        2d0 * q_prim(j, k+2, l))
-                            qR(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k+2, l) + &
-                                                        27d0 * q_prim(j, k+1, l) + &
-                                                        47d0 * q_prim(j, k, l) -   &
-                                                        13d0 * q_prim(j, k-1, l) + &
-                                                        2d0 * q_prim(j, k-2, l))
-                        end do
+            end do
+        else if(idir == 2) then
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                        qL(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k-2, l) + &
+                                                    27d0 * q_prim(j, k-1, l) + &
+                                                    47d0 * q_prim(j, k, l) -   &
+                                                    13d0 * q_prim(j, k+1, l) + &
+                                                    2d0 * q_prim(j, k+2, l))
+                        qR(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k+2, l) + &
+                                                    27d0 * q_prim(j, k+1, l) + &
+                                                    47d0 * q_prim(j, k, l) -   &
+                                                    13d0 * q_prim(j, k-1, l) + &
+                                                    2d0 * q_prim(j, k-2, l))
                     end do
                 end do
-            else
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k, l-2) + &
-                                                        27d0 * q_prim(j, k, l-1) + &
-                                                        47d0 * q_prim(j, k, l) -   &
-                                                        13d0 * q_prim(j, k, l+1) + &
-                                                        2d0 * q_prim(j, k, l+2))
-                            qR(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k, l+2) + &
-                                                        27d0 * q_prim(j, k, l+1) + &
-                                                        47d0 * q_prim(j, k, l) -   &
-                                                        13d0 * q_prim(j, k, l-1) + &
-                                                        2d0 * q_prim(j, k, l-2))
-                        end do
+            end do
+        else
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                        qL(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k, l-2) + &
+                                                    27d0 * q_prim(j, k, l-1) + &
+                                                    47d0 * q_prim(j, k, l) -   &
+                                                    13d0 * q_prim(j, k, l+1) + &
+                                                    2d0 * q_prim(j, k, l+2))
+                        qR(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k, l+2) + &
+                                                    27d0 * q_prim(j, k, l+1) + &
+                                                    47d0 * q_prim(j, k, l) -   &
+                                                    13d0 * q_prim(j, k, l-1) + &
+                                                    2d0 * q_prim(j, k, l-2))
                     end do
                 end do
-            end if
-        else if (igr_order == 7) then
-            if(idir == 1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/420d0) * (-3d0 * q_prim(j-3, k, l) + &
-                                                        25d0 * q_prim(j-2, k, l) - &
-                                                        101d0 * q_prim(j-1, k, l) + &
-                                                        319d0 * q_prim(j, k, l) +   &
-                                                        214d0 * q_prim(j+1, k, l) - &
-                                                        38d0 * q_prim(j+2, k, l) +  &
-                                                        4d0 * q_prim(j+3, k, l))
-                            qR(j, k, l) = (1d0/420d0) * (-3d0 * q_prim(j+3, k, l) + &
-                                                        25d0 * q_prim(j+2, k, l) - &
-                                                        101d0 * q_prim(j+1, k, l) + &
-                                                        319d0 * q_prim(j, k, l) +   &
-                                                        214d0 * q_prim(j-1, k, l) - &
-                                                        38d0 * q_prim(j-2, k, l) +  &
-                                                        4d0 * q_prim(j-3, k, l))
-                        end do
-                    end do
-                end do
-            else if(idir == 2) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/420d0) * (-3d0 * q_prim(j, k-3, l) + &
-                                                        25d0 * q_prim(j, k-2, l) - &
-                                                        101d0 * q_prim(j, k-1, l) + &
-                                                        319d0 * q_prim(j, k, l) +   &
-                                                        214d0 * q_prim(j, k+1, l) - &
-                                                        38d0 * q_prim(j, k+2, l) +  &
-                                                        4d0 * q_prim(j, k+3, l))
-                            qR(j, k, l) = (1d0/420d0) * (-3d0 * q_prim(j, k+3, l) + &
-                                                        25d0 * q_prim(j, k+2, l) - &
-                                                        101d0 * q_prim(j, k+1, l) + &
-                                                        319d0 * q_prim(j, k, l) +   &
-                                                        214d0 * q_prim(j, k-1, l) - &
-                                                        38d0 * q_prim(j, k-2, l) +  &
-                                                        4d0 * q_prim(j, k-3, l))
-                        end do
-                    end do
-                end do
-            else
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/420d0) * (-3d0 * q_prim(j, k, l-3) + &
-                                                        25d0 * q_prim(j, k, l-2) - &
-                                                        101d0 * q_prim(j, k, l-1) + &
-                                                        319d0 * q_prim(j, k, l) +   &
-                                                        214d0 * q_prim(j, k, l+1) - &
-                                                        38d0 * q_prim(j, k, l+2) +  &
-                                                        4d0 * q_prim(j, k, l+3))
-                            qR(j, k, l) = (1d0/420d0) * (-3d0 * q_prim(j, k, l+3) + &
-                                                        25d0 * q_prim(j, k, l+2) - &
-                                                        101d0 * q_prim(j, k, l+1) + &
-                                                        319d0 * q_prim(j, k, l) +   &
-                                                        214d0 * q_prim(j, k, l-1) - &
-                                                        38d0 * q_prim(j, k, l-2) +  &
-                                                        4d0 * q_prim(j, k, l-3))
-                        end do
-                    end do
-                end do
-            end if
-        else if (igr_order == 9) then
-            if(idir == 1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/2520d0) * (4d0 * q_prim(j-4, k, l) - &
-                                                        41d0 * q_prim(j-3, k, l) + &
-                                                        199d0 * q_prim(j-2, k, l) - &
-                                                        641d0 * q_prim(j-1, k, l) + &
-                                                        1879d0 * q_prim(j, k, l) +   &
-                                                        1375d0 * q_prim(j+1, k, l) + &
-                                                        305d0 * q_prim(j+2, k, l) + &
-                                                        55d0 * q_prim(j+3, k, l) - &
-                                                        5d0 * q_prim(j+4, k, l))
-                            qR(j, k, l) = (1d0/2520d0) * (4d0 * q_prim(j+4, k, l) - &
-                                                        41d0 * q_prim(j+3, k, l) + &
-                                                        199d0 * q_prim(j+2, k, l) - &
-                                                        641d0 * q_prim(j+1, k, l) + &
-                                                        1879d0 * q_prim(j, k, l) +   &
-                                                        1375d0 * q_prim(j-1, k, l) + &
-                                                        305d0 * q_prim(j-2, k, l) + &
-                                                        55d0 * q_prim(j-3, k, l) - &
-                                                        5d0 * q_prim(j-4, k, l))
-                        end do
-                    end do
-                end do
-            else if(idir == 2) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/2520d0) * (4d0 * q_prim(j-4, k-4, l) - &
-                                                        41d0 * q_prim(j-3, k-3, l) + &
-                                                        199d0 * q_prim(j-2, k-2, l) - &
-                                                        641d0 * q_prim(j-1, k-1, l) + &
-                                                        1879d0 * q_prim(j, k, l) +   &
-                                                        1375d0 * q_prim(j+1, k+1, l) + &
-                                                        305d0 * q_prim(j+2, k+2, l) + &
-                                                        55d0 * q_prim(j+3, k+3, l) - &
-                                                        5d0 * q_prim(j+4, k+4, l))
-                            qR(j, k, l) = (1d0/2520d0) * (4d0 * q_prim(j, k+4, l) - &
-                                                        41d0 * q_prim(j, k+3, l) + &
-                                                        199d0 * q_prim(j, k+2, l) - &
-                                                        641d0 * q_prim(j, k+1, l) + &
-                                                        1879d0 * q_prim(j, k, l) +   &
-                                                        1375d0 * q_prim(j, k-1, l) + &
-                                                        305d0 * q_prim(j, k-2, l) + &
-                                                        55d0 * q_prim(j, k-3, l) - &
-                                                        5d0 * q_prim(j, k-4, l))
-                        end do
-                    end do
-                end do
-            else
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/2520d0) * (4d0 * q_prim(j-4, k, l-4) - &
-                                                        41d0 * q_prim(j-3, k, l-3) + &
-                                                        199d0 * q_prim(j-2, k, l-2) - &
-                                                        641d0 * q_prim(j-1, k, l-1) + &
-                                                        1879d0 * q_prim(j, k, l) +   &
-                                                        1375d0 * q_prim(j+1, k, l+1) + &
-                                                        305d0 * q_prim(j+2, k, l+2) + &
-                                                        55d0 * q_prim(j+3, k, l+3) - &
-                                                        5d0 * q_prim(j+4, k, l+4))
-                            qR(j, k, l) = (1d0/2520d0) * (4d0 * q_prim(j, k, l+4) - &
-                                                        41d0 * q_prim(j, k, l+3) + &
-                                                        199d0 * q_prim(j, k, l+2) - &
-                                                        641d0 * q_prim(j, k, l+1) + &
-                                                        1879d0 * q_prim(j, k, l) +   &
-                                                        1375d0 * q_prim(j, k, l-1) + &
-                                                        305d0 * q_prim(j, k, l-2) + &
-                                                        55d0 * q_prim(j, k, l-3) - &
-                                                        5d0 * q_prim(j, k, l-4))
-                        end do
-                    end do
-                end do
-            end if
-        else if (igr_order == 11) then
-            if(idir == 1) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/27720d0) * (-10d0 * q_prim(j-5, k, l) + &
-                                                        122d0 * q_prim(j-4, k, l) - &
-                                                        703d0 * q_prim(j-3, k, l) + &
-                                                        2597d0 * q_prim(j-2, k, l) - &
-                                                        7303d0 * q_prim(j-1, k, l) + &
-                                                        20417d0 * q_prim(j, k, l) +   &
-                                                        15797d0 * q_prim(j+1, k, l) - &
-                                                        4003d0 * q_prim(j+2, k, l) + &
-                                                        947d0 * q_prim(j+3, k, l) - &
-                                                        153d0 * q_prim(j+4, k, l) + &
-                                                        12d0 * q_prim(j+5, k, l))
-                            qR(j, k, l) = (1d0/27720d0) * (-10d0 * q_prim(j+5, k, l) + &
-                                                        122d0 * q_prim(j+4, k, l) - &
-                                                        703d0 * q_prim(j+3, k, l) + &
-                                                        2597d0 * q_prim(j+2, k, l) - &
-                                                        7303d0 * q_prim(j+1, k, l) + &
-                                                        20417d0 * q_prim(j, k, l) +   &
-                                                        15797d0 * q_prim(j-1, k, l) - &
-                                                        4003d0 * q_prim(j-2, k, l) + &
-                                                        947d0 * q_prim(j-3, k, l) - &
-                                                        153d0 * q_prim(j-4, k, l) + &
-                                                        12d0 * q_prim(j-5, k, l))
-                        end do
-                    end do
-                end do
-            else if(idir == 2) then
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/27720d0) * (-10d0 * q_prim(j, k-5, l) + &
-                                                        122d0 * q_prim(j, k-4, l) - &
-                                                        703d0 * q_prim(j, k-3, l) + &
-                                                        2597d0 * q_prim(j, k-2, l) - &
-                                                        7303d0 * q_prim(j, k-1, l) + &
-                                                        20417d0 * q_prim(j, k, l) +   &
-                                                        15797d0 * q_prim(j, k+1, l) - &
-                                                        4003d0 * q_prim(j, k+2, l) + &
-                                                        947d0 * q_prim(j, k+3, l) - &
-                                                        153d0 * q_prim(j, k+4, l) + &
-                                                        12d0 * q_prim(j, k+5, l))
-                            qR(j, k, l) = (1d0/27720d0) * (-10d0 * q_prim(j, k+5, l) + &
-                                                        122d0 * q_prim(j, k+4, l) - &
-                                                        703d0 * q_prim(j, k+3, l) + &
-                                                        2597d0 * q_prim(j, k+2, l) - &
-                                                        7303d0 * q_prim(j, k+1, l) + &
-                                                        20417d0 * q_prim(j, k, l) +   &
-                                                        15797d0 * q_prim(j, k-1, l) - &
-                                                        4003d0 * q_prim(j, k-2, l) + &
-                                                        947d0 * q_prim(j, k-3, l) - &
-                                                        153d0 * q_prim(j, k-4, l) + &
-                                                        12d0 * q_prim(j, k-5, l))
-                        end do
-                    end do
-                end do
-            else
-                !$acc parallel loop collapse(3) gang vector default(present)
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
-                            qL(j, k, l) = (1d0/27720d0) * (-10d0 * q_prim(j, k, l-5) + &
-                                                        122d0 * q_prim(j, k, l-4) - &
-                                                        703d0 * q_prim(j, k, l-3) + &
-                                                        2597d0 * q_prim(j, k, l-2) - &
-                                                        7303d0 * q_prim(j, k, l-1) + &
-                                                        20417d0 * q_prim(j, k, l) +   &
-                                                        15797d0 * q_prim(j, k, l+1) - &
-                                                        4003d0 * q_prim(j, k, l+2) + &
-                                                        947d0 * q_prim(j, k, l+3) - &
-                                                        153d0 * q_prim(j, k, l+4) + &
-                                                        12d0 * q_prim(j, k, l+5))
-                            qR(j, k, l) = (1d0/27720d0) * (-10d0 * q_prim(j, k, l+5) + &
-                                                        122d0 * q_prim(j, k, l+4) - &
-                                                        703d0 * q_prim(j, k, l+3) + &
-                                                        2597d0 * q_prim(j, k, l+2) - &
-                                                        7303d0 * q_prim(j, k, l+1) + &
-                                                        20417d0 * q_prim(j, k, l) +   &
-                                                        15797d0 * q_prim(j, k, l-1) - &
-                                                        4003d0 * q_prim(j, k, l-2) + &
-                                                        947d0 * q_prim(j, k, l-3) - &
-                                                        153d0 * q_prim(j, k, l-4) + &
-                                                        12d0 * q_prim(j, k, l-5))
-                        end do
-                    end do
-                end do
-            end if
+            end do
         end if
 
     end subroutine s_reconstruct_deriv
@@ -483,7 +236,7 @@ contains
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
-                            do j = ix%beg, ix%end
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
                                 jac(j,-k,l) = jac(j,n-k+1,l)
                             end do
                         end do
@@ -498,7 +251,7 @@ contains
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
-                            do j = ix%beg, ix%end
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
                                 jac(j,n+k,l) = jac(j,k-1,l)
                             end do
                         end do
@@ -513,8 +266,8 @@ contains
                     else
                         !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 1, buff_size
-                            do k = iy%beg, iy%end
-                                do j = ix%beg, ix%end
+                            do k = idwbuff(2)%beg, idwbuff(2)%end
+                                do j = idwbuff(1)%beg, idwbuff(1)%end
                                     jac(j,k,-l) = jac(j,k,p-l+1)
                                 end do
                             end do
@@ -528,8 +281,8 @@ contains
                     else
                     !$acc parallel loop gang vector collapse(3) default(present)
                         do l = 1, buff_size
-                            do k = iy%beg, iy%end
-                                do j = ix%beg, ix%end
+                            do k = idwbuff(2)%beg, idwbuff(2)%end
+                                do j = idwbuff(1)%beg, idwbuff(1)%end
                                     jac(j,k,p+l) = jac(j,k,l-1)
                                 end do
                             end do
@@ -539,9 +292,9 @@ contains
             end if
 
             !$acc parallel loop collapse(3) gang vector default(present)
-            do l = iz%beg, iz%end
-                do k = iy%beg, iy%end
-                    do j = ix%beg, ix%end
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
                         jac_old(j, k, l) = jac(j, k, l)
                     end do
                 end do
@@ -906,9 +659,9 @@ contains
         !$acc update device(omega)
 
         !$acc parallel loop collapse(3) gang vector default(present)
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
                     rho_igr(j,k,l) = q_prim_vf(contxb)%sf(j,k,l)
                 end do
             end do
@@ -917,8 +670,8 @@ contains
         if(p == 0) then
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0, p
-                do k = iy%beg + 2, iy%end - 2
-                    do j = ix%beg+2, ix%end - 2
+                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
                         dux(j,k,l) = (1/(12d0*dx(j))) * ( &
                             8d0*q_prim_vf(momxb)%sf(j+1,k,l) - &
                             8d0*q_prim_vf(momxb)%sf(j-1,k,l) + &
@@ -937,8 +690,8 @@ contains
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0, p
-                do k = iy%beg + 2, iy%end - 2
-                    do j = ix%beg+2, ix%end - 2
+                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
                         dvx(j,k,l) = (1/(12d0*dx(j))) * ( &
                             8d0*q_prim_vf(momxb+1)%sf(j+1,k,l) - &
                             8d0*q_prim_vf(momxb+1)%sf(j-1,k,l) + &
@@ -957,8 +710,8 @@ contains
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0, p
-                do k = iy%beg + 1, iy%end - 1
-                    do j = ix%beg + 1, ix%end - 1
+                do k = idwbuff(2)%beg + 1, idwbuff(2)%end - 1
+                    do j = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
                         jac_rhs(j, k, l) = alf_igr*( &
                                               dux(j,k,l)*dux(j,k,l) + dvx(j,k,l) * duy(j,k,l) + &
                                               duy(j,k,l)*dvx(j,k,l) + dvy(j,k,l) * dvy(j,k,l) +  &
@@ -969,8 +722,8 @@ contains
 
             !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry)
             do l = 0, p
-                do k = iy%beg + 1, iy%end - 1
-                    do j = ix%beg + 1, ix%end - 1
+                do k = idwbuff(2)%beg + 1, idwbuff(2)%end - 1
+                    do j = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
                         rho_lx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j-1,k,l))
                         rho_rx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j+1,k,l))
                         rho_ly = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k-1,l))
@@ -987,9 +740,9 @@ contains
         !!! 3D
         else
             !$acc parallel loop collapse(3) gang vector default(present)
-            do l = iz%beg + 2, iz%end - 2
-                do k = iy%beg + 2, iy%end - 2
-                    do j = ix%beg+2, ix%end - 2
+            do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
                         dux(j,k,l) = (1/(12d0*dx(j))) * ( &
                             8d0*q_prim_vf(momxb)%sf(j+1,k,l) - &
                             8d0*q_prim_vf(momxb)%sf(j-1,k,l) + &
@@ -1013,9 +766,9 @@ contains
             end do
 
             !$acc parallel loop collapse(3) gang vector default(present)
-            do l = iz%beg + 2, iz%end - 2
-                do k = iy%beg + 2, iy%end - 2
-                    do j = ix%beg+2, ix%end - 2
+            do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
                         dvx(j,k,l) = (1/(12d0*dx(j))) * ( &
                             8d0*q_prim_vf(momxb+1)%sf(j+1,k,l) - &
                             8d0*q_prim_vf(momxb+1)%sf(j-1,k,l) + &
@@ -1039,9 +792,9 @@ contains
             end do
 
             !$acc parallel loop collapse(3) gang vector default(present)
-            do l = iz%beg + 2, iz%end - 2
-                do k = iy%beg + 2, iy%end - 2
-                    do j = ix%beg+2, ix%end - 2
+            do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
                         dwx(j,k,l) = (1/(12d0*dx(j))) * ( &
                             8d0*q_prim_vf(momxb+2)%sf(j+1,k,l) - &
                             8d0*q_prim_vf(momxb+2)%sf(j-1,k,l) + &
@@ -1065,9 +818,9 @@ contains
             end do
 
             !$acc parallel loop collapse(3) gang vector default(present)
-            do l = iz%beg + 1, iz%end - 1
-                do k = iy%beg + 1, iy%end - 1
-                    do j = ix%beg + 1, ix%end - 1
+            do l = idwbuff(3)%beg + 1, idwbuff(3)%end - 1
+                do k = idwbuff(2)%beg + 1, idwbuff(2)%end - 1
+                    do j = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
                         jac_rhs(j, k, l) = alf_igr*((dux(j,k,l)*dux(j,k,l) + dvx(j,k,l) * duy(j,k,l) + dwx(j,k,l) * duz(j,k,l)) + &
                                               (duy(j,k,l)*dvx(j,k,l) + dvy(j,k,l) * dvy(j,k,l) + dwy(j,k,l) * dvz(j,k,l)) + &
                                               (duz(j,k,l)*dwx(j,k,l) + dvz(j,k,l) * dwy(j,k,l) + dwz(j,k,l) * dwz(j,k,l)) + &
@@ -1077,9 +830,9 @@ contains
             end do
 
             !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
-            do l = iz%beg + 1, iz%end - 1
-                do k = iy%beg + 1, iy%end - 1
-                    do j = ix%beg + 1, ix%end - 1
+            do l = idwbuff(3)%beg + 1, idwbuff(3)%end - 1
+                do k = idwbuff(2)%beg + 1, idwbuff(2)%end - 1
+                    do j = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
                         rho_lx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j-1,k,l))
                         rho_rx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j+1,k,l))
                         rho_ly = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k-1,l))
@@ -1108,8 +861,8 @@ contains
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size - 1
                     do l = 0, p
-                        do k = iy%beg + 2, iy%end - 2
-                            do j = ix%beg + 2, ix%end - 2
+                        do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                            do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                                 qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j-2, k, l) + 27d0 * q_prim_vf(i)%sf(j-1, k, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j+1, k, l) + 2d0 * q_prim_vf(i)%sf(j+2, k, l))
                                 qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j+2, k, l) + 27d0 * q_prim_vf(i)%sf(j+1, k, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j-1, k, l) + 2d0 * q_prim_vf(i)%sf(j-2, k, l))
                             end do
@@ -1119,9 +872,9 @@ contains
             else
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size - 1
-                    do l = iz%beg + 2, iz%end - 2
-                        do k = iy%beg + 2, iy%end - 2
-                            do j = ix%beg + 2, ix%end - 2
+                    do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                        do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                            do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                                 qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j-2, k, l) + 27d0 * q_prim_vf(i)%sf(j-1, k, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j+1, k, l) + 2d0 * q_prim_vf(i)%sf(j+2, k, l))
                                 qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j+2, k, l) + 27d0 * q_prim_vf(i)%sf(j+1, k, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j-1, k, l) + 2d0 * q_prim_vf(i)%sf(j-2, k, l))
                             end do
@@ -1134,8 +887,8 @@ contains
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size - 1
                     do l = 0, p
-                        do k = iy%beg + 2, iy%end - 2
-                            do j = ix%beg + 2, ix%end - 2
+                        do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                            do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                                 qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k-2, l) + 27d0 * q_prim_vf(i)%sf(j, k-1, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k+1, l) + 2d0 * q_prim_vf(i)%sf(j, k+2, l))
                                 qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k+2, l) + 27d0 * q_prim_vf(i)%sf(j, k+1, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k-1, l) + 2d0 * q_prim_vf(i)%sf(j, k-2, l))
                             end do
@@ -1145,9 +898,9 @@ contains
             else
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do i = 1, sys_size - 1
-                    do l = iz%beg + 2, iz%end - 2
-                        do k = iy%beg + 2, iy%end - 2
-                            do j = ix%beg + 2, ix%end - 2
+                    do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                        do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                            do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                                 qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k-2, l) + 27d0 * q_prim_vf(i)%sf(j, k-1, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k+1, l) + 2d0 * q_prim_vf(i)%sf(j, k+2, l))
                                 qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k+2, l) + 27d0 * q_prim_vf(i)%sf(j, k+1, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k-1, l) + 2d0 * q_prim_vf(i)%sf(j, k-2, l))
                             end do
@@ -1158,9 +911,9 @@ contains
         else if (idir == 3) then
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, sys_size - 1
-                do l = iz%beg + 2, iz%end - 2
-                    do k = iy%beg + 2, iy%end - 2
-                        do j = ix%beg + 2, ix%end - 2
+                do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                             qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k, l-2) + 27d0 * q_prim_vf(i)%sf(j, k, l-1) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k, l+1) + 2d0 * q_prim_vf(i)%sf(j, k, l+2))
                             qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k, l+2) + 27d0 * q_prim_vf(i)%sf(j, k, l+1) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k, l-1) + 2d0 * q_prim_vf(i)%sf(j, k, l-2))
                         end do
@@ -1217,266 +970,55 @@ contains
 
     end subroutine s_get_viscous_igr
 
-    subroutine s_igr_flux_add(rhs_vf, flux_vf, lw_in, idir)
+    subroutine s_igr_flux_add(rhs_vf, flux_vf, idir)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: flux_vf, rhs_vf
 
-        integer, intent(in) :: idir, lw_in
+        integer, intent(in) :: idir
 
         if (idir == 1) then
-
-            if(p == 0) then
-                if(time_stepper == 6) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, sys_size-1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-
-                                    if(lw_in == 1) then
-                                        rhs_vf(i)%sf(j,k,l) = &
-                                            1d0/(2d0*dx(j)) * &
-                                            ( flux_vf(i)%sf(j,k,l) - &
-                                              flux_vf(i)%sf(j+1,k,l) + &
-                                              flux_vf(i)%sf(j,k+1,l) - &
-                                              flux_vf(i)%sf(j+1,k+1,l))
-                                    else if(lw_in == 2) then
-                                        rhs_vf(i)%sf(j,k,l) = &
-                                            1d0/(2d0*dx(j)) * &
-                                            ( flux_vf(i)%sf(j-1,k-1,l) - &
-                                              flux_vf(i)%sf(j,k-1,l) + &
-                                              flux_vf(i)%sf(j-1,k,l) - &
-                                              flux_vf(i)%sf(j,k,l))
-                                    end if
-
-                                end do
-                            end do
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size - 1
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = 1d0/dx(j)* &
+                                (flux_vf(i)%sf(j - 1 , k, l) &
+                                 - flux_vf(i)%sf(j , k, l))
                         end do
                     end do
-                else
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, sys_size - 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    rhs_vf(i)%sf(j, k, l) = 1d0/dx(j)* &
-                                        (flux_vf(i)%sf(j - 1 , k, l) &
-                                         - flux_vf(i)%sf(j , k, l))
-                                end do
-                            end do
-                        end do
-                    end do
-                end if
-            else
-
-                if(time_stepper == 6) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, sys_size-1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                     if(lw_in == 1) then
-                                        rhs_vf(i)%sf(j,k,l) = &
-                                            1d0/(4d0*dx(j)) * &
-                                            ( flux_vf(i)%sf(j,k,l) - &
-                                              flux_vf(i)%sf(j+1,k,l) + &
-                                              flux_vf(i)%sf(j,k+1,l) - &
-                                              flux_vf(i)%sf(j+1,k+1,l) + &
-                                              flux_vf(i)%sf(j,k,l+1) - &
-                                              flux_vf(i)%sf(j+1,k,l+1) + &
-                                              flux_vf(i)%sf(j,k+1, l+1) - &
-                                              flux_vf(i)%sf(j+1,k+1, l+1))
-
-                                    else if(lw_in == 2) then
-                                        rhs_vf(i)%sf(j,k,l) = &
-                                            1d0/(4d0*dx(j)) * &
-                                            ( flux_vf(i)%sf(j-1,k-1,l) - &
-                                              flux_vf(i)%sf(j,k-1,l) + &
-                                              flux_vf(i)%sf(j-1,k,l) - &
-                                              flux_vf(i)%sf(j,k,l)  + &
-                                              flux_vf(i)%sf(j-1,k-1,l-1) - &
-                                              flux_vf(i)%sf(j,k-1,l-1) + &
-                                              flux_vf(i)%sf(j-1,k,l-1) - &
-                                              flux_vf(i)%sf(j,k,l-1))
-
-                                    end if
-
-                                end do
-                            end do
-                        end do
-                    end do
-                else
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, sys_size - 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    rhs_vf(i)%sf(j, k, l) = 1d0/dx(j)* &
-                                        (flux_vf(i)%sf(j - 1 , k, l) &
-                                         - flux_vf(i)%sf(j , k, l))
-                                end do
-                            end do
-                        end do
-                    end do
-                end if
-
-            end if
-
+                end do
+            end do
         elseif (idir == 2) then
-
-            if(p == 0) then
-                if(time_stepper == 6) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, sys_size-1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-
-                                    if(lw_in == 1) then
-                                        rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) + &
-                                            1d0/(2d0*dy(k)) * &
-                                            ( flux_vf(i)%sf(j,k,l) - &
-                                              flux_vf(i)%sf(j,k+1,l) + &
-                                              flux_vf(i)%sf(j+1,k,l) - &
-                                              flux_vf(i)%sf(j+1,k+1,l))
-                                    else if(lw_in == 2) then
-                                        rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) + &
-                                            1d0/(2d0*dy(k)) * &
-                                            ( flux_vf(i)%sf(j-1,k-1,l) - &
-                                              flux_vf(i)%sf(j-1,k,l) + &
-                                              flux_vf(i)%sf(j,k-1,l) - &
-                                              flux_vf(i)%sf(j,k,l))
-                                    end if
-
-                                end do
-                            end do
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size - 1
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = &
+                                rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
+                                (flux_vf(i)%sf(k - 1, j  , l) &
+                                 - flux_vf(i)%sf(k, j , l))
                         end do
                     end do
-                else
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, sys_size - 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
-                                        (flux_vf(i)%sf(k - 1, j  , l) &
-                                         - flux_vf(i)%sf(k, j , l))
-                                end do
-                            end do
-                        end do
-                    end do
-                end if
-            else
-                if(time_stepper == 6) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, sys_size-1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                     if(lw_in == 1) then
-                                        rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) + &
-                                            1d0/(4d0*dy(k)) * &
-                                            ( flux_vf(i)%sf(j,k,l) - &
-                                              flux_vf(i)%sf(j,k+1,l) + &
-                                              flux_vf(i)%sf(j+1,k,l) - &
-                                              flux_vf(i)%sf(j+1,k+1,l) + &
-                                              flux_vf(i)%sf(j,k,l+1) - &
-                                              flux_vf(i)%sf(j,k+1,l+1) + &
-                                              flux_vf(i)%sf(j+1,k, l+1) - &
-                                              flux_vf(i)%sf(j+1,k+1, l+1))
-
-                                    else if(lw_in == 2) then
-                                        rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) + &
-                                            1d0/(4d0*dy(k)) * &
-                                            ( flux_vf(i)%sf(j-1,k-1,l) - &
-                                              flux_vf(i)%sf(j-1,k,l) + &
-                                              flux_vf(i)%sf(j,k-1,l) - &
-                                              flux_vf(i)%sf(j,k,l)  + &
-                                              flux_vf(i)%sf(j-1,k-1,l-1) - &
-                                              flux_vf(i)%sf(j-1,k,l-1) + &
-                                              flux_vf(i)%sf(j,k-1,l-1) - &
-                                              flux_vf(i)%sf(j,k,l-1))
-
-                                    end if
-
-                                end do
-                            end do
-                        end do
-                    end do
-                else
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = 1, sys_size - 1
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    rhs_vf(i)%sf(j, k, l) = &
-                                        rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
-                                        (flux_vf(i)%sf(j, k - 1 , l) &
-                                         - flux_vf(i)%sf(j, k , l))
-                                end do
-                            end do
-                        end do
-                    end do
-                end if
-            end if
-
+                end do
+            end do
         elseif (idir == 3) then
-
-            if(time_stepper == 6) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size-1
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                 if(lw_in == 1) then
-                                    rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) + &
-                                        1d0/(4d0*dz(l)) * &
-                                        ( flux_vf(i)%sf(j,k,l) - &
-                                          flux_vf(i)%sf(j,k,l+1) + &
-                                          flux_vf(i)%sf(j+1,k,l) - &
-                                          flux_vf(i)%sf(j+1,k,l+1) + &
-                                          flux_vf(i)%sf(j,k+1,l) - &
-                                          flux_vf(i)%sf(j,k+1,l+1) + &
-                                          flux_vf(i)%sf(j+1,k+1,l) - &
-                                          flux_vf(i)%sf(j+1,k+1,l+1))
-
-                                else if(lw_in == 2) then
-                                    rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) + &
-                                        1d0/(4d0*dz(l)) * &
-                                        ( flux_vf(i)%sf(j-1,k-1,l-1) - &
-                                          flux_vf(i)%sf(j-1,k-1,l) + &
-                                          flux_vf(i)%sf(j,k-1,l-1) - &
-                                          flux_vf(i)%sf(j,k-1,l)  + &
-                                          flux_vf(i)%sf(j-1,k,l-1) - &
-                                          flux_vf(i)%sf(j-1,k,l) + &
-                                          flux_vf(i)%sf(j,k,l-1) - &
-                                          flux_vf(i)%sf(j,k,l))
-
-                                end if
-
-                            end do
+           !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size - 1
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = &
+                                rhs_vf(i)%sf(j, k, l) + 1d0/dz(l)* &
+                                (flux_vf(i)%sf(j, k, l-1) &
+                                 - flux_vf(i)%sf(j, k, l ))
                         end do
                     end do
                 end do
-            else
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size - 1
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                rhs_vf(i)%sf(j, k, l) = &
-                                    rhs_vf(i)%sf(j, k, l) + 1d0/dz(l)* &
-                                    (flux_vf(i)%sf(j, k, l-1) &
-                                     - flux_vf(i)%sf(j, k, l ))
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-
+            end do
         end if
 
     end subroutine s_igr_flux_add

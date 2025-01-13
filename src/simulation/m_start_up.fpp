@@ -173,7 +173,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref, igr, igr_order
+            hyperelasticity, R0ref, igr
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1286,8 +1286,6 @@ contains
         elseif (time_stepper == 4) then
             ! (Adaptive) 4th/5th order Runge—Kutta–Cash–Karp (RKCK) time-stepper (Cash J. and Karp A., 1990)
             call s_4th_5th_order_rkck(t_step, time_avg)
-        else if(time_stepper == 6) then
-            call s_rlw_rk3(t_step, time_avg)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)

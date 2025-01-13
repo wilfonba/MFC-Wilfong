@@ -165,9 +165,6 @@ module m_rhs
     real(wp), allocatable, dimension(:, :, :) :: nbub !< Bubble number density
     !$acc declare create(nbub)
 
-    integer :: lw_in
-    !$acc declare create(lw_in)
-
 contains
 
     !> The computation of parameters, the allocation of memory,
@@ -598,7 +595,7 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, lw)
+    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
@@ -608,7 +605,6 @@ contains
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
-        integer, intent(IN), optional :: lw
 
         real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
@@ -617,13 +613,6 @@ contains
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
-
-        if(igr) then
-            if(present(lw)) then
-                lw_in = lw
-                !$acc update device(lw_in)
-            end if
-        end if
 
         ! Association/Population of Working Variables
         !$acc parallel loop collapse(4) gang vector default(present)
@@ -734,7 +723,7 @@ contains
                 call nvtxEndRange
 
                 call nvtxStartRange("IGR_Flux_Add")
-                call s_igr_flux_add(rhs_vf,flux_n(id)%vf, lw_in, id)
+                call s_igr_flux_add(rhs_vf,flux_n(id)%vf, id)
                 call nvtxEndRange
 
             else ! Finite volume solve
