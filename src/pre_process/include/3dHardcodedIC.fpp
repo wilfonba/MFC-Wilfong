@@ -5,6 +5,9 @@
 
     real(wp) :: eps
 
+    ! 3D vortex collision
+    real(wp) :: r1, r2, off1, off2, v1, vr, rc, xl, yl, zl, theta, rp, vrp, phi, num, den
+
     eps = 1e-9_wp
 #:enddef
 
@@ -56,7 +59,58 @@
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
 
-        ! Put your variable assignments here
+    case (302) ! 3D vertex collision
+        r1 = 1._wp
+        r2 = 0.25_wp
+        v1 = 1
+        vr = 1
+        off1 = -1.1*r2
+        off2 = 1.1*r2
+
+        if ((sqrt(z_cc(k)**2._wp + y_cc(j)**2._wp) - r1)**2._wp + (x_cc(i) + off1)**2._wp < r2**2._wp) then
+            xl = x_cc(i) + off1
+            yl = y_cc(j)
+            zl = z_cc(k)
+
+            theta = atan(yl,zl)
+            rp = sqrt(xl**2 + (yl - r1*sin(theta))**2 + (zl - r1*cos(theta))**2)
+            vrp = -(rp/r2)*vr
+            if (sqrt(yl**2 + zl**2) > r1) then
+                num = sqrt((yl - r1*sin(theta))**2 + (zl - r1*cos(theta))**2)
+            else
+                num = -sqrt((yl - r1*sin(theta))**2 + (zl - r1*cos(theta))**2)
+            end if
+            den = xl
+            phi = atan(den, num) - pi/2
+
+            q_prim_vf(momxb)%sf(i,j,k) = sin(phi)*vrp
+            q_prim_vf(momxb+1)%sf(i,j,k) = -cos(phi)*sin(theta)*vrp
+            q_prim_vf(momxe)%sf(i,j,k) = cos(phi)*cos(theta)*vrp
+            q_prim_vf(e_idx)%sf(i,j,k) = 1
+        elseif ((sqrt(z_cc(k)**2._wp + y_cc(j)**2._wp) - r1)**2._wp + (x_cc(i) + off2)**2._wp < r2**2._wp) then
+            xl = x_cc(i) + off2
+            yl = y_cc(j)
+            zl = z_cc(k)
+
+            theta = atan(yl,zl)
+            rp = sqrt(xl**2 + (yl - r1*sin(theta))**2 + (zl - r1*cos(theta))**2)
+            vrp = (rp/r2)*vr
+            if (sqrt(yl**2 + zl**2) > r1) then
+                num = sqrt((yl - r1*sin(theta))**2 + (zl - r1*cos(theta))**2)
+            else
+                num = -sqrt((yl - r1*sin(theta))**2 + (zl - r1*cos(theta))**2)
+            end if
+            den = xl
+            phi = atan(den, num) - pi/2
+
+            q_prim_vf(momxb)%sf(i,j,k) = sin(phi)*vrp
+            q_prim_vf(momxb+1)%sf(i,j,k) = -cos(phi)*sin(theta)*vrp
+            q_prim_vf(momxe)%sf(i,j,k) = cos(phi)*cos(theta)*vrp
+            q_prim_vf(e_idx)%sf(i,j,k) = 1
+        end if
+
+
+    ! Put your variable assignments here
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
