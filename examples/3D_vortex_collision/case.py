@@ -17,8 +17,8 @@ ye = 4*r1
 zb = -4*r1
 ze = 4*r1
 
-Ny = 499
-Nz = 499
+Ny = 1999
+Nz = 1999
 Nx = int((24*r2)/(8*r1)*Ny)
 
 # Configuring case dictionary
@@ -34,9 +34,9 @@ print(
             "y_domain%end": ye,
             "z_domain%beg": zb,
             "z_domain%end": ze,
-            "m": 2000,
-            "n": 2000,
-            "p": 2000,
+            "m": Nx,
+            "n": Ny,
+            "p": Nz,
             "cfl_adap_dt": "T",
             "cfl_target": 0.5,
             "n_start": 0,
@@ -66,10 +66,14 @@ print(
             "format": 1,
             "precision": 2,
             # "prim_vars_wrt": "T",
-            "vel_wrt(1)": "T",
-            "vel_wrt(2)": "T",
-            "vel_wrt(3)": "T",
+            # "vel_wrt(1)": "T",
+            # "vel_wrt(2)": "T",
+            # "vel_wrt(3)": "T",
+            "qm_wrt": "T",
             "parallel_io": "T",
+            "schlieren_wrt": "T",
+            "schlieren_alpha(1)": 1,
+            "fd_order": 4,
             # Patch 1: Base
             "patch_icpp(1)%geometry": 13,
             "patch_icpp(1)%hcid": 302,

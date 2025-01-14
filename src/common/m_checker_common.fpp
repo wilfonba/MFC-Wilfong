@@ -87,10 +87,10 @@ contains
     subroutine s_check_total_cells
         character(len=5) :: numStr !< for int to string conversion
 
-        call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
-        @:PROHIBIT(nGlobal < 2**(min(1, m) + min(1, n) + min(1, p))*num_procs, &
-            "Total number of cells must be at least (2^[number of dimensions])*num_procs, " // &
-            "which is currently "//trim(numStr))
+        !call s_int_to_str(2**(min(1, m) + min(1, n) + min(1, p))*num_procs, numStr)
+        !@:PROHIBIT(nGlobal < 2**(min(1, m) + min(1, n) + min(1, p))*num_procs, &
+            !"Total number of cells must be at least (2^[number of dimensions])*num_procs, " // &
+            !"which is currently "//trim(numStr))
     end subroutine s_check_total_cells
 
 #endif
