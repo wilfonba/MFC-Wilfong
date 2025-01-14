@@ -10,16 +10,16 @@ vr = 1
 off1 = -1.1*r2
 off2 = 1.1*r2
 
-xb = -4*r2
-xe = 4*r2
-yb = 0
+xb = -6*r2
+xe = 6*r2
+yb = -4*r1
 ye = 4*r1
-zb = 0
+zb = -4*r1
 ze = 4*r1
 
-Ny = 299
-Nz = 299
-Nx = int((8*r2)/(4*r1)*Ny)
+Ny = 699
+Nz = 699
+Nx = int((12*r2)/(8*r1)*Ny)
 
 # Configuring case dictionary
 print(
@@ -40,13 +40,13 @@ print(
             "cfl_adap_dt": "T",
             "cfl_target": 0.5,
             "n_start": 0,
-            "t_stop": 3,
-            "t_save": 3/10,
+            "t_stop": 10,
+            "t_save": 2,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
-            "num_fluids": 1,
+            "num_fluids": 3,
             "time_stepper": 3,
             "weno_order": 5,
             "weno_eps": 1.0e-16,
@@ -58,14 +58,20 @@ print(
             "avg_state": 2,
             "bc_x%beg": -3,
             "bc_x%end": -3,
-            "bc_y%beg": -2,
+            "bc_y%beg": -3,
             "bc_y%end": -3,
-            "bc_z%beg": -2,
+            "bc_z%beg": -3,
             "bc_z%end": -3,
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
-            "prim_vars_wrt": "T",
+            # "prim_vars_wrt": "T",
+            "alpha_wrt(1)": "T",
+            # "alpha_wrt(2)": "T",
+            # "alpha_wrt(3)": "T",
+            "vel_wrt(1)": "T",
+            "vel_wrt(2)": "T",
+            "vel_wrt(3)": "T",
             "parallel_io": "T",
             # Patch 1: Base
             "patch_icpp(1)%geometry": 13,
@@ -79,12 +85,20 @@ print(
             "patch_icpp(1)%vel(1)": 0.0,
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,
-            "patch_icpp(1)%pres": 101325,
-            "patch_icpp(1)%alpha_rho(1)": 1,
-            "patch_icpp(1)%alpha(1)": 1,
+            "patch_icpp(1)%pres": 1,
+            "patch_icpp(1)%alpha_rho(1)": 1 - eps,
+            "patch_icpp(1)%alpha(1)": 1 - eps,
+            "patch_icpp(1)%alpha_rho(2)": eps,
+            "patch_icpp(1)%alpha(2)": eps,
+            "patch_icpp(1)%alpha_rho(3)": eps,
+            "patch_icpp(1)%alpha(3)": eps,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0,
+            "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+            "fluid_pp(2)%pi_inf": 0,
+            "fluid_pp(3)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+            "fluid_pp(3)%pi_inf": 0,
         }
     )
 )

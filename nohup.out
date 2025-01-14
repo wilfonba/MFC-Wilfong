@@ -1,0 +1,642 @@
+mfc: Found CMake: /fastscratch/bwilfong3/software/MFC-Wilfong/build/cmake/bin/cmake.
+mfc: OK > (venv) Entered the Python 3.9.5 virtual environment (>= 3.9).
+
+      .=++*:          -+*+=.        | bwilfong3@wingtip-gpu3 [Linux]
+     :+   -*-        ==   =* .      | ------------------------------
+   :*+      ==      ++    .+-       | 
+  :*##-.....:*+   .#%+++=--+=:::.   | --jobs 24
+  -=-++-======#=--**+++==+*++=::-:. | --mpi --gpu --no-debug --no-gcov --no-unified
+ .:++=----------====+*= ==..:%..... | --targets pre_process, simulation, and post_process
+  .:-=++++===--==+=-+=   +.  :=     | 
+  +#=::::::::=%=. -+:    =+   *:    | ----------------------------------------------------------
+ .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, count, packer) --help
+
+ Acquiring /fastscratch/bwilfong3/exampleCases/2D_shockdroplet/case.py...
+ Acquiring /fastscratch/bwilfong3/exampleCases/2D_shockdroplet/case.py...
+ Build | syscheck, syscheck, pre_process, simulation, and post_process | Case Optimized for /fastscratch/bwilfong3/exampleCases/2D_shockdroplet/case.py
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/ab29bd3004 --target syscheck --parallel 24 --config Release
+
+[ 25%] Building Fortran object CMakeFiles/syscheck_lib.dir/fypp/syscheck/syscheck.fpp.f90.o
+[ 50%] Built target syscheck_lib
+[100%] Built target syscheck
+
+ $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/ab29bd3004
+
+-- Install configuration: "Release"
+-- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/ab29bd3004/bin/syscheck
+-- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/ab29bd3004/bin/syscheck" to ""
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/4b354ae468 --target pre_process --parallel 24 --config Release
+
+[  1%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_constants.fpp.f90.o
+[  2%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_thermochem.fpp.f90.o
+[  3%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_delay_file_access.f90.o
+[  5%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_eigen_solver.f90.o
+[  6%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_derived_types.fpp.f90.o
+[  7%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_helper_basic.f90.o
+[  9%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_global_parameters.fpp.f90.o
+[ 10%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_mpi_common.fpp.f90.o
+[ 11%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_finite_differences.fpp.f90.o
+[ 13%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_helper.fpp.f90.o
+[ 14%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_mpi_proxy.fpp.f90.o
+[ 15%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_compile_specific.f90.o
+[ 17%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_perturbation.fpp.f90.o
+[ 18%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/pre_process/m_grid.f90.o
+[ 19%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_variables_conversion.fpp.f90.o
+[ 21%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_checker_common.fpp.f90.o
+[ 22%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_checker.fpp.f90.o
+[ 23%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_model.fpp.f90.o
+[ 25%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_assign_variables.fpp.f90.o
+[ 26%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_data_output.fpp.f90.o
+[ 27%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_phase_change.fpp.f90.o
+[ 28%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_patches.fpp.f90.o
+[ 30%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_check_ib_patches.fpp.f90.o
+[ 31%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_check_patches.fpp.f90.o
+[ 32%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_initial_condition.fpp.f90.o
+[ 34%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_start_up.fpp.f90.o
+[ 35%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/pre_process/p_main.f90.o
+[ 63%] Built target pre_process_lib
+[100%] Built target pre_process
+
+ $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/4b354ae468
+
+-- Install configuration: "Release"
+-- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/4b354ae468/bin/pre_process
+-- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/4b354ae468/bin/pre_process" to ""
+
+ Generating case.fpp.
+   Case optimization is enabled.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/1f48661f48 --target simulation --parallel 24 --config Release
+
+[  1%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_constants.fpp.f90.o
+[  2%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_thermochem.fpp.f90.o
+[  3%] Building Fortran object CMakeFiles/simulation_lib.dir/src/simulation/m_nvtx.f90.o
+[  4%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_delay_file_access.f90.o
+[  5%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_eigen_solver.f90.o
+[  5%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_derived_types.fpp.f90.o
+[  5%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_helper_basic.f90.o
+[  6%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_global_parameters.fpp.f90.o
+[  7%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_mpi_common.fpp.f90.o
+[  8%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_compute_cbc.fpp.f90.o
+[  9%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_finite_differences.fpp.f90.o
+[ 10%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_helper.fpp.f90.o
+[ 11%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_mpi_proxy.fpp.f90.o
+[ 12%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_variables_conversion.fpp.f90.o
+[ 13%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_boundary_conditions.fpp.f90.o
+[ 14%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_checker.fpp.f90.o
+[ 15%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_checker_common.fpp.f90.o
+[ 15%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_chemistry.fpp.f90.o
+[ 16%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_compute_levelset.fpp.f90.o
+[ 17%] Building Fortran object CMakeFiles/simulation_lib.dir/src/common/m_compile_specific.f90.o
+[ 18%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_fftw.fpp.f90.o
+[ 19%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_hypoelastic.fpp.f90.o
+[ 20%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_bubbles.fpp.f90.o
+[ 21%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_body_forces.fpp.f90.o
+[ 22%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_cbc.fpp.f90.o
+[ 22%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_ibm.fpp.f90.o
+[ 23%] Building Fortran object CMakeFiles/simulation_lib.dir/src/simulation/m_sim_helpers.f90.o
+[ 24%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_phase_change.fpp.f90.o
+[ 25%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_muscl.fpp.f90.o
+[ 26%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_qbmm.fpp.f90.o
+[ 27%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_weno.fpp.f90.o
+[ 28%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_data_output.fpp.f90.o
+[ 28%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_surface_tension.fpp.f90.o
+[ 29%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_viscous.fpp.f90.o
+[ 30%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_acoustic_src.fpp.f90.o
+[ 31%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_riemann_solvers.fpp.f90.o
+[ 32%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_rhs.fpp.f90.o
+[ 33%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_time_steppers.fpp.f90.o
+[ 34%] Building Fortran object CMakeFiles/simulation_lib.dir/src/simulation/m_derived_variables.f90.o
+[ 35%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/m_start_up.fpp.f90.o
+[ 36%] Building Fortran object CMakeFiles/simulation_lib.dir/fypp/simulation/p_main.fpp.f90.o
+[ 65%] Built target simulation_lib
+[100%] Built target simulation
+
+ $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/1f48661f48
+
+-- Install configuration: "Release"
+-- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/1f48661f48/bin/simulation
+-- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/1f48661f48/bin/simulation" to ""
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/7d4de6236e --target post_process --parallel 24 --config Release
+
+[  1%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_constants.fpp.f90.o
+[  3%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_phase_change.fpp.f90.o
+[  5%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_thermochem.fpp.f90.o
+[  6%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_delay_file_access.f90.o
+[  8%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_eigen_solver.f90.o
+[ 10%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_derived_types.fpp.f90.o
+[ 12%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_helper_basic.f90.o
+[ 13%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_global_parameters.fpp.f90.o
+[ 15%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_mpi_common.fpp.f90.o
+[ 17%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_finite_differences.fpp.f90.o
+[ 18%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_helper.fpp.f90.o
+[ 20%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_mpi_proxy.fpp.f90.o
+[ 22%] Building Fortran object CMakeFiles/post_process_lib.dir/src/common/m_compile_specific.f90.o
+[ 24%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_checker.fpp.f90.o
+[ 25%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_checker_common.fpp.f90.o
+[ 27%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_variables_conversion.fpp.f90.o
+[ 29%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_data_output.fpp.f90.o
+[ 31%] Building Fortran object CMakeFiles/post_process_lib.dir/src/post_process/m_data_input.f90.o
+[ 32%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/m_derived_variables.fpp.f90.o
+[ 34%] Building Fortran object CMakeFiles/post_process_lib.dir/src/post_process/m_start_up.f90.o
+[ 36%] Building Fortran object CMakeFiles/post_process_lib.dir/fypp/post_process/p_main.fpp.f90.o
+[ 62%] Built target post_process_lib
+[100%] Built target post_process
+
+ $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/7d4de6236e
+
+-- Install configuration: "Release"
+-- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/7d4de6236e/bin/post_process
+-- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/7d4de6236e/bin/post_process" to ""
+
+ Run
+   Using queue system Interactive.
+   Using baked-in template for default.
+   Generating input files for syscheck...
+    
+     Generating syscheck.inp:
+       INFO: Forwarded 0/80 parameters.
+    
+   Generating input files for pre_process...
+    
+     Generating pre_process.inp:
+       INFO: Forwarded 65/80 parameters.
+    
+   Generating input files for simulation...
+    
+     Generating simulation.inp:
+       INFO: Forwarded 32/80 parameters.
+    
+   Generating input files for post_process...
+    
+     Generating post_process.inp:
+       INFO: Forwarded 24/80 parameters.
+    
+   $ /bin/bash /fastscratch/bwilfong3/exampleCases/2D_shockdroplet/MFC.sh
+
++-----------------------------------------------------------------------------------------------------------+ 
+| MFC case # MFC @ /fastscratch/bwilfong3/exampleCases/2D_shockdroplet/case.py:                             |
++-----------------------------------------------------------------------------------------------------------+ 
+| * Start-time     17:57:48                            * Start-date     17:57:48                            |
+| * Partition      N/A                                 * Walltime       01:00:00                            |
+| * Account        N/A                                 * Nodes          1                                   |
+| * Job Name       MFC                                 * Engine         interactive                         |
+| * QoS            N/A                                 * Binary         N/A                                 |
+| * Queue System   Interactive                         * Email          N/A                                 |
++-----------------------------------------------------------------------------------------------------------+ 
+
+mfc: WARNING > This is the default template.
+mfc: WARNING > It is not intended to support all systems and execution engines.
+mfc: WARNING > Consider using a different template via the --computer option if you encounter problems.
+mfc: OK > :) Selected MPI launcher mpirun. Use --binary to override.
+mfc: OK > :) Running syscheck:
+
++ mpirun -np 1 /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/ab29bd3004/bin/syscheck
+ [TEST] MPI: call mpi_init(ierr)
+--------------------------------------------------------------------------
+WARNING: There is at least non-excluded one OpenFabrics device found,
+but there are no active ports detected (or Open MPI was unable to use
+them).  This is most certainly not what you wanted.  Check your
+cables, subnet manager configuration, etc.  The openib BTL will be
+ignored for this job.
+
+  Local host: wingtip-gpu3
+--------------------------------------------------------------------------
+ [TEST] MPI: call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr)
+ [TEST] MPI: call mpi_barrier(MPI_COMM_WORLD, ierr)
+ [TEST] MPI: call assert(rank >= 0)
+ [TEST] MPI: call mpi_comm_size(MPI_COMM_WORLD, nRanks, ierr)
+ [TEST] MPI: call assert(nRanks > 0 .and. rank < nRanks)
+ [TEST] ACC: devtype = acc_get_device_type()
+ [TEST] ACC: num_devices = acc_get_num_devices(devtype)
+ [TEST] ACC: call assert(num_devices > 0)
+ [TEST] ACC: call acc_set_device_num(mod(rank, nRanks), devtype)
+ [TEST] ACC: allocate(arr(1:N))
+ [TEST] ACC: !$acc enter data create(arr(1:N))
+ [TEST] ACC: !$acc parallel loop
+ [TEST] ACC: !$acc update host(arr(1:N))
+ [TEST] ACC: !$acc exit data delete(arr)
+ [TEST] MPI: call mpi_barrier(MPI_COMM_WORLD, ierr)
+ [TEST] MPI: call mpi_finalize(ierr)
+ 
+ Syscheck: PASSED.
+
+mfc: OK > :) Running pre_process:
+
++ mpirun -np 1 /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/4b354ae468/bin/pre_process
+--------------------------------------------------------------------------
+WARNING: There is at least non-excluded one OpenFabrics device found,
+but there are no active ports detected (or Open MPI was unable to use
+them).  This is most certainly not what you wanted.  Check your
+cables, subnet manager configuration, etc.  The openib BTL will be
+ignored for this job.
+
+  Local host: wingtip-gpu3
+--------------------------------------------------------------------------
+ Pre-processing a 4799x1199x0 case on 1 rank(s)
+ Processing patch            1
+ Processing patch            2
+ Processing patch            3
+ Elapsed Time    2.462823152542114     
+
+mfc: OK > :) Running simulation:
+
++ mpirun -np 1 /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/1f48661f48/bin/simulation
+--------------------------------------------------------------------------
+WARNING: There is at least non-excluded one OpenFabrics device found,
+but there are no active ports detected (or Open MPI was unable to use
+them).  This is most certainly not what you wanted.  Check your
+cables, subnet manager configuration, etc.  The openib BTL will be
+ignored for this job.
+
+  Local host: wingtip-gpu3
+--------------------------------------------------------------------------
+ Simulating a case-optimized 4799x1199x0 case on 1 rank(s) with OpenACC offloading.
+ [  0%]  Time step        1 of 221872 @ t_step = 0
+ [  1%]  Time step        2 of 221872 @ t_step = 1
+ [  1%]  Time step        3 of 221872 @ t_step = 2
+ [  1%]  Time step        4 of 221872 @ t_step = 3
+ [  1%]  Time step        5 of 221872 @ t_step = 4
+ [  1%]  Time step        6 of 221872 @ t_step = 5
+ [  1%]  Time step        7 of 221872 @ t_step = 6
+ [  1%]  Time step        8 of 221872 @ t_step = 7
+ [  1%]  Time step        9 of 221872 @ t_step = 8
+ [  1%]  Time step       10 of 221872 @ t_step = 9
+ [  1%]  Time step       11 of 221872 @ t_step = 10
+ [  1%]  Time step       12 of 221872 @ t_step = 11
+ [  1%]  Time step       13 of 221872 @ t_step = 12
+ [  1%]  Time step       14 of 221872 @ t_step = 13
+ [  1%]  Time step       15 of 221872 @ t_step = 14
+ [  1%]  Time step       16 of 221872 @ t_step = 15
+ [  1%]  Time step       17 of 221872 @ t_step = 16
+ [  1%]  Time step       18 of 221872 @ t_step = 17
+ [  1%]  Time step       19 of 221872 @ t_step = 18
+ [  1%]  Time step       20 of 221872 @ t_step = 19
+ [  1%]  Time step       21 of 221872 @ t_step = 20
+ [  1%]  Time step       22 of 221872 @ t_step = 21
+ [  1%]  Time step       23 of 221872 @ t_step = 22
+ [  1%]  Time step       24 of 221872 @ t_step = 23
+ [  1%]  Time step       25 of 221872 @ t_step = 24
+ [  1%]  Time step       26 of 221872 @ t_step = 25
+ [  1%]  Time step       27 of 221872 @ t_step = 26
+ [  1%]  Time step       28 of 221872 @ t_step = 27
+ [  1%]  Time step       29 of 221872 @ t_step = 28
+ [  1%]  Time step       30 of 221872 @ t_step = 29
+ [  1%]  Time step       31 of 221872 @ t_step = 30
+ [  1%]  Time step       32 of 221872 @ t_step = 31
+ [  1%]  Time step       33 of 221872 @ t_step = 32
+ [  1%]  Time step       34 of 221872 @ t_step = 33
+ [  1%]  Time step       35 of 221872 @ t_step = 34
+ [  1%]  Time step       36 of 221872 @ t_step = 35
+ [  1%]  Time step       37 of 221872 @ t_step = 36
+ [  1%]  Time step       38 of 221872 @ t_step = 37
+ [  1%]  Time step       39 of 221872 @ t_step = 38
+ [  1%]  Time step       40 of 221872 @ t_step = 39
+ [  1%]  Time step       41 of 221872 @ t_step = 40
+ [  1%]  Time step       42 of 221872 @ t_step = 41
+ [  1%]  Time step       43 of 221872 @ t_step = 42
+ [  1%]  Time step       44 of 221872 @ t_step = 43
+ [  1%]  Time step       45 of 221872 @ t_step = 44
+ [  1%]  Time step       46 of 221872 @ t_step = 45
+ [  1%]  Time step       47 of 221872 @ t_step = 46
+ [  1%]  Time step       48 of 221872 @ t_step = 47
+ [  1%]  Time step       49 of 221872 @ t_step = 48
+ [  1%]  Time step       50 of 221872 @ t_step = 49
+ [  1%]  Time step       51 of 221872 @ t_step = 50
+ [  1%]  Time step       52 of 221872 @ t_step = 51
+ [  1%]  Time step       53 of 221872 @ t_step = 52
+ [  1%]  Time step       54 of 221872 @ t_step = 53
+ [  1%]  Time step       55 of 221872 @ t_step = 54
+ [  1%]  Time step       56 of 221872 @ t_step = 55
+ [  1%]  Time step       57 of 221872 @ t_step = 56
+ [  1%]  Time step       58 of 221872 @ t_step = 57
+ [  1%]  Time step       59 of 221872 @ t_step = 58
+ [  1%]  Time step       60 of 221872 @ t_step = 59
+ [  1%]  Time step       61 of 221872 @ t_step = 60
+ [  1%]  Time step       62 of 221872 @ t_step = 61
+ [  1%]  Time step       63 of 221872 @ t_step = 62
+ [  1%]  Time step       64 of 221872 @ t_step = 63
+ [  1%]  Time step       65 of 221872 @ t_step = 64
+ [  1%]  Time step       66 of 221872 @ t_step = 65
+ [  1%]  Time step       67 of 221872 @ t_step = 66
+ [  1%]  Time step       68 of 221872 @ t_step = 67
+ [  1%]  Time step       69 of 221872 @ t_step = 68
+ [  1%]  Time step       70 of 221872 @ t_step = 69
+ [  1%]  Time step       71 of 221872 @ t_step = 70
+ [  1%]  Time step       72 of 221872 @ t_step = 71
+ [  1%]  Time step       73 of 221872 @ t_step = 72
+ [  1%]  Time step       74 of 221872 @ t_step = 73
+ [  1%]  Time step       75 of 221872 @ t_step = 74
+ [  1%]  Time step       76 of 221872 @ t_step = 75
+ [  1%]  Time step       77 of 221872 @ t_step = 76
+ [  1%]  Time step       78 of 221872 @ t_step = 77
+ [  1%]  Time step       79 of 221872 @ t_step = 78
+ [  1%]  Time step       80 of 221872 @ t_step = 79
+ [  1%]  Time step       81 of 221872 @ t_step = 80
+ [  1%]  Time step       82 of 221872 @ t_step = 81
+ [  1%]  Time step       83 of 221872 @ t_step = 82
+ [  1%]  Time step       84 of 221872 @ t_step = 83
+ [  1%]  Time step       85 of 221872 @ t_step = 84
+ [  1%]  Time step       86 of 221872 @ t_step = 85
+ [  1%]  Time step       87 of 221872 @ t_step = 86
+ [  1%]  Time step       88 of 221872 @ t_step = 87
+ [  1%]  Time step       89 of 221872 @ t_step = 88
+ [  1%]  Time step       90 of 221872 @ t_step = 89
+ [  1%]  Time step       91 of 221872 @ t_step = 90
+ [  1%]  Time step       92 of 221872 @ t_step = 91
+ [  1%]  Time step       93 of 221872 @ t_step = 92
+ [  1%]  Time step       94 of 221872 @ t_step = 93
+ [  1%]  Time step       95 of 221872 @ t_step = 94
+ [  1%]  Time step       96 of 221872 @ t_step = 95
+ [  1%]  Time step       97 of 221872 @ t_step = 96
+ [  1%]  Time step       98 of 221872 @ t_step = 97
+ [  1%]  Time step       99 of 221872 @ t_step = 98
+ [  1%]  Time step      100 of 221872 @ t_step = 99
+ [  1%]  Time step      101 of 221872 @ t_step = 100
+ [  1%]  Time step      102 of 221872 @ t_step = 101
+ [  1%]  Time step      103 of 221872 @ t_step = 102
+ [  1%]  Time step      104 of 221872 @ t_step = 103
+ [  1%]  Time step      105 of 221872 @ t_step = 104
+ [  1%]  Time step      106 of 221872 @ t_step = 105
+ [  1%]  Time step      107 of 221872 @ t_step = 106
+ [  1%]  Time step      108 of 221872 @ t_step = 107
+ [  1%]  Time step      109 of 221872 @ t_step = 108
+ [  1%]  Time step      110 of 221872 @ t_step = 109
+ [  1%]  Time step      111 of 221872 @ t_step = 110
+ [  1%]  Time step      112 of 221872 @ t_step = 111
+ [  1%]  Time step      113 of 221872 @ t_step = 112
+ [  1%]  Time step      114 of 221872 @ t_step = 113
+ [  1%]  Time step      115 of 221872 @ t_step = 114
+ [  1%]  Time step      116 of 221872 @ t_step = 115
+ [  1%]  Time step      117 of 221872 @ t_step = 116
+ [  1%]  Time step      118 of 221872 @ t_step = 117
+ [  1%]  Time step      119 of 221872 @ t_step = 118
+ [  1%]  Time step      120 of 221872 @ t_step = 119
+ [  1%]  Time step      121 of 221872 @ t_step = 120
+ [  1%]  Time step      122 of 221872 @ t_step = 121
+ [  1%]  Time step      123 of 221872 @ t_step = 122
+ [  1%]  Time step      124 of 221872 @ t_step = 123
+ [  1%]  Time step      125 of 221872 @ t_step = 124
+ [  1%]  Time step      126 of 221872 @ t_step = 125
+ [  1%]  Time step      127 of 221872 @ t_step = 126
+ [  1%]  Time step      128 of 221872 @ t_step = 127
+ [  1%]  Time step      129 of 221872 @ t_step = 128
+ [  1%]  Time step      130 of 221872 @ t_step = 129
+ [  1%]  Time step      131 of 221872 @ t_step = 130
+ [  1%]  Time step      132 of 221872 @ t_step = 131
+ [  1%]  Time step      133 of 221872 @ t_step = 132
+ [  1%]  Time step      134 of 221872 @ t_step = 133
+ [  1%]  Time step      135 of 221872 @ t_step = 134
+ [  1%]  Time step      136 of 221872 @ t_step = 135
+ [  1%]  Time step      137 of 221872 @ t_step = 136
+ [  1%]  Time step      138 of 221872 @ t_step = 137
+ [  1%]  Time step      139 of 221872 @ t_step = 138
+ [  1%]  Time step      140 of 221872 @ t_step = 139
+ [  1%]  Time step      141 of 221872 @ t_step = 140
+ [  1%]  Time step      142 of 221872 @ t_step = 141
+ [  1%]  Time step      143 of 221872 @ t_step = 142
+ [  1%]  Time step      144 of 221872 @ t_step = 143
+ [  1%]  Time step      145 of 221872 @ t_step = 144
+ [  1%]  Time step      146 of 221872 @ t_step = 145
+ [  1%]  Time step      147 of 221872 @ t_step = 146
+ [  1%]  Time step      148 of 221872 @ t_step = 147
+ [  1%]  Time step      149 of 221872 @ t_step = 148
+ [  1%]  Time step      150 of 221872 @ t_step = 149
+ [  1%]  Time step      151 of 221872 @ t_step = 150
+ [  1%]  Time step      152 of 221872 @ t_step = 151
+ [  1%]  Time step      153 of 221872 @ t_step = 152
+ [  1%]  Time step      154 of 221872 @ t_step = 153
+ [  1%]  Time step      155 of 221872 @ t_step = 154
+ [  1%]  Time step      156 of 221872 @ t_step = 155
+ [  1%]  Time step      157 of 221872 @ t_step = 156
+ [  1%]  Time step      158 of 221872 @ t_step = 157
+ [  1%]  Time step      159 of 221872 @ t_step = 158
+ [  1%]  Time step      160 of 221872 @ t_step = 159
+ [  1%]  Time step      161 of 221872 @ t_step = 160
+ [  1%]  Time step      162 of 221872 @ t_step = 161
+ [  1%]  Time step      163 of 221872 @ t_step = 162
+ [  1%]  Time step      164 of 221872 @ t_step = 163
+ [  1%]  Time step      165 of 221872 @ t_step = 164
+ [  1%]  Time step      166 of 221872 @ t_step = 165
+ [  1%]  Time step      167 of 221872 @ t_step = 166
+ [  1%]  Time step      168 of 221872 @ t_step = 167
+ [  1%]  Time step      169 of 221872 @ t_step = 168
+ [  1%]  Time step      170 of 221872 @ t_step = 169
+ [  1%]  Time step      171 of 221872 @ t_step = 170
+ [  1%]  Time step      172 of 221872 @ t_step = 171
+ [  1%]  Time step      173 of 221872 @ t_step = 172
+ [  1%]  Time step      174 of 221872 @ t_step = 173
+ [  1%]  Time step      175 of 221872 @ t_step = 174
+ [  1%]  Time step      176 of 221872 @ t_step = 175
+ [  1%]  Time step      177 of 221872 @ t_step = 176
+ [  1%]  Time step      178 of 221872 @ t_step = 177
+ [  1%]  Time step      179 of 221872 @ t_step = 178
+ [  1%]  Time step      180 of 221872 @ t_step = 179
+ [  1%]  Time step      181 of 221872 @ t_step = 180
+ [  1%]  Time step      182 of 221872 @ t_step = 181
+ [  1%]  Time step      183 of 221872 @ t_step = 182
+ [  1%]  Time step      184 of 221872 @ t_step = 183
+ [  1%]  Time step      185 of 221872 @ t_step = 184
+ [  1%]  Time step      186 of 221872 @ t_step = 185
+ [  1%]  Time step      187 of 221872 @ t_step = 186
+ [  1%]  Time step      188 of 221872 @ t_step = 187
+ [  1%]  Time step      189 of 221872 @ t_step = 188
+ [  1%]  Time step      190 of 221872 @ t_step = 189
+ [  1%]  Time step      191 of 221872 @ t_step = 190
+ [  1%]  Time step      192 of 221872 @ t_step = 191
+ [  1%]  Time step      193 of 221872 @ t_step = 192
+ [  1%]  Time step      194 of 221872 @ t_step = 193
+ [  1%]  Time step      195 of 221872 @ t_step = 194
+ [  1%]  Time step      196 of 221872 @ t_step = 195
+ [  1%]  Time step      197 of 221872 @ t_step = 196
+ [  1%]  Time step      198 of 221872 @ t_step = 197
+ [  1%]  Time step      199 of 221872 @ t_step = 198
+ [  1%]  Time step      200 of 221872 @ t_step = 199
+ [  1%]  Time step      201 of 221872 @ t_step = 200
+ [  1%]  Time step      202 of 221872 @ t_step = 201
+ [  1%]  Time step      203 of 221872 @ t_step = 202
+ [  1%]  Time step      204 of 221872 @ t_step = 203
+ [  1%]  Time step      205 of 221872 @ t_step = 204
+ [  1%]  Time step      206 of 221872 @ t_step = 205
+ [  1%]  Time step      207 of 221872 @ t_step = 206
+ [  1%]  Time step      208 of 221872 @ t_step = 207
+ [  1%]  Time step      209 of 221872 @ t_step = 208
+ [  1%]  Time step      210 of 221872 @ t_step = 209
+ [  1%]  Time step      211 of 221872 @ t_step = 210
+ [  1%]  Time step      212 of 221872 @ t_step = 211
+ [  1%]  Time step      213 of 221872 @ t_step = 212
+ [  1%]  Time step      214 of 221872 @ t_step = 213
+ [  1%]  Time step      215 of 221872 @ t_step = 214
+ [  1%]  Time step      216 of 221872 @ t_step = 215
+ [  1%]  Time step      217 of 221872 @ t_step = 216
+ [  1%]  Time step      218 of 221872 @ t_step = 217
+ [  1%]  Time step      219 of 221872 @ t_step = 218
+ [  1%]  Time step      220 of 221872 @ t_step = 219
+ [  1%]  Time step      221 of 221872 @ t_step = 220
+ [  1%]  Time step      222 of 221872 @ t_step = 221
+ [  1%]  Time step      223 of 221872 @ t_step = 222
+ [  1%]  Time step      224 of 221872 @ t_step = 223
+ [  1%]  Time step      225 of 221872 @ t_step = 224
+ [  1%]  Time step      226 of 221872 @ t_step = 225
+ [  1%]  Time step      227 of 221872 @ t_step = 226
+ [  1%]  Time step      228 of 221872 @ t_step = 227
+ [  1%]  Time step      229 of 221872 @ t_step = 228
+ [  1%]  Time step      230 of 221872 @ t_step = 229
+ [  1%]  Time step      231 of 221872 @ t_step = 230
+ [  1%]  Time step      232 of 221872 @ t_step = 231
+ [  1%]  Time step      233 of 221872 @ t_step = 232
+ [  1%]  Time step      234 of 221872 @ t_step = 233
+ [  1%]  Time step      235 of 221872 @ t_step = 234
+ [  1%]  Time step      236 of 221872 @ t_step = 235
+ [  1%]  Time step      237 of 221872 @ t_step = 236
+ [  1%]  Time step      238 of 221872 @ t_step = 237
+ [  1%]  Time step      239 of 221872 @ t_step = 238
+ [  1%]  Time step      240 of 221872 @ t_step = 239
+ [  1%]  Time step      241 of 221872 @ t_step = 240
+ [  1%]  Time step      242 of 221872 @ t_step = 241
+ [  1%]  Time step      243 of 221872 @ t_step = 242
+ [  1%]  Time step      244 of 221872 @ t_step = 243
+ [  1%]  Time step      245 of 221872 @ t_step = 244
+ [  1%]  Time step      246 of 221872 @ t_step = 245
+ [  1%]  Time step      247 of 221872 @ t_step = 246
+ [  1%]  Time step      248 of 221872 @ t_step = 247
+ [  1%]  Time step      249 of 221872 @ t_step = 248
+ [  1%]  Time step      250 of 221872 @ t_step = 249
+ [  1%]  Time step      251 of 221872 @ t_step = 250
+ [  1%]  Time step      252 of 221872 @ t_step = 251
+ [  1%]  Time step      253 of 221872 @ t_step = 252
+ [  1%]  Time step      254 of 221872 @ t_step = 253
+ [  1%]  Time step      255 of 221872 @ t_step = 254
+ [  1%]  Time step      256 of 221872 @ t_step = 255
+ [  1%]  Time step      257 of 221872 @ t_step = 256
+ [  1%]  Time step      258 of 221872 @ t_step = 257
+ [  1%]  Time step      259 of 221872 @ t_step = 258
+ [  1%]  Time step      260 of 221872 @ t_step = 259
+ [  1%]  Time step      261 of 221872 @ t_step = 260
+ [  1%]  Time step      262 of 221872 @ t_step = 261
+ [  1%]  Time step      263 of 221872 @ t_step = 262
+ [  1%]  Time step      264 of 221872 @ t_step = 263
+ [  1%]  Time step      265 of 221872 @ t_step = 264
+ [  1%]  Time step      266 of 221872 @ t_step = 265
+ [  1%]  Time step      267 of 221872 @ t_step = 266
+ [  1%]  Time step      268 of 221872 @ t_step = 267
+ [  1%]  Time step      269 of 221872 @ t_step = 268
+ [  1%]  Time step      270 of 221872 @ t_step = 269
+ [  1%]  Time step      271 of 221872 @ t_step = 270
+ [  1%]  Time step      272 of 221872 @ t_step = 271
+ [  1%]  Time step      273 of 221872 @ t_step = 272
+ [  1%]  Time step      274 of 221872 @ t_step = 273
+ [  1%]  Time step      275 of 221872 @ t_step = 274
+ [  1%]  Time step      276 of 221872 @ t_step = 275
+ [  1%]  Time step      277 of 221872 @ t_step = 276
+ [  1%]  Time step      278 of 221872 @ t_step = 277
+ [  1%]  Time step      279 of 221872 @ t_step = 278
+ [  1%]  Time step      280 of 221872 @ t_step = 279
+ [  1%]  Time step      281 of 221872 @ t_step = 280
+ [  1%]  Time step      282 of 221872 @ t_step = 281
+ [  1%]  Time step      283 of 221872 @ t_step = 282
+ [  1%]  Time step      284 of 221872 @ t_step = 283
+ [  1%]  Time step      285 of 221872 @ t_step = 284
+ [  1%]  Time step      286 of 221872 @ t_step = 285
+ [  1%]  Time step      287 of 221872 @ t_step = 286
+ [  1%]  Time step      288 of 221872 @ t_step = 287
+ [  1%]  Time step      289 of 221872 @ t_step = 288
+ [  1%]  Time step      290 of 221872 @ t_step = 289
+ [  1%]  Time step      291 of 221872 @ t_step = 290
+ [  1%]  Time step      292 of 221872 @ t_step = 291
+ [  1%]  Time step      293 of 221872 @ t_step = 292
+ [  1%]  Time step      294 of 221872 @ t_step = 293
+ [  1%]  Time step      295 of 221872 @ t_step = 294
+ [  1%]  Time step      296 of 221872 @ t_step = 295
+ [  1%]  Time step      297 of 221872 @ t_step = 296
+ [  1%]  Time step      298 of 221872 @ t_step = 297
+ [  1%]  Time step      299 of 221872 @ t_step = 298
+ [  1%]  Time step      300 of 221872 @ t_step = 299
+ [  1%]  Time step      301 of 221872 @ t_step = 300
+ [  1%]  Time step      302 of 221872 @ t_step = 301
+ [  1%]  Time step      303 of 221872 @ t_step = 302
+ [  1%]  Time step      304 of 221872 @ t_step = 303
+ [  1%]  Time step      305 of 221872 @ t_step = 304
+ [  1%]  Time step      306 of 221872 @ t_step = 305
+ [  1%]  Time step      307 of 221872 @ t_step = 306
+ [  1%]  Time step      308 of 221872 @ t_step = 307
+ [  1%]  Time step      309 of 221872 @ t_step = 308
+ [  1%]  Time step      310 of 221872 @ t_step = 309
+ [  1%]  Time step      311 of 221872 @ t_step = 310
+ [  1%]  Time step      312 of 221872 @ t_step = 311
+ [  1%]  Time step      313 of 221872 @ t_step = 312
+ [  1%]  Time step      314 of 221872 @ t_step = 313
+ [  1%]  Time step      315 of 221872 @ t_step = 314
+ [  1%]  Time step      316 of 221872 @ t_step = 315
+ [  1%]  Time step      317 of 221872 @ t_step = 316
+ [  1%]  Time step      318 of 221872 @ t_step = 317
+ [  1%]  Time step      319 of 221872 @ t_step = 318
+ [  1%]  Time step      320 of 221872 @ t_step = 319
+ [  1%]  Time step      321 of 221872 @ t_step = 320
+ [  1%]  Time step      322 of 221872 @ t_step = 321
+ [  1%]  Time step      323 of 221872 @ t_step = 322
+ [  1%]  Time step      324 of 221872 @ t_step = 323
+ [  1%]  Time step      325 of 221872 @ t_step = 324
+ [  1%]  Time step      326 of 221872 @ t_step = 325
+ [  1%]  Time step      327 of 221872 @ t_step = 326
+ [  1%]  Time step      328 of 221872 @ t_step = 327
+ [  1%]  Time step      329 of 221872 @ t_step = 328
+ [  1%]  Time step      330 of 221872 @ t_step = 329
+ [  1%]  Time step      331 of 221872 @ t_step = 330
+ [  1%]  Time step      332 of 221872 @ t_step = 331
+ [  1%]  Time step      333 of 221872 @ t_step = 332
+ [  1%]  Time step      334 of 221872 @ t_step = 333
+ [  1%]  Time step      335 of 221872 @ t_step = 334
+ [  1%]  Time step      336 of 221872 @ t_step = 335
+ [  1%]  Time step      337 of 221872 @ t_step = 336
+ [  1%]  Time step      338 of 221872 @ t_step = 337
+ [  1%]  Time step      339 of 221872 @ t_step = 338
+ [  1%]  Time step      340 of 221872 @ t_step = 339
+ [  1%]  Time step      341 of 221872 @ t_step = 340
+ [  1%]  Time step      342 of 221872 @ t_step = 341
+ [  1%]  Time step      343 of 221872 @ t_step = 342
+ [  1%]  Time step      344 of 221872 @ t_step = 343
+ [  1%]  Time step      345 of 221872 @ t_step = 344
+ [  1%]  Time step      346 of 221872 @ t_step = 345
+ [  1%]  Time step      347 of 221872 @ t_step = 346
+ [  1%]  Time step      348 of 221872 @ t_step = 347
+ [  1%]  Time step      349 of 221872 @ t_step = 348
+ [  1%]  Time step      350 of 221872 @ t_step = 349
+ [  1%]  Time step      351 of 221872 @ t_step = 350
+ [  1%]  Time step      352 of 221872 @ t_step = 351
+ [  1%]  Time step      353 of 221872 @ t_step = 352
+ [  1%]  Time step      354 of 221872 @ t_step = 353
+ [  1%]  Time step      355 of 221872 @ t_step = 354
+ [  1%]  Time step      356 of 221872 @ t_step = 355
+ [  1%]  Time step      357 of 221872 @ t_step = 356
+ [  1%]  Time step      358 of 221872 @ t_step = 357
+ [  1%]  Time step      359 of 221872 @ t_step = 358
+ [  1%]  Time step      360 of 221872 @ t_step = 359
+ [  1%]  Time step      361 of 221872 @ t_step = 360
+ [  1%]  Time step      362 of 221872 @ t_step = 361
+ [  1%]  Time step      363 of 221872 @ t_step = 362
+ [  1%]  Time step      364 of 221872 @ t_step = 363
+ [  1%]  Time step      365 of 221872 @ t_step = 364
+ [  1%]  Time step      366 of 221872 @ t_step = 365
+ [  1%]  Time step      367 of 221872 @ t_step = 366
+ [  1%]  Time step      368 of 221872 @ t_step = 367
+
+mfc: ERROR > :( /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/1f48661f48/bin/simulation failed with exit code 1.
+
+ 
+
+Error: Submitting batch file for Interactive failed. It can be found here: /fastscratch/bwilfong3/exampleCases/2D_shockdroplet/MFC.sh. Please check the file for errors.
+
+Terminated
+
+mfc: ERROR > main.py finished with a 143 exit code.
+mfc: (venv) Exiting the Python virtual environment.
