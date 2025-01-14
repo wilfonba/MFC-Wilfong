@@ -87,10 +87,6 @@
             q_prim_vf(momxb+1)%sf(i,j,k) = -cos(phi)*sin(theta)*vrp
             q_prim_vf(momxe)%sf(i,j,k) = cos(phi)*cos(theta)*vrp
             q_prim_vf(e_idx)%sf(i,j,k) = 1
-            q_prim_vf(advxb)%sf(i,j,k) = 1e-9
-            q_prim_vf(contxb)%sf(i,j,k) = 1e-9
-            q_prim_vf(advxb+1)%sf(i,j,k) = 1-eps
-            q_prim_vf(contxb+1)%sf(i,j,k) = 1-eps
 
         elseif ((sqrt(z_cc(k)**2._wp + y_cc(j)**2._wp) - r1)**2._wp + (x_cc(i) + off2)**2._wp < r2**2._wp) then
             xl = x_cc(i) + off2
@@ -112,10 +108,6 @@
             q_prim_vf(momxb+1)%sf(i,j,k) = -cos(phi)*sin(theta)*vrp
             q_prim_vf(momxe)%sf(i,j,k) = cos(phi)*cos(theta)*vrp
             q_prim_vf(e_idx)%sf(i,j,k) = 1
-            q_prim_vf(advxb)%sf(i,j,k) = 1e-9
-            q_prim_vf(contxb)%sf(i,j,k) = 1e-9
-            q_prim_vf(advxb+2)%sf(i,j,k) = 1-eps
-            q_prim_vf(contxb+2)%sf(i,j,k) = 1-eps
         end if
 
 
