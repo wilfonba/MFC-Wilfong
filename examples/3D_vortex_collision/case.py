@@ -69,10 +69,11 @@ print(
             # "vel_wrt(1)": "T",
             # "vel_wrt(2)": "T",
             # "vel_wrt(3)": "T",
+            "omega_wrt(1)": "T",
+            "omega_wrt(2)": "T",
+            "omega_wrt(3)": "T",
             "qm_wrt": "T",
             "parallel_io": "T",
-            "schlieren_wrt": "T",
-            "schlieren_alpha(1)": 1,
             "fd_order": 4,
             # Patch 1: Base
             "patch_icpp(1)%geometry": 13,
