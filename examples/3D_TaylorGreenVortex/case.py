@@ -43,7 +43,7 @@ print(
             "dt": dt,
             "t_step_start": 0,
             "t_step_stop": Nt,
-            "t_step_save": int(Nt / 100),
+            "t_step_save": 1, #int(Nt / 100),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
@@ -57,6 +57,8 @@ print(
             "weno_avg": "F",
             "mapped_weno": "T",
             "riemann_solver": 2,
+            "igr": "T",
+            "igr_order": 5,
             "wave_speeds": 1,
             "avg_state": 2,
             "bc_x%beg": -1,
@@ -69,7 +71,7 @@ print(
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
-            # 'prim_vars_wrt'                :'T',
+            "prim_vars_wrt": "T",
             "omega_wrt(1)": "T",
             "omega_wrt(2)": "T",
             "omega_wrt(3)": "T",

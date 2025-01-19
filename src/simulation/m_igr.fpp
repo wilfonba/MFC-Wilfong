@@ -2,7 +2,6 @@
 
 module m_igr
 
-
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters
@@ -30,10 +29,9 @@ module m_igr
     !$acc declare create(duLx, duLy, dvLx, dvLy, duLz, dvLz, dwLz, dwLx, dwLy, FL)
     !$acc declare create(duRx, duRy, dvRx, dvRy, duRz, dvRz, dwRz, dwRx, dwRy, FR)
 
-    real(kind(0d0)), allocatable, dimension(:, :, :, :) :: qL_rs_vf, qR_rs_vf
+    real(wp), allocatable, dimension(:, :, :, :) :: qL_rs_vf, qR_rs_vf
 
-
-    real(kind(0d0)) :: alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze
+    real(wp) :: alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze
     !$acc declare create(alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze)
 
     type(int_bounds_info) :: ix, iy, iz
@@ -67,7 +65,6 @@ contains
                             idwbuff(3)%beg:idwbuff(3)%end, &
                             1:sys_size))
 
-
         if(any(Re_size > 0)) then
             #:for VAR in ['duLx', 'duLy', 'dvLx', 'dvLy', 'duLz', 'dvLz',       &
                         & 'dwLz', 'dwLx', 'dwLy', 'FL', 'duRx', 'duRy', 'dvRx', &
@@ -89,14 +86,14 @@ contains
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
-                    jac(j, k, l) = 0d0
-                    jac_old(j, k, l) = 0d0
-                    jac_rhs(j, k, l) = 0d0
+                    jac(j, k, l) = 0._wp
+                    jac_old(j, k, l) = 0._wp
+                    jac_rhs(j, k, l) = 0._wp
                end do
             end do
         end do
 
-        mu = 1d0 / fluid_pp(1)%Re(1)
+        mu = 1._wp / fluid_pp(1)%Re(1)
         !$acc update device(mu)
 
     end subroutine s_initialize_igr_module
@@ -105,72 +102,316 @@ contains
     ! Balsara & Shu (1999)
     subroutine s_reconstruct_deriv(qL, qR, q_prim, idir)
 
-        real(kind(0d0)), &
+        real(wp), &
             dimension(startx:, starty:, startz:), &
             intent(INOUT) :: qL, qR, q_prim
         integer, intent(IN) :: idir
 
-        if(idir == 1) then
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
-                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                    do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                        qL(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j-2, k, l) + &
-                                                    27d0 * q_prim(j-1, k, l) + &
-                                                    47d0 * q_prim(j, k, l) -   &
-                                                    13d0 * q_prim(j+1, k, l) + &
-                                                    2d0 * q_prim(j+2, k, l))
-                        qR(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j+2, k, l) + &
-                                                    27d0 * q_prim(j+1, k, l) + &
-                                                    47d0 * q_prim(j, k, l) -   &
-                                                    13d0 * q_prim(j-1, k, l) + &
-                                                    2d0 * q_prim(j-2, k, l))
+        if (igr_order == 5) then
+            if(idir == 1) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                            qL(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j-2, k, l) + &
+                                                        27._wp * q_prim(j-1, k, l) + &
+                                                        47._wp * q_prim(j, k, l) -   &
+                                                        13._wp * q_prim(j+1, k, l) + &
+                                                        2._wp * q_prim(j+2, k, l))
+                            qR(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j+2, k, l) + &
+                                                        27._wp * q_prim(j+1, k, l) + &
+                                                        47._wp * q_prim(j, k, l) -   &
+                                                        13._wp * q_prim(j-1, k, l) + &
+                                                        2._wp * q_prim(j-2, k, l))
+                        end do
                     end do
                 end do
-            end do
-        else if(idir == 2) then
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
-                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                    do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                        qL(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k-2, l) + &
-                                                    27d0 * q_prim(j, k-1, l) + &
-                                                    47d0 * q_prim(j, k, l) -   &
-                                                    13d0 * q_prim(j, k+1, l) + &
-                                                    2d0 * q_prim(j, k+2, l))
-                        qR(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k+2, l) + &
-                                                    27d0 * q_prim(j, k+1, l) + &
-                                                    47d0 * q_prim(j, k, l) -   &
-                                                    13d0 * q_prim(j, k-1, l) + &
-                                                    2d0 * q_prim(j, k-2, l))
+            else if(idir == 2) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                            qL(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j, k-2, l) + &
+                                                        27._wp * q_prim(j, k-1, l) + &
+                                                        47._wp * q_prim(j, k, l) -   &
+                                                        13._wp * q_prim(j, k+1, l) + &
+                                                        2._wp * q_prim(j, k+2, l))
+                            qR(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j, k+2, l) + &
+                                                        27._wp * q_prim(j, k+1, l) + &
+                                                        47._wp * q_prim(j, k, l) -   &
+                                                        13._wp * q_prim(j, k-1, l) + &
+                                                        2._wp * q_prim(j, k-2, l))
+                        end do
                     end do
                 end do
-            end do
-        else
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
-                do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                    do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                        qL(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k, l-2) + &
-                                                    27d0 * q_prim(j, k, l-1) + &
-                                                    47d0 * q_prim(j, k, l) -   &
-                                                    13d0 * q_prim(j, k, l+1) + &
-                                                    2d0 * q_prim(j, k, l+2))
-                        qR(j, k, l) = (1d0/60d0) * (-3d0 * q_prim(j, k, l+2) + &
-                                                    27d0 * q_prim(j, k, l+1) + &
-                                                    47d0 * q_prim(j, k, l) -   &
-                                                    13d0 * q_prim(j, k, l-1) + &
-                                                    2d0 * q_prim(j, k, l-2))
+            else
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                            qL(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j, k, l-2) + &
+                                                        27._wp * q_prim(j, k, l-1) + &
+                                                        47._wp * q_prim(j, k, l) -   &
+                                                        13._wp * q_prim(j, k, l+1) + &
+                                                        2._wp * q_prim(j, k, l+2))
+                            qR(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j, k, l+2) + &
+                                                        27._wp * q_prim(j, k, l+1) + &
+                                                        47._wp * q_prim(j, k, l) -   &
+                                                        13._wp * q_prim(j, k, l-1) + &
+                                                        2._wp * q_prim(j, k, l-2))
+                        end do
                     end do
                 end do
-            end do
+            end if
+        else if (igr_order == 7) then
+            if(idir == 1) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 3, idwbuff(3)%end - 3
+                    do k = idwbuff(2)%beg + 3, idwbuff(2)%end - 3
+                        do j = idwbuff(1)%beg + 3, idwbuff(1)%end - 3
+                            qL(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j-3, k, l) - &
+                                                        38._wp * q_prim(j-2, k, l) + &
+                                                        214._wp * q_prim(j-1, k, l) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j+1, k, l) + &
+                                                        25._wp * q_prim(j+2, k, l) - &
+                                                        3._wp * q_prim(j+3, k, l))
+                            qR(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j+3, k, l) - &
+                                                        3._wp * q_prim(j+2, k, l) + &
+                                                        214._wp * q_prim(j+1, k, l) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j-1, k, l) + &
+                                                        25._wp * q_prim(j-2, k, l) - &
+                                                        3._wp * q_prim(j-3, k, l))
+                        end do
+                    end do
+                end do
+            else if(idir == 2) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 3, idwbuff(3)%end - 3
+                    do k = idwbuff(2)%beg + 3, idwbuff(2)%end - 3
+                        do j = idwbuff(1)%beg + 3, idwbuff(1)%end - 3
+                            qL(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j, k-3, l) - &
+                                                        38._wp * q_prim(j, k-2, l) + &
+                                                        214._wp * q_prim(j, k-1, l) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j, k+1, l) + &
+                                                        25._wp * q_prim(j, k+2, l) - &
+                                                        3._wp * q_prim(j, k+3, l))
+                            qR(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j, k+3, l) - &
+                                                        3._wp * q_prim(j, k+2, l) + &
+                                                        214._wp * q_prim(j, k+1, l) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j, k-1, l) + &
+                                                        25._wp * q_prim(j, k-2, l) - &
+                                                        3._wp * q_prim(j, k-3, l))
+
+                        end do
+                    end do
+                end do
+            else
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 3, idwbuff(3)%end - 3
+                    do k = idwbuff(2)%beg + 3, idwbuff(2)%end - 3
+                        do j = idwbuff(1)%beg + 3, idwbuff(1)%end - 3
+                            qL(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j, k, l-3) - &
+                                                        38._wp * q_prim(j, k, l-2) + &
+                                                        214._wp * q_prim(j, k, l-1) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j, k, l+1) + &
+                                                        25._wp * q_prim(j, k, l+2) - &
+                                                        3._wp * q_prim(j, k, l+3))
+                            qR(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j, k, l+3) - &
+                                                        3._wp * q_prim(j, k, l+2) + &
+                                                        214._wp * q_prim(j, k, l+1) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j, k, l-1) + &
+                                                        25._wp * q_prim(j, k, l-2) - &
+                                                        3._wp * q_prim(j, k, l-3))
+
+                        end do
+                    end do
+                end do
+            end if
+        else if (igr_order == 9) then
+            if(idir == 1) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 4, idwbuff(3)%end - 4
+                    do k = idwbuff(2)%beg + 4, idwbuff(2)%end - 4
+                        do j = idwbuff(1)%beg + 4, idwbuff(1)%end - 4
+                            qL(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j-4, k, l) + &
+                                                        55._wp * q_prim(j-3, k, l) - &
+                                                        305._wp * q_prim(j-2, k, l) + &
+                                                        1375._wp * q_prim(j-1, k, l) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j+1, k, l) + &
+                                                        199._wp * q_prim(j+2, k, l) - &
+                                                        41._wp * q_prim(j+3, k, l) + &
+                                                        4._wp * q_prim(j+4, k, l))
+                            qR(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j+4, k, l) + &
+                                                        55._wp * q_prim(j+3, k, l) - &
+                                                        305._wp * q_prim(j+2, k, l) + &
+                                                        1375._wp * q_prim(j+1, k, l) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j-1, k, l) + &
+                                                        199._wp * q_prim(j-2, k, l) - &
+                                                        41._wp * q_prim(j-3, k, l) + &
+                                                        4._wp * q_prim(j-4, k, l))
+                        end do
+                    end do
+                end do
+            else if(idir == 2) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 4, idwbuff(3)%end - 4
+                    do k = idwbuff(2)%beg + 4, idwbuff(2)%end - 4
+                        do j = idwbuff(1)%beg + 4, idwbuff(1)%end - 4
+                            qL(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j, k-4, l) + &
+                                                        55._wp * q_prim(j, k-3, l) - &
+                                                        305._wp * q_prim(j, k-2, l) + &
+                                                        1375._wp * q_prim(j, k-1, l) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j, k+1, l) + &
+                                                        199._wp * q_prim(j, k+2, l) - &
+                                                        41._wp * q_prim(j, k+3, l) + &
+                                                        4._wp * q_prim(j, k+4, l))
+                            qR(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j, k-4, l) + &
+                                                        55._wp * q_prim(j, k-3, l) - &
+                                                        305._wp * q_prim(j, k-2, l) + &
+                                                        1375._wp * q_prim(j, k-1, l) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j, k+1, l) + &
+                                                        199._wp * q_prim(j, k+2, l) - &
+                                                        41._wp * q_prim(j, k+3, l) + &
+                                                        4._wp * q_prim(j, k+4, l))
+                        end do
+                    end do
+                end do
+            else
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 4, idwbuff(3)%end - 4
+                    do k = idwbuff(2)%beg + 4, idwbuff(2)%end - 4
+                        do j = idwbuff(1)%beg + 4, idwbuff(1)%end - 4
+                            qL(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j, k, l-4) + &
+                                                        55._wp * q_prim(j, k, l-3) - &
+                                                        305._wp * q_prim(j, k, l-2) + &
+                                                        1375._wp * q_prim(j, k, l-1) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j, k, l+1) + &
+                                                        199._wp * q_prim(j, k, l+2) - &
+                                                        41._wp * q_prim(j, k, l+3) + &
+                                                        4._wp * q_prim(j, k, l+4))
+                            qR(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j, k, l+4) + &
+                                                        55._wp * q_prim(j, k, l+3) - &
+                                                        305._wp * q_prim(j, k, l+2) + &
+                                                        1375._wp * q_prim(j, k, l+1) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j, k, l-1) + &
+                                                        199._wp * q_prim(j, k, l-2) - &
+                                                        41._wp * q_prim(j, k, l-3) + &
+                                                        4._wp * q_prim(j, k, l-4))
+                        end do
+                    end do
+                end do
+            end if
+        else if (igr_order == 11) then
+            if(idir == 1) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 5, idwbuff(3)%end - 5
+                    do k = idwbuff(2)%beg + 5, idwbuff(2)%end - 5
+                        do j = idwbuff(1)%beg + 5, idwbuff(1)%end - 5
+                            qL(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j-5, k, l) - &
+                                                        153._wp * q_prim(j-4, k, l) + &
+                                                        947._wp * q_prim(j-3, k, l) - &
+                                                        4003._wp * q_prim(j-2, k, l) + &
+                                                        15797._wp * q_prim(j-1, k, l) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j+1, k, l) + &
+                                                        2597._wp * q_prim(j+2, k, l) - &
+                                                        703._wp * q_prim(j+3, k, l) + &
+                                                        122._wp * q_prim(j+4, k, l) - &
+                                                        10._wp * q_prim(j+5, k, l))
+                            qR(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j+5, k, l) - &
+                                                        153._wp * q_prim(j+4, k, l) + &
+                                                        947._wp * q_prim(j+3, k, l) - &
+                                                        4003._wp * q_prim(j+2, k, l) + &
+                                                        15797._wp * q_prim(j+1, k, l) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j-1, k, l) + &
+                                                        2597._wp * q_prim(j-2, k, l) - &
+                                                        703._wp * q_prim(j-3, k, l) + &
+                                                        122._wp * q_prim(j-4, k, l) - &
+                                                        10._wp * q_prim(j-5, k, l))
+                        end do
+                    end do
+                end do
+            else if(idir == 2) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 5, idwbuff(3)%end - 5
+                    do k = idwbuff(2)%beg + 5, idwbuff(2)%end - 5
+                        do j = idwbuff(1)%beg + 5, idwbuff(1)%end - 5
+                            qL(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j, k-5, l) - &
+                                                        153._wp * q_prim(j, k-4, l) + &
+                                                        947._wp * q_prim(j, k-3, l) - &
+                                                        4003._wp * q_prim(j, k-2, l) + &
+                                                        15797._wp * q_prim(j, k-1, l) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j, k+1, l) + &
+                                                        2597._wp * q_prim(j, k+2, l) - &
+                                                        703._wp * q_prim(j, k+3, l) + &
+                                                        122._wp * q_prim(j, k+4, l) - &
+                                                        10._wp * q_prim(j, k+5, l))
+                            qR(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j, k+5, l) - &
+                                                        153._wp * q_prim(j, k+4, l) + &
+                                                        947._wp * q_prim(j, k+3, l) - &
+                                                        4003._wp * q_prim(j, k+2, l) + &
+                                                        15797._wp * q_prim(j, k+1, l) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j, k-1, l) + &
+                                                        2597._wp * q_prim(j, k-2, l) - &
+                                                        703._wp * q_prim(j, k-3, l) + &
+                                                        122._wp * q_prim(j, k-4, l) - &
+                                                        10._wp * q_prim(j, k-5, l))
+                        end do
+                    end do
+                end do
+            else
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 5, idwbuff(3)%end - 5
+                    do k = idwbuff(2)%beg + 5, idwbuff(2)%end - 5
+                        do j = idwbuff(1)%beg + 5, idwbuff(1)%end - 5
+                            qL(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j, k, l-5) - &
+                                                        153._wp * q_prim(j, k, l-4) + &
+                                                        947._wp * q_prim(j, k, l-3) - &
+                                                        4003._wp * q_prim(j, k, l-2) + &
+                                                        15797._wp * q_prim(j, k, l-1) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j, k, l+1) + &
+                                                        2597._wp * q_prim(j, k, l+2) - &
+                                                        703._wp * q_prim(j, k, l+3) + &
+                                                        122._wp * q_prim(j, k, l+4) - &
+                                                        10._wp * q_prim(j, k, l+5))
+                            qR(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j, k, l+5) - &
+                                                        153._wp * q_prim(j, k, l+4) + &
+                                                        947._wp * q_prim(j, k, l+3) - &
+                                                        4003._wp * q_prim(j, k, l+2) + &
+                                                        15797._wp * q_prim(j, k, l+1) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j, k, l-1) + &
+                                                        2597._wp * q_prim(j, k, l-2) - &
+                                                        703._wp * q_prim(j, k, l-3) + &
+                                                        122._wp * q_prim(j, k, l-4) - &
+                                                        10._wp * q_prim(j, k, l-5))
+                        end do
+                    end do
+                end do
+            end if
         end if
 
     end subroutine s_reconstruct_deriv
 
     subroutine s_igr_jacobi_iteration()
 
-        real(kind(0d0)) :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
+        real(wp) :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
 
         do q = 1, num_igr_iters
 
@@ -178,23 +419,23 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        rho_lx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j-1,k,l))
-                        rho_rx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j+1,k,l))
-                        rho_ly = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k-1,l))
-                        rho_ry = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k+1,l))
+                        rho_lx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j-1,k,l))
+                        rho_rx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j+1,k,l))
+                        rho_ly = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k-1,l))
+                        rho_ry = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k+1,l))
 
                         if(p > 0) then
-                            rho_lz = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k,l-1))
-                            rho_rz = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k,l+1))
+                            rho_lz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l-1))
+                            rho_rz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l+1))
                         end if
 
                         jac(j, k, l) = jac_rhs(j, k, l)
-                        jac(j, k, l) = jac(j, k, l) + alf_igr * (1d0 / dx(j)**2d0) * (rho_lx* jac_old(j-1,k,l) + rho_rx*jac_old(j+1,k,l))
-                        jac(j, k, l) = jac(j, k, l) + alf_igr * (1d0 / dy(k)**2d0) * (rho_ly* jac_old(j,k-1,l) + rho_ry*jac_old(j,k+1,l))
+                        jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dx(j)**2._wp) * (rho_lx* jac_old(j-1,k,l) + rho_rx*jac_old(j+1,k,l))
+                        jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dy(k)**2._wp) * (rho_ly* jac_old(j,k-1,l) + rho_ry*jac_old(j,k+1,l))
                         if(p > 0) then
-                            jac(j, k, l) = jac(j, k, l) + alf_igr * (1d0 / dz(l)**2d0) * (rho_lz* jac_old(j,k,l-1) + rho_rz*jac_old(j,k,l+1))
+                            jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dz(l)**2._wp) * (rho_lz* jac_old(j,k,l-1) + rho_rz*jac_old(j,k,l+1))
                         end if
-                        jac(j, k, l) = omega * (1 / fd_coeff(j,k,l))*jac(j,k,l) + (1 - omega)*jac_old(j, k, l)
+                        jac(j, k, l) = omega * (1._wp / fd_coeff(j,k,l))*jac(j,k,l) + (1._wp - omega)*jac_old(j, k, l)
                     end do
                 end do
             end do
@@ -321,53 +562,53 @@ contains
                         do j = -1, m+1
 
                             flux_vf(contxb)%sf(j,k,l) = &
-                                0.5d0 * (qL_rs_vf(j+1,k,l, contxb) * &
+                                0.5_wp * (qL_rs_vf(j+1,k,l, contxb) * &
                                 qL_rs_vf(j+1,k,l, momxb)) + &
-                                0.5d0 * (qR_rs_vf(j,k,l, contxb) * &
+                                0.5_wp * (qR_rs_vf(j,k,l, contxb) * &
                                 qR_rs_vf(j,k,l, momxb)) + &
-                                 250d0 * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j+1, k, l, contxb))
+                                250._wp * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j+1, k, l, contxb))
 
                             ! Momentum -> rho*u^2 + p + [[F_igr]]
                             flux_vf(momxb)%sf(j,k,l) = &
-                                 0.5d0* ( qL_rs_vf(j+1,k,l,contxb) * &
+                                 0.5_wp* ( qL_rs_vf(j+1,k,l,contxb) * &
                                 (qL_rs_vf(j+1,k,l,momxb)**2.0) + &
                                  qL_rs_vf(j+1,k,l,E_idx) + &
                                 FL(j+1, k, l) ) + &
-                                 0.5d0* ( qR_rs_vf(j,k,l,contxb) * &
+                                 0.5_wp* ( qR_rs_vf(j,k,l,contxb) * &
                                 (qR_rs_vf(j,k,l,momxb)**2.0) + &
                                  qR_rs_vf(j,k,l,E_idx) + &
                                 FR(j, k, l) ) + &
-                                 250d0 * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
+                                 250._wp * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
 
-                            flux_vf(momxb+1)%sf(j, k, l) = 0.5d0* qL_rs_vf(j+1,k,l,contxb) * &
+                            flux_vf(momxb+1)%sf(j, k, l) = 0.5_wp* qL_rs_vf(j+1,k,l,contxb) * &
                                 qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxb+1) + &
-                                0.5d0*  qR_rs_vf(j,k,l,contxb) * &
+                                0.5_wp*  qR_rs_vf(j,k,l,contxb) * &
                                 qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+1) + &
-                                250d0 * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
+                                250._wp * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
 
                              flux_vf(E_idx)%sf(j, k, l) = &
-                             0.5d0 * ( qL_rs_vf(j+1,k,l,momxb) * (qL_rs_vf(j+1,k,l,E_idx)*gammas(1) + pi_infs(1) + &
-                                0.5d0*qL_rs_vf(j+1, k, l,contxb) * (qL_rs_vf(j+1, k, l,momxb)**2d0 + qL_rs_vf(j+1, k, l,momxb+1)**2d0 ) + &
-                               qL_rs_vf(j+1,k,l,E_idx) + FL(j+1, k, l)) ) + &
-                            0.5d0 * ( qR_rs_vf(j,k,l,momxb) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
-                                0.5d0*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2d0 + qR_rs_vf(j, k, l,momxb+1)**2d0 ) + &
-                               qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
-                               250d0 * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
+                                0.5_wp * ( qL_rs_vf(j+1,k,l,momxb) * (qL_rs_vf(j+1,k,l,E_idx)*gammas(1) + pi_infs(1) + &
+                                0.5_wp*qL_rs_vf(j+1, k, l,contxb) * (qL_rs_vf(j+1, k, l,momxb)**2._wp + qL_rs_vf(j+1, k, l,momxb+1)**2._wp ) + &
+                                qL_rs_vf(j+1,k,l,E_idx) + FL(j+1, k, l)) ) + &
+                                0.5_wp * ( qR_rs_vf(j,k,l,momxb) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
+                                0.5_wp*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp ) + &
+                                qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
+                                250._wp * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
 
                             if(any(Re_size>0)) then
                                 flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) - &
-                                            0.5d0 * mu*((4d0/3d0)*duLx(j+1, k, l) - (2d0/3d0)*dvLy(j+1, k, l)) - &
-                                            0.5d0 * mu*((4d0/3d0)*duRx(j, k, l) - (2d0/3d0)*dvRy(j, k, l))
+                                            0.5_wp * mu*((4._wp/3._wp)*duLx(j+1, k, l) - (2._wp/3._wp)*dvLy(j+1, k, l)) - &
+                                            0.5_wp * mu*((4._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j, k, l))
 
                                 flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) - &
-                                           0.5d0*mu*(duLy(j+1, k, l) + dvLx(j+1, k, l))  -  &
-                                           0.5d0*mu*(duRy(j, k, l) + dvRx(j, k, l))
+                                           0.5_wp*mu*(duLy(j+1, k, l) + dvLx(j+1, k, l))  -  &
+                                           0.5_wp*mu*(duRy(j, k, l) + dvRx(j, k, l))
 
                                 flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) - &
-                                    0.5d0*mu*qL_rs_vf(j+1, k, l, momxb)*((4d0/3d0)*duLx(j+1, k, l) - (2d0/3d0)*dvLy(j+1, k, l)) - &
-                                    0.5d0*mu*qL_rs_vf(j+1, k, l, momxb)*(duLy(j+1, k, l) + dvLx(j+1, k, l))   - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb)*((4d0/3d0)*duRx(j, k, l) - (2d0/3d0)*dvRy(j, k, l)) - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb)*(duRy(j, k, l) + dvRx(j, k, l))
+                                    0.5_wp*mu*qL_rs_vf(j+1, k, l, momxb)*((4._wp/3._wp)*duLx(j+1, k, l) - (2._wp/3._wp)*dvLy(j+1, k, l)) - &
+                                    0.5_wp*mu*qL_rs_vf(j+1, k, l, momxb)*(duLy(j+1, k, l) + dvLx(j+1, k, l))   - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb)*((4._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j, k, l)) - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb)*(duRy(j, k, l) + dvRx(j, k, l))
                             end if
 
                         end do
@@ -380,65 +621,65 @@ contains
                         do j = -1, m+1
 
                             flux_vf(contxb)%sf(j,k,l) = &
-                                0.5d0 * (qL_rs_vf(j+1,k,l, contxb) * &
+                                0.5_wp * (qL_rs_vf(j+1,k,l, contxb) * &
                                 qL_rs_vf(j+1,k,l, momxb)) + &
-                                0.5d0 * (qR_rs_vf(j,k,l, contxb) * &
+                                0.5_wp * (qR_rs_vf(j,k,l, contxb) * &
                                 qR_rs_vf(j,k,l, momxb)) + &
-                                 250d0 * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j+1, k, l, contxb))
+                                250._wp * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j+1, k, l, contxb))
 
                             ! Momentum -> rho*u^2 + p + [[F_igr]]
                             flux_vf(momxb)%sf(j,k,l) = &
-                                 0.5d0* ( qL_rs_vf(j+1,k,l,contxb) * &
+                                 0.5_wp* ( qL_rs_vf(j+1,k,l,contxb) * &
                                 (qL_rs_vf(j+1,k,l,momxb)**2.0) + &
                                  qL_rs_vf(j+1,k,l,E_idx) + &
                                 FL(j+1, k, l) ) + &
-                                 0.5d0* ( qR_rs_vf(j,k,l,contxb) * &
+                                 0.5_wp* ( qR_rs_vf(j,k,l,contxb) * &
                                 (qR_rs_vf(j,k,l,momxb)**2.0) + &
                                  qR_rs_vf(j,k,l,E_idx) + &
                                 FR(j, k, l) ) + &
-                                 250d0 * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
+                                250._wp * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
 
-                            flux_vf(momxb+1)%sf(j, k, l) = 0.5d0* qL_rs_vf(j+1,k,l,contxb) * &
+                            flux_vf(momxb+1)%sf(j, k, l) = 0.5_wp* qL_rs_vf(j+1,k,l,contxb) * &
                                 (qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxb+1)) + &
-                                 0.5d0* qR_rs_vf(j,k,l,contxb) * &
+                                 0.5_wp* qR_rs_vf(j,k,l,contxb) * &
                                 (qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+1)) + &
-                                 250d0 * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
+                                 250._wp * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
 
-                            flux_vf(momxb+2)%sf(j, k, l) = 0.5d0* qL_rs_vf(j+1,k,l,contxb) * &
+                            flux_vf(momxb+2)%sf(j, k, l) = 0.5_wp* qL_rs_vf(j+1,k,l,contxb) * &
                                 (qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxb+2)) + &
-                                 0.5d0*  qR_rs_vf(j,k,l,contxb) * &
+                                 0.5_wp*  qR_rs_vf(j,k,l,contxb) * &
                                 (qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+2)) + &
-                                 250d0 * (qR_rs_vf(j, k, l, momxb+2) - qL_rs_vf(j+1, k, l, momxb+2))
+                                250._wp * (qR_rs_vf(j, k, l, momxb+2) - qL_rs_vf(j+1, k, l, momxb+2))
 
                             flux_vf(E_idx)%sf(j, k, l) = &
-                             0.5d0 * ( qL_rs_vf(j+1,k,l,momxb) * (qL_rs_vf(j+1,k,l,E_idx)*gammas(1) + pi_infs(1) + &
-                                0.5d0*qL_rs_vf(j+1, k, l,contxb) * (qL_rs_vf(j+1, k, l,momxb)**2d0 + qL_rs_vf(j+1, k, l,momxb+1)**2d0 + qL_rs_vf(j+1, k, l,momxb+2)**2d0) + &
+                             0.5_wp * ( qL_rs_vf(j+1,k,l,momxb) * (qL_rs_vf(j+1,k,l,E_idx)*gammas(1) + pi_infs(1) + &
+                                0.5_wp*qL_rs_vf(j+1, k, l,contxb) * (qL_rs_vf(j+1, k, l,momxb)**2._wp + qL_rs_vf(j+1, k, l,momxb+1)**2._wp + qL_rs_vf(j+1, k, l,momxb+2)**2._wp) + &
                                qL_rs_vf(j+1,k,l,E_idx) + FL(j+1, k, l)) ) + &
-                            0.5d0 * ( qR_rs_vf(j,k,l,momxb) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
-                                0.5d0*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2d0 + qR_rs_vf(j, k, l,momxb+1)**2d0 + qR_rs_vf(j, k, l,momxb+2)**2d0) + &
+                            0.5_wp * ( qR_rs_vf(j,k,l,momxb) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
+                                0.5_wp*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp + qR_rs_vf(j, k, l,momxb+2)**2._wp) + &
                                qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
-                               250d0 * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
+                               250._wp * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
 
                             if(any(Re_size>0)) then
                                 flux_vf(momxb+2)%sf(j, k, l) = flux_vf(momxb+2)%sf(j, k, l) - &
-                                           0.5d0*mu*(duLz(j+1, k, l) + dwLx(j+1, k, l))  -  &
-                                           0.5d0*mu*(duRz(j, k, l) + dwRx(j, k, l))
+                                           0.5_wp*mu*(duLz(j+1, k, l) + dwLx(j+1, k, l))  -  &
+                                           0.5_wp*mu*(duRz(j, k, l) + dwRx(j, k, l))
 
                                 flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) - &
-                                           0.5d0*mu*(duLy(j+1, k, l) + dvLx(j+1, k, l))  -  &
-                                           0.5d0*mu*(duRy(j, k, l) + dvRx(j, k, l))
+                                           0.5_wp*mu*(duLy(j+1, k, l) + dvLx(j+1, k, l))  -  &
+                                           0.5_wp*mu*(duRy(j, k, l) + dvRx(j, k, l))
 
                                 flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) - &
-                                            0.5d0 * mu*((4d0/3d0)*duLx(j+1, k, l) - (2d0/3d0)*dvLy(j+1, k, l) - (2d0/3d0) * dwLz(j+1, k, l)) - &
-                                            0.5d0 * mu*((4d0/3d0)*duRx(j, k, l) - (2d0/3d0)*dvRy(j, k, l) - (2d0/3d0) * dwRz(j, k, l))
+                                            0.5_wp * mu*((4._wp/3._wp)*duLx(j+1, k, l) - (2._wp/3._wp)*dvLy(j+1, k, l) - (2._wp/3._wp) * dwLz(j+1, k, l)) - &
+                                            0.5_wp * mu*((4._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp) * dwRz(j, k, l))
 
                                 flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) - &
-                                    0.5d0*mu*qL_rs_vf(j+1, k, l, momxb)*((4d0/3d0)*duLx(j+1, k, l) - (2d0/3d0)*dvLy(j+1, k, l) - (2d0/3d0)*dwLz(j+1, k, l)) - &
-                                    0.5d0*mu*qL_rs_vf(j+1, k, l, momxb)*(duLy(j+1, k, l) + dvLx(j+1, k, l))   - &
-                                    0.5d0*mu*qL_rs_vf(j+1, k, l, momxb)*(duLz(j+1, k, l) + dwLx(j+1, k, l))   - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb)*((4d0/3d0)*duRx(j, k, l) - (2d0/3d0)*dvRy(j, k, l) - (2d0/3d0)*dwRz(j, k, l)) - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb)*(duRy(j, k, l) + dvRx(j, k, l)) - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb)*(duRz(j, k, l) + dwRx(j, k, l))
+                                    0.5_wp*mu*qL_rs_vf(j+1, k, l, momxb)*((4._wp/3._wp)*duLx(j+1, k, l) - (2._wp/3._wp)*dvLy(j+1, k, l) - (2._wp/3._wp)*dwLz(j+1, k, l)) - &
+                                    0.5_wp*mu*qL_rs_vf(j+1, k, l, momxb)*(duLy(j+1, k, l) + dvLx(j+1, k, l))   - &
+                                    0.5_wp*mu*qL_rs_vf(j+1, k, l, momxb)*(duLz(j+1, k, l) + dwLx(j+1, k, l))   - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb)*((4._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp)*dwRz(j, k, l)) - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb)*(duRy(j, k, l) + dvRx(j, k, l)) - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb)*(duRz(j, k, l) + dwRx(j, k, l))
                             end if
                         end do
                     end do
@@ -452,52 +693,52 @@ contains
                         do j = -1, n+1
 
                             flux_vf(contxb)%sf(j, k, l) = &
-                                0.5d0 * (qL_rs_vf(j+1,k,l, contxb) * &
+                                0.5_wp * (qL_rs_vf(j+1,k,l, contxb) * &
                                 qL_rs_vf(j+1,k,l, momxb+1)) + &
-                                0.5d0 * (qR_rs_vf(j,k,l, contxb) * &
+                                0.5_wp * (qR_rs_vf(j,k,l, contxb) * &
                                 qR_rs_vf(j,k,l, momxb+1)) + &
-                                 250d0 * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j+1, k, l, contxb))
+                                250._wp * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j+1, k, l, contxb))
 
                             flux_vf(momxb+1)%sf(j, k, l) = &
-                                 0.5d0* ( qL_rs_vf(j+1,k,l,contxb) * &
+                                 0.5_wp* ( qL_rs_vf(j+1,k,l,contxb) * &
                                 (qL_rs_vf(j+1,k,l,momxb+1)**2.0) + &
                                  qL_rs_vf(j+1,k,l,E_idx) + &
                                 FL(j+1, k, l) ) + &
-                                 0.5d0* ( qR_rs_vf(j,k,l,contxb) * &
+                                 0.5_wp* ( qR_rs_vf(j,k,l,contxb) * &
                                 (qR_rs_vf(j,k,l,momxb+1)**2.0) + &
                                  qR_rs_vf(j,k,l,E_idx) + &
                                 FR(j, k, l) ) + &
-                                 250d0 * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
+                                250._wp * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
 
-                            flux_vf(momxb)%sf(j, k, l) = 0.5d0* qL_rs_vf(j+1,k,l,contxb) * &
+                            flux_vf(momxb)%sf(j, k, l) = 0.5_wp* qL_rs_vf(j+1,k,l,contxb) * &
                                 (qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxb+1)) + &
-                                 0.5d0* qR_rs_vf(j,k,l,contxb) * &
+                                 0.5_wp* qR_rs_vf(j,k,l,contxb) * &
                                 (qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+1)) + &
-                                 250d0 * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
+                                250._wp * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
 
                             flux_vf(E_idx)%sf(j, k, l) = &
-                             0.5d0 * ( qL_rs_vf(j+1,k,l,momxb+1) * (qL_rs_vf(j+1,k,l,E_idx)*gammas(1) + pi_infs(1) + &
-                                0.5d0*qL_rs_vf(j+1, k, l,contxb) * (qL_rs_vf(j+1, k, l,momxb)**2d0 + qL_rs_vf(j+1, k, l,momxb+1)**2d0 ) + &
+                             0.5_wp * ( qL_rs_vf(j+1,k,l,momxb+1) * (qL_rs_vf(j+1,k,l,E_idx)*gammas(1) + pi_infs(1) + &
+                                0.5_wp*qL_rs_vf(j+1, k, l,contxb) * (qL_rs_vf(j+1, k, l,momxb)**2._wp + qL_rs_vf(j+1, k, l,momxb+1)**2._wp ) + &
                                qL_rs_vf(j+1,k,l,E_idx) + FL(j+1, k, l)) ) + &
-                            0.5d0 * ( qR_rs_vf(j,k,l,momxb+1) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
-                                0.5d0*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2d0 + qR_rs_vf(j, k, l,momxb+1)**2d0 ) + &
+                            0.5_wp * ( qR_rs_vf(j,k,l,momxb+1) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
+                                0.5_wp*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp ) + &
                                qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
-                               250d0 * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
+                               250._wp * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
 
                             if(any(Re_size>0)) then
                                 flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) - &
-                                            0.5d0 * mu*((4d0/3d0)*dvLy(j+1, k, l) - (2d0/3d0)*duLx(j+1, k, l)) - &
-                                            0.5d0 * mu*((4d0/3d0)*dvRy(j, k, l) - (2d0/3d0)*duRx(j, k, l) )
+                                            0.5_wp * mu*((4._wp/3._wp)*dvLy(j+1, k, l) - (2._wp/3._wp)*duLx(j+1, k, l)) - &
+                                            0.5_wp * mu*((4._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp)*duRx(j, k, l) )
 
                                 flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) - &
-                                           0.5d0*mu*(duLy(j+1, k, l) + dvLx(j+1, k, l))  -  &
-                                           0.5d0*mu*(duRy(j, k, l) + dvRx(j, k, l))
+                                           0.5_wp*mu*(duLy(j+1, k, l) + dvLx(j+1, k, l))  -  &
+                                           0.5_wp*mu*(duRy(j, k, l) + dvRx(j, k, l))
 
                                 flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) - &
-                                    0.5d0*mu*qL_rs_vf(j+1, k, l, momxb+1)*((4d0/3d0)*dvLy(j+1, k, l) - (2d0/3d0)*duLx(j+1, k, l)) - &
-                                    0.5d0*mu*qL_rs_vf(j+1, k, l, momxb+1)*(duLy(j+1, k, l) + dvLx(j+1, k, l))   - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb+1)*((4d0/3d0)*dvRy(j, k, l) - (2d0/3d0)*duRx(j, k, l)) - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb+1)*(duRy(j, k, l) + dvRx(j, k, l))
+                                    0.5_wp*mu*qL_rs_vf(j+1, k, l, momxb+1)*((4._wp/3._wp)*dvLy(j+1, k, l) - (2._wp/3._wp)*duLx(j+1, k, l)) - &
+                                    0.5_wp*mu*qL_rs_vf(j+1, k, l, momxb+1)*(duLy(j+1, k, l) + dvLx(j+1, k, l))   - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb+1)*((4._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp)*duRx(j, k, l)) - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb+1)*(duRy(j, k, l) + dvRx(j, k, l))
                             end if
 
                         end do
@@ -510,64 +751,64 @@ contains
                          do j = -1, m+1
 
                             flux_vf(contxb)%sf(j, k, l) = &
-                                0.5d0 * (qL_rs_vf(j,k+1,l, contxb) * &
+                                0.5_wp * (qL_rs_vf(j,k+1,l, contxb) * &
                                 qL_rs_vf(j,k+1,l, momxb+1)) + &
-                                0.5d0 * (qR_rs_vf(j,k,l, contxb) * &
+                                0.5_wp * (qR_rs_vf(j,k,l, contxb) * &
                                 qR_rs_vf(j,k,l, momxb+1)) + &
-                                 250d0 * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j, k+1, l, contxb))
+                                250._wp * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j, k+1, l, contxb))
 
                             flux_vf(momxb+1)%sf(j, k, l) = &
-                                 0.5d0* ( qL_rs_vf(j,k+1,l,contxb) * &
+                                 0.5_wp* ( qL_rs_vf(j,k+1,l,contxb) * &
                                 (qL_rs_vf(j,k+1,l,momxb+1)**2.0) + &
                                  qL_rs_vf(j,k+1,l,E_idx) + &
                                 FL(j, k+1, l) ) + &
-                                 0.5d0* ( qR_rs_vf(j,k,l,contxb) * &
+                                 0.5_wp* ( qR_rs_vf(j,k,l,contxb) * &
                                 (qR_rs_vf(j,k,l,momxb+1)**2.0) + &
                                  qR_rs_vf(j,k,l,E_idx) + &
                                 FR(j, k, l) ) + &
-                                 250d0 * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j, k+1, l, momxb+1))
+                                 250._wp * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j, k+1, l, momxb+1))
 
-                            flux_vf(momxb)%sf(j, k, l) = 0.5d0* qL_rs_vf(j,k+1,l,contxb) * &
+                            flux_vf(momxb)%sf(j, k, l) = 0.5_wp* qL_rs_vf(j,k+1,l,contxb) * &
                                 (qL_rs_vf(j,k+1,l,momxb)*qL_rs_vf(j,k+1,l,momxb+1)) + &
-                                 0.5d0* qR_rs_vf(j,k,l,contxb) * &
+                                 0.5_wp* qR_rs_vf(j,k,l,contxb) * &
                                 (qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+1)) + &
-                                 250d0 * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j, k+1, l, momxb))
+                                 250._wp * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j, k+1, l, momxb))
 
-                            flux_vf(momxb+2)%sf(j, k, l) = 0.5d0* qL_rs_vf(j,k+1,l,contxb) * &
+                            flux_vf(momxb+2)%sf(j, k, l) = 0.5_wp* qL_rs_vf(j,k+1,l,contxb) * &
                                 (qL_rs_vf(j,k+1,l,momxb+1)*qL_rs_vf(j,k+1,l,momxb+2)) + &
-                                 0.5d0* qR_rs_vf(j,k,l,contxb) * &
+                                 0.5_wp* qR_rs_vf(j,k,l,contxb) * &
                                 (qR_rs_vf(j,k,l,momxb+1)*qR_rs_vf(j,k,l,momxb+2)) + &
-                                 250d0 * (qR_rs_vf(j, k, l, momxb+2) - qL_rs_vf(j, k+1, l, momxb+2))
+                                 250._wp * (qR_rs_vf(j, k, l, momxb+2) - qL_rs_vf(j, k+1, l, momxb+2))
 
                             flux_vf(E_idx)%sf(j, k, l) = &
-                             0.5d0 * ( qL_rs_vf(j,k+1,l,momxb+1) * (qL_rs_vf(j,k+1,l,E_idx)*gammas(1) + pi_infs(1) + &
-                                0.5d0*qL_rs_vf(j, k+1, l,contxb) * (qL_rs_vf(j, k+1, l,momxb)**2d0 + qL_rs_vf(j, k+1, l,momxb+1)**2d0 + qL_rs_vf(j,k+1,l,momxb+2)**2d0) + &
+                             0.5_wp * ( qL_rs_vf(j,k+1,l,momxb+1) * (qL_rs_vf(j,k+1,l,E_idx)*gammas(1) + pi_infs(1) + &
+                                0.5_wp*qL_rs_vf(j, k+1, l,contxb) * (qL_rs_vf(j, k+1, l,momxb)**2._wp + qL_rs_vf(j, k+1, l,momxb+1)**2._wp + qL_rs_vf(j,k+1,l,momxb+2)**2._wp) + &
                                qL_rs_vf(j,k+1,l,E_idx) + FL(j, k+1, l)) ) + &
-                            0.5d0 * ( qR_rs_vf(j,k,l,momxb+1) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
-                                0.5d0*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2d0 + qR_rs_vf(j, k, l,momxb+1)**2d0 + qR_rs_vf(j,k,l,momxb+2)**2d0 ) + &
+                            0.5_wp * ( qR_rs_vf(j,k,l,momxb+1) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
+                                0.5_wp*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp + qR_rs_vf(j,k,l,momxb+2)**2._wp ) + &
                                qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
-                               250d0 * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j, k+1, l, E_idx))
+                               250._wp * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j, k+1, l, E_idx))
 
                             if(any(Re_size>0)) then
                                 flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) - &
-                                            0.5d0 * mu*((4d0/3d0)*dvLy(j, k+1, l) - (2d0/3d0)*duLx(j, k+1, l) - (2d0/3d0)*dwLz(j,k+1,l)) - &
-                                            0.5d0 * mu*((4d0/3d0)*dvRy(j, k, l) - (2d0/3d0)*duRx(j, k, l) - (2d0/3d0)*dwRz(j,k,l) )
+                                            0.5_wp * mu*((4._wp/3._wp)*dvLy(j, k+1, l) - (2._wp/3._wp)*duLx(j, k+1, l) - (2._wp/3._wp)*dwLz(j,k+1,l)) - &
+                                            0.5_wp * mu*((4._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dwRz(j,k,l) )
 
                                 flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) - &
-                                           0.5d0*mu*(duLy(j, k+1, l) + dvLx(j, k+1, l))  -  &
-                                           0.5d0*mu*(duRy(j, k, l) + dvRx(j, k, l))
+                                           0.5_wp*mu*(duLy(j, k+1, l) + dvLx(j, k+1, l))  -  &
+                                           0.5_wp*mu*(duRy(j, k, l) + dvRx(j, k, l))
 
                                 flux_vf(momxb+2)%sf(j, k, l) = flux_vf(momxb+2)%sf(j, k, l) - &
-                                           0.5d0*mu*(dvLz(j, k+1, l) + dwLy(j, k+1, l))  -  &
-                                           0.5d0*mu*(dvRz(j, k, l) + dwRy(j, k, l))
+                                           0.5_wp*mu*(dvLz(j, k+1, l) + dwLy(j, k+1, l))  -  &
+                                           0.5_wp*mu*(dvRz(j, k, l) + dwRy(j, k, l))
 
                                 flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) - &
-                                    0.5d0*mu*qL_rs_vf(j, k+1, l, momxb+1)*((4d0/3d0)*dvLy(j, k+1, l) - (2d0/3d0)*duLx(j, k+1, l) - (2d0/3d0)*dwLz(j,k+1 ,l)) - &
-                                    0.5d0*mu*qL_rs_vf(j, k+1, l, momxb+1)*(duLy(j, k+1, l) + dvLx(j, k+1, l))   - &
-                                    0.5d0*mu*qL_rs_vf(j, k+1, l, momxb+1)*(dwLy(j, k+1, l) + dvLz(j, k+1, l))   - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb+1)*((4d0/3d0)*dvRy(j, k, l) - (2d0/3d0)*duRx(j, k, l) - (2d0/3d0)*dwRz(j ,k ,l)) - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb+1)*(duRy(j, k, l) + dvRx(j, k, l))   - &
-                                    0.5d0*mu*qR_rs_vf(j, k, l, momxb+1)*(dwRy(j, k, l) + dvRz(j, k, l))
+                                    0.5_wp*mu*qL_rs_vf(j, k+1, l, momxb+1)*((4._wp/3._wp)*dvLy(j, k+1, l) - (2._wp/3._wp)*duLx(j, k+1, l) - (2._wp/3._wp)*dwLz(j,k+1 ,l)) - &
+                                    0.5_wp*mu*qL_rs_vf(j, k+1, l, momxb+1)*(duLy(j, k+1, l) + dvLx(j, k+1, l))   - &
+                                    0.5_wp*mu*qL_rs_vf(j, k+1, l, momxb+1)*(dwLy(j, k+1, l) + dvLz(j, k+1, l))   - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb+1)*((4._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dwRz(j ,k ,l)) - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb+1)*(duRy(j, k, l) + dvRx(j, k, l))   - &
+                                    0.5_wp*mu*qR_rs_vf(j, k, l, momxb+1)*(dwRy(j, k, l) + dvRz(j, k, l))
                             end if
                         end do
                     end do
@@ -580,64 +821,64 @@ contains
                     do j = -1, m+1
 
                         flux_vf(contxb)%sf(j, k, l) = &
-                            0.5d0 * (qL_rs_vf(j,k,l+1, contxb) * &
+                            0.5_wp * (qL_rs_vf(j,k,l+1, contxb) * &
                             qL_rs_vf(j,k,l+1, momxb+2)) + &
-                            0.5d0 * (qR_rs_vf(j,k,l, contxb) * &
+                            0.5_wp * (qR_rs_vf(j,k,l, contxb) * &
                             qR_rs_vf(j,k,l, momxb+2)) + &
-                             250d0 * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j, k, l+1, contxb))
+                            250._wp * (qR_rs_vf(j, k, l, contxb) - qL_rs_vf(j, k, l+1, contxb))
 
                         flux_vf(momxb+2)%sf(j, k, l) = &
-                             0.5d0* ( qL_rs_vf(j,k,l+1,contxb) * &
+                             0.5_wp* ( qL_rs_vf(j,k,l+1,contxb) * &
                             (qL_rs_vf(j,k,l+1,momxb+2)**2.0) + &
                              qL_rs_vf(j,k,l+1,E_idx) + &
                             FL(j, k, l+1) ) + &
-                             0.5d0* ( qR_rs_vf(j,k,l,contxb) * &
+                             0.5_wp* ( qR_rs_vf(j,k,l,contxb) * &
                             (qR_rs_vf(j,k,l,momxb+2)**2.0) + &
                              qR_rs_vf(j,k,l,E_idx) + &
                             FR(j, k, l) ) + &
-                             250d0 * (qR_rs_vf(j, k, l, momxb+2) - qL_rs_vf(j, k, l+1, momxb+2))
+                             250._wp * (qR_rs_vf(j, k, l, momxb+2) - qL_rs_vf(j, k, l+1, momxb+2))
 
-                        flux_vf(momxb)%sf(j, k, l) = 0.5d0* qL_rs_vf(j+1,k,l,contxb) * &
+                        flux_vf(momxb)%sf(j, k, l) = 0.5_wp* qL_rs_vf(j+1,k,l,contxb) * &
                             (qL_rs_vf(j,k,l+1,momxb)*qL_rs_vf(j,k,l+1,momxb+2)) + &
-                             0.5d0* qR_rs_vf(j,k,l,contxb) * &
+                             0.5_wp* qR_rs_vf(j,k,l,contxb) * &
                             (qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+2)) + &
-                             250d0 * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j, k, l+1, momxb))
+                             250._wp * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j, k, l+1, momxb))
 
-                        flux_vf(momxb+1)%sf(j, k, l) = 0.5d0*  qL_rs_vf(j,k,l+1,contxb) * &
+                        flux_vf(momxb+1)%sf(j, k, l) = 0.5_wp*  qL_rs_vf(j,k,l+1,contxb) * &
                             (qL_rs_vf(j,k,l+1,momxb+1)*qL_rs_vf(j,k,l+1,momxb+2)) + &
-                             0.5d0* qR_rs_vf(j,k,l,contxb) * &
+                             0.5_wp* qR_rs_vf(j,k,l,contxb) * &
                             (qR_rs_vf(j,k,l,momxb+1)*qR_rs_vf(j,k,l,momxb+2)) + &
-                             250d0 * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j, k, l+1, momxb+1))
+                             250._wp * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j, k, l+1, momxb+1))
 
                          flux_vf(E_idx)%sf(j, k, l) = &
-                         0.5d0 * ( qL_rs_vf(j,k,l+1,momxb+2) * (qL_rs_vf(j,k,l+1,E_idx)*gammas(1) + pi_infs(1) + &
-                            0.5d0*qL_rs_vf(j, k, l+1,contxb) * (qL_rs_vf(j, k, l+1,momxb)**2d0 + qL_rs_vf(j, k, l+1,momxb+1)**2d0 + qL_rs_vf(j,k,l+1,momxb+2)**2d0) + &
+                         0.5_wp * ( qL_rs_vf(j,k,l+1,momxb+2) * (qL_rs_vf(j,k,l+1,E_idx)*gammas(1) + pi_infs(1) + &
+                            0.5_wp*qL_rs_vf(j, k, l+1,contxb) * (qL_rs_vf(j, k, l+1,momxb)**2._wp + qL_rs_vf(j, k, l+1,momxb+1)**2._wp + qL_rs_vf(j,k,l+1,momxb+2)**2._wp) + &
                            qL_rs_vf(j,k,l+1,E_idx) + FL(j, k, l+1)) ) + &
-                        0.5d0 * ( qR_rs_vf(j,k,l,momxb+2) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
-                            0.5d0*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2d0 + qR_rs_vf(j, k, l,momxb+1)**2d0 + qR_rs_vf(j,k,l,momxb+2)**2d0 ) + &
+                        0.5_wp * ( qR_rs_vf(j,k,l,momxb+2) * (qR_rs_vf(j,k,l,E_idx)*gammas(1) + pi_infs(1) + &
+                            0.5_wp*qR_rs_vf(j, k, l,contxb) * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp + qR_rs_vf(j,k,l,momxb+2)**2._wp ) + &
                            qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
-                           250d0 * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j, k, l+1, E_idx))
+                           250._wp * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j, k, l+1, E_idx))
 
                         if(any(Re_size>0)) then
                             flux_vf(momxb+2)%sf(j, k, l) = flux_vf(momxb+2)%sf(j, k, l) - &
-                                        0.5d0 * mu*((4d0/3d0)*dwLz(j, k, l+1) - (2d0/3d0)*duLx(j, k, l+1) - (2d0/3d0)*dvLy(j,k,l+1)) - &
-                                        0.5d0 * mu*((4d0/3d0)*dwRz(j, k, l) - (2d0/3d0)*duRx(j, k, l) - (2d0/3d0)*dvRy(j,k,l) )
+                                        0.5_wp * mu*((4._wp/3._wp)*dwLz(j, k, l+1) - (2._wp/3._wp)*duLx(j, k, l+1) - (2._wp/3._wp)*dvLy(j,k,l+1)) - &
+                                        0.5_wp * mu*((4._wp/3._wp)*dwRz(j, k, l) - (2._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j,k,l) )
 
                             flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) - &
-                                       0.5d0*mu*(duLz(j, k, l+1) + dwLx(j, k, l+1))  -  &
-                                       0.5d0*mu*(duRz(j, k, l) + dwRx(j, k, l))
+                                       0.5_wp*mu*(duLz(j, k, l+1) + dwLx(j, k, l+1))  -  &
+                                       0.5_wp*mu*(duRz(j, k, l) + dwRx(j, k, l))
 
                             flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) - &
-                                       0.5d0*mu*(dvLz(j, k, l+1) + dwLy(j, k, l+1))  -  &
-                                       0.5d0*mu*(dvRz(j, k, l) + dwRy(j, k, l))
+                                       0.5_wp*mu*(dvLz(j, k, l+1) + dwLy(j, k, l+1))  -  &
+                                       0.5_wp*mu*(dvRz(j, k, l) + dwRy(j, k, l))
 
                             flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) - &
-                            0.5d0*mu*qL_rs_vf(j, k, l+1, momxb+2)*((4d0/3d0)*dwLz(j, k, l+1) - (2d0/3d0)*duLx(j, k, l+1) - (2d0/3d0)*dvLy(j ,k ,l+1)) - &
-                            0.5d0*mu*qL_rs_vf(j, k, l+1, momxb+2)*(duLz(j, k, l+1) + dwLx(j, k, l+1))   - &
-                            0.5d0*mu*qL_rs_vf(j, k, l+1, momxb+2)*(dvLz(j, k, l+1) + dwLy(j, k, l+1))   - &
-                            0.5d0*mu*qR_rs_vf(j, k, l, momxb+2)*((4d0/3d0)*dwRz(j, k, l) - (2d0/3d0)*duRx(j, k, l) - (2d0/3d0)*dvRy(j ,k ,l)) - &
-                            0.5d0*mu*qR_rs_vf(j, k, l, momxb+2)*(duRz(j, k, l) + dwRx(j, k, l))   - &
-                            0.5d0*mu*qR_rs_vf(j, k, l, momxb+2)*(dvRz(j, k, l) + dwRy(j, k, l))
+                            0.5_wp*mu*qL_rs_vf(j, k, l+1, momxb+2)*((4._wp/3._wp)*dwLz(j, k, l+1) - (2._wp/3._wp)*duLx(j, k, l+1) - (2._wp/3._wp)*dvLy(j ,k ,l+1)) - &
+                            0.5_wp*mu*qL_rs_vf(j, k, l+1, momxb+2)*(duLz(j, k, l+1) + dwLx(j, k, l+1))   - &
+                            0.5_wp*mu*qL_rs_vf(j, k, l+1, momxb+2)*(dvLz(j, k, l+1) + dwLy(j, k, l+1))   - &
+                            0.5_wp*mu*qR_rs_vf(j, k, l, momxb+2)*((4._wp/3._wp)*dwRz(j, k, l) - (2._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j ,k ,l)) - &
+                            0.5_wp*mu*qR_rs_vf(j, k, l, momxb+2)*(duRz(j, k, l) + dwRx(j, k, l))   - &
+                            0.5_wp*mu*qR_rs_vf(j, k, l, momxb+2)*(dvRz(j, k, l) + dwRy(j, k, l))
                         end if
                     end do
                 end do
@@ -650,12 +891,12 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        real(kind(0d0)) :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
+        real(wp) :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
 
-        alf_igr = 0d0*(dx(1)**2)
+        alf_igr = 0._wp*(dx(1)**2)
         !$acc update device(alf_igr)
 
-        omega = 1d0
+        omega = 1._wp
         !$acc update device(omega)
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -672,15 +913,15 @@ contains
             do l = 0, p
                 do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                     do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
-                        dux(j,k,l) = (1/(12d0*dx(j))) * ( &
-                            8d0*q_prim_vf(momxb)%sf(j+1,k,l) - &
-                            8d0*q_prim_vf(momxb)%sf(j-1,k,l) + &
+                        dux(j,k,l) = (1/(12._wp*dx(j))) * ( &
+                            8._wp*q_prim_vf(momxb)%sf(j+1,k,l) - &
+                            8._wp*q_prim_vf(momxb)%sf(j-1,k,l) + &
                             q_prim_vf(momxb)%sf(j-2,k,l) - &
                             q_prim_vf(momxb)%sf(j+2,k,l) )
 
-                        duy(j,k,l) = (1/(12d0*dy(k))) * ( &
-                            8d0*q_prim_vf(momxb)%sf(j,k+1,l) - &
-                            8d0*q_prim_vf(momxb)%sf(j,k-1,l) + &
+                        duy(j,k,l) = (1/(12._wp*dy(k))) * ( &
+                            8._wp*q_prim_vf(momxb)%sf(j,k+1,l) - &
+                            8._wp*q_prim_vf(momxb)%sf(j,k-1,l) + &
                             q_prim_vf(momxb)%sf(j,k-2,l) - &
                             q_prim_vf(momxb)%sf(j,k+2,l) )
 
@@ -692,15 +933,15 @@ contains
             do l = 0, p
                 do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                     do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
-                        dvx(j,k,l) = (1/(12d0*dx(j))) * ( &
-                            8d0*q_prim_vf(momxb+1)%sf(j+1,k,l) - &
-                            8d0*q_prim_vf(momxb+1)%sf(j-1,k,l) + &
+                        dvx(j,k,l) = (1/(12._wp*dx(j))) * ( &
+                            8._wp*q_prim_vf(momxb+1)%sf(j+1,k,l) - &
+                            8._wp*q_prim_vf(momxb+1)%sf(j-1,k,l) + &
                             q_prim_vf(momxb+1)%sf(j-2,k,l) - &
                             q_prim_vf(momxb+1)%sf(j+2,k,l) )
 
-                        dvy(j,k,l) = (1/(12d0*dy(k))) * ( &
-                            8d0*q_prim_vf(momxb+1)%sf(j,k+1,l) - &
-                            8d0*q_prim_vf(momxb+1)%sf(j,k-1,l) + &
+                        dvy(j,k,l) = (1/(12._wp*dy(k))) * ( &
+                            8._wp*q_prim_vf(momxb+1)%sf(j,k+1,l) - &
+                            8._wp*q_prim_vf(momxb+1)%sf(j,k-1,l) + &
                             q_prim_vf(momxb+1)%sf(j,k-2,l) - &
                             q_prim_vf(momxb+1)%sf(j,k+2,l) )
 
@@ -715,7 +956,7 @@ contains
                         jac_rhs(j, k, l) = alf_igr*( &
                                               dux(j,k,l)*dux(j,k,l) + dvx(j,k,l) * duy(j,k,l) + &
                                               duy(j,k,l)*dvx(j,k,l) + dvy(j,k,l) * dvy(j,k,l) +  &
-                                              (dux(j,k,l) + dvy(j,k,l))**2d0)
+                                              (dux(j,k,l) + dvy(j,k,l))**2._wp)
                    end do
                 end do
             end do
@@ -724,14 +965,14 @@ contains
             do l = 0, p
                 do k = idwbuff(2)%beg + 1, idwbuff(2)%end - 1
                     do j = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
-                        rho_lx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j-1,k,l))
-                        rho_rx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j+1,k,l))
-                        rho_ly = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k-1,l))
-                        rho_ry = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k+1,l))
+                        rho_lx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j-1,k,l))
+                        rho_rx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j+1,k,l))
+                        rho_ly = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k-1,l))
+                        rho_ry = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k+1,l))
 
-                        fd_coeff(j,k,l) = 1d0 / rho_igr(j, k, l)
+                        fd_coeff(j,k,l) = 1._wp / rho_igr(j, k, l)
 
-                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1d0 / dx(j)**2d0) * (rho_lx + rho_rx) +  (1d0 / dy(k)**2d0) *(rho_ly + rho_ry) )
+                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (rho_lx + rho_rx) +  (1._wp / dy(k)**2._wp) *(rho_ly + rho_ry) )
 
                     end do
                 end do
@@ -743,21 +984,21 @@ contains
             do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
                 do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                     do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
-                        dux(j,k,l) = (1/(12d0*dx(j))) * ( &
-                            8d0*q_prim_vf(momxb)%sf(j+1,k,l) - &
-                            8d0*q_prim_vf(momxb)%sf(j-1,k,l) + &
+                        dux(j,k,l) = (1/(12._wp*dx(j))) * ( &
+                            8._wp*q_prim_vf(momxb)%sf(j+1,k,l) - &
+                            8._wp*q_prim_vf(momxb)%sf(j-1,k,l) + &
                             q_prim_vf(momxb)%sf(j-2,k,l) - &
                             q_prim_vf(momxb)%sf(j+2,k,l) )
 
-                        duy(j,k,l) = (1/(12d0*dy(k))) * ( &
-                            8d0*q_prim_vf(momxb)%sf(j,k+1,l) - &
-                            8d0*q_prim_vf(momxb)%sf(j,k-1,l) + &
+                        duy(j,k,l) = (1/(12._wp*dy(k))) * ( &
+                            8._wp*q_prim_vf(momxb)%sf(j,k+1,l) - &
+                            8._wp*q_prim_vf(momxb)%sf(j,k-1,l) + &
                             q_prim_vf(momxb)%sf(j,k-2,l) - &
                             q_prim_vf(momxb)%sf(j,k+2,l) )
 
-                        duz(j,k,l) = (1/(12d0*dz(l))) * ( &
-                            8d0*q_prim_vf(momxb)%sf(j,k,l+1) - &
-                            8d0*q_prim_vf(momxb)%sf(j,k,l-1) + &
+                        duz(j,k,l) = (1/(12._wp*dz(l))) * ( &
+                            8._wp*q_prim_vf(momxb)%sf(j,k,l+1) - &
+                            8._wp*q_prim_vf(momxb)%sf(j,k,l-1) + &
                             q_prim_vf(momxb)%sf(j,k,l-2) - &
                             q_prim_vf(momxb)%sf(j,k,l+2) )
 
@@ -769,21 +1010,21 @@ contains
             do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
                 do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                     do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
-                        dvx(j,k,l) = (1/(12d0*dx(j))) * ( &
-                            8d0*q_prim_vf(momxb+1)%sf(j+1,k,l) - &
-                            8d0*q_prim_vf(momxb+1)%sf(j-1,k,l) + &
+                        dvx(j,k,l) = (1/(12._wp*dx(j))) * ( &
+                            8._wp*q_prim_vf(momxb+1)%sf(j+1,k,l) - &
+                            8._wp*q_prim_vf(momxb+1)%sf(j-1,k,l) + &
                             q_prim_vf(momxb+1)%sf(j-2,k,l) - &
                             q_prim_vf(momxb+1)%sf(j+2,k,l) )
 
-                        dvy(j,k,l) = (1/(12d0*dy(k))) * ( &
-                            8d0*q_prim_vf(momxb+1)%sf(j,k+1,l) - &
-                            8d0*q_prim_vf(momxb+1)%sf(j,k-1,l) + &
+                        dvy(j,k,l) = (1/(12._wp*dy(k))) * ( &
+                            8._wp*q_prim_vf(momxb+1)%sf(j,k+1,l) - &
+                            8._wp*q_prim_vf(momxb+1)%sf(j,k-1,l) + &
                             q_prim_vf(momxb+1)%sf(j,k-2,l) - &
                             q_prim_vf(momxb+1)%sf(j,k+2,l) )
 
-                        dvz(j,k,l) = (1/(12d0*dz(l))) * ( &
-                            8d0*q_prim_vf(momxb+1)%sf(j,k,l+1) - &
-                            8d0*q_prim_vf(momxb+1)%sf(j,k,l-1) + &
+                        dvz(j,k,l) = (1/(12._wp*dz(l))) * ( &
+                            8._wp*q_prim_vf(momxb+1)%sf(j,k,l+1) - &
+                            8._wp*q_prim_vf(momxb+1)%sf(j,k,l-1) + &
                             q_prim_vf(momxb+1)%sf(j,k,l-2) - &
                             q_prim_vf(momxb+1)%sf(j,k,l+2) )
 
@@ -795,21 +1036,21 @@ contains
             do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
                 do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                     do j = idwbuff(1)%beg+2, idwbuff(1)%end - 2
-                        dwx(j,k,l) = (1/(12d0*dx(j))) * ( &
-                            8d0*q_prim_vf(momxb+2)%sf(j+1,k,l) - &
-                            8d0*q_prim_vf(momxb+2)%sf(j-1,k,l) + &
+                        dwx(j,k,l) = (1/(12._wp*dx(j))) * ( &
+                            8._wp*q_prim_vf(momxb+2)%sf(j+1,k,l) - &
+                            8._wp*q_prim_vf(momxb+2)%sf(j-1,k,l) + &
                             q_prim_vf(momxb+2)%sf(j-2,k,l) - &
                             q_prim_vf(momxb+2)%sf(j+2,k,l) )
 
-                        dwy(j,k,l) = (1/(12d0*dy(k))) * ( &
-                            8d0*q_prim_vf(momxb+2)%sf(j,k+1,l) - &
-                            8d0*q_prim_vf(momxb+2)%sf(j,k-1,l) + &
+                        dwy(j,k,l) = (1/(12._wp*dy(k))) * ( &
+                            8._wp*q_prim_vf(momxb+2)%sf(j,k+1,l) - &
+                            8._wp*q_prim_vf(momxb+2)%sf(j,k-1,l) + &
                             q_prim_vf(momxb+2)%sf(j,k-2,l) - &
                             q_prim_vf(momxb+2)%sf(j,k+2,l) )
 
-                        dwz(j,k,l) = (1/(12d0*dz(l))) * ( &
-                            8d0*q_prim_vf(momxb+2)%sf(j,k,l+1) - &
-                            8d0*q_prim_vf(momxb+2)%sf(j,k,l-1) + &
+                        dwz(j,k,l) = (1/(12._wp*dz(l))) * ( &
+                            8._wp*q_prim_vf(momxb+2)%sf(j,k,l+1) - &
+                            8._wp*q_prim_vf(momxb+2)%sf(j,k,l-1) + &
                             q_prim_vf(momxb+2)%sf(j,k,l-2) - &
                             q_prim_vf(momxb+2)%sf(j,k,l+2) )
 
@@ -824,7 +1065,7 @@ contains
                         jac_rhs(j, k, l) = alf_igr*((dux(j,k,l)*dux(j,k,l) + dvx(j,k,l) * duy(j,k,l) + dwx(j,k,l) * duz(j,k,l)) + &
                                               (duy(j,k,l)*dvx(j,k,l) + dvy(j,k,l) * dvy(j,k,l) + dwy(j,k,l) * dvz(j,k,l)) + &
                                               (duz(j,k,l)*dwx(j,k,l) + dvz(j,k,l) * dwy(j,k,l) + dwz(j,k,l) * dwz(j,k,l)) + &
-                                              (dux(j,k,l) + dvy(j,k,l) + dwz(j,k,l))**2d0 )
+                                              (dux(j,k,l) + dvy(j,k,l) + dwz(j,k,l))**2._wp )
                    end do
                 end do
             end do
@@ -833,16 +1074,16 @@ contains
             do l = idwbuff(3)%beg + 1, idwbuff(3)%end - 1
                 do k = idwbuff(2)%beg + 1, idwbuff(2)%end - 1
                     do j = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
-                        rho_lx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j-1,k,l))
-                        rho_rx = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j+1,k,l))
-                        rho_ly = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k-1,l))
-                        rho_ry = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k+1,l))
-                        rho_lz = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k,l-1))
-                        rho_rz = 0.5d0 *(1d0 / rho_igr(j,k,l) + 1d0 / rho_igr(j,k,l+1))
+                        rho_lx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j-1,k,l))
+                        rho_rx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j+1,k,l))
+                        rho_ly = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k-1,l))
+                        rho_ry = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k+1,l))
+                        rho_lz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l-1))
+                        rho_rz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l+1))
 
-                        fd_coeff(j,k,l) = 1d0 / rho_igr(j, k, l)
+                        fd_coeff(j,k,l) = 1._wp / rho_igr(j, k, l)
 
-                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1d0 / dx(j)**2d0) * (rho_lx + rho_rx) +  (1d0 / dy(k)**2d0) *(rho_ly + rho_ry) + (1d0 / dz(l)**2d0) * (rho_lz + rho_rz) )
+                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (rho_lx + rho_rx) +  (1._wp / dy(k)**2._wp) *(rho_ly + rho_ry) + (1._wp / dz(l)**2._wp) * (rho_lz + rho_rz) )
 
                     end do
                 end do
@@ -863,8 +1104,8 @@ contains
                     do l = 0, p
                         do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                             do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                                qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j-2, k, l) + 27d0 * q_prim_vf(i)%sf(j-1, k, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j+1, k, l) + 2d0 * q_prim_vf(i)%sf(j+2, k, l))
-                                qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j+2, k, l) + 27d0 * q_prim_vf(i)%sf(j+1, k, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j-1, k, l) + 2d0 * q_prim_vf(i)%sf(j-2, k, l))
+                                qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j-2, k, l) + 27._wp * q_prim_vf(i)%sf(j-1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j+1, k, l) + 2._wp * q_prim_vf(i)%sf(j+2, k, l))
+                                qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j+2, k, l) + 27._wp * q_prim_vf(i)%sf(j+1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j-1, k, l) + 2._wp * q_prim_vf(i)%sf(j-2, k, l))
                             end do
                         end do
                     end do
@@ -875,8 +1116,8 @@ contains
                     do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
                         do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                             do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                                qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j-2, k, l) + 27d0 * q_prim_vf(i)%sf(j-1, k, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j+1, k, l) + 2d0 * q_prim_vf(i)%sf(j+2, k, l))
-                                qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j+2, k, l) + 27d0 * q_prim_vf(i)%sf(j+1, k, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j-1, k, l) + 2d0 * q_prim_vf(i)%sf(j-2, k, l))
+                                qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j-2, k, l) + 27._wp * q_prim_vf(i)%sf(j-1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j+1, k, l) + 2._wp * q_prim_vf(i)%sf(j+2, k, l))
+                                qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j+2, k, l) + 27._wp * q_prim_vf(i)%sf(j+1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j-1, k, l) + 2._wp * q_prim_vf(i)%sf(j-2, k, l))
                             end do
                         end do
                     end do
@@ -889,8 +1130,8 @@ contains
                     do l = 0, p
                         do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                             do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                                qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k-2, l) + 27d0 * q_prim_vf(i)%sf(j, k-1, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k+1, l) + 2d0 * q_prim_vf(i)%sf(j, k+2, l))
-                                qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k+2, l) + 27d0 * q_prim_vf(i)%sf(j, k+1, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k-1, l) + 2d0 * q_prim_vf(i)%sf(j, k-2, l))
+                                qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k-2, l) + 27._wp * q_prim_vf(i)%sf(j, k-1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k+1, l) + 2._wp * q_prim_vf(i)%sf(j, k+2, l))
+                                qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k+2, l) + 27._wp * q_prim_vf(i)%sf(j, k+1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k-1, l) + 2._wp * q_prim_vf(i)%sf(j, k-2, l))
                             end do
                         end do
                     end do
@@ -901,8 +1142,8 @@ contains
                     do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
                         do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                             do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                                qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k-2, l) + 27d0 * q_prim_vf(i)%sf(j, k-1, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k+1, l) + 2d0 * q_prim_vf(i)%sf(j, k+2, l))
-                                qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k+2, l) + 27d0 * q_prim_vf(i)%sf(j, k+1, l) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k-1, l) + 2d0 * q_prim_vf(i)%sf(j, k-2, l))
+                                qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k-2, l) + 27._wp * q_prim_vf(i)%sf(j, k-1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k+1, l) + 2._wp * q_prim_vf(i)%sf(j, k+2, l))
+                                qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k+2, l) + 27._wp * q_prim_vf(i)%sf(j, k+1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k-1, l) + 2._wp * q_prim_vf(i)%sf(j, k-2, l))
                             end do
                         end do
                     end do
@@ -914,8 +1155,8 @@ contains
                 do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
                     do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
                         do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                            qL_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k, l-2) + 27d0 * q_prim_vf(i)%sf(j, k, l-1) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k, l+1) + 2d0 * q_prim_vf(i)%sf(j, k, l+2))
-                            qR_rs_vf(j, k, l, i) = (1d0/60d0) * (-3d0 * q_prim_vf(i)%sf(j, k, l+2) + 27d0 * q_prim_vf(i)%sf(j, k, l+1) +  47d0 * q_prim_vf(i)%sf(j, k, l) -13d0 * q_prim_vf(i)%sf(j, k, l-1) + 2d0 * q_prim_vf(i)%sf(j, k, l-2))
+                            qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k, l-2) + 27._wp * q_prim_vf(i)%sf(j, k, l-1) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k, l+1) + 2._wp * q_prim_vf(i)%sf(j, k, l+2))
+                            qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k, l+2) + 27._wp * q_prim_vf(i)%sf(j, k, l+1) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k, l-1) + 2._wp * q_prim_vf(i)%sf(j, k, l-2))
                         end do
                     end do
                 end do
@@ -984,7 +1225,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(i)%sf(j, k, l) = 1d0/dx(j)* &
+                            rhs_vf(i)%sf(j, k, l) = 1._wp/dx(j)* &
                                 (flux_vf(i)%sf(j - 1 , k, l) &
                                  - flux_vf(i)%sf(j , k, l))
                         end do
@@ -998,7 +1239,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1d0/dy(k)* &
+                                rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
                                 (flux_vf(i)%sf(k - 1, j  , l) &
                                  - flux_vf(i)%sf(k, j , l))
                         end do
@@ -1012,7 +1253,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             rhs_vf(i)%sf(j, k, l) = &
-                                rhs_vf(i)%sf(j, k, l) + 1d0/dz(l)* &
+                                rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)* &
                                 (flux_vf(i)%sf(j, k, l-1) &
                                  - flux_vf(i)%sf(j, k, l ))
                         end do

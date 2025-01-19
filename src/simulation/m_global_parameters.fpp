@@ -117,6 +117,7 @@ module m_global_parameters
         logical, parameter :: wenoz = (${wenoz}$ /= 0)              !< WENO-Z
         logical, parameter :: teno = (${teno}$ /= 0)                !< TENO (Targeted ENO)
         real(wp), parameter :: wenoz_q = ${wenoz_q}$         !< Power constant for WENO-Z
+        integer, parameter :: igr_order = ${igr_order}$ !< Order of the IGR reconstructions
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
@@ -127,6 +128,7 @@ module m_global_parameters
         logical :: wenoz          !< WENO-Z
         logical :: teno           !< TENO (Targeted ENO)
         real(wp) :: wenoz_q  !< Power constant for WENO-Z
+        integer :: igr_order !< Order of the IGR reconstructions
     #:endif
 
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -168,7 +170,7 @@ module m_global_parameters
     integer :: cpu_start, cpu_end, cpu_rate
 
     #:if not MFC_CASE_OPTIMIZATION
-        !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q)
+        !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, igr_order)
     #:endif
 
     !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
@@ -605,6 +607,7 @@ contains
             nb = 1
             weno_order = dflt_int
             num_fluids = dflt_int
+            igr_order = dflt_int
         #:endif
 
         R0_type = dflt_int
