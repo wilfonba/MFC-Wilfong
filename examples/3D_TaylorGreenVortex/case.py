@@ -43,7 +43,7 @@ print(
             "dt": dt,
             "t_step_start": 0,
             "t_step_stop": Nt,
-            "t_step_save": 1, #int(Nt / 100),
+            "t_step_save": int(Nt / 100),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,

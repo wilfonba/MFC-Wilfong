@@ -13,7 +13,7 @@ module m_igr
     implicit none
 
     private; public :: s_initialize_igr_module, &
-        s_reconstruct_deriv, &
+        s_reconstruct_igr, &
         s_igr_jacobi_iteration, &
         s_igr_riemann_solver, &
         s_initialize_igr, &
@@ -100,7 +100,7 @@ contains
 
     ! WENO like reconstructions using only the optimial weights as given in
     ! Balsara & Shu (1999)
-    subroutine s_reconstruct_deriv(qL, qR, q_prim, idir)
+    subroutine s_reconstruct_igr(qL, qR, q_prim, idir)
 
         real(wp), &
             dimension(startx:, starty:, startz:), &
@@ -407,7 +407,7 @@ contains
             end if
         end if
 
-    end subroutine s_reconstruct_deriv
+    end subroutine s_reconstruct_igr
 
     subroutine s_igr_jacobi_iteration()
 
@@ -961,6 +961,7 @@ contains
                 end do
             end do
 
+
             !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry)
             do l = 0, p
                 do k = idwbuff(2)%beg + 1, idwbuff(2)%end - 1
@@ -973,7 +974,6 @@ contains
                         fd_coeff(j,k,l) = 1._wp / rho_igr(j, k, l)
 
                         fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (rho_lx + rho_rx) +  (1._wp / dy(k)**2._wp) *(rho_ly + rho_ry) )
-
                     end do
                 end do
             end do
@@ -1001,7 +1001,6 @@ contains
                             8._wp*q_prim_vf(momxb)%sf(j,k,l-1) + &
                             q_prim_vf(momxb)%sf(j,k,l-2) - &
                             q_prim_vf(momxb)%sf(j,k,l+2) )
-
                     end do
                 end do
             end do
@@ -1027,7 +1026,6 @@ contains
                             8._wp*q_prim_vf(momxb+1)%sf(j,k,l-1) + &
                             q_prim_vf(momxb+1)%sf(j,k,l-2) - &
                             q_prim_vf(momxb+1)%sf(j,k,l+2) )
-
                     end do
                 end do
             end do
@@ -1053,7 +1051,6 @@ contains
                             8._wp*q_prim_vf(momxb+2)%sf(j,k,l-1) + &
                             q_prim_vf(momxb+2)%sf(j,k,l-2) - &
                             q_prim_vf(momxb+2)%sf(j,k,l+2) )
-
                     end do
                 end do
             end do
@@ -1097,73 +1094,77 @@ contains
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         integer, intent(in) :: idir
 
-        if (idir == 1) then
-            if(p == 0) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size - 1
-                    do l = 0, p
-                        do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                            do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                                qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j-2, k, l) + 27._wp * q_prim_vf(i)%sf(j-1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j+1, k, l) + 2._wp * q_prim_vf(i)%sf(j+2, k, l))
-                                qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j+2, k, l) + 27._wp * q_prim_vf(i)%sf(j+1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j-1, k, l) + 2._wp * q_prim_vf(i)%sf(j-2, k, l))
-                            end do
-                        end do
-                    end do
-                end do
-            else
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size - 1
-                    do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
-                        do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                            do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                                qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j-2, k, l) + 27._wp * q_prim_vf(i)%sf(j-1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j+1, k, l) + 2._wp * q_prim_vf(i)%sf(j+2, k, l))
-                                qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j+2, k, l) + 27._wp * q_prim_vf(i)%sf(j+1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j-1, k, l) + 2._wp * q_prim_vf(i)%sf(j-2, k, l))
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-        else if (idir == 2) then
-            if(p == 0) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size - 1
-                    do l = 0, p
-                        do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                            do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                                qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k-2, l) + 27._wp * q_prim_vf(i)%sf(j, k-1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k+1, l) + 2._wp * q_prim_vf(i)%sf(j, k+2, l))
-                                qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k+2, l) + 27._wp * q_prim_vf(i)%sf(j, k+1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k-1, l) + 2._wp * q_prim_vf(i)%sf(j, k-2, l))
-                            end do
-                        end do
-                    end do
-                end do
-            else
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size - 1
-                    do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
-                        do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                            do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                                qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k-2, l) + 27._wp * q_prim_vf(i)%sf(j, k-1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k+1, l) + 2._wp * q_prim_vf(i)%sf(j, k+2, l))
-                                qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k+2, l) + 27._wp * q_prim_vf(i)%sf(j, k+1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k-1, l) + 2._wp * q_prim_vf(i)%sf(j, k-2, l))
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-        else if (idir == 3) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size - 1
-                do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
-                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                            qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k, l-2) + 27._wp * q_prim_vf(i)%sf(j, k, l-1) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k, l+1) + 2._wp * q_prim_vf(i)%sf(j, k, l+2))
-                            qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k, l+2) + 27._wp * q_prim_vf(i)%sf(j, k, l+1) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k, l-1) + 2._wp * q_prim_vf(i)%sf(j, k, l-2))
-                        end do
-                    end do
-                end do
-            end do
-        end if
+        do i = 1, sys_size - 1
+            call s_reconstruct_igr(qL_rs_vf(:,:,:,i), qR_rs_vf(:,:,:,i), q_prim_vf(i)%sf, idir)
+        end do
 
-        call s_reconstruct_deriv(FL, FR, jac, idir)
+        !if (idir == 1) then
+            !if(p == 0) then
+                !!$acc parallel loop collapse(4) gang vector default(present)
+                !do i = 1, sys_size - 1
+                    !do l = 0, p
+                        !do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                            !do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                                !qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j-2, k, l) + 27._wp * q_prim_vf(i)%sf(j-1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j+1, k, l) + 2._wp * q_prim_vf(i)%sf(j+2, k, l))
+                                !qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j+2, k, l) + 27._wp * q_prim_vf(i)%sf(j+1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j-1, k, l) + 2._wp * q_prim_vf(i)%sf(j-2, k, l))
+                            !end do
+                        !end do
+                    !end do
+                !end do
+            !else
+                !!$acc parallel loop collapse(4) gang vector default(present)
+                !do i = 1, sys_size - 1
+                    !do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                        !do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                            !do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                                !qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j-2, k, l) + 27._wp * q_prim_vf(i)%sf(j-1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j+1, k, l) + 2._wp * q_prim_vf(i)%sf(j+2, k, l))
+                                !qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j+2, k, l) + 27._wp * q_prim_vf(i)%sf(j+1, k, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j-1, k, l) + 2._wp * q_prim_vf(i)%sf(j-2, k, l))
+                            !end do
+                        !end do
+                    !end do
+                !end do
+            !end if
+        !else if (idir == 2) then
+            !if(p == 0) then
+                !!$acc parallel loop collapse(4) gang vector default(present)
+                !do i = 1, sys_size - 1
+                    !do l = 0, p
+                        !do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                            !do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                                !qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k-2, l) + 27._wp * q_prim_vf(i)%sf(j, k-1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k+1, l) + 2._wp * q_prim_vf(i)%sf(j, k+2, l))
+                                !qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k+2, l) + 27._wp * q_prim_vf(i)%sf(j, k+1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k-1, l) + 2._wp * q_prim_vf(i)%sf(j, k-2, l))
+                            !end do
+                        !end do
+                    !end do
+                !end do
+            !else
+                !!$acc parallel loop collapse(4) gang vector default(present)
+                !do i = 1, sys_size - 1
+                    !do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                        !do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                            !do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                                !qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k-2, l) + 27._wp * q_prim_vf(i)%sf(j, k-1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k+1, l) + 2._wp * q_prim_vf(i)%sf(j, k+2, l))
+                                !qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k+2, l) + 27._wp * q_prim_vf(i)%sf(j, k+1, l) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k-1, l) + 2._wp * q_prim_vf(i)%sf(j, k-2, l))
+                            !end do
+                        !end do
+                    !end do
+                !end do
+            !end if
+        !else if (idir == 3) then
+            !!$acc parallel loop collapse(4) gang vector default(present)
+            !do i = 1, sys_size - 1
+                !do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                    !do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        !do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                            !qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k, l-2) + 27._wp * q_prim_vf(i)%sf(j, k, l-1) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k, l+1) + 2._wp * q_prim_vf(i)%sf(j, k, l+2))
+                            !qR_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k, l+2) + 27._wp * q_prim_vf(i)%sf(j, k, l+1) +  47._wp * q_prim_vf(i)%sf(j, k, l) -13._wp * q_prim_vf(i)%sf(j, k, l-1) + 2._wp * q_prim_vf(i)%sf(j, k, l-2))
+                        !end do
+                    !end do
+                !end do
+            !end do
+        !end if
+
+        call s_reconstruct_igr(FL, FR, jac, idir)
 
     end subroutine s_reconstruct_prim_vars_igr
 
@@ -1172,41 +1173,41 @@ contains
         integer, intent(in) :: idir
 
         if (idir == 1) then
-            call s_reconstruct_deriv(duLx, duRx, dux, 1)
-            call s_reconstruct_deriv(dvLx, dvRx, dvx, 1)
-            call s_reconstruct_deriv(dwLx, dwRx, dwx, 1)
+            call s_reconstruct_igr(duLx, duRx, dux, 1)
+            call s_reconstruct_igr(dvLx, dvRx, dvx, 1)
+            call s_reconstruct_igr(dwLx, dwRx, dwx, 1)
 
-            call s_reconstruct_deriv(duLy, duRy, duy, 1)
-            call s_reconstruct_deriv(dvLy, dvRy, dvy, 1)
-            call s_reconstruct_deriv(dwLy, dwRy, dwy, 1)
+            call s_reconstruct_igr(duLy, duRy, duy, 1)
+            call s_reconstruct_igr(dvLy, dvRy, dvy, 1)
+            call s_reconstruct_igr(dwLy, dwRy, dwy, 1)
 
-            call s_reconstruct_deriv(duLz, duRz, duz, 1)
-            call s_reconstruct_deriv(dvLz, dvRz, dvz, 1)
-            call s_reconstruct_deriv(dwLz, dwRz, dwz, 1)
+            call s_reconstruct_igr(duLz, duRz, duz, 1)
+            call s_reconstruct_igr(dvLz, dvRz, dvz, 1)
+            call s_reconstruct_igr(dwLz, dwRz, dwz, 1)
         elseif (idir == 2) then
-            call s_reconstruct_deriv(duLx, duRx, dux, 2)
-            call s_reconstruct_deriv(dvLx, dvRx, dvx, 2)
-            call s_reconstruct_deriv(dwLx, dwRx, dwx, 2)
+            call s_reconstruct_igr(duLx, duRx, dux, 2)
+            call s_reconstruct_igr(dvLx, dvRx, dvx, 2)
+            call s_reconstruct_igr(dwLx, dwRx, dwx, 2)
 
-            call s_reconstruct_deriv(duLy, duRy, duy, 2)
-            call s_reconstruct_deriv(dvLy, dvRy, dvy, 2)
-            call s_reconstruct_deriv(dwLy, dwRy, dwy, 2)
+            call s_reconstruct_igr(duLy, duRy, duy, 2)
+            call s_reconstruct_igr(dvLy, dvRy, dvy, 2)
+            call s_reconstruct_igr(dwLy, dwRy, dwy, 2)
 
-            call s_reconstruct_deriv(duLz, duRz, duz, 2)
-            call s_reconstruct_deriv(dvLz, dvRz, dvz, 2)
-            call s_reconstruct_deriv(dwLz, dwRz, dwz, 2)
+            call s_reconstruct_igr(duLz, duRz, duz, 2)
+            call s_reconstruct_igr(dvLz, dvRz, dvz, 2)
+            call s_reconstruct_igr(dwLz, dwRz, dwz, 2)
         elseif (idir == 3) then
-            call s_reconstruct_deriv(duLx, duRx, dux, 3)
-            call s_reconstruct_deriv(dvLx, dvRx, dvx, 3)
-            call s_reconstruct_deriv(dwLx, dwRx, dwx, 3)
+            call s_reconstruct_igr(duLx, duRx, dux, 3)
+            call s_reconstruct_igr(dvLx, dvRx, dvx, 3)
+            call s_reconstruct_igr(dwLx, dwRx, dwx, 3)
 
-            call s_reconstruct_deriv(duLy, duRy, duy, 3)
-            call s_reconstruct_deriv(dvLy, dvRy, dvy, 3)
-            call s_reconstruct_deriv(dwLy, dwRy, dwy, 3)
+            call s_reconstruct_igr(duLy, duRy, duy, 3)
+            call s_reconstruct_igr(dvLy, dvRy, dvy, 3)
+            call s_reconstruct_igr(dwLy, dwRy, dwy, 3)
 
-            call s_reconstruct_deriv(duLz, duRz, duz, 3)
-            call s_reconstruct_deriv(dvLz, dvRz, dvz, 3)
-            call s_reconstruct_deriv(dwLz, dwRz, dwz, 3)
+            call s_reconstruct_igr(duLz, duRz, duz, 3)
+            call s_reconstruct_igr(dvLz, dvRz, dvz, 3)
+            call s_reconstruct_igr(dwLz, dwRz, dwz, 3)
         end if
 
     end subroutine s_get_viscous_igr
@@ -1240,8 +1241,8 @@ contains
                         do j = 0, m
                             rhs_vf(i)%sf(j, k, l) = &
                                 rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)* &
-                                (flux_vf(i)%sf(k - 1, j  , l) &
-                                 - flux_vf(i)%sf(k, j , l))
+                                (flux_vf(i)%sf(j, k - 1, l) &
+                                 - flux_vf(i)%sf(j, k , l))
                         end do
                     end do
                 end do

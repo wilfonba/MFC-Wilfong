@@ -1121,7 +1121,7 @@ contains
         end if
 
         if (igr) then
-            buff_size = max(buff_size, 4)
+            buff_size = 4
         end if
 
         if (probe_wrt) then

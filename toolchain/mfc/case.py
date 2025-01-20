@@ -212,6 +212,7 @@ class Case:
 #:set wenoz                 = {wenoz}
 #:set teno                  = {teno}
 #:set wenoz_q               = {self.params.get("wenoz_q", -1)}
+#:set igr_order             = {int(self.params.get("igr_order", 1))}
 """
 
         return """\
