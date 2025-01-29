@@ -1,0 +1,245 @@
+else if (igr_order == 7) then
+            if(idir == 1) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 3, idwbuff(3)%end - 3
+                    do k = idwbuff(2)%beg + 3, idwbuff(2)%end - 3
+                        do j = idwbuff(1)%beg + 3, idwbuff(1)%end - 3
+                            qL(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j-3, k, l) - &
+                                                        38._wp * q_prim(j-2, k, l) + &
+                                                        214._wp * q_prim(j-1, k, l) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j+1, k, l) + &
+                                                        25._wp * q_prim(j+2, k, l) - &
+                                                        3._wp * q_prim(j+3, k, l))
+                            qR(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j+3, k, l) - &
+                                                        3._wp * q_prim(j+2, k, l) + &
+                                                        214._wp * q_prim(j+1, k, l) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j-1, k, l) + &
+                                                        25._wp * q_prim(j-2, k, l) - &
+                                                        3._wp * q_prim(j-3, k, l))
+                        end do
+                    end do
+                end do
+            else if(idir == 2) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 3, idwbuff(3)%end - 3
+                    do k = idwbuff(2)%beg + 3, idwbuff(2)%end - 3
+                        do j = idwbuff(1)%beg + 3, idwbuff(1)%end - 3
+                            qL(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j, k-3, l) - &
+                                                        38._wp * q_prim(j, k-2, l) + &
+                                                        214._wp * q_prim(j, k-1, l) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j, k+1, l) + &
+                                                        25._wp * q_prim(j, k+2, l) - &
+                                                        3._wp * q_prim(j, k+3, l))
+                            qR(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j, k+3, l) - &
+                                                        3._wp * q_prim(j, k+2, l) + &
+                                                        214._wp * q_prim(j, k+1, l) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j, k-1, l) + &
+                                                        25._wp * q_prim(j, k-2, l) - &
+                                                        3._wp * q_prim(j, k-3, l))
+
+                        end do
+                    end do
+                end do
+            else
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 3, idwbuff(3)%end - 3
+                    do k = idwbuff(2)%beg + 3, idwbuff(2)%end - 3
+                        do j = idwbuff(1)%beg + 3, idwbuff(1)%end - 3
+                            qL(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j, k, l-3) - &
+                                                        38._wp * q_prim(j, k, l-2) + &
+                                                        214._wp * q_prim(j, k, l-1) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j, k, l+1) + &
+                                                        25._wp * q_prim(j, k, l+2) - &
+                                                        3._wp * q_prim(j, k, l+3))
+                            qR(j, k, l) = (1._wp/420._wp) * (4._wp * q_prim(j, k, l+3) - &
+                                                        3._wp * q_prim(j, k, l+2) + &
+                                                        214._wp * q_prim(j, k, l+1) + &
+                                                        319._wp * q_prim(j, k, l) -   &
+                                                        101._wp * q_prim(j, k, l-1) + &
+                                                        25._wp * q_prim(j, k, l-2) - &
+                                                        3._wp * q_prim(j, k, l-3))
+
+                        end do
+                    end do
+                end do
+            end if
+        else if (igr_order == 9) then
+            if(idir == 1) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 4, idwbuff(3)%end - 4
+                    do k = idwbuff(2)%beg + 4, idwbuff(2)%end - 4
+                        do j = idwbuff(1)%beg + 4, idwbuff(1)%end - 4
+                            qL(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j-4, k, l) + &
+                                                        55._wp * q_prim(j-3, k, l) - &
+                                                        305._wp * q_prim(j-2, k, l) + &
+                                                        1375._wp * q_prim(j-1, k, l) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j+1, k, l) + &
+                                                        199._wp * q_prim(j+2, k, l) - &
+                                                        41._wp * q_prim(j+3, k, l) + &
+                                                        4._wp * q_prim(j+4, k, l))
+                            qR(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j+4, k, l) + &
+                                                        55._wp * q_prim(j+3, k, l) - &
+                                                        305._wp * q_prim(j+2, k, l) + &
+                                                        1375._wp * q_prim(j+1, k, l) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j-1, k, l) + &
+                                                        199._wp * q_prim(j-2, k, l) - &
+                                                        41._wp * q_prim(j-3, k, l) + &
+                                                        4._wp * q_prim(j-4, k, l))
+                        end do
+                    end do
+                end do
+            else if(idir == 2) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 4, idwbuff(3)%end - 4
+                    do k = idwbuff(2)%beg + 4, idwbuff(2)%end - 4
+                        do j = idwbuff(1)%beg + 4, idwbuff(1)%end - 4
+                            qL(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j, k-4, l) + &
+                                                        55._wp * q_prim(j, k-3, l) - &
+                                                        305._wp * q_prim(j, k-2, l) + &
+                                                        1375._wp * q_prim(j, k-1, l) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j, k+1, l) + &
+                                                        199._wp * q_prim(j, k+2, l) - &
+                                                        41._wp * q_prim(j, k+3, l) + &
+                                                        4._wp * q_prim(j, k+4, l))
+                            qR(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j, k-4, l) + &
+                                                        55._wp * q_prim(j, k-3, l) - &
+                                                        305._wp * q_prim(j, k-2, l) + &
+                                                        1375._wp * q_prim(j, k-1, l) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j, k+1, l) + &
+                                                        199._wp * q_prim(j, k+2, l) - &
+                                                        41._wp * q_prim(j, k+3, l) + &
+                                                        4._wp * q_prim(j, k+4, l))
+                        end do
+                    end do
+                end do
+            else
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 4, idwbuff(3)%end - 4
+                    do k = idwbuff(2)%beg + 4, idwbuff(2)%end - 4
+                        do j = idwbuff(1)%beg + 4, idwbuff(1)%end - 4
+                            qL(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j, k, l-4) + &
+                                                        55._wp * q_prim(j, k, l-3) - &
+                                                        305._wp * q_prim(j, k, l-2) + &
+                                                        1375._wp * q_prim(j, k, l-1) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j, k, l+1) + &
+                                                        199._wp * q_prim(j, k, l+2) - &
+                                                        41._wp * q_prim(j, k, l+3) + &
+                                                        4._wp * q_prim(j, k, l+4))
+                            qR(j, k, l) = (1._wp/2520._wp) * (-5._wp * q_prim(j, k, l+4) + &
+                                                        55._wp * q_prim(j, k, l+3) - &
+                                                        305._wp * q_prim(j, k, l+2) + &
+                                                        1375._wp * q_prim(j, k, l+1) + &
+                                                        1879._wp * q_prim(j, k, l) -   &
+                                                        641._wp * q_prim(j, k, l-1) + &
+                                                        199._wp * q_prim(j, k, l-2) - &
+                                                        41._wp * q_prim(j, k, l-3) + &
+                                                        4._wp * q_prim(j, k, l-4))
+                        end do
+                    end do
+                end do
+            end if
+        else if (igr_order == 11) then
+            if(idir == 1) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 5, idwbuff(3)%end - 5
+                    do k = idwbuff(2)%beg + 5, idwbuff(2)%end - 5
+                        do j = idwbuff(1)%beg + 5, idwbuff(1)%end - 5
+                            qL(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j-5, k, l) - &
+                                                        153._wp * q_prim(j-4, k, l) + &
+                                                        947._wp * q_prim(j-3, k, l) - &
+                                                        4003._wp * q_prim(j-2, k, l) + &
+                                                        15797._wp * q_prim(j-1, k, l) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j+1, k, l) + &
+                                                        2597._wp * q_prim(j+2, k, l) - &
+                                                        703._wp * q_prim(j+3, k, l) + &
+                                                        122._wp * q_prim(j+4, k, l) - &
+                                                        10._wp * q_prim(j+5, k, l))
+                            qR(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j+5, k, l) - &
+                                                        153._wp * q_prim(j+4, k, l) + &
+                                                        947._wp * q_prim(j+3, k, l) - &
+                                                        4003._wp * q_prim(j+2, k, l) + &
+                                                        15797._wp * q_prim(j+1, k, l) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j-1, k, l) + &
+                                                        2597._wp * q_prim(j-2, k, l) - &
+                                                        703._wp * q_prim(j-3, k, l) + &
+                                                        122._wp * q_prim(j-4, k, l) - &
+                                                        10._wp * q_prim(j-5, k, l))
+                        end do
+                    end do
+                end do
+            else if(idir == 2) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 5, idwbuff(3)%end - 5
+                    do k = idwbuff(2)%beg + 5, idwbuff(2)%end - 5
+                        do j = idwbuff(1)%beg + 5, idwbuff(1)%end - 5
+                            qL(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j, k-5, l) - &
+                                                        153._wp * q_prim(j, k-4, l) + &
+                                                        947._wp * q_prim(j, k-3, l) - &
+                                                        4003._wp * q_prim(j, k-2, l) + &
+                                                        15797._wp * q_prim(j, k-1, l) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j, k+1, l) + &
+                                                        2597._wp * q_prim(j, k+2, l) - &
+                                                        703._wp * q_prim(j, k+3, l) + &
+                                                        122._wp * q_prim(j, k+4, l) - &
+                                                        10._wp * q_prim(j, k+5, l))
+                            qR(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j, k+5, l) - &
+                                                        153._wp * q_prim(j, k+4, l) + &
+                                                        947._wp * q_prim(j, k+3, l) - &
+                                                        4003._wp * q_prim(j, k+2, l) + &
+                                                        15797._wp * q_prim(j, k+1, l) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j, k-1, l) + &
+                                                        2597._wp * q_prim(j, k-2, l) - &
+                                                        703._wp * q_prim(j, k-3, l) + &
+                                                        122._wp * q_prim(j, k-4, l) - &
+                                                        10._wp * q_prim(j, k-5, l))
+                        end do
+                    end do
+                end do
+            else
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg + 5, idwbuff(3)%end - 5
+                    do k = idwbuff(2)%beg + 5, idwbuff(2)%end - 5
+                        do j = idwbuff(1)%beg + 5, idwbuff(1)%end - 5
+                            qL(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j, k, l-5) - &
+                                                        153._wp * q_prim(j, k, l-4) + &
+                                                        947._wp * q_prim(j, k, l-3) - &
+                                                        4003._wp * q_prim(j, k, l-2) + &
+                                                        15797._wp * q_prim(j, k, l-1) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j, k, l+1) + &
+                                                        2597._wp * q_prim(j, k, l+2) - &
+                                                        703._wp * q_prim(j, k, l+3) + &
+                                                        122._wp * q_prim(j, k, l+4) - &
+                                                        10._wp * q_prim(j, k, l+5))
+                            qR(j, k, l) = (1._wp/27720._wp) * (12._wp * q_prim(j, k, l+5) - &
+                                                        153._wp * q_prim(j, k, l+4) + &
+                                                        947._wp * q_prim(j, k, l+3) - &
+                                                        4003._wp * q_prim(j, k, l+2) + &
+                                                        15797._wp * q_prim(j, k, l+1) + &
+                                                        21417._wp * q_prim(j, k, l) -   &
+                                                        7303._wp * q_prim(j, k, l-1) + &
+                                                        2597._wp * q_prim(j, k, l-2) - &
+                                                        703._wp * q_prim(j, k, l-3) + &
+                                                        122._wp * q_prim(j, k, l-4) - &
+                                                        10._wp * q_prim(j, k, l-5))
+                        end do
+                    end do
+                end do
+            end if
+        end if
+
+

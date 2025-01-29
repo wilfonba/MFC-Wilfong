@@ -25,8 +25,8 @@ print(
             "p": 0,
             "dt": 1e-07,
             "t_step_start": 0,
-            "t_step_stop": 100000,
-            "t_step_save": 1000,
+            "t_step_stop": 10000,
+            "t_step_save": 100,
             "igr": "T",
             # Simulation Algorithm Parameters
             "num_patches": 1,

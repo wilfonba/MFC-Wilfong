@@ -307,8 +307,6 @@ contains
 
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
 
-
-
         ! Allocation of dq_prim_ds_qp
         @:ALLOCATE(dq_prim_dx_qp(1:1))
         @:ALLOCATE(dq_prim_dy_qp(1:1))
@@ -566,7 +564,7 @@ contains
         @:ALLOCATE(gm_alphaL_n(1:num_dims))
         @:ALLOCATE(gm_alphaR_n(1:num_dims))
 
-    if (alt_soundspeed) then
+        if (alt_soundspeed) then
             @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
         end if
 
@@ -723,7 +721,7 @@ contains
                 call nvtxEndRange
 
                 call nvtxStartRange("IGR_Flux_Add")
-                call s_igr_flux_add(rhs_vf,flux_n(id)%vf, id)
+                call s_igr_flux_add(q_prim_qp%vf, rhs_vf,flux_n(id)%vf, id)
                 call nvtxEndRange
 
             else ! Finite volume solve
@@ -2142,86 +2140,95 @@ contains
         end do
 
         @:DEALLOCATE(q_cons_qp%vf, q_prim_qp%vf)
-        @:DEALLOCATE(qL_rsx_vf, qR_rsx_vf)
 
-        if (n > 0) then
-            @:DEALLOCATE(qL_rsy_vf, qR_rsy_vf)
-        end if
-
-        if (p > 0) then
-            @:DEALLOCATE(qL_rsz_vf, qR_rsz_vf)
-        end if
-
-        if (viscous .and. weno_Re_flux) then
-            @:DEALLOCATE(dqL_rsx_vf, dqR_rsx_vf)
+        if (.not. igr) then
+            @:DEALLOCATE(qL_rsx_vf, qR_rsx_vf)
 
             if (n > 0) then
-                @:DEALLOCATE(dqL_rsy_vf, dqR_rsy_vf)
+                @:DEALLOCATE(qL_rsy_vf, qR_rsy_vf)
             end if
 
             if (p > 0) then
-                @:DEALLOCATE(dqL_rsz_vf, dqR_rsz_vf)
+                @:DEALLOCATE(qL_rsz_vf, qR_rsz_vf)
+            end if
+
+            if (viscous) then
+                do l = mom_idx%beg, mom_idx%end
+                    @:DEALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf)
+                end do
+
+                if (n > 0) then
+
+                    do l = mom_idx%beg, mom_idx%end
+                        @:DEALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf)
+                    end do
+
+                    if (p > 0) then
+                        do l = mom_idx%beg, mom_idx%end
+                            @:DEALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf)
+                        end do
+                    end if
+
+                end if
+
+                @:DEALLOCATE(dq_prim_dx_qp(1)%vf)
+                @:DEALLOCATE(dq_prim_dy_qp(1)%vf)
+                @:DEALLOCATE(dq_prim_dz_qp(1)%vf)
+
+                do i = num_dims, 1, -1
+
+                    do l = mom_idx%beg, mom_idx%end
+                        @:DEALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf)
+                        @:DEALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf)
+                    end do
+
+                    if (n > 0) then
+                        do l = mom_idx%beg, mom_idx%end
+                            @:DEALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf)
+                            @:DEALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf)
+                        end do
+                    end if
+
+                    if (p > 0) then
+                        do l = mom_idx%beg, mom_idx%end
+                            @:DEALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf)
+                            @:DEALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf)
+                        end do
+                    end if
+
+                    @:DEALLOCATE(dqL_prim_dx_n(i)%vf)
+                    @:DEALLOCATE(dqL_prim_dy_n(i)%vf)
+                    @:DEALLOCATE(dqL_prim_dz_n(i)%vf)
+                    @:DEALLOCATE(dqR_prim_dx_n(i)%vf)
+                    @:DEALLOCATE(dqR_prim_dy_n(i)%vf)
+                    @:DEALLOCATE(dqR_prim_dz_n(i)%vf)
+                end do
+
+                if (weno_Re_flux) then
+                    @:DEALLOCATE(dqL_rsx_vf, dqR_rsx_vf)
+
+                    if (n > 0) then
+                        @:DEALLOCATE(dqL_rsy_vf, dqR_rsy_vf)
+                    end if
+
+                    if (p > 0) then
+                        @:DEALLOCATE(dqL_rsz_vf, dqR_rsz_vf)
+                    end if
+                end if
+
+                if (cyl_coord) then
+                    do i = 1, num_dims
+                        @:DEALLOCATE(tau_re_vf(cont_idx%end + i)%sf)
+                    end do
+                    @:DEALLOCATE(tau_re_vf(e_idx)%sf)
+                    @:DEALLOCATE(tau_re_vf)
+                end if
             end if
         end if
 
         if (mpp_lim .and. bubbles_euler) then
             !$acc exit data delete(alf_sum%sf)
             deallocate (alf_sum%sf)
-        end if
-
-        if (viscous) then
-            do l = mom_idx%beg, mom_idx%end
-                @:DEALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf)
-            end do
-
-            if (n > 0) then
-
-                do l = mom_idx%beg, mom_idx%end
-                    @:DEALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf)
-                end do
-
-                if (p > 0) then
-                    do l = mom_idx%beg, mom_idx%end
-                        @:DEALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf)
-                    end do
-                end if
-
-            end if
-
-            @:DEALLOCATE(dq_prim_dx_qp(1)%vf)
-            @:DEALLOCATE(dq_prim_dy_qp(1)%vf)
-            @:DEALLOCATE(dq_prim_dz_qp(1)%vf)
-        end if
-
-        if (viscous) then
-            do i = num_dims, 1, -1
-
-                do l = mom_idx%beg, mom_idx%end
-                    @:DEALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf)
-                    @:DEALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf)
-                end do
-
-                if (n > 0) then
-                    do l = mom_idx%beg, mom_idx%end
-                        @:DEALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf)
-                        @:DEALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf)
-                    end do
-                end if
-
-                if (p > 0) then
-                    do l = mom_idx%beg, mom_idx%end
-                        @:DEALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf)
-                        @:DEALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf)
-                    end do
-                end if
-
-                @:DEALLOCATE(dqL_prim_dx_n(i)%vf)
-                @:DEALLOCATE(dqL_prim_dy_n(i)%vf)
-                @:DEALLOCATE(dqL_prim_dz_n(i)%vf)
-                @:DEALLOCATE(dqR_prim_dx_n(i)%vf)
-                @:DEALLOCATE(dqR_prim_dy_n(i)%vf)
-                @:DEALLOCATE(dqR_prim_dz_n(i)%vf)
-            end do
         end if
 
         @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
@@ -2263,14 +2270,6 @@ contains
         end do
 
         @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
-
-        if (viscous .and. cyl_coord) then
-            do i = 1, num_dims
-                @:DEALLOCATE(tau_re_vf(cont_idx%end + i)%sf)
-            end do
-            @:DEALLOCATE(tau_re_vf(e_idx)%sf)
-            @:DEALLOCATE(tau_re_vf)
-        end if
 
     end subroutine s_finalize_rhs_module
 

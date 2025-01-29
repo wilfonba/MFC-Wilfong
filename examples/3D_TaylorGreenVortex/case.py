@@ -58,7 +58,6 @@ print(
             "mapped_weno": "T",
             "riemann_solver": 2,
             "igr": "T",
-            "igr_order": 5,
             "wave_speeds": 1,
             "avg_state": 2,
             "bc_x%beg": -1,
