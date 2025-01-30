@@ -389,7 +389,7 @@ contains
                               + Re_L
                 end do
                 Re_L = 1._wp/max(Re_L, sgm_eps)
-            end if
+            end if 
         elseif (idir == 2) then
             do i = 1, num_fluids
                 rho_L = rho_L + qL_rs_vf(j, k+1, l, i)
@@ -1036,7 +1036,7 @@ contains
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         integer, intent(in) :: idir
 
-        do i = 1, E_idx
+        do i = 1,sys_size
             call s_reconstruct_igr(qL_rs_vf(:,:,:,i), qR_rs_vf(:,:,:,i), q_prim_vf(i)%sf, idir)
         end do
 

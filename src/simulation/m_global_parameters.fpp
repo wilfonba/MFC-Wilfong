@@ -1120,10 +1120,6 @@ contains
             buff_size = max(buff_size, 6)
         end if
 
-        if (igr) then
-            buff_size = 4
-        end if
-
         if (probe_wrt) then
             fd_number = max(1, fd_order/2)
         end if
