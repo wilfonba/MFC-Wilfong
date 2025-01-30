@@ -16,7 +16,7 @@ print(
             "n": 99,
             "p": 0,
             "igr": "T",
-            "dt": 5.0e-07,
+            "dt": 5.0e-06,
             "t_step_start": 0,
             "t_step_stop": 1000,
             "t_step_save": 1,

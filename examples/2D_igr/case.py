@@ -16,10 +16,10 @@ x1 = l
 y0 = -l
 y1 = l
 
-Nx = 99
-Ny = 99
+Nx = 199
+Ny = 199
 
-mydt = 5e-3
+mydt = 2.5e-3
 
 # Configuration case dictionary
 data = {
@@ -34,10 +34,15 @@ data = {
     "n": Ny,
     "p": 0,
     "cyl_coord": "F",
-    "dt": mydt,
-    "t_step_start": 0,
-    "t_step_stop": 500,
-    "t_step_save": 1,
+    "cfl_const_dt": "T",
+    "cfl_target": 0.1,
+    "n_start": 0,
+    "t_stop": 2.5,
+    "t_save": 2.5/100,
+    # "dt": mydt,
+    # "t_step_start": 0,
+    # "t_step_stop": 1000,
+    # "t_step_save": 10,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -84,14 +89,17 @@ data = {
     "patch_icpp(1)%alpha(1)": 1,
     # High pressure
     "patch_icpp(2)%alter_patch(1)": "T",
+    "patch_icpp(2)%smoothen": "T",
+    "patch_icpp(2)%smooth_patch_id": 1,
+    "patch_icpp(2)%smooth_coeff": 0.9,
     "patch_icpp(2)%geometry": 2,
     "patch_icpp(2)%x_centroid": 0,
     "patch_icpp(2)%y_centroid": 0,
     "patch_icpp(2)%radius": r0,
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
-    "patch_icpp(2)%pres": 2,
-    "patch_icpp(2)%alpha_rho(1)": 1,
+    "patch_icpp(2)%pres": 5,
+    "patch_icpp(2)%alpha_rho(1)": 5,
     "patch_icpp(2)%alpha(1)": 1,
 }
 

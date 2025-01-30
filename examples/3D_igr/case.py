@@ -22,7 +22,7 @@ Nx = 49
 Ny = Nx
 Nz = Nx
 
-mydt = 1e-3
+mydt = 2.5e-4
 
 # Configuration case dictionary
 data = {
@@ -41,8 +41,8 @@ data = {
     "cyl_coord": "F",
     "dt": mydt,
     "t_step_start": 0,
-    "t_step_stop": 500,
-    "t_step_save": 1,
+    "t_step_stop": 2000,
+    "t_step_save": 2,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -95,7 +95,7 @@ data = {
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
     "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.5,
+    "patch_icpp(2)%smooth_coeff": 0.9,
     "patch_icpp(2)%geometry": 8,
     "patch_icpp(2)%x_centroid": 0,
     "patch_icpp(2)%y_centroid": 0,
@@ -104,7 +104,7 @@ data = {
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
     "patch_icpp(2)%vel(3)": 0.0,
-    "patch_icpp(2)%pres": 1.1,
+    "patch_icpp(2)%pres": 2,
     "patch_icpp(2)%alpha_rho(1)": 1,
     "patch_icpp(2)%alpha(1)": 1,
 }
