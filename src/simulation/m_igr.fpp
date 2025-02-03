@@ -260,7 +260,7 @@ contains
                     end do
                 end do
             end do
-            !call s_print_2d_array(jac_rhs(:,:,0))
+
             if(bcxb >= -1) then
                 if(bcxb >= 0) then
                     call s_mpi_sendrecv_F_igr(jac, 1, -1)
@@ -352,7 +352,7 @@ contains
                     end if
                 end if
             end if
-            !call s_print_2d_array(jac(:,:,0))
+
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -384,7 +384,7 @@ contains
                 pi_inf_L = pi_inf_L + qL_rs_vf(j+1, k, l, E_idx + i)*pi_infs(i)
             end do
 
-            a_L = sqrt(gamma_L * (qL_rs_vf(j+1,k,l,E_idx) + pi_inf_L) / rho_L)
+            a_L = sqrt((qL_rs_vf(j+1,k,l,E_idx)/(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
             u_L = qL_rs_vf(j+1, k, l, momxb)
             v_L = qL_rs_vf(j+1, k, l, momxb+1)
 
@@ -405,7 +405,7 @@ contains
                 pi_inf_L = pi_inf_L + qL_rs_vf(j, k+1, l, E_idx + i)*pi_infs(i)
             end do
 
-            a_L = sqrt(gamma_L * (qL_rs_vf(j,k+1,l,E_idx) + pi_inf_L) / rho_L)
+            a_L = sqrt((qL_rs_vf(j,k+1,l,E_idx)/(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
             u_L = qL_rs_vf(j, k+1, l, momxb)
             v_L = qL_rs_vf(j, k+1, l, momxb+1)
 
@@ -426,7 +426,7 @@ contains
                 pi_inf_L = pi_inf_L + qL_rs_vf(j, k, l+1, E_idx + i)*pi_infs(i)
             end do
 
-            a_L = sqrt(gamma_L * (qL_rs_vf(j,k,l+1,E_idx) + pi_inf_L) / rho_L)
+            a_L = sqrt((qL_rs_vf(j,k,l+1,E_idx)/(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
             u_L = qL_rs_vf(j, k, l+1, momxb)
             v_L = qL_rs_vf(j, k, l+1, momxb+1)
 
@@ -450,7 +450,7 @@ contains
             pi_inf_R = pi_inf_R + qR_rs_vf(j, k, l, E_idx + i)*pi_infs(i)
         end do
 
-        a_R = sqrt(gamma_R * (qR_rs_vf(j,k,l,E_idx) + pi_inf_R) / rho_R)
+        a_R = sqrt((qR_rs_vf(j,k,l,E_idx)/(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
         u_R = qR_rs_vf(j, k, l, momxb)
         v_R = qR_rs_vf(j, k, l, momxb+1)
 
@@ -875,7 +875,7 @@ contains
                 end do
             end do
         end do
-        !call s_print_2d_array(rho_igr(:,:,0))
+
         if(p == 0) then
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = 0, p
@@ -1141,18 +1141,18 @@ contains
                 end do
             end do
 
-            !if (num_fluids > 1) then
-                !do i = advxb, advxe
-                    !do l = 0, p
-                        !do k = 0, n
-                            !do j = 0, m
-                                !rhs_vf(i)%sf(j, k, l) = -1._wp/(2._wp*dx(j)) * q_prim_vf(momxb)%sf(j,k,l) * &
-                                    !(q_prim_vf(i)%sf(j+1,k,l) - q_prim_vf(i)%sf(j-1,k,l))
-                            !end do
-                        !end do
-                    !end do
-                !end do
-            !end if
+            if (num_fluids > 1) then
+                do i = advxb, advxe
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(i)%sf(j, k, l) = -1._wp/(2._wp*dx(j)) * q_prim_vf(momxb)%sf(j,k,l) * &
+                                    (q_prim_vf(i)%sf(j+1,k,l) - q_prim_vf(i)%sf(j-1,k,l))
+                            end do
+                        end do
+                    end do
+                end do
+            end if
         elseif (idir == 2) then
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, E_idx
@@ -1168,18 +1168,18 @@ contains
                 end do
             end do
 
-            !if (num_fluids > 1) then
-                !do i = advxb, advxe
-                    !do l = 0, p
-                        !do k = 0, n
-                            !do j = 0, m
-                                !rhs_vf(i)%sf(j, k, l) = -1._wp/(2._wp*dy(k)) *q_prim_vf(momxb+1)%sf(j,k,l) * &
-                                    !(q_prim_vf(i)%sf(j,k+1,l) - q_prim_vf(i)%sf(j,k-1,l))
-                            !end do
-                        !end do
-                    !end do
-                !end do
-            !end if
+            if (num_fluids > 1) then
+                do i = advxb, advxe
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(i)%sf(j, k, l) = -1._wp/(2._wp*dy(k)) *q_prim_vf(momxb+1)%sf(j,k,l) * &
+                                    (q_prim_vf(i)%sf(j,k+1,l) - q_prim_vf(i)%sf(j,k-1,l))
+                            end do
+                        end do
+                    end do
+                end do
+            end if
         elseif (idir == 3) then
             !$acc parallel loop collapse(4) gang vector default(present)
             do i = 1, E_idx
@@ -1195,18 +1195,18 @@ contains
                 end do
             end do
 
-            !if (num_fluids > 1) then
-                !do i = advxb, advxe
-                    !do l = 0, p
-                        !do k = 0, n
-                            !do j = 0, m
-                                !rhs_vf(i)%sf(j, k, l) = -1._wp/(2._wp*dz(l)) *q_prim_vf(momxe)%sf(j,k,l) * &
-                                    !(q_prim_vf(i)%sf(j,k,l+1) - q_prim_vf(i)%sf(j,k,l-1))
-                           !end do
-                        !end do
-                    !end do
-                !end do
-            !end if
+            if (num_fluids > 1) then
+                do i = advxb, advxe
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(i)%sf(j, k, l) = -1._wp/(2._wp*dz(l)) *q_prim_vf(momxe)%sf(j,k,l) * &
+                                    (q_prim_vf(i)%sf(j,k,l+1) - q_prim_vf(i)%sf(j,k,l-1))
+                           end do
+                        end do
+                    end do
+                end do
+            end if
         end if
 
     end subroutine s_igr_flux_add

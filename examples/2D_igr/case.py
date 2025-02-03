@@ -42,13 +42,13 @@ data = {
     "dt": dt,
     "t_step_start": 0,
     "t_step_stop": 2500,
-    "t_step_save": 1,
+    "t_step_save": 25,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
     "mixture_err": "T",
     "mpp_lim": "F",
-    "time_stepper": 1,
+    "time_stepper": 3,
     "weno_order": 5,
     "avg_state": 2,
     "weno_eps": 1e-16,
@@ -73,8 +73,8 @@ data = {
     # Fluid Parameters (Gas)
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
-    # "viscous": "T",
-    # "fluid_pp(1)%Re(1)": 1e5,
+    "viscous": "T",
+    "fluid_pp(1)%Re(1)": 1e5,
     # Ambient pressure
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": 0,
@@ -101,8 +101,8 @@ data = {
     # "patch_icpp(2)%radii(2)": 2*r0/3,
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
-    "patch_icpp(2)%pres": 5,
-    "patch_icpp(2)%alpha_rho(1)": 1,
+    "patch_icpp(2)%pres": 9.518,
+    "patch_icpp(2)%alpha_rho(1)": 5,
     "patch_icpp(2)%alpha(1)": 1,
 }
 

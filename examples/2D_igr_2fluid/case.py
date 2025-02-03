@@ -37,8 +37,8 @@ data = {
     "cyl_coord": "F",
     "dt": dt,
     "t_step_start": 0,
-    "t_step_stop": 1000,
-    "t_step_save": 10,
+    "t_step_stop": 2500,
+    "t_step_save": 1,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
