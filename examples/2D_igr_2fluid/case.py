@@ -8,6 +8,7 @@ import math
 import json
 
 l = 1
+eps = 1e-6
 
 # Numerical setup
 r0 = l/4
@@ -34,21 +35,16 @@ data = {
     "n": Ny,
     "p": 0,
     "cyl_coord": "F",
-    # "cfl_const_dt": "T",
-    # "cfl_target": 0.1,
-    # "n_start": 0,
-    # "t_stop": 2.5,
-    # "t_save": 2.5/100,
     "dt": dt,
     "t_step_start": 0,
-    "t_step_stop": 2500,
-    "t_step_save": 1,
+    "t_step_stop": 1000,
+    "t_step_save": 10,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
     "mixture_err": "T",
     "mpp_lim": "F",
-    "time_stepper": 1,
+    "time_stepper": 3,
     "weno_order": 5,
     "avg_state": 2,
     "weno_eps": 1e-16,
@@ -63,8 +59,9 @@ data = {
     "bc_y%beg": -1,
     "bc_y%end": -1,
     "num_patches": 2,
-    "num_fluids": 1,
+    "num_fluids": 2,
     "igr": "T",
+    # "viscous": "T",
     # Database Structure Parameters
     "format": 1,
     "precision": 2,
@@ -73,8 +70,10 @@ data = {
     # Fluid Parameters (Gas)
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
-    # "viscous": "T",
     # "fluid_pp(1)%Re(1)": 1e5,
+    "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+    "fluid_pp(2)%pi_inf": 0.0e00,
+    # "fluid_pp(2)%Re(1)": 1e5,
     # Ambient pressure
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": 0,
@@ -85,25 +84,26 @@ data = {
     "patch_icpp(1)%vel(2)": 0.0,
     "patch_icpp(1)%vel(3)": 0.0,
     "patch_icpp(1)%pres": 1,
-    "patch_icpp(1)%alpha_rho(1)": 1,
-    "patch_icpp(1)%alpha(1)": 1,
+    "patch_icpp(1)%alpha_rho(1)": 1 - eps,
+    "patch_icpp(1)%alpha(1)": 1 - eps,
+    "patch_icpp(1)%alpha_rho(2)": eps,
+    "patch_icpp(1)%alpha(2)": eps,
     # High pressure
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
     "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.5,
+    "patch_icpp(2)%smooth_coeff": 0.7,
     "patch_icpp(2)%geometry": 2,
-    # "patch_icpp(2)%geometry": 5,
     "patch_icpp(2)%x_centroid": 0,
     "patch_icpp(2)%y_centroid": 0,
     "patch_icpp(2)%radius": r0,
-    # "patch_icpp(2)%radii(1)": r0,
-    # "patch_icpp(2)%radii(2)": 2*r0/3,
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
-    "patch_icpp(2)%pres": 5,
-    "patch_icpp(2)%alpha_rho(1)": 1,
-    "patch_icpp(2)%alpha(1)": 1,
+    "patch_icpp(2)%pres": 1.1,
+    "patch_icpp(2)%alpha_rho(1)": eps,
+    "patch_icpp(2)%alpha(1)": eps,
+    "patch_icpp(2)%alpha_rho(2)": (1 - eps)*1.1,
+    "patch_icpp(2)%alpha(2)": 1 - eps,
 }
 
 print(json.dumps(data))

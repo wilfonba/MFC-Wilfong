@@ -367,11 +367,12 @@ contains
     end subroutine s_igr_jacobi_iteration
 
     subroutine s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
-                                    Re_L, Re_R, j, k, l, idir)
+                                    Re_L, Re_R, cfl, j, k, l, idir)
 
-        real(wp) rho_L, gamma_L, pi_inf_L, Re_L
-        real(wp) rho_R, gamma_R, pi_inf_R, Re_R
-
+        real(wp) :: rho_L, gamma_L, pi_inf_L, Re_L
+        real(wp) :: rho_R, gamma_R, pi_inf_R, Re_R
+        real(wp) :: a_L, a_R, cfl
+        real(wp) :: u_L, u_R, v_L, v_R
         integer :: j, k, l, idir
 
         rho_L = 0._wp; gamma_L = 0._wp; pi_inf_L = 0._wp
@@ -382,6 +383,10 @@ contains
                 gamma_L = gamma_L + qL_rs_vf(j+1, k, l, E_idx + i)*gammas(i)
                 pi_inf_L = pi_inf_L + qL_rs_vf(j+1, k, l, E_idx + i)*pi_infs(i)
             end do
+
+            a_L = sqrt(gamma_L * (qL_rs_vf(j+1,k,l,E_idx) + pi_inf_L) / rho_L)
+            u_L = qL_rs_vf(j+1, k, l, momxb)
+            v_L = qL_rs_vf(j+1, k, l, momxb+1)
 
             if (viscous) then
                 Re_L = dflt_real
@@ -400,6 +405,10 @@ contains
                 pi_inf_L = pi_inf_L + qL_rs_vf(j, k+1, l, E_idx + i)*pi_infs(i)
             end do
 
+            a_L = sqrt(gamma_L * (qL_rs_vf(j,k+1,l,E_idx) + pi_inf_L) / rho_L)
+            u_L = qL_rs_vf(j, k+1, l, momxb)
+            v_L = qL_rs_vf(j, k+1, l, momxb+1)
+
             if (viscous) then
                 Re_L = dflt_real
                 if (Re_size(1) > 0) Re_L = 0._wp
@@ -416,6 +425,10 @@ contains
                 gamma_L = gamma_L + qL_rs_vf(j, k, l+1, E_idx + i)*gammas(i)
                 pi_inf_L = pi_inf_L + qL_rs_vf(j, k, l+1, E_idx + i)*pi_infs(i)
             end do
+
+            a_L = sqrt(gamma_L * (qL_rs_vf(j,k,l+1,E_idx) + pi_inf_L) / rho_L)
+            u_L = qL_rs_vf(j, k, l+1, momxb)
+            v_L = qL_rs_vf(j, k, l+1, momxb+1)
 
             if (viscous) then
                 Re_L = dflt_real
@@ -437,6 +450,10 @@ contains
             pi_inf_R = pi_inf_R + qR_rs_vf(j, k, l, E_idx + i)*pi_infs(i)
         end do
 
+        a_R = sqrt(gamma_R * (qR_rs_vf(j,k,l,E_idx) + pi_inf_R) / rho_R)
+        u_R = qR_rs_vf(j, k, l, momxb)
+        v_R = qR_rs_vf(j, k, l, momxb+1)
+
         if (viscous) then
             Re_R = dflt_real
             if (Re_size(1) > 0) Re_R = 0._wp
@@ -447,7 +464,9 @@ contains
             end do
             Re_R = 1._wp/max(Re_R, sgm_eps)
         end if
-        !print*, Re_L, Re_R
+
+        cfl = max(sqrt(u_L**2._wp + v_L**2._wp), sqrt(u_R**2._wp + v_R**2._wp)) + max(a_L, a_R)
+
     end subroutine s_compute_mixture
 
     subroutine s_igr_riemann_solver(flux_vf, idir)
@@ -459,6 +478,7 @@ contains
 
         real(wp) :: rho_L, gamma_L, pi_inf_L, Re_L, mu_L
         real(wp) :: rho_R, gamma_R, pi_inf_R, Re_R, mu_R
+        real(wp) :: cfl
 
         if (idir == 1) then
 
@@ -467,9 +487,8 @@ contains
                 do l = 0, p
                     do k = -1, n+1
                         do j = -1, m+1
-
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r,j, k, l, idir)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir)
 
                             do i = 1, num_fluids
                                 !flux_vf(advxb + i - 1)%sf(j,k,l) = &
@@ -483,7 +502,7 @@ contains
                                     qL_rs_vf(j+1,k,l, momxb)) + &
                                     0.5_wp * (qR_rs_vf(j,k,l, contxb+i-1) * &
                                     qR_rs_vf(j,k,l, momxb)) + &
-                                    1._wp * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j+1, k, l, contxb+i-1))
+                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j+1, k, l, contxb+i-1))
                             end do
 
                             ! Momentum -> rho*u^2 + p + [[F_igr]]
@@ -492,12 +511,12 @@ contains
                                  qL_rs_vf(j+1,k,l,E_idx) + FL(j+1, k, l) ) + &
                                  0.5_wp* (rho_R * (qR_rs_vf(j,k,l,momxb)**2.0) + &
                                  qR_rs_vf(j,k,l,E_idx) + FR(j, k, l) ) + &
-                                 1._wp * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
+                                 0.5_wp*cfl * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
 
                             flux_vf(momxb+1)%sf(j, k, l) =  &
                                 0.5_wp * rho_L * qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxb+1) + &
                                 0.5_wp * rho_R * qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+1) + &
-                                1._wp * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
 
                              flux_vf(E_idx)%sf(j, k, l) = &
                                 0.5_wp * (qL_rs_vf(j+1,k,l,momxb) * (qL_rs_vf(j+1,k,l,E_idx)*gamma_L + pi_inf_L + &
@@ -506,7 +525,7 @@ contains
                                 0.5_wp * (qR_rs_vf(j,k,l,momxb) * (qR_rs_vf(j,k,l,E_idx)*gamma_R + pi_inf_R + &
                                 0.5_wp * rho_R * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp ) + &
                                 qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
-                                1._wp * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
 
                             if(viscous) then
                                 mu_L = 1/Re_L; mu_R = 1/Re_R
@@ -536,7 +555,7 @@ contains
                         do j = -1, m+1
 
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r,j, k, l, idir)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir)
 
                             do i = 1, num_fluids
                                 !flux_vf(advxb + i - 1)%sf(j,k,l) = &
@@ -550,7 +569,7 @@ contains
                                     qL_rs_vf(j+1,k,l, momxb)) + &
                                     0.5_wp * (qR_rs_vf(j,k,l, contxb+i-1) * &
                                     qR_rs_vf(j,k,l, momxb)) + &
-                                    1._wp * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j+1, k, l, contxb+i-1))
+                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j+1, k, l, contxb+i-1))
                             end do
 
                             ! Momentum -> rho*u^2 + p + [[F_igr]]
@@ -559,17 +578,17 @@ contains
                                 qL_rs_vf(j+1,k,l,E_idx) + FL(j+1, k, l) ) + &
                                 0.5_wp* (rho_R * (qR_rs_vf(j,k,l,momxb)**2.0) + &
                                 qR_rs_vf(j,k,l,E_idx) + FR(j, k, l) ) + &
-                                1._wp * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j+1, k, l, momxb))
 
                             flux_vf(momxb+1)%sf(j, k, l) = &
                                 0.5_wp * rho_L * (qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxb+1)) + &
                                 0.5_wp * rho_R * (qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+1)) + &
-                                1._wp * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j+1, k, l, momxb+1))
 
                             flux_vf(momxe)%sf(j, k, l) = &
                                 0.5_wp * rho_L * (qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxe)) + &
                                 0.5_wp*  rho_R * (qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxe)) + &
-                                1._wp * (qR_rs_vf(j, k, l, momxe) - qL_rs_vf(j+1, k, l, momxe))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, momxe) - qL_rs_vf(j+1, k, l, momxe))
 
                             flux_vf(E_idx)%sf(j, k, l) = &
                                 0.5_wp * ( qL_rs_vf(j+1,k,l,momxb) * (qL_rs_vf(j+1,k,l,E_idx)*gamma_L + pi_inf_L + &
@@ -578,7 +597,7 @@ contains
                                 0.5_wp * ( qR_rs_vf(j,k,l,momxb) * (qR_rs_vf(j,k,l,E_idx)*gamma_R + pi_inf_R + &
                                 0.5_wp * rho_L * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp + qR_rs_vf(j, k, l,momxe)**2._wp) + &
                                 qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
-                                1._wp * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
 
                             if(viscous) then
                                 mu_L = 1/Re_L; mu_R = 1/Re_R
@@ -615,7 +634,7 @@ contains
                         do j = -1, n+1
 
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r,j, k, l, idir)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir)
 
                             do i = 1, num_fluids
                                 !flux_vf(advxb + i - 1)%sf(j,k,l) = &
@@ -629,7 +648,7 @@ contains
                                     qL_rs_vf(j,k+1,l, momxb+1)) + &
                                     0.5_wp * (qR_rs_vf(j,k,l, contxb+i-1) * &
                                     qR_rs_vf(j,k,l, momxb+1)) + &
-                                    1._wp * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j, k+1, l, contxb+i-1))
+                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j, k+1, l, contxb+i-1))
                             end do
 
                             flux_vf(momxb+1)%sf(j, k, l) = &
@@ -637,12 +656,12 @@ contains
                                  qL_rs_vf(j,k+1,l,E_idx) + FL(j, k+1, l) ) + &
                                  0.5_wp * (rho_R * (qR_rs_vf(j,k,l,momxb+1)**2.0) + &
                                  qR_rs_vf(j,k,l,E_idx) + FR(j, k, l) ) + &
-                                1._wp * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j, k+1, l, momxb+1))
+                                 0.5_wp*cfl * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j, k+1, l, momxb+1))
 
                             flux_vf(momxb)%sf(j, k, l) = &
                                 0.5_wp * rho_L * (qL_rs_vf(j,k+1,l,momxb)*qL_rs_vf(j,k+1,l,momxb+1)) + &
                                 0.5_wp * rho_R * (qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+1)) + &
-                                1._wp * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j, k+1, l, momxb))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j, k+1, l, momxb))
 
                             flux_vf(E_idx)%sf(j, k, l) = &
                                 0.5_wp * ( qL_rs_vf(j,k+1,l,momxb+1) * (qL_rs_vf(j,k+1,l,E_idx)*gamma_L + pi_inf_L + &
@@ -651,7 +670,7 @@ contains
                                 0.5_wp * ( qR_rs_vf(j,k,l,momxb+1) * (qR_rs_vf(j,k,l,E_idx)*gamma_R + pi_inf_R + &
                                 0.5_wp * rho_R * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp ) + &
                                 qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
-                                1._wp * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j, k+1, l, E_idx))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j, k+1, l, E_idx))
 
                             if(viscous) then
                                 mu_L = 1/Re_L; mu_R = 1/Re_R
@@ -680,7 +699,7 @@ contains
                          do j = -1, m+1
 
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r,j, k, l, idir)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir)
 
                             do i = 1, num_fluids
                                 !flux_vf(advxb + i - 1)%sf(j,k,l) = &
@@ -694,25 +713,25 @@ contains
                                     qL_rs_vf(j,k+1,l, momxb+1)) + &
                                     0.5_wp * (qR_rs_vf(j,k,l, contxb+i-1) * &
                                     qR_rs_vf(j,k,l, momxb+1)) + &
-                                    1._wp * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j, k+1, l, contxb+i-1))
+                                    0.5_wp*cfl* (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j, k+1, l, contxb+i-1))
                             end do
 
                             flux_vf(momxb)%sf(j, k, l) = &
                                 0.5_wp * rho_L * (qL_rs_vf(j,k+1,l,momxb)*qL_rs_vf(j,k+1,l,momxb+1)) + &
                                 0.5_wp * rho_R * (qR_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,momxb+1)) + &
-                                1._wp * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j, k+1, l, momxb))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, momxb) - qL_rs_vf(j, k+1, l, momxb))
 
                             flux_vf(momxb+1)%sf(j, k, l) = &
                                 0.5_wp* (rho_L * (qL_rs_vf(j,k+1,l,momxb+1)**2.0) + &
                                 qL_rs_vf(j,k+1,l,E_idx) + FL(j, k+1, l) ) + &
                                 0.5_wp* (rho_R * (qR_rs_vf(j,k,l,momxb+1)**2.0) + &
                                 qR_rs_vf(j,k,l,E_idx) + FR(j, k, l) ) + &
-                                1._wp * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j, k+1, l, momxb+1))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, momxb+1) - qL_rs_vf(j, k+1, l, momxb+1))
 
                             flux_vf(momxe)%sf(j, k, l) = &
                                 0.5_wp* rho_L * (qL_rs_vf(j,k+1,l,momxb+1)*qL_rs_vf(j,k+1,l,momxe)) + &
                                 0.5_wp* rho_R * (qR_rs_vf(j,k,l,momxb+1)*qR_rs_vf(j,k,l,momxe)) + &
-                                1._wp * (qR_rs_vf(j, k, l, momxe) - qL_rs_vf(j, k+1, l, momxe))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, momxe) - qL_rs_vf(j, k+1, l, momxe))
 
                             flux_vf(E_idx)%sf(j, k, l) = &
                                 0.5_wp * ( qL_rs_vf(j,k+1,l,momxb+1) * (qL_rs_vf(j,k+1,l,E_idx)*gamma_L + pi_inf_L + &
@@ -721,7 +740,7 @@ contains
                                 0.5_wp * ( qR_rs_vf(j,k,l,momxb+1) * (qR_rs_vf(j,k,l,E_idx)*gamma_R + pi_inf_R + &
                                 0.5_wp * rho_R * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp + qR_rs_vf(j,k,l,momxe)**2._wp ) + &
                                 qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
-                                1._wp * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j, k+1, l, E_idx))
+                                0.5_wp*cfl * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j, k+1, l, E_idx))
 
                             if(viscous) then
                                 mu_L = 1/Re_L; mu_R = 1/Re_R
@@ -757,7 +776,7 @@ contains
                     do j = -1, m+1
 
                         call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                 pi_inf_L, pi_inf_R, Re_L, Re_r,j, k, l, idir)
+                                                 pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir)
 
                         do i = 1, num_fluids
                             !flux_vf(advxb + i - 1)%sf(j,k,l) = &
@@ -843,7 +862,7 @@ contains
         end if
         !$acc update device(alf_igr)
 
-        omega = 1._wp
+        omega = 1.0_wp
         !$acc update device(omega)
 
         !$acc parallel loop collapse(3) gang vector default(present)
