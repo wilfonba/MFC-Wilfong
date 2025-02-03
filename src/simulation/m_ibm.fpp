@@ -18,6 +18,8 @@ module m_ibm
 
     use m_helper
 
+    use m_constants
+
     implicit none
 
     private :: s_compute_image_points, &
@@ -39,7 +41,6 @@ module m_ibm
     type(ghost_point), dimension(:), allocatable :: inner_points
     !$acc declare create(ghost_points, inner_points)
 
-    integer :: gp_layers !< Number of ghost point layers
     integer :: num_gps !< Number of ghost points
     integer :: num_inner_gps !< Number of ghost points
     !$acc declare create(gp_layers, num_gps, num_inner_gps)
@@ -49,29 +50,27 @@ contains
     !>  Allocates memory for the variables in the IBM module
     subroutine s_initialize_ibm_module()
 
-        gp_layers = 3
-
         if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, -gp_layers:p+gp_layers))
             @:ALLOCATE(levelset%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, num_ibs))
+                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, 1:num_ibs))
             @:ALLOCATE(levelset_norm%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, num_ibs, 3))
+                -gp_layers:n+gp_layers, -gp_layers:p+gp_layers, 1:num_ibs, 1:3))
         else
             @:ALLOCATE(ib_markers%sf(-gp_layers:m+gp_layers, &
                 -gp_layers:n+gp_layers, 0:0))
             @:ALLOCATE(levelset%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, 0:0, num_ibs))
+                -gp_layers:n+gp_layers, 0:0, 1:num_ibs))
             @:ALLOCATE(levelset_norm%sf(-gp_layers:m+gp_layers, &
-                -gp_layers:n+gp_layers, 0:0, num_ibs, 3))
+                -gp_layers:n+gp_layers, 0:0, 1:num_ibs, 1:3))
         end if
 
         @:ACC_SETUP_SFs(ib_markers)
         @:ACC_SETUP_SFs(levelset)
-        ! @:ALLOCATE(ib_markers%sf(0:m, 0:n, 0:p))
+        @:ACC_SETUP_SFs(levelset_norm)
 
-        !$acc enter data copyin(gp_layers, num_gps, num_inner_gps)
+        !$acc enter data copyin(num_gps, num_inner_gps)
 
     end subroutine s_initialize_ibm_module
 
@@ -82,6 +81,8 @@ contains
         integer :: i, j, k
 
         !$acc update device(ib_markers%sf)
+        !$acc update device(levelset%sf)
+        !$acc update device(levelset_norm%sf)
 
         ! Get neighboring IB variables from other processors
         call s_mpi_sendrecv_ib_buffers(ib_markers, gp_layers)
@@ -209,7 +210,9 @@ contains
 
             ! Calculate velocity of ghost cell
             if (gp%slip) then
-                norm = levelset_norm%sf(j, k, l, patch_id, :)
+                norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
+                buf = sqrt(sum(norm**2))
+                norm = norm/buf
                 vel_norm_IP = sum(vel_IP*norm)*norm
                 vel_g = vel_IP - vel_norm_IP
             else
@@ -417,6 +420,7 @@ contains
         integer :: i, j, k, l, q !< Iterator variables
 
         num_gps = 0
+        num_inner_gps = 0
 
         do i = 0, m
             do j = 0, n
