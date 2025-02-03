@@ -253,7 +253,7 @@ contains
                         jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dx(j)**2._wp) * (rho_lx* jac_old(j-1,k,l) + rho_rx*jac_old(j+1,k,l))
                         jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dy(k)**2._wp) * (rho_ly* jac_old(j,k-1,l) + rho_ry*jac_old(j,k+1,l))
                         if(p > 0) then
-                            jac(j, k, l) = jac(j, k, l) + 2._wp * alf_igr * (1._wp / dz(l)**2._wp) * (rho_lz* jac_old(j,k,l-1) + rho_rz*jac_old(j,k,l+1))
+                            jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dz(l)**2._wp) * (rho_lz* jac_old(j,k,l-1) + rho_rz*jac_old(j,k,l+1))
                         end if
 
                         jac(j, k, l) = omega * (1._wp / fd_coeff(j,k,l))*jac(j,k,l) + (1._wp - omega)*jac_old(j, k, l)
