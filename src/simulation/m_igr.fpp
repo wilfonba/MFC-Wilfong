@@ -368,7 +368,11 @@ contains
 
     subroutine s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
                                     Re_L, Re_R, cfl, j, k, l, idir)
-
+#ifdef _CRAYFTN
+        !DIR$ INLINEALWAYS s_compute_mixture
+#else
+        !$acc routine seq
+#endif
         real(wp) :: rho_L, gamma_L, pi_inf_L, Re_L
         real(wp) :: rho_R, gamma_R, pi_inf_R, Re_R
         real(wp) :: a_L, a_R, cfl
