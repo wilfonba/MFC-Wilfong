@@ -367,7 +367,7 @@ contains
     end subroutine s_igr_jacobi_iteration
 
     subroutine s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
-                                    Re_L, Re_R, cfl, j, k, l, idir)
+                                    Re_L, Re_R, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
 #ifdef _CRAYFTN
         !DIR$ INLINEALWAYS s_compute_mixture
 #else
@@ -375,99 +375,56 @@ contains
 #endif
         real(wp) :: rho_L, gamma_L, pi_inf_L, Re_L
         real(wp) :: rho_R, gamma_R, pi_inf_R, Re_R
+        real(wp), dimension(num_fluids) :: alpha_L, alpha_rho_L, alpha_R, alpha_rho_R
+        real(wp), dimension(num_dims) :: vel_L, vel_R
+        real(wp) :: pres_L, pres_R
         real(wp) :: a_L, a_R, cfl
         real(wp) :: u_L, u_R, v_L, v_R, w_L, w_R
-        integer :: j, k, l, idir
+        integer :: i, j, k, l, q, idir
 
         rho_L = 0._wp; gamma_L = 0._wp; pi_inf_L = 0._wp
 
-        if (idir == 1) then
-            do i = 1, num_fluids
-                rho_L = rho_L + qL_rs_vf(j+1, k, l, i)
-                gamma_L = gamma_L + qL_rs_vf(j+1, k, l, E_idx + i)*gammas(i)
-                pi_inf_L = pi_inf_L + qL_rs_vf(j+1, k, l, E_idx + i)*pi_infs(i)
+        do i = 1, num_fluids
+            rho_L = rho_L + alpha_rho_L(i)
+            gamma_L = gamma_L + alpha_L(i)*gammas(i)
+            pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
+        end do
+
+        a_L = sqrt((pres_L/(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+        u_L = vel_L(1)
+        v_L = vel_L(2)
+        if (p > 0) w_L = vel_L(3)
+
+        if (viscous) then
+            Re_L = dflt_real
+            if (Re_size(1) > 0) Re_L = 0._wp
+            !$acc loop seq
+            do q = 1, Re_size(1)
+                Re_L =  alpha_L(Re_idx(1, q)) / Res(1, q) &
+                          + Re_L
             end do
-
-            a_L = sqrt((qL_rs_vf(j+1,k,l,E_idx)/(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
-            u_L = qL_rs_vf(j+1, k, l, momxb)
-            v_L = qL_rs_vf(j+1, k, l, momxb+1)
-            if (p > 0) w_L = qL_rs_vf(j+1,k,l,momxe)
-
-            if (viscous) then
-                Re_L = dflt_real
-                if (Re_size(1) > 0) Re_L = 0._wp
-                !$acc loop seq
-                do q = 1, Re_size(1)
-                    Re_L = qL_rs_vf(j+1, k, l, E_idx + Re_idx(1, q))/Res(1, q) &
-                              + Re_L
-                end do
-                Re_L = 1._wp/max(Re_L, sgm_eps)
-            end if
-        elseif (idir == 2) then
-            do i = 1, num_fluids
-                rho_L = rho_L + qL_rs_vf(j, k+1, l, i)
-                gamma_L = gamma_L + qL_rs_vf(j, k+1, l, E_idx + i)*gammas(i)
-                pi_inf_L = pi_inf_L + qL_rs_vf(j, k+1, l, E_idx + i)*pi_infs(i)
-            end do
-
-            a_L = sqrt((qL_rs_vf(j,k+1,l,E_idx)/(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
-            u_L = qL_rs_vf(j, k+1, l, momxb)
-            v_L = qL_rs_vf(j, k+1, l, momxb+1)
-            if (p > 0) w_L = qL_rs_vf(j,k+1,l,momxe)
-
-            if (viscous) then
-                Re_L = dflt_real
-                if (Re_size(1) > 0) Re_L = 0._wp
-                !$acc loop seq
-                do q = 1, Re_size(1)
-                    Re_L = qL_rs_vf(j, k+1, l, E_idx + Re_idx(1, q))/Res(1, q) &
-                              + Re_L
-                end do
-                Re_L = 1._wp/max(Re_L, sgm_eps)
-            end if
-        elseif (idir == 3) then
-            do i = 1, num_fluids
-                rho_L = rho_L + qL_rs_vf(j, k, l+1, i)
-                gamma_L = gamma_L + qL_rs_vf(j, k, l+1, E_idx + i)*gammas(i)
-                pi_inf_L = pi_inf_L + qL_rs_vf(j, k, l+1, E_idx + i)*pi_infs(i)
-            end do
-
-            a_L = sqrt((qL_rs_vf(j,k,l+1,E_idx)/(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
-            u_L = qL_rs_vf(j, k, l+1, momxb)
-            v_L = qL_rs_vf(j, k, l+1, momxb+1)
-            if (p > 0) w_L = qL_rs_vf(j,k,l+1,momxe)
-
-            if (viscous) then
-                Re_L = dflt_real
-                if (Re_size(1) > 0) Re_L = 0._wp
-                !$acc loop seq
-                do q = 1, Re_size(1)
-                    Re_L = qL_rs_vf(j, k, l+1, E_idx + Re_idx(1, q))/Res(1, q) &
-                              + Re_L
-                end do
-                Re_L = 1._wp/max(Re_L, sgm_eps)
-            end if
+            Re_L = 1._wp/max(Re_L, sgm_eps)
         end if
 
         rho_R = 0._wp; gamma_R = 0._wp; pi_inf_R = 0._wp
 
         do i = 1, num_fluids
-            rho_R = rho_R + qR_rs_vf(j, k, l, i)
-            gamma_R = gamma_R + qR_rs_vf(j, k, l, E_idx + i)*gammas(i)
-            pi_inf_R = pi_inf_R + qR_rs_vf(j, k, l, E_idx + i)*pi_infs(i)
+            rho_R = rho_R + alpha_rho_R(i)
+            gamma_R = gamma_R + alpha_R(i)*gammas(i)
+            pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
         end do
 
-        a_R = sqrt((qR_rs_vf(j,k,l,E_idx)/(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
-        u_R = qR_rs_vf(j, k, l, momxb)
-        v_R = qR_rs_vf(j, k, l, momxb+1)
-        if (p > 0) w_R = qR_rs_vf(j,k,l,momxe)
+        a_R = sqrt((pres_R/(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
+        u_R = vel_R(1)
+        v_R = vel_R(2)
+        if (p > 0) w_R = vel_R(3)
 
         if (viscous) then
             Re_R = dflt_real
             if (Re_size(1) > 0) Re_R = 0._wp
             !$acc loop seq
             do q = 1, Re_size(1)
-                Re_R = qR_rs_vf(j, k, l, E_idx + Re_idx(1, q))/Res(1, q) &
+                Re_R = alpha_R(Re_idx(1, q))/Res(1, q) &
                           + Re_R
             end do
             Re_R = 1._wp/max(Re_R, sgm_eps)
@@ -491,16 +448,38 @@ contains
         real(wp) :: rho_L, gamma_L, pi_inf_L, Re_L, mu_L
         real(wp) :: rho_R, gamma_R, pi_inf_R, Re_R, mu_R
         real(wp) :: cfl
+        real(wp), dimension(num_fluids) :: alpha_L, alpha_rho_L, alpha_R, alpha_rho_R
+        real(wp), dimension(num_dims) :: vel_L, vel_R
+        real(wp) :: pres_L, pres_R
 
         if (idir == 1) then
 
             if(p == 0) then
-                !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
                 do l = 0, p
                     do k = -1, n+1
                         do j = -1, m+1
+
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                alpha_rho_L(i) = qL_rs_vf(j+1, k, l, i)
+                                alpha_L(i) = qL_rs_vf(j+1, k, l, E_idx + i)
+
+                                alpha_rho_R(i) = qR_rs_vf(j, k, l, i)
+                                alpha_R(i) = qR_rs_vf(j, k, l, E_idx + i)
+                            end do
+
+                            !$acc loop seq
+                            do i = 1, num_dims
+                                vel_L(i) = qL_rs_vf(j+1, k, l, contxe + i)
+                                vel_R(i) = qR_rs_vf(j, k, l, contxe + i)
+                            end do
+
+                            pres_L = qL_rs_vf(j+1, k, l, E_idx)
+                            pres_R = qR_rs_vf(j, k, l, E_idx)
+
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
 
                             do i = 1, num_fluids
                                 !flux_vf(advxb + i - 1)%sf(j,k,l) = &
@@ -561,14 +540,33 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
                 do l = -1, p+1
                     do k = -1, n+1
                         do j = -1, m+1
 
-                            call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_R, cfl, j, k, l, idir)
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                alpha_rho_L(i) = qL_rs_vf(j+1, k, l, i)
+                                alpha_L(i) = qL_rs_vf(j+1, k, l, E_idx + i)
 
+                                alpha_rho_R(i) = qR_rs_vf(j, k, l, i)
+                                alpha_R(i) = qR_rs_vf(j, k, l, E_idx + i)
+                            end do
+
+                            !$acc loop seq
+                            do i = 1, num_dims
+                                vel_L(i) = qL_rs_vf(j+1, k, l, contxe + i)
+                                vel_R(i) = qR_rs_vf(j, k, l, contxe + i)
+                            end do
+
+                            pres_L = qL_rs_vf(j+1, k, l, E_idx)
+                            pres_R = qR_rs_vf(j, k, l, E_idx)
+
+                            call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
+
+                            !$acc loop seq
                             do i = 1, num_fluids
                                 !flux_vf(advxb + i - 1)%sf(j,k,l) = &
                                     !0.5_wp * (qL_rs_vf(j+1,k,l,advxb+i-1) * &
@@ -640,13 +638,32 @@ contains
             end if
         else if (idir == 2) then
             if(p == 0) then
-                !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
                 do l = 0, p
                     do k = -1, m+1
                         do j = -1, n+1
 
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                alpha_rho_L(i) = qL_rs_vf(j, k+1, l, i)
+                                alpha_L(i) = qL_rs_vf(j, k+1, l, E_idx + i)
+
+                                alpha_rho_R(i) = qR_rs_vf(j, k, l, i)
+                                alpha_R(i) = qR_rs_vf(j, k, l, E_idx + i)
+                            end do
+
+
+                            !$acc loop seq
+                            do i = 1, num_dims
+                                vel_L(i) = qL_rs_vf(j, k+1, l, contxe + i)
+                                vel_R(i) = qR_rs_vf(j, k, l, contxe + i)
+                            end do
+
+                            pres_L = qL_rs_vf(j, k+1, l, E_idx)
+                            pres_R = qR_rs_vf(j, k, l, E_idx)
+
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
 
                             do i = 1, num_fluids
                                 !flux_vf(advxb + i - 1)%sf(j,k,l) = &
@@ -705,13 +722,31 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present) private(alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
                 do l = -1, p+1
                     do k = -1, n+1
                          do j = -1, m+1
 
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                alpha_rho_L(i) = qL_rs_vf(j, k+1, l, i)
+                                alpha_L(i) = qL_rs_vf(j, k+1, l, E_idx + i)
+
+                                alpha_rho_R(i) = qR_rs_vf(j, k, l, i)
+                                alpha_R(i) = qR_rs_vf(j, k, l, E_idx + i)
+                            end do
+
+                            !$acc loop seq
+                            do i = 1, num_dims
+                                vel_L(i) = qL_rs_vf(j, k+1, l, contxe + i)
+                                vel_R(i) = qR_rs_vf(j, k, l, contxe + i)
+                            end do
+
+                            pres_L = qL_rs_vf(j, k+1, l, E_idx)
+                            pres_R = qR_rs_vf(j, k, l, E_idx)
+
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
 
                             do i = 1, num_fluids
                                 !flux_vf(advxb + i - 1)%sf(j,k,l) = &
@@ -782,13 +817,32 @@ contains
                 end do
             end if
         elseif (idir == 3) then
-            !$acc parallel loop collapse(3) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
             do l = -1, p+1
                 do k = -1, n+1
                     do j = -1, m+1
 
+                        !$acc loop seq
+                        do i = 1, num_fluids
+                            alpha_rho_L(i) = qL_rs_vf(j, k, l+1, i)
+                            alpha_L(i) = qL_rs_vf(j, k, l+1, E_idx + i)
+
+                            alpha_rho_R(i) = qR_rs_vf(j, k, l, i)
+                            alpha_R(i) = qR_rs_vf(j, k, l, E_idx + i)
+                        end do
+
+                        !$acc loop seq
+                        do i = 1, num_dims
+                            vel_L(i) = qL_rs_vf(j, k, l+1, contxe + i)
+                            vel_R(i) = qR_rs_vf(j, k, l, contxe + i)
+                        end do
+
+                        pres_L = qL_rs_vf(j, k, l+1, E_idx)
+                        pres_R = qR_rs_vf(j, k, l, E_idx)
+
                         call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                 pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir)
+                                             pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
+
 
                         do i = 1, num_fluids
                             !flux_vf(advxb + i - 1)%sf(j,k,l) = &
