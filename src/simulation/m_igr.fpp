@@ -49,7 +49,6 @@ contains
     subroutine s_initialize_igr_module()
 
         bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
-        print *, bcxb, bcyb, bczb, bcxe
         !bcxb = -1; bcxe = -1; bcyb = -1; bcye = -1; bczb = -1; bcze = -1
         !$acc update device(bcxb, bcxe, bcyb, bcye, bczb, bcze)
 
@@ -207,7 +206,7 @@ contains
                         end do
                     end do
                 end do
-            else if (idir == 3) then
+            else
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
                     do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
@@ -653,6 +652,7 @@ contains
                                 alpha_R(i) = qR_rs_vf(j, k, l, E_idx + i)
                             end do
 
+
                             !$acc loop seq
                             do i = 1, num_dims
                                 vel_L(i) = qL_rs_vf(j, k+1, l, contxe + i)
@@ -928,7 +928,7 @@ contains
         end if
         !$acc update device(alf_igr)
 
-        omega = 1._wp
+        omega = 1.0_wp
         !$acc update device(omega)
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -1127,7 +1127,7 @@ contains
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         integer, intent(in) :: idir
 
-        do i = 1, sys_size
+        do i = 1,sys_size
             call s_reconstruct_igr(qL_rs_vf(:,:,:,i), qR_rs_vf(:,:,:,i), q_prim_vf(i)%sf, idir)
         end do
 
