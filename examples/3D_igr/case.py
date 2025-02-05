@@ -18,11 +18,11 @@ y1 = l
 z0 = -l
 z1 = l
 
-Nx = 199
+Nx = 200
 Ny = Nx
 Nz = Nx
 
-mydt = 1e-3
+mydt = 5e-4
 
 # Configuration case dictionary
 data = {
@@ -39,10 +39,15 @@ data = {
     "n": Ny,
     "p": Nz,
     "cyl_coord": "F",
-    "dt": mydt,
-    "t_step_start": 0,
-    "t_step_stop": 2500,
-    "t_step_save": 250,
+    "cfl_adap_dt": "T",
+    "cfl_target": 0.1,
+    "t_stop": 2.5,
+    "t_save": 0.025,
+    "n_start": 0,
+    # "dt": mydt,
+    # "t_step_start": 0,
+    # "t_step_stop": 5000,
+    # "t_step_save": 250,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -66,7 +71,7 @@ data = {
     "bc_z%end": -1,
     "num_patches": 2,
     "num_fluids": 1,
-    "igr": "T",
+    # "igr": "T",
     # Database Structure Parameters
     "format": 1,
     "precision": 2,
@@ -75,8 +80,8 @@ data = {
     # Fluid Parameters (Gas)
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
-    "viscous": "T",
-    "fluid_pp(1)%Re(1)": 1e5,
+    # "viscous": "T",
+    # "fluid_pp(1)%Re(1)": 1e5,
     # Ambient pressure
     "patch_icpp(1)%geometry": 9,
     "patch_icpp(1)%x_centroid": 0,
@@ -95,7 +100,7 @@ data = {
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
     "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.5,
+    "patch_icpp(2)%smooth_coeff": 0.25,
     "patch_icpp(2)%geometry": 8,
     "patch_icpp(2)%x_centroid": 0,
     "patch_icpp(2)%y_centroid": 0,

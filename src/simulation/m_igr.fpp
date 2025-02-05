@@ -206,7 +206,7 @@ contains
                         end do
                     end do
                 end do
-            else
+            else if (idir == 3) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
                     do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
@@ -390,7 +390,7 @@ contains
             pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
         end do
 
-        a_L = sqrt((pres_L/(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+        a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
         u_L = vel_L(1)
         v_L = vel_L(2)
         if (p > 0) w_L = vel_L(3)
@@ -414,7 +414,7 @@ contains
             pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
         end do
 
-        a_R = sqrt((pres_R/(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
+        a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
         u_R = vel_R(1)
         v_R = vel_R(2)
         if (p > 0) w_R = vel_R(3)
@@ -605,7 +605,7 @@ contains
                                 0.5_wp * rho_L * (qL_rs_vf(j+1, k, l,momxb)**2._wp + qL_rs_vf(j+1, k, l,momxb+1)**2._wp + qL_rs_vf(j+1, k, l,momxe)**2._wp) + &
                                 qL_rs_vf(j+1,k,l,E_idx) + FL(j+1, k, l)) ) + &
                                 0.5_wp * ( qR_rs_vf(j,k,l,momxb) * (qR_rs_vf(j,k,l,E_idx)*gamma_R + pi_inf_R + &
-                                0.5_wp * rho_L * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp + qR_rs_vf(j, k, l,momxe)**2._wp) + &
+                                0.5_wp * rho_R * (qR_rs_vf(j, k, l,momxb)**2._wp + qR_rs_vf(j, k, l,momxb+1)**2._wp + qR_rs_vf(j, k, l,momxe)**2._wp) + &
                                 qR_rs_vf(j,k,l,E_idx) + FR(j, k, l)) ) + &
                                 0.5_wp*cfl * (qR_rs_vf(j, k, l, E_idx) - qL_rs_vf(j+1, k, l, E_idx))
 
@@ -614,15 +614,15 @@ contains
 
                                 flux_vf(momxe)%sf(j, k, l) = flux_vf(momxe)%sf(j, k, l) - &
                                            0.5_wp*mu_L*(duLz(j+1, k, l) + dwLx(j+1, k, l))  -  &
-                                           0.5_wp*mu_L*(duRz(j, k, l) + dwRx(j, k, l))
+                                           0.5_wp*mu_R*(duRz(j, k, l) + dwRx(j, k, l))
 
                                 flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) - &
                                            0.5_wp*mu_L*(duLy(j+1, k, l) + dvLx(j+1, k, l))  -  &
-                                           0.5_wp*mu_L*(duRy(j, k, l) + dvRx(j, k, l))
+                                           0.5_wp*mu_R*(duRy(j, k, l) + dvRx(j, k, l))
 
                                 flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) - &
                                             0.5_wp * mu_L * ((4._wp/3._wp)*duLx(j+1, k, l) - (2._wp/3._wp)*dvLy(j+1, k, l) - (2._wp/3._wp) * dwLz(j+1, k, l)) - &
-                                            0.5_wp * mu_L * ((4._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp) * dwRz(j, k, l))
+                                            0.5_wp * mu_R * ((4._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp) * dwRz(j, k, l))
 
                                 flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) - &
                                     0.5_wp*mu_L*qL_rs_vf(j+1, k, l, momxb)*((4._wp/3._wp)*duLx(j+1, k, l) - (2._wp/3._wp)*dvLy(j+1, k, l) - (2._wp/3._wp)*dwLz(j+1, k, l)) - &
@@ -651,7 +651,6 @@ contains
                                 alpha_rho_R(i) = qR_rs_vf(j, k, l, i)
                                 alpha_R(i) = qR_rs_vf(j, k, l, E_idx + i)
                             end do
-
 
                             !$acc loop seq
                             do i = 1, num_dims
@@ -928,7 +927,7 @@ contains
         end if
         !$acc update device(alf_igr)
 
-        omega = 1.0_wp
+        omega = 1._wp
         !$acc update device(omega)
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -1127,7 +1126,7 @@ contains
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         integer, intent(in) :: idir
 
-        do i = 1,sys_size
+        do i = 1, sys_size
             call s_reconstruct_igr(qL_rs_vf(:,:,:,i), qR_rs_vf(:,:,:,i), q_prim_vf(i)%sf, idir)
         end do
 
