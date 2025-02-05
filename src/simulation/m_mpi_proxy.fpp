@@ -606,7 +606,7 @@ contains
             end if
 
             ! Boundary condition at the end
-            if (proc_coords(2) < num_procs_y - 1 .or. .or. (bc_y%end == -1 .and. num_procs_y > 1)) then
+            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == -1 .and. num_procs_y > 1)) then
                 proc_coords(2) = proc_coords(2) + 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%end, ierr)
