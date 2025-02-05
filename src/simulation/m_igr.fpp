@@ -49,6 +49,7 @@ contains
     subroutine s_initialize_igr_module()
 
         bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
+        print *, bcxb, bcyb, bczb, bcxe
         !bcxb = -1; bcxe = -1; bcyb = -1; bcye = -1; bczb = -1; bcze = -1
         !$acc update device(bcxb, bcxe, bcyb, bcye, bczb, bcze)
 
