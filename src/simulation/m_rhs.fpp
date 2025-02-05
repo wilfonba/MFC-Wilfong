@@ -607,7 +607,7 @@ contains
         real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
         integer :: i, j, k, l, id !< Generic loop iterators
-
+        
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
@@ -942,7 +942,7 @@ contains
         end if
 
         call nvtxEndRange
-
+    
     end subroutine s_compute_rhs
 
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)

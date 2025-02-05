@@ -2177,7 +2177,6 @@ contains
                         p_recv => q_cons_buff_recv(0)
                         !$acc data attach(p_send, p_recv)
                         !$acc host_data use_device(p_send, p_recv)
-
                         call MPI_SENDRECV( &
                         p_send, &
                         buff_size*(n + 1)*(p + 1), &
@@ -2185,11 +2184,12 @@ contains
                         p_recv, &
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)  
-
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr) 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
-
                         call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
                         buff_size*(n + 1)*(p + 1), &
@@ -2198,13 +2198,7 @@ contains
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)  
-                    end if
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
-                    end if          
+                    end if        
 
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2230,6 +2224,9 @@ contains
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2240,13 +2237,7 @@ contains
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    end if           
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
-                    end if
+                    end if     
                     
                 end if
 
@@ -2289,6 +2280,9 @@ contains
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2299,12 +2293,6 @@ contains
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    end if
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
                     end if
 
                 else
@@ -2331,6 +2319,9 @@ contains
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2342,13 +2333,7 @@ contains
                         MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    end if           
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
-                    end if
+                    end if     
 
                 end if
 
@@ -2394,6 +2379,9 @@ contains
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2404,14 +2392,6 @@ contains
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    end if
-
-                    
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
                     end if
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2437,6 +2417,9 @@ contains
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2447,13 +2430,7 @@ contains
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    end if                   
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
-                    end if
+                    end if        
                     
                 end if
 
@@ -2496,6 +2473,9 @@ contains
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2506,13 +2486,7 @@ contains
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    end if                
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
-                    end if
+                    end if     
 
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2537,7 +2511,10 @@ contains
                         p_recv, &
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_y%end, 1, &
-                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)                        
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr) 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait                        
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2548,12 +2525,6 @@ contains
                         buff_size*(m + 2*buff_size + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_y%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    end if
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
                     end if
 
                 end if
@@ -2600,6 +2571,9 @@ contains
                         buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
                         MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2610,13 +2584,6 @@ contains
                         buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
                         MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    end if
-                   
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
                     end if
 
                 else
@@ -2643,6 +2610,9 @@ contains
                         buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
                         MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2654,12 +2624,6 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                     end if
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
-                    end if 
                     
                 end if
 
@@ -2702,6 +2666,9 @@ contains
                         buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
                         MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                         else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2712,14 +2679,7 @@ contains
                         buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
                         MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    end if               
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
-                    end if
-
+                    end if        
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
                     do l = p - (buff_size - 1), p
@@ -2744,6 +2704,9 @@ contains
                         buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
                         MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait 
                     else
                         !$acc update host(q_cons_buff_send)
                         call MPI_SENDRECV( &
@@ -2755,12 +2718,6 @@ contains
                         MPI_DOUBLE_PRECISION, bc_z%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                     end if       
-
-                    if(rdma_mpi) then 
-                        !$acc end host_data
-                        !$acc end data
-                        !$acc wait
-                    end if
 
                 end if
 
