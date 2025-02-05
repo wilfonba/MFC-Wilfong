@@ -615,15 +615,15 @@ contains
 
                                 flux_vf(momxe)%sf(j, k, l) = flux_vf(momxe)%sf(j, k, l) - &
                                            0.5_wp*mu_L*(duLz(j+1, k, l) + dwLx(j+1, k, l))  -  &
-                                           0.5_wp*mu_L*(duRz(j, k, l) + dwRx(j, k, l))
+                                           0.5_wp*mu_R*(duRz(j, k, l) + dwRx(j, k, l))
 
                                 flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) - &
                                            0.5_wp*mu_L*(duLy(j+1, k, l) + dvLx(j+1, k, l))  -  &
-                                           0.5_wp*mu_L*(duRy(j, k, l) + dvRx(j, k, l))
+                                           0.5_wp*mu_R*(duRy(j, k, l) + dvRx(j, k, l))
 
                                 flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) - &
                                             0.5_wp * mu_L * ((4._wp/3._wp)*duLx(j+1, k, l) - (2._wp/3._wp)*dvLy(j+1, k, l) - (2._wp/3._wp) * dwLz(j+1, k, l)) - &
-                                            0.5_wp * mu_L * ((4._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp) * dwRz(j, k, l))
+                                            0.5_wp * mu_R * ((4._wp/3._wp)*duRx(j, k, l) - (2._wp/3._wp)*dvRy(j, k, l) - (2._wp/3._wp) * dwRz(j, k, l))
 
                                 flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) - &
                                     0.5_wp*mu_L*qL_rs_vf(j+1, k, l, momxb)*((4._wp/3._wp)*duLx(j+1, k, l) - (2._wp/3._wp)*dvLy(j+1, k, l) - (2._wp/3._wp)*dwLz(j+1, k, l)) - &
