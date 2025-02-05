@@ -2156,8 +2156,7 @@ contains
         integer, intent(IN) :: mpi_dir
         integer, intent(IN) :: pbc_loc
         integer :: i, j, k, l, r, q
-
-        !print *, "MPI", proc_rank, F_igr(1, 0:buff_size-1, 50)
+        real(wp), pointer :: p_send, p_recv
 
         if(mpi_dir == 1) then
             if(pbc_loc == -1) then
@@ -2173,9 +2172,25 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
 
-                    call MPI_SENDRECV( &
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        p_recv, &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)  
+
+                    else
+                        !$acc update host(q_cons_buff_send)
+
+                        call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%end, 0, &
@@ -2183,9 +2198,13 @@ contains
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)  
+                    end if
 
-                    !$acc end host_data
-                    !$acc wait           
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if          
 
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2198,9 +2217,22 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
-
-                    call MPI_SENDRECV( &
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
+                        p_recv, &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
@@ -2208,10 +2240,18 @@ contains
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 0, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if           
 
-                    !$acc end host_data
-                    !$acc wait
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
                     
+                end if
+
+                if(.not. rdma_mpi) then 
+                    !$acc update device(q_cons_buff_recv)
                 end if
 
                 !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2236,9 +2276,22 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
-
-                    call MPI_SENDRECV( &
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
+                        p_recv, &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
                         q_cons_buff_send(0), &
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%beg, 1, &
@@ -2246,9 +2299,13 @@ contains
                         buff_size*(n + 1)*(p + 1), &
                         MPI_DOUBLE_PRECISION, bc_x%end, 1, &
                         MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if
 
-                    !$acc end host_data
-                    !$acc wait
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
 
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2261,20 +2318,42 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        p_recv, &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*(n + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_x%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
-                    call MPI_SENDRECV( &
-                    q_cons_buff_send(0), &
-                    buff_size*(n + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_x%end, 0, &
-                    q_cons_buff_recv(0), &
-                    buff_size*(n + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_x%end, 1, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if           
 
-                    !$acc end host_data
-                    !$acc wait 
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
 
+                end if
+
+                if(.not. rdma_mpi) then 
+                    !$acc update device(q_cons_buff_recv)
                 end if
 
                 !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2302,19 +2381,38 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%end, 0, &
+                        p_recv, &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if
 
-                    call MPI_SENDRECV( &
-                    q_cons_buff_send(0), &
-                    buff_size*(m + 2*buff_size + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_y%end, 0, &
-                    q_cons_buff_recv(0), &
-                    buff_size*(m + 2*buff_size + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    
 
-                    !$acc end host_data
-                    !$acc wait
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
                     do l = 0, p
@@ -2326,20 +2424,41 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
+                        p_recv, &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
+                        q_cons_buff_recv(0), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if                   
 
-                    call MPI_SENDRECV( &
-                    q_cons_buff_send(0), &
-                    buff_size*(m + 2*buff_size + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
-                    q_cons_buff_recv(0), &
-                    buff_size*(m + 2*buff_size + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_y%beg, 0, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc wait
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
                     
+                end if
+
+                if(.not. rdma_mpi) then 
+                    !$acc update device(q_cons_buff_recv)
                 end if
 
                 !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2364,19 +2483,36 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
+                        p_recv, &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
+                        q_cons_buff_recv(0), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if                
 
-                    call MPI_SENDRECV( &
-                    q_cons_buff_send(0), &
-                    buff_size*(m + 2*buff_size + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_y%beg, 1, &
-                    q_cons_buff_recv(0), &
-                    buff_size*(m + 2*buff_size + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_y%end, 1, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc wait
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
 
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2389,20 +2525,41 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%end, 0, &
+                        p_recv, &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)                        
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        MPI_DOUBLE_PRECISION, bc_y%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if
 
-                    call MPI_SENDRECV( &
-                    q_cons_buff_send(0), &
-                    buff_size*(m + 2*buff_size + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_y%end, 0, &
-                    q_cons_buff_recv(0), &
-                    buff_size*(m + 2*buff_size + 1)*(p + 1), &
-                    MPI_DOUBLE_PRECISION, bc_y%end, 1, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
 
-                    !$acc end host_data
-                    !$acc wait
+                end if
 
+                if(.not. rdma_mpi) then 
+                    !$acc update device(q_cons_buff_recv)
                 end if
 
                 !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2430,19 +2587,37 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%end, 0, &
+                        p_recv, &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if
+                   
 
-                    call MPI_SENDRECV( &
-                    q_cons_buff_send(0), &
-                    buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
-                    MPI_DOUBLE_PRECISION, bc_z%end, 0, &
-                    q_cons_buff_recv(0), &
-                    buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
-                    MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc wait
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
 
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2455,20 +2630,41 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
+                        p_recv, &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
+                        q_cons_buff_recv(0), &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if
 
-                    call MPI_SENDRECV( &
-                    q_cons_buff_send(0), &
-                    buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
-                    MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
-                    q_cons_buff_recv(0), &
-                    buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
-                    MPI_DOUBLE_PRECISION, bc_z%beg, 0, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc wait 
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if 
                     
+                end if
+
+                if(.not. rdma_mpi) then 
+                    !$acc update device(q_cons_buff_recv)
                 end if
 
                 !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2493,19 +2689,36 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
+                        p_recv, &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
+                        q_cons_buff_recv(0), &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if               
 
-                    call MPI_SENDRECV( &
-                    q_cons_buff_send(0), &
-                    buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
-                    MPI_DOUBLE_PRECISION, bc_z%beg, 1, &
-                    q_cons_buff_recv(0), &
-                    buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
-                    MPI_DOUBLE_PRECISION, bc_z%end, 1, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    !$acc end host_data
-                    !$acc wait
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
 
                 else
                     !$acc parallel loop gang vector collapse(3) default(present) private(r)
@@ -2518,21 +2731,41 @@ contains
                         end do
                     end do
 
-                    !$acc host_data use_device(q_cons_buff_send, q_cons_buff_recv)
+                    if(rdma_mpi) then 
+                        p_send => q_cons_buff_send(0)
+                        p_recv => q_cons_buff_recv(0)
+                        !$acc data attach(p_send, p_recv)
+                        !$acc host_data use_device(p_send, p_recv)
+                        call MPI_SENDRECV( &
+                        p_send, &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%end, 0, &
+                        p_recv, &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    else
+                        !$acc update host(q_cons_buff_send)
+                        call MPI_SENDRECV( &
+                        q_cons_buff_send(0), &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%end, 0, &
+                        q_cons_buff_recv(0), &
+                        buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
+                        MPI_DOUBLE_PRECISION, bc_z%end, 1, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    end if       
 
-                    call MPI_SENDRECV( &
-                    q_cons_buff_send(0), &
-                    buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
-                    MPI_DOUBLE_PRECISION, bc_z%end, 0, &
-                    q_cons_buff_recv(0), &
-                    buff_size*(m + 2*buff_size+1)*(n + 2*buff_size +1), &
-                    MPI_DOUBLE_PRECISION, bc_z%end, 1, &
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    if(rdma_mpi) then 
+                        !$acc end host_data
+                        !$acc end data
+                        !$acc wait
+                    end if
 
-                    
-                    !$acc end host_data
-                    !$acc wait
+                end if
 
+                if(.not. rdma_mpi) then 
+                    !$acc update device(q_cons_buff_recv)
                 end if
 
                 !$acc parallel loop gang vector collapse(3) default(present) private(r)
