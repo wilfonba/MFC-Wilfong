@@ -391,7 +391,7 @@ contains
             pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
         end do
 
-        a_L = sqrt((pres_L/(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+        a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
         u_L = vel_L(1)
         v_L = vel_L(2)
         if (p > 0) w_L = vel_L(3)
@@ -415,7 +415,7 @@ contains
             pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
         end do
 
-        a_R = sqrt((pres_R/(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
+        a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
         u_R = vel_R(1)
         v_R = vel_R(2)
         if (p > 0) w_R = vel_R(3)
