@@ -11,11 +11,11 @@ l = 1
 
 # Numerical setup
 r0 = l/4
-x0 = -l
+x0 = 0
 x1 = l
-y0 = -l
+y0 = 0
 y1 = l
-z0 = -l
+z0 = 0
 z1 = l
 
 Nx = 200
@@ -63,15 +63,15 @@ data = {
     "weno_Re_flux": "T",
     "riemann_solver": 2,
     "wave_speeds": 1,
-    "bc_x%beg": -1,
-    "bc_x%end": -1,
-    "bc_y%beg": -1,
-    "bc_y%end": -1,
-    "bc_z%beg": -1,
-    "bc_z%end": -1,
+    "bc_x%beg": -2,
+    "bc_x%end": -3,
+    "bc_y%beg": -2,
+    "bc_y%end": -3,
+    "bc_z%beg": -2,
+    "bc_z%end": -3,
     "num_patches": 2,
     "num_fluids": 1,
-    # "igr": "T",
+    "igr": "T",
     # Database Structure Parameters
     "format": 1,
     "precision": 2,

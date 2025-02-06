@@ -27,12 +27,12 @@ l = 1
 
 # Numerical setup
 r0 = l/4
-x0 = -l
+x0 = 0
 x1 = l
-y0 = -l
+y0 = 0
 y1 = l
 
-Nx = 100
+Nx = 1000
 Ny = Nx
 
 mydt = 5e-4
@@ -51,14 +51,14 @@ data = {
     "p": 0,
     "cyl_coord": "F",
     "cfl_const_dt": "T",
-    "cfl_target": 0.5,
-    "t_stop": 2,
-    "t_save": 0.05,
+    "cfl_target": 0.1,
+    "t_stop": 0.2,
+    "t_save": 0.002,
     "n_start": 0,
-    # "dt": mydt,
+    # "dt": 5e-5,
     # "t_step_start": 0,
     # "t_step_stop": 5000,
-    # "t_step_save": 250,
+    # "t_step_save": 5,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -71,16 +71,12 @@ data = {
     "mapped_weno": "T",
     "null_weights": "F",
     "mp_weno": "T",
-    "weno_Re_flux": "T",
+    "weno_Re_flux": "F",
     "riemann_solver": 2,
     "wave_speeds": 1,
-    "bc_x%beg": -1,
-    "bc_x%end": -1,
-    "bc_y%beg": -1,
-    "bc_y%end": -1,
     "num_patches": 1,
     "num_fluids": 1,
-    # "igr": "T",
+    "igr": "T",
     # Database Structure Parameters
     "format": 1,
     "precision": 2,
@@ -89,12 +85,16 @@ data = {
     # Fluid Parameters (Gas)
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
-    "viscous": "T",
-    "fluid_pp(1)%Re(1)": 1e5,
+    # "viscous": "T",
+    # "fluid_pp(1)%Re(1)": 1e5,
 }
 
 if (args.dir == 1):
     mods = {
+    "bc_x%beg": -3,
+    "bc_x%end": -3,
+    "bc_y%beg": -1,
+    "bc_y%end": -1,
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": 0.0,
     "patch_icpp(1)%y_centroid": 0.0,
@@ -105,13 +105,18 @@ if (args.dir == 1):
     "patch_icpp(1)%vel(1)": 0,
     "patch_icpp(1)%vel(2)": 0,
     "patch_icpp(1)%vel(3)": 0,
-    "patch_icpp(1)%pres": "(10*exp(-(3*x**2)))**1.4 + 1",
-    "patch_icpp(1)%alpha_rho(1)": "10*exp(-(3*x**2)) + 1",
+    "patch_icpp(1)%pres": "0.55 + 0.45*tanh(100*(0.5-x))",
+    # "patch_icpp(1)%alpha_rho(1)": "10*exp(-(3*x**2)) + 1",
+    "patch_icpp(1)%alpha_rho(1)": "0.5625 + 0.4375*tanh(100*(0.5-x))",
     "patch_icpp(1)%alpha(1)": 1,
     }
 
 if (args.dir == 2):
     mods = {
+    "bc_x%beg": -1,
+    "bc_x%end": -1,
+    "bc_y%beg": -3,
+    "bc_y%end": -3,
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": 0.0,
     "patch_icpp(1)%y_centroid": 0.0,
@@ -122,8 +127,9 @@ if (args.dir == 2):
     "patch_icpp(1)%vel(1)": 0,
     "patch_icpp(1)%vel(2)": 0,
     "patch_icpp(1)%vel(3)": 0,
-    "patch_icpp(1)%pres": "(10*exp(-(3*y**2)))**1.4 + 1",
-    "patch_icpp(1)%alpha_rho(1)": "10*exp(-(3*y**2)) + 1",
+    "patch_icpp(1)%pres": "0.55 + 0.45*tanh(100*(0.5-y))",
+    # "patch_icpp(1)%alpha_rho(1)": "10*exp(-(3*y**2)) + 1",
+    "patch_icpp(1)%alpha_rho(1)": "0.5625 + 0.4375*tanh(100*(0.5-y))",
     "patch_icpp(1)%alpha(1)": 1,
     }
 

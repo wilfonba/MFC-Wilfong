@@ -261,10 +261,10 @@ contains
                 end do
             end do
 
-            if(bcxb >= -1) then
+            if(bcxb >= -12) then
                 if(bcxb >= 0) then
                     call s_mpi_sendrecv_F_igr(jac, 1, -1)
-                else
+                else if (bcxb == -1) then
                     !$acc parallel loop gang vector collapse(3) default(present)
                     do l = 0, p
                         do k = 0, n
@@ -273,13 +273,32 @@ contains
                             end do
                         end do
                     end do
+                else if (bcxb == -2) then
+                    !$acc parallel loop gang vector collapse(3) default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                jac(-j, k, l) = jac(j - 1,k,l)
+                            end do
+                        end do
+                    end do
+                else
+                    !$acc parallel loop gang vector collapse(3) default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                jac(-j, k, l) = jac(0,k,l)
+                            end do
+                        end do
+                    end do
+
                 end if
             end if
 
-            if(bcxe >= -1) then
+            if(bcxe >= -12) then
                 if(bcxe >= 0) then
                     call s_mpi_sendrecv_F_igr(jac, 1, 1)
-                else
+                else if (bcxe == -1) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 0, n
@@ -288,13 +307,31 @@ contains
                             end do
                         end do
                     end do
+                else if (bcxe == -2) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                jac(m+j, k, l) = jac(m - (j - 1),k,l)
+                            end do
+                        end do
+                    end do
+                else
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                jac(m+j, k, l) = jac(m,k,l)
+                            end do
+                        end do
+                    end do
                 end if
             end if
 
-            if(bcyb >= -1) then
+            if(bcyb >= -12) then
                 if(bcyb >= 0) then
                     call s_mpi_sendrecv_F_igr(jac, 2, -1)
-                else
+                else if (bcyb == -1) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
@@ -303,13 +340,31 @@ contains
                             end do
                         end do
                     end do
+                else if (bcyb == -2) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
+                                jac(j,-k,l) = jac(j,k-1,l)
+                            end do
+                        end do
+                    end do
+                else
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
+                                jac(j,-k,l) = jac(j,0,l)
+                            end do
+                        end do
+                    end do
                 end if
             end if
 
-            if(bcye >= -1) then
+            if(bcye >= -12) then
                 if(bcye >= 0) then
                     call s_mpi_sendrecv_F_igr(jac, 2, 1)
-                else
+                else if (bcye == -1) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
@@ -318,14 +373,33 @@ contains
                             end do
                         end do
                     end do
+                else if (bcye == -2) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
+                                jac(j,n+k,l) = jac(j,n - (k-1),l)
+                            end do
+                        end do
+                    end do
+                else
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
+                                jac(j,n+k,l) = jac(j,n,l)
+                            end do
+                        end do
+                    end do
+
                 end if
             end if
 
             if(p > 0) then
-                if(bczb >= -1) then
+                if(bczb >= -12) then
                     if(bczb >= 0) then
                         call s_mpi_sendrecv_F_igr(jac, 3, -1)
-                    else
+                    else if (bczb == -1) then
                         !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 1, buff_size
                             do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -334,14 +408,33 @@ contains
                                 end do
                             end do
                         end do
+                    else if (bczb == -2) then
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 1, buff_size
+                            do k = idwbuff(2)%beg, idwbuff(2)%end
+                                do j = idwbuff(1)%beg, idwbuff(1)%end
+                                    jac(j,k,-l) = jac(j,k,l-1)
+                                end do
+                            end do
+                        end do
+                    else
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 1, buff_size
+                            do k = idwbuff(2)%beg, idwbuff(2)%end
+                                do j = idwbuff(1)%beg, idwbuff(1)%end
+                                    jac(j,k,-l) = jac(j,k,0)
+                                end do
+                            end do
+                        end do
+
                     end if
                 end if
 
-                if(bcze >= -1) then
+                if(bcze >= -12) then
                     if(bcze >= 0) then
                         call s_mpi_sendrecv_F_igr(jac, 3, 1)
-                    else
-                    !$acc parallel loop gang vector collapse(3) default(present)
+                    else if (bcze == -1) then
+                        !$acc parallel loop gang vector collapse(3) default(present)
                         do l = 1, buff_size
                             do k = idwbuff(2)%beg, idwbuff(2)%end
                                 do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -349,6 +442,25 @@ contains
                                 end do
                             end do
                         end do
+                    else if (bcze == -2) then
+                        !$acc parallel loop gang vector collapse(3) default(present)
+                        do l = 1, buff_size
+                            do k = idwbuff(2)%beg, idwbuff(2)%end
+                                do j = idwbuff(1)%beg, idwbuff(1)%end
+                                    jac(j,k,p+l) = jac(j,k,p - (l-1))
+                                end do
+                            end do
+                        end do
+                    else
+                        !$acc parallel loop gang vector collapse(3) default(present)
+                        do l = 1, buff_size
+                            do k = idwbuff(2)%beg, idwbuff(2)%end
+                                do j = idwbuff(1)%beg, idwbuff(1)%end
+                                    jac(j,k,p+l) = jac(j,k,p)
+                                end do
+                            end do
+                        end do
+
                     end if
                 end if
             end if
@@ -488,12 +600,12 @@ contains
                                     !0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                     !qR_rs_vf(j,k,l,momxb)) + &
                                     !1._wp * (qR_rs_vf(j, k, l, advxb+i-1) - qL_rs_vf(j+1, k, l, advxb+i-1))
-                                flux_vf(contxb + i - 1)%sf(j,k,l) = &
-                                    0.5_wp * (qL_rs_vf(j+1,k,l, contxb+i-1) * &
+                                flux_vf(i)%sf(j,k,l) = &
+                                    0.5_wp * (qL_rs_vf(j+1,k,l,i) * &
                                     qL_rs_vf(j+1,k,l, momxb)) + &
-                                    0.5_wp * (qR_rs_vf(j,k,l, contxb+i-1) * &
+                                    0.5_wp * (qR_rs_vf(j,k,l,i) * &
                                     qR_rs_vf(j,k,l, momxb)) + &
-                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j+1, k, l, contxb+i-1))
+                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, i) - qL_rs_vf(j+1, k, l, i))
                             end do
 
                             ! Momentum -> rho*u^2 + p + [[F_igr]]
@@ -574,12 +686,12 @@ contains
                                     !0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                     !qR_rs_vf(j,k,l,momxb)) + &
                                     !1._wp * (qR_rs_vf(j, k, l, advxb+i-1) - qL_rs_vf(j+1, k, l, advxb+i-1))
-                                flux_vf(contxb + i - 1)%sf(j,k,l) = &
-                                    0.5_wp * (qL_rs_vf(j+1,k,l, contxb+i-1) * &
+                                flux_vf(i)%sf(j,k,l) = &
+                                    0.5_wp * (qL_rs_vf(j+1,k,l,i) * &
                                     qL_rs_vf(j+1,k,l, momxb)) + &
-                                    0.5_wp * (qR_rs_vf(j,k,l, contxb+i-1) * &
+                                    0.5_wp * (qR_rs_vf(j,k,l,i) * &
                                     qR_rs_vf(j,k,l, momxb)) + &
-                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j+1, k, l, contxb+i-1))
+                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, i) - qL_rs_vf(j+1, k, l, i))
                             end do
 
                             ! Momentum -> rho*u^2 + p + [[F_igr]]
@@ -672,12 +784,12 @@ contains
                                     !0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                     !qR_rs_vf(j,k,l,momxb+1)) + &
                                     !1._wp * (qR_rs_vf(j, k, l, advxb+i-1) - qL_rs_vf(j, k+1, l, advxb+i-1))
-                                flux_vf(contxb + i - 1)%sf(j,k,l) = &
-                                    0.5_wp * (qL_rs_vf(j,k+1,l, contxb+i-1) * &
+                                flux_vf(i)%sf(j,k,l) = &
+                                    0.5_wp * (qL_rs_vf(j,k+1,l,i) * &
                                     qL_rs_vf(j,k+1,l, momxb+1)) + &
-                                    0.5_wp * (qR_rs_vf(j,k,l, contxb+i-1) * &
+                                    0.5_wp * (qR_rs_vf(j,k,l,i) * &
                                     qR_rs_vf(j,k,l, momxb+1)) + &
-                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j, k+1, l, contxb+i-1))
+                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, i) - qL_rs_vf(j, k+1, l, i))
                             end do
 
                             flux_vf(momxb+1)%sf(j, k, l) = &
@@ -755,12 +867,12 @@ contains
                                     !0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                     !qR_rs_vf(j,k,l,momxb+1)) + &
                                     !1._wp * (qR_rs_vf(j, k, l, advxb+i-1) - qL_rs_vf(j, k+1, l, advxb+i-1))
-                                flux_vf(contxb + i - 1)%sf(j,k,l) = &
-                                    0.5_wp * (qL_rs_vf(j,k+1,l, contxb+i-1) * &
+                                flux_vf(i)%sf(j,k,l) = &
+                                    0.5_wp * (qL_rs_vf(j,k+1,l,i) * &
                                     qL_rs_vf(j,k+1,l, momxb+1)) + &
-                                    0.5_wp * (qR_rs_vf(j,k,l, contxb+i-1) * &
+                                    0.5_wp * (qR_rs_vf(j,k,l,i) * &
                                     qR_rs_vf(j,k,l, momxb+1)) + &
-                                    0.5_wp*cfl* (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j, k+1, l, contxb+i-1))
+                                    0.5_wp*cfl* (qR_rs_vf(j, k, l, i) - qL_rs_vf(j, k+1, l, i))
                             end do
 
                             flux_vf(momxb)%sf(j, k, l) = &
@@ -851,12 +963,12 @@ contains
                                 !0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                 !qR_rs_vf(j,k,l,momxe)) + &
                                 !1._wp * (qR_rs_vf(j, k, l, advxb+i-1) - qL_rs_vf(j, k, l+1, advxb+i-1))
-                            flux_vf(contxb + i - 1)%sf(j,k,l) = &
-                                0.5_wp * (qL_rs_vf(j,k,l+1, contxb+i-1) * &
+                            flux_vf(i)%sf(j,k,l) = &
+                                0.5_wp * (qL_rs_vf(j,k,l+1,i) * &
                                 qL_rs_vf(j,k,l+1, momxe)) + &
-                                0.5_wp * (qR_rs_vf(j,k,l, contxb+i-1) * &
+                                0.5_wp * (qR_rs_vf(j,k,l,i) * &
                                 qR_rs_vf(j,k,l, momxe)) + &
-                                0.5_wp * cfl * (qR_rs_vf(j, k, l, contxb+i-1) - qL_rs_vf(j, k, l+1, contxb+i-1))
+                                0.5_wp * cfl * (qR_rs_vf(j, k, l, i) - qL_rs_vf(j, k, l+1, i))
                         end do
 
                         flux_vf(momxb)%sf(j, k, l) = &
