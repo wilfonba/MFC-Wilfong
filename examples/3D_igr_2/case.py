@@ -11,11 +11,11 @@ l = 1
 
 # Numerical setup
 r0 = l/4
-x0 = 0
+x0 = -1
 x1 = l
-y0 = 0
+y0 = -1
 y1 = l
-z0 = 0
+z0 = -1
 z1 = l
 
 Nx = 200
@@ -63,13 +63,13 @@ data = {
     "weno_Re_flux": "F",
     "riemann_solver": 2,
     "wave_speeds": 1,
-    "bc_x%beg": -2,
-    "bc_x%end": -3,
-    "bc_y%beg": -2,
-    "bc_y%end": -3,
-    "bc_z%beg": -2,
-    "bc_z%end": -3,
-    "num_patches": 2,
+    "bc_x%beg": -1,
+    "bc_x%end": -1,
+    "bc_y%beg": -1,
+    "bc_y%end": -1,
+    "bc_z%beg": -1,
+    "bc_z%end": -1,
+    "num_patches": 1,
     "num_fluids": 1,
     "igr": "T",
     # Database Structure Parameters
@@ -93,25 +93,9 @@ data = {
     "patch_icpp(1)%vel(1)": 0.0,
     "patch_icpp(1)%vel(2)": 0.0,
     "patch_icpp(1)%vel(3)": 0.0,
-    "patch_icpp(1)%pres": 1,
-    "patch_icpp(1)%alpha_rho(1)": 1,
+    "patch_icpp(1)%pres": "1.0 + 2.63 * exp(-(x**2 + y**2 + z**2) / (2 * 0.2**2))",
+    "patch_icpp(1)%alpha_rho(1)": "1.0 + 2.00 * exp(-(x**2 + y**2 + z**2) / (2 * 0.2**2))",
     "patch_icpp(1)%alpha(1)": 1,
-    # High pressure
-    "patch_icpp(2)%alter_patch(1)": "T",
-    "patch_icpp(2)%smoothen": "T",
-    "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.25,
-    "patch_icpp(2)%geometry": 8,
-    "patch_icpp(2)%x_centroid": 0,
-    "patch_icpp(2)%y_centroid": 0,
-    "patch_icpp(2)%z_centroid": 0,
-    "patch_icpp(2)%radius": r0,
-    "patch_icpp(2)%vel(1)": 0.0,
-    "patch_icpp(2)%vel(2)": 0.0,
-    "patch_icpp(2)%vel(3)": 0.0,
-    "patch_icpp(2)%pres": 2.63,
-    "patch_icpp(2)%alpha_rho(1)": 2,
-    "patch_icpp(2)%alpha(1)": 1,
 }
 
 print(json.dumps(data))
