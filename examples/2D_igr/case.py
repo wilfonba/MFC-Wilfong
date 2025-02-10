@@ -19,7 +19,7 @@ y1 = l
 Nx = 199
 Ny = 199
 
-dt = 1e-3
+dt = 5e-4
 
 # Configuration case dictionary
 data = {
@@ -41,8 +41,8 @@ data = {
     # "t_save": 2.5/100,
     "dt": dt,
     "t_step_start": 0,
-    "t_step_stop": 2500,
-    "t_step_save": 25,
+    "t_step_stop": 5000,
+    "t_step_save": 50,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",

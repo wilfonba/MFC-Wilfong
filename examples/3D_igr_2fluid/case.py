@@ -8,6 +8,7 @@ import math
 import json
 
 l = 1
+eps = 1e-6
 
 # Numerical setup
 r0 = l/4
@@ -22,7 +23,7 @@ Nx = 200
 Ny = Nx
 Nz = Nx
 
-mydt = 5e-4
+dt = 1e-4
 
 # Configuration case dictionary
 data = {
@@ -39,10 +40,10 @@ data = {
     "n": Ny,
     "p": Nz,
     "cyl_coord": "F",
-    "dt": mydt,
+    "dt": dt,
     "t_step_start": 0,
-    "t_step_stop": int(2.5/mydt),
-    "t_step_save": int(2.5/mydt/100),
+    "t_step_stop": 5000,
+    "t_step_save": 50,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -55,18 +56,20 @@ data = {
     "mapped_weno": "T",
     "null_weights": "F",
     "mp_weno": "T",
-    "weno_Re_flux": "F",
+    "weno_Re_flux": "T",
     "riemann_solver": 2,
     "wave_speeds": 1,
-    "bc_x%beg": -1,
-    "bc_x%end": -1,
-    "bc_y%beg": -1,
-    "bc_y%end": -1,
-    "bc_z%beg": -1,
-    "bc_z%end": -1,
+    "bc_x%beg": -3,
+    "bc_x%end": -3,
+    "bc_y%beg": -3,
+    "bc_y%end": -3,
+    "bc_z%beg": -3,
+    "bc_z%end": -3,
     "num_patches": 2,
-    "num_fluids": 1,
+    "num_fluids": 2,
     "igr": "T",
+    "alf_factor": 10,
+    "viscous": "T",
     # Database Structure Parameters
     "format": 1,
     "precision": 2,
@@ -75,8 +78,10 @@ data = {
     # Fluid Parameters (Gas)
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
-    # "viscous": "T",
-    # "fluid_pp(1)%Re(1)": 1e5,
+    "fluid_pp(1)%Re(1)": 1e5,
+    "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+    "fluid_pp(2)%pi_inf": 0.0e00,
+    "fluid_pp(2)%Re(1)": 1e5,
     # Ambient pressure
     "patch_icpp(1)%geometry": 9,
     "patch_icpp(1)%x_centroid": 0,
@@ -89,13 +94,15 @@ data = {
     "patch_icpp(1)%vel(2)": 0.0,
     "patch_icpp(1)%vel(3)": 0.0,
     "patch_icpp(1)%pres": 1,
-    "patch_icpp(1)%alpha_rho(1)": 1,
-    "patch_icpp(1)%alpha(1)": 1,
+    "patch_icpp(1)%alpha_rho(1)": 1 - eps,
+    "patch_icpp(1)%alpha(1)": 1 - eps,
+    "patch_icpp(1)%alpha_rho(2)": eps,
+    "patch_icpp(1)%alpha(2)": eps,
     # High pressure
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
     "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.25,
+    "patch_icpp(2)%smooth_coeff": 0.1,
     "patch_icpp(2)%geometry": 8,
     "patch_icpp(2)%x_centroid": 0,
     "patch_icpp(2)%y_centroid": 0,
@@ -104,9 +111,11 @@ data = {
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
     "patch_icpp(2)%vel(3)": 0.0,
-    "patch_icpp(2)%pres": 2.63,
-    "patch_icpp(2)%alpha_rho(1)": 2,
-    "patch_icpp(2)%alpha(1)": 1,
+    "patch_icpp(2)%pres": 9.518,
+    "patch_icpp(2)%alpha_rho(1)": eps,
+    "patch_icpp(2)%alpha(1)": eps,
+    "patch_icpp(2)%alpha_rho(2)": (1 - eps)*5,
+    "patch_icpp(2)%alpha(2)": 1 - eps,
 }
 
 print(json.dumps(data))

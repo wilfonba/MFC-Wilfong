@@ -156,7 +156,7 @@ contains
             rhoref, pref, bubbles_euler, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, igr_order, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, igr_order, alf_igr, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -1615,6 +1615,8 @@ contains
         !$acc update device(bc_x%grcbc_in, bc_x%grcbc_out, bc_x%grcbc_vel_out)
         !$acc update device(bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out)
         !$acc update device(bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out)
+
+        !$acc update device(alf_factor)
 
         !$acc update device(relax, relax_model)
         if (relax) then

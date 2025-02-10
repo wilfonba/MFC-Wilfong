@@ -17,10 +17,10 @@ x1 = l
 y0 = -l
 y1 = l
 
-Nx = 199
-Ny = 199
+Nx = 200
+Ny = 200
 
-dt = 1e-3
+dt = 1e-4
 
 # Configuration case dictionary
 data = {
@@ -37,8 +37,8 @@ data = {
     "cyl_coord": "F",
     "dt": dt,
     "t_step_start": 0,
-    "t_step_stop": 2500,
-    "t_step_save": 25,
+    "t_step_stop": 5000,
+    "t_step_save": 50,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -54,14 +54,15 @@ data = {
     "weno_Re_flux": "T",
     "riemann_solver": 2,
     "wave_speeds": 1,
-    "bc_x%beg": -1,
-    "bc_x%end": -1,
-    "bc_y%beg": -1,
-    "bc_y%end": -1,
+    "bc_x%beg": -3,
+    "bc_x%end": -3,
+    "bc_y%beg": -3,
+    "bc_y%end": -3,
     "num_patches": 2,
     "num_fluids": 2,
     "igr": "T",
-    # "viscous": "T",
+    "alf_factor": 10,
+    "viscous": "T",
     # Database Structure Parameters
     "format": 1,
     "precision": 2,
@@ -70,10 +71,10 @@ data = {
     # Fluid Parameters (Gas)
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
-    # "fluid_pp(1)%Re(1)": 1e5,
+    "fluid_pp(1)%Re(1)": 1e5,
     "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(2)%pi_inf": 0.0e00,
-    # "fluid_pp(2)%Re(1)": 1e5,
+    "fluid_pp(2)%Re(1)": 1e5,
     # Ambient pressure
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": 0,
@@ -92,17 +93,17 @@ data = {
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
     "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.2,
+    "patch_icpp(2)%smooth_coeff": 0.1,
     "patch_icpp(2)%geometry": 2,
     "patch_icpp(2)%x_centroid": 0,
     "patch_icpp(2)%y_centroid": 0,
     "patch_icpp(2)%radius": r0,
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
-    "patch_icpp(2)%pres": 1.1,
+    "patch_icpp(2)%pres": 9.518,
     "patch_icpp(2)%alpha_rho(1)": eps,
     "patch_icpp(2)%alpha(1)": eps,
-    "patch_icpp(2)%alpha_rho(2)": (1 - eps)*1.1,
+    "patch_icpp(2)%alpha_rho(2)": (1 - eps)*5,
     "patch_icpp(2)%alpha(2)": 1 - eps,
 }
 
