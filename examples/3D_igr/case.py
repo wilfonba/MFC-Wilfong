@@ -11,18 +11,18 @@ l = 1
 
 # Numerical setup
 r0 = l/4
-x0 = 0
+x0 = -l
 x1 = l
-y0 = 0
+y0 = -l
 y1 = l
-z0 = 0
+z0 = -l
 z1 = l
 
-Nx = 200
+Nx = 400
 Ny = Nx
 Nz = Nx
 
-mydt = 5e-4
+mydt = 2.5e-4
 
 # Configuration case dictionary
 data = {
@@ -39,15 +39,10 @@ data = {
     "n": Ny,
     "p": Nz,
     "cyl_coord": "F",
-    "cfl_const_dt": "T",
-    "cfl_target": 0.5,
-    "t_stop": 2.5,
-    "t_save": 0.025,
-    "n_start": 0,
-    # "dt": mydt,
-    # "t_step_start": 0,
-    # "t_step_stop": 5000,
-    # "t_step_save": 250,
+    "dt": mydt,
+    "t_step_start": 0,
+    "t_step_stop": int(2.5/mydt),
+    "t_step_save": int(2.5/mydt/100),
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -63,12 +58,12 @@ data = {
     "weno_Re_flux": "F",
     "riemann_solver": 2,
     "wave_speeds": 1,
-    "bc_x%beg": -2,
-    "bc_x%end": -3,
-    "bc_y%beg": -2,
-    "bc_y%end": -3,
-    "bc_z%beg": -2,
-    "bc_z%end": -3,
+    "bc_x%beg": -1,
+    "bc_x%end": -1,
+    "bc_y%beg": -1,
+    "bc_y%end": -1,
+    "bc_z%beg": -1,
+    "bc_z%end": -1,
     "num_patches": 2,
     "num_fluids": 1,
     "igr": "T",

@@ -1326,6 +1326,9 @@ contains
                             do j = 0, m
                                 rhs_vf(i)%sf(j, k, l) = -1._wp/(2._wp*dx(j)) * q_prim_vf(momxb)%sf(j,k,l) * &
                                     (q_prim_vf(i)%sf(j+1,k,l) - q_prim_vf(i)%sf(j-1,k,l))
+                                !if (k = 100) then
+                                    !print*, rhs_vf(i)%sf(j,k,l)
+                                !end if
                             end do
                         end do
                     end do

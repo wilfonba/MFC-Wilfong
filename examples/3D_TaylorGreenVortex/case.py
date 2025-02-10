@@ -2,11 +2,11 @@
 import math
 import json
 
-N = 49
+N =299
 
 Re = 1600
 L = 1
-P0 = 101325
+P0 = 1
 rho0 = 1
 C0 = math.sqrt(1.4 * P0)
 V0 = 0.1 * C0
@@ -15,7 +15,7 @@ mu = V0 * L / Re
 cfl = 0.5
 dx = 2 * math.pi * L / (N + 1)
 
-dt = cfl * dx / (C0)
+dt = cfl * dx / (V0 + C0)
 
 tC = L / V0
 tEnd = 20 * tC
@@ -40,10 +40,15 @@ print(
             "n": N,
             "p": N,
             "cyl_coord": "F",
-            "dt": dt,
-            "t_step_start": 0,
-            "t_step_stop": Nt,
-            "t_step_save": int(Nt / 100),
+            # "dt": dt,
+            # "t_step_start": 0,
+            # "t_step_stop": Nt,
+            # "t_step_save": int(Nt / 100),
+            "cfl_adap_dt": "T",
+            "cfl_target": 0.5,
+            "t_stop": 20*tC,
+            "t_save": tC,
+            "n_start": 0,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,

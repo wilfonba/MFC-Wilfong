@@ -11,18 +11,18 @@ l = 1
 
 # Numerical setup
 r0 = l/4
-x0 = -1
+x0 = -l
 x1 = l
-y0 = -1
+y0 = -l
 y1 = l
-z0 = -1
+z0 = -l
 z1 = l
 
-Nx = 200
+Nx = 500
 Ny = Nx
 Nz = Nx
 
-mydt = 5e-4
+mydt = 2.5e-4
 
 # Configuration case dictionary
 data = {
@@ -39,15 +39,10 @@ data = {
     "n": Ny,
     "p": Nz,
     "cyl_coord": "F",
-    "cfl_const_dt": "T",
-    "cfl_target": 0.5,
-    "t_stop": 2.5,
-    "t_save": 0.025,
-    "n_start": 0,
-    # "dt": mydt,
-    # "t_step_start": 0,
-    # "t_step_stop": 5000,
-    # "t_step_save": 250,
+    "dt": mydt,
+    "t_step_start": 0,
+    "t_step_stop": int(2.5/mydt),
+    "t_step_save": int(2.5/mydt/100),
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -69,7 +64,7 @@ data = {
     "bc_y%end": -1,
     "bc_z%beg": -1,
     "bc_z%end": -1,
-    "num_patches": 1,
+    "num_patches": 4,
     "num_fluids": 1,
     "igr": "T",
     # Database Structure Parameters
@@ -93,9 +88,58 @@ data = {
     "patch_icpp(1)%vel(1)": 0.0,
     "patch_icpp(1)%vel(2)": 0.0,
     "patch_icpp(1)%vel(3)": 0.0,
-    "patch_icpp(1)%pres": "1.0 + 2.63 * exp(-(x**2 + y**2 + z**2) / (2 * 0.2**2))",
-    "patch_icpp(1)%alpha_rho(1)": "1.0 + 2.00 * exp(-(x**2 + y**2 + z**2) / (2 * 0.2**2))",
+    "patch_icpp(1)%pres": 1,
+    "patch_icpp(1)%alpha_rho(1)": 1,
     "patch_icpp(1)%alpha(1)": 1,
+
+    "patch_icpp(2)%alter_patch(1)": "T",
+    "patch_icpp(2)%smoothen": "T",
+    "patch_icpp(2)%smooth_patch_id": 1,
+    "patch_icpp(2)%smooth_coeff": 0.25,
+    "patch_icpp(2)%geometry": 8,
+    "patch_icpp(2)%x_centroid": l/3,
+    "patch_icpp(2)%y_centroid": 0,
+    "patch_icpp(2)%z_centroid": 0,
+    "patch_icpp(2)%radius": r0,
+    "patch_icpp(2)%vel(1)": 0.0,
+    "patch_icpp(2)%vel(2)": 0.0,
+    "patch_icpp(2)%vel(3)": 0.0,
+    "patch_icpp(2)%pres": 2.63,
+    "patch_icpp(2)%alpha_rho(1)": 2,
+    "patch_icpp(2)%alpha(1)": 1,
+
+    "patch_icpp(3)%alter_patch(1)": "T",
+    "patch_icpp(3)%smoothen": "T",
+    "patch_icpp(3)%smooth_patch_id": 1,
+    "patch_icpp(3)%smooth_coeff": 0.25,
+    "patch_icpp(3)%geometry": 8,
+    "patch_icpp(3)%x_centroid": -l/3,
+    "patch_icpp(3)%y_centroid": l/3,
+    "patch_icpp(3)%z_centroid": l/3,
+    "patch_icpp(3)%radius": r0,
+    "patch_icpp(3)%vel(1)": 0.0,
+    "patch_icpp(3)%vel(2)": 0.0,
+    "patch_icpp(3)%vel(3)": 0.0,
+    "patch_icpp(3)%pres": 2.63,
+    "patch_icpp(3)%alpha_rho(1)": 2,
+    "patch_icpp(3)%alpha(1)": 1,
+
+    "patch_icpp(4)%alter_patch(1)": "T",
+    "patch_icpp(4)%smoothen": "T",
+    "patch_icpp(4)%smooth_patch_id": 1,
+    "patch_icpp(4)%smooth_coeff": 0.25,
+    "patch_icpp(4)%geometry": 8,
+    "patch_icpp(4)%x_centroid": -l/3,
+    "patch_icpp(4)%y_centroid": -l/3,
+    "patch_icpp(4)%z_centroid": -l/3,
+    "patch_icpp(4)%radius": r0,
+    "patch_icpp(4)%vel(1)": 0.0,
+    "patch_icpp(4)%vel(2)": 0.0,
+    "patch_icpp(4)%vel(3)": 0.0,
+    "patch_icpp(4)%pres": 2.63,
+    "patch_icpp(4)%alpha_rho(1)": 2,
+    "patch_icpp(4)%alpha(1)": 1,
+
 }
 
 print(json.dumps(data))
