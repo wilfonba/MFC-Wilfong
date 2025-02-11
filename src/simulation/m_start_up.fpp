@@ -156,7 +156,7 @@ contains
             rhoref, pref, bubbles_euler, bubble_model, &
             R0ref, chem_params, &
 #:if not MFC_CASE_OPTIMIZATION
-            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, igr_order, alf_igr, &
+            nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, num_fluids, igr_order, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &

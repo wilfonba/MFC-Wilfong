@@ -118,7 +118,6 @@ module m_global_parameters
         logical, parameter :: teno = (${teno}$ /= 0)                !< TENO (Targeted ENO)
         real(wp), parameter :: wenoz_q = ${wenoz_q}$         !< Power constant for WENO-Z
         integer, parameter :: igr_order = ${igr_order}$ !< Order of the IGR reconstructions
-        real(wp), parameter :: alf_factor = ${alf_factor}$ !<alpha factor for IGR
     #:else
         integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
         integer :: weno_order     !< Order of the WENO reconstruction
@@ -130,7 +129,6 @@ module m_global_parameters
         logical :: teno           !< TENO (Targeted ENO)
         real(wp) :: wenoz_q  !< Power constant for WENO-Z
         integer :: igr_order !< Order of the IGR reconstructions
-        real(wp) :: alf_factor  !< alpha factor for IGR
     #:endif
 
     real(wp) :: weno_eps       !< Binding for the WENO nonlinear weights
@@ -155,6 +153,7 @@ module m_global_parameters
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
     logical :: igr           !< Use information geometric regularization
+    real(wp) :: alf_factor  !< alpha factor for IGR
 
     !$acc declare create(chemistry, igr)
 
@@ -173,10 +172,12 @@ module m_global_parameters
 
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(num_dims, weno_polyn, weno_order, weno_num_stencils, &
-        !$acc num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, igr_order, alf_factor)
+        !$acc num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, igr_order)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, &
+    !$acc mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, &
+    !$acc elasticity, low_Mach, viscous, shear_stress, bulk_stress, alf_factor)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -611,8 +612,9 @@ contains
             weno_order = dflt_int
             num_fluids = dflt_int
             igr_order = dflt_int
-            alf_factor = dflt_alf_factor
         #:endif
+
+        alf_factor = dflt_alf_factor
 
         R0_type = dflt_int
 

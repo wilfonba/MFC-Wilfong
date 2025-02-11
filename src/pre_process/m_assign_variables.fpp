@@ -202,84 +202,72 @@ contains
         integer, intent(in) :: j, k, l
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        integer :: i, j, k, l, q
+        integer :: i
         real(wp) :: pres_mag, loc, n_tait, B_tait, p0
         real(wp) :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
-        !p0 = 101325
-        !pres_mag = 1e-1_wp
-        !loc = x_cc(177)
-        !n_tait = fluid_pp(1)%gamma
-        !B_tait = fluid_pp(1)%pi_inf
+        p0 = 101325
+        pres_mag = 1e-1_wp
+        loc = x_cc(177)
+        n_tait = fluid_pp(1)%gamma
+        B_tait = fluid_pp(1)%pi_inf
 
-        !n_tait = 1._wp/n_tait + 1._wp
-        !B_tait = B_tait*(n_tait - 1._wp)/n_tait
+        n_tait = 1._wp/n_tait + 1._wp
+        B_tait = B_tait*(n_tait - 1._wp)/n_tait
 
-        !if (j < 177) then
-            !q_prim_vf(E_idx)%sf(j, k, l) = 0.5_wp*q_prim_vf(E_idx)%sf(j, k, l)
-        !end if
+        if (j < 177) then
+            q_prim_vf(E_idx)%sf(j, k, l) = 0.5_wp*q_prim_vf(E_idx)%sf(j, k, l)
+        end if
 
-        !if (qbmm) then
-            !do i = 1, nb
-                !q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1/3._wp)
-            !end do
-        !end if
-
-        !R3bar = 0._wp
-
-        !if (qbmm) then
-            !do i = 1, nb
-                !R3bar = R3bar + weight(i)*0.5_wp*(q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))**3._wp
-                !R3bar = R3bar + weight(i)*0.5_wp*(q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))**3._wp
-            !end do
-        !else
-            !do i = 1, nb
-                !if (polytropic) then
-                    !R3bar = R3bar + weight(i)*(q_prim_vf(bubxb + (i - 1)*2)%sf(j, k, l))**3._wp
-                !else
-                    !R3bar = R3bar + weight(i)*(q_prim_vf(bubxb + (i - 1)*4)%sf(j, k, l))**3._wp
-                !end if
-            !end do
-        !end if
-
-        !n0 = 3._wp*q_prim_vf(alf_idx)%sf(j, k, l)/(4._wp*pi*R3bar)
-
-        !ratio = ((1._wp + B_tait)/(q_prim_vf(E_idx)%sf(j, k, l) + B_tait))**(1._wp/n_tait)
-
-        !nH = n0/((1._wp - q_prim_vf(alf_idx)%sf(j, k, l))*ratio + (4._wp*pi/3._wp)*n0*R3bar)
-        !vfH = (4._wp*pi/3._wp)*nH*R3bar
-        !rhoH = (1._wp - vfH)/ratio
-        !deno = 1._wp - (1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/rhoH
-
-        !if (deno == 0._wp) then
-            !velH = 0._wp
-        !else
-            !velH = (q_prim_vf(E_idx)%sf(j, k, l) - 1._wp)/(1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/deno
-            !velH = sqrt(velH)
-            !velH = velH*deno
-        !end if
-
-        !do i = cont_idx%beg, cont_idx%end
-            !q_prim_vf(i)%sf(j, k, l) = rhoH
-        !end do
-
-        !do i = mom_idx%beg, mom_idx%end
-            !q_prim_vf(i)%sf(j, k, l) = velH
-        !end do
-
-        !q_prim_vf(alf_idx)%sf(j, k, l) = vfH
-
-        do q = 1, 4
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        do i = 1, sys_size
-
-                        end do
-                    end do
-                end do
+        if (qbmm) then
+            do i = 1, nb
+                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1/3._wp)
             end do
+        end if
+
+        R3bar = 0._wp
+
+        if (qbmm) then
+            do i = 1, nb
+                R3bar = R3bar + weight(i)*0.5_wp*(q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))**3._wp
+                R3bar = R3bar + weight(i)*0.5_wp*(q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))**3._wp
+            end do
+        else
+            do i = 1, nb
+                if (polytropic) then
+                    R3bar = R3bar + weight(i)*(q_prim_vf(bubxb + (i - 1)*2)%sf(j, k, l))**3._wp
+                else
+                    R3bar = R3bar + weight(i)*(q_prim_vf(bubxb + (i - 1)*4)%sf(j, k, l))**3._wp
+                end if
+            end do
+        end if
+
+        n0 = 3._wp*q_prim_vf(alf_idx)%sf(j, k, l)/(4._wp*pi*R3bar)
+
+        ratio = ((1._wp + B_tait)/(q_prim_vf(E_idx)%sf(j, k, l) + B_tait))**(1._wp/n_tait)
+
+        nH = n0/((1._wp - q_prim_vf(alf_idx)%sf(j, k, l))*ratio + (4._wp*pi/3._wp)*n0*R3bar)
+        vfH = (4._wp*pi/3._wp)*nH*R3bar
+        rhoH = (1._wp - vfH)/ratio
+        deno = 1._wp - (1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/rhoH
+
+        if (deno == 0._wp) then
+            velH = 0._wp
+        else
+            velH = (q_prim_vf(E_idx)%sf(j, k, l) - 1._wp)/(1._wp - q_prim_vf(alf_idx)%sf(j, k, l))/deno
+            velH = sqrt(velH)
+            velH = velH*deno
+        end if
+
+        do i = cont_idx%beg, cont_idx%end
+            q_prim_vf(i)%sf(j, k, l) = rhoH
         end do
+
+        do i = mom_idx%beg, mom_idx%end
+            q_prim_vf(i)%sf(j, k, l) = velH
+        end do
+
+        q_prim_vf(alf_idx)%sf(j, k, l) = vfH
 
     end subroutine s_perturb_primitive
 
