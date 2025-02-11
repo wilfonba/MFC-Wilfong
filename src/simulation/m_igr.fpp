@@ -1394,14 +1394,15 @@ contains
                         do j = 0, m
                             !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
                                 !q_prim_vf(i)%sf(j,k,l) * dwz(j,k,l)
-                            rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
-                                q_prim_vf(momxe)%sf(j,k,l) * &
-                                (1/(12._wp*dz(l))) * ( &
-                                8._wp*q_prim_vf(i)%sf(j,k,l+1) - &
-                                8._wp*q_prim_vf(i)%sf(j,k,l-1) + &
-                                q_prim_vf(i)%sf(j,k,l-2) - &
-                                q_prim_vf(i)%sf(j,k,l+1) )
-
+                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
+                                q_prim_vf(i)%sf(j,k,l) * (1/dz(l))*(qR_rs_vf(j,k,l,momxe) - qL_rs_vf(j,k,l,momxe))
+                            !rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
+                                !q_prim_vf(momxe)%sf(j,k,l) * &
+                                !(1/(12._wp*dz(l))) * ( &
+                                !8._wp*q_prim_vf(i)%sf(j,k,l+1) - &
+                                !8._wp*q_prim_vf(i)%sf(j,k,l-1) + &
+                                !q_prim_vf(i)%sf(j,k,l-2) - &
+                                !q_prim_vf(i)%sf(j,k,l+1) )
                         end do
                     end do
                 end do

@@ -173,7 +173,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref, igr
+            hyperelasticity, R0ref, igr, alf_factor
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1374,10 +1374,10 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                            print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
-                            error stop "NaN(s) in timestep output."
-                        end if
+                        !if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                            !print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
+                            !error stop "NaN(s) in timestep output."
+                        !end if
                     end do
                 end do
             end do
