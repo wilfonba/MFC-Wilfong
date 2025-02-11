@@ -50,7 +50,7 @@ data = {
     "alt_soundspeed": "F",
     "mixture_err": "T",
     "mpp_lim": "F",
-    "time_stepper": 1,
+    "time_stepper": 3,
     "weno_order": 5,
     "avg_state": 2,
     "weno_eps": 1e-16,

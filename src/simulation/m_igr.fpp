@@ -139,8 +139,8 @@ contains
             if(idir == 1) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, 0
-                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end + 2
-                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end + 2
+                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                             qL(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j-2, k, l) + &
                                                         27._wp * q_prim(j-1, k, l) + &
                                                         47._wp * q_prim(j, k, l) -   &
@@ -157,8 +157,8 @@ contains
             else if(idir == 2) then
                 !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, 0
-                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end + 2
-                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end + 2
+                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                             qL(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j, k-2, l) + &
                                                         27._wp * q_prim(j, k-1, l) + &
                                                         47._wp * q_prim(j, k, l) -   &
@@ -176,9 +176,9 @@ contains
         else
             if(idir == 1) then
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do l = idwbuff(3)%beg + 2, idwbuff(3)%end + 2
-                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end + 2
-                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end + 2
+                do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                             qL(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j-2, k, l) + &
                                                         27._wp * q_prim(j-1, k, l) + &
                                                         47._wp * q_prim(j, k, l) -   &
@@ -194,9 +194,9 @@ contains
                 end do
             else if(idir == 2) then
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do l = idwbuff(3)%beg + 2, idwbuff(3)%end + 2
-                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end + 2
-                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end + 2
+                do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                             qL(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j, k-2, l) + &
                                                         27._wp * q_prim(j, k-1, l) + &
                                                         47._wp * q_prim(j, k, l) -   &
@@ -212,9 +212,9 @@ contains
                 end do
             else
                 !$acc parallel loop collapse(3) gang vector default(present)
-                do l = idwbuff(3)%beg + 2, idwbuff(3)%end + 2
-                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end + 2
-                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end + 2
+                do l = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                    do k = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do j = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
                             qL(j, k, l) = (1._wp/60._wp) * (-3._wp * q_prim(j, k, l-2) + &
                                                         27._wp * q_prim(j, k, l-1) + &
                                                         47._wp * q_prim(j, k, l) -   &
@@ -1374,7 +1374,7 @@ contains
             end do
         elseif (idir == 3) then
             !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, E_idx
+            do i = 1, sys_size
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
