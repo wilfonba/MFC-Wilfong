@@ -1,0 +1,121 @@
+mfc: Found CMake: /fastscratch/bwilfong3/software/MFC-Wilfong/build/cmake/bin/cmake.
+mfc: OK > (venv) Entered the Python 3.10.16 virtual environment (>= 3.9).
+
+      .=++*:          -+*+=.        | bwilfong3@wingtip-gpu3 [Linux]
+     :+   -*-        ==   =* .      | ------------------------------
+   :*+      ==      ++    .+-       | 
+  :*##-.....:*+   .#%+++=--+=:::.   | --jobs 32
+  -=-++-======#=--**+++==+*++=::-:. | --mpi --gpu --no-debug --no-gcov --no-unified --no-single
+ .:++=----------====+*= ==..:%..... | --targets pre_process, simulation, and post_process
+  .:-=++++===--==+=-+=   +.  :=     | 
+  +#=::::::::=%=. -+:    =+   *:    | ----------------------------------------------------------
+ .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, count, packer) --help
+
+ Acquiring /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_igr/case.py...
+ Acquiring /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_igr/case.py...
+ Build | syscheck, syscheck, pre_process, simulation, and post_process | Case Optimized: /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_igr/case.py
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/0fbcb0ddcd --target syscheck --parallel 32 --config Release
+
+[ 16%] Building Fortran object CMakeFiles/syscheck_lib.dir/modules/syscheck/m_thermochem.f90.o
+[ 33%] Building Fortran object CMakeFiles/syscheck_lib.dir/fypp/syscheck/syscheck.fpp.f90.o
+[ 50%] Built target syscheck_lib
+[100%] Built target syscheck
+
+ $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/0fbcb0ddcd
+
+-- Install configuration: "Release"
+-- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/0fbcb0ddcd/bin/syscheck
+-- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/0fbcb0ddcd/bin/syscheck" to ""
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/4aa13650e3 --target pre_process --parallel 32 --config Release
+
+[  1%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_precision_select.f90.o
+[  2%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_nvtx.f90.o
+[  3%] Building Fortran object CMakeFiles/pre_process_lib.dir/modules/pre_process/m_thermochem.f90.o
+[  4%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_constants.fpp.f90.o
+[  5%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_delay_file_access.f90.o
+[  7%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_eigen_solver.f90.o
+cleaning up after signal(2)...
+cleaning up after signal(2)...
+cleaning up after signal(2)...
+make[3]: *** [CMakeFiles/pre_process_lib.dir/build.make:347: CMakeFiles/pre_process_lib.dir/src/common/m_delay_file_access.f90.o] Error 127
+make[3]: *** [CMakeFiles/pre_process_lib.dir/build.make:607: CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_constants.fpp.f90.o] Error 127
+make[2]: *** [CMakeFiles/Makefile2:111: CMakeFiles/pre_process_lib.dir/all] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:92: CMakeFiles/pre_process.dir/rule] Interrupt
+make: *** [Makefile:170: pre_process] Interrupt
+Terminated
+
+mfc: ERROR > main.py finished with a 143 exit code.
+mfc: (venv) Exiting the Python virtual environment.
+mfc: Found CMake: /fastscratch/bwilfong3/software/MFC-Wilfong/build/cmake/bin/cmake.
+mfc: OK > (venv) Entered the Python 3.10.16 virtual environment (>= 3.9).
+
+      .=++*:          -+*+=.        | bwilfong3@wingtip-gpu3 [Linux]
+     :+   -*-        ==   =* .      | ------------------------------
+   :*+      ==      ++    .+-       | 
+  :*##-.....:*+   .#%+++=--+=:::.   | --jobs 32
+  -=-++-======#=--**+++==+*++=::-:. | --mpi --gpu --no-debug --no-gcov --no-unified --no-single
+ .:++=----------====+*= ==..:%..... | --targets pre_process, simulation, and post_process
+  .:-=++++===--==+=-+=   +.  :=     | 
+  +#=::::::::=%=. -+:    =+   *:    | ----------------------------------------------------------
+ .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, count, packer) --help
+
+ Acquiring /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_igr/case.py...
+ Acquiring /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_igr/case.py...
+ Build | syscheck, syscheck, pre_process, simulation, and post_process | Case Optimized: /fastscratch/bwilfong3/software/MFC-Wilfong/examples/3D_igr/case.py
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/0fbcb0ddcd --target syscheck --parallel 32 --config Release
+
+[ 16%] Building Fortran object CMakeFiles/syscheck_lib.dir/modules/syscheck/m_thermochem.f90.o
+[ 33%] Building Fortran object CMakeFiles/syscheck_lib.dir/fypp/syscheck/syscheck.fpp.f90.o
+[ 50%] Built target syscheck_lib
+[100%] Built target syscheck
+
+ $ cmake --install /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/0fbcb0ddcd
+
+-- Install configuration: "Release"
+-- Installing: /fastscratch/bwilfong3/software/MFC-Wilfong/build/install/0fbcb0ddcd/bin/syscheck
+-- Set runtime path of "/fastscratch/bwilfong3/software/MFC-Wilfong/build/install/0fbcb0ddcd/bin/syscheck" to ""
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+ $ cmake --build /fastscratch/bwilfong3/software/MFC-Wilfong/build/staging/4aa13650e3 --target pre_process --parallel 32 --config Release
+
+[  1%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_precision_select.f90.o
+[  2%] Building Fortran object CMakeFiles/pre_process_lib.dir/modules/pre_process/m_thermochem.f90.o
+[  3%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_nvtx.f90.o
+[  4%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_constants.fpp.f90.o
+[  5%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_delay_file_access.f90.o
+[  7%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_eigen_solver.f90.o
+[  8%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_derived_types.fpp.f90.o
+[  9%] Building Fortran object CMakeFiles/pre_process_lib.dir/src/common/m_helper_basic.f90.o
+[ 10%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_global_parameters.fpp.f90.o
+[ 11%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_mpi_common.fpp.f90.o
+[ 12%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_chemistry.fpp.f90.o
+[ 14%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_finite_differences.fpp.f90.o
+[ 15%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_helper.fpp.f90.o
+[ 16%] Building Fortran object CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_mpi_proxy.fpp.f90.o
+cleaning up after signal(1)...
+cleaning up after signal(1)...
+make[3]: *** [CMakeFiles/pre_process_lib.dir/build.make:646: CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_helper.fpp.f90.o] Error 127
+make[3]: *** [CMakeFiles/pre_process_lib.dir/build.make:529: CMakeFiles/pre_process_lib.dir/fypp/pre_process/m_mpi_proxy.fpp.f90.o] Error 127
+make[2]: *** [CMakeFiles/Makefile2:111: CMakeFiles/pre_process_lib.dir/all] Hangup
+make[1]: *** [CMakeFiles/Makefile2:92: CMakeFiles/pre_process.dir/rule] Hangup
+make: *** [Makefile:170: pre_process] Hangup
+SIGHUP
+CMake Error: Generator: execution of make failed. Make command was: /usr/bin/make -f Makefile -j32 pre_process && 
+ 
+
+Error: Failed to build the pre_process target.
+
+Terminated
+
+mfc: ERROR > main.py finished with a 143 exit code.
+mfc: (venv) Exiting the Python virtual environment.

@@ -1374,10 +1374,10 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
-                            print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
-                            error stop "NaN(s) in timestep output."
-                        end if
+                        !if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                            !print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
+                            !error stop "NaN(s) in timestep output."
+                        !end if
                     end do
                 end do
             end do

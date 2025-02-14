@@ -237,8 +237,8 @@ contains
 
         real(wp) :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
 
-        do q = 1, num_igr_iters
-            !print*, "Iter: ", q
+        do q = 1, 10
+            print*, "Iter: ", q
             !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
             do l = 0, p
                 do k = 0, n
@@ -259,9 +259,9 @@ contains
                         if(p > 0) then
                             jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dz(l)**2._wp) * (rho_lz* jac_old(j,k,l-1) + rho_rz*jac_old(j,k,l+1))
                         end if
-                        !if (k == 200) then
-                            !print*, j, omega, jac(j, k, l) - omega * (1._wp / fd_coeff(j,k,l))*jac(j,k,l) + (1._wp - omega)*jac_old(j, k, l)
-                        !end if
+                        if (k == 200) then
+                            print*, j, jac(j, k, l) - omega * (1._wp / fd_coeff(j,k,l))*jac(j,k,l) + (1._wp - omega)*jac_old(j, k, l)
+                        end if
                         jac(j, k, l) = omega * (1._wp / fd_coeff(j,k,l))*jac(j,k,l) + (1._wp - omega)*jac_old(j, k, l)
                     end do
                 end do
@@ -770,6 +770,7 @@ contains
                                 alpha_R(i) = qR_rs_vf(j, k, l, E_idx + i)
                             end do
 
+
                             !$acc loop seq
                             do i = 1, num_dims
                                 vel_L(i) = qL_rs_vf(j, k+1, l, contxe + i)
@@ -1045,7 +1046,7 @@ contains
         end if
         !$acc update device(alf_igr)
 
-        omega = 1.0_wp
+        omega = 0.5_wp
         !$acc update device(omega)
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -1330,8 +1331,14 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
+                            !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
+                                !q_prim_vf(i)%sf(j,k,l) * dux(j,k,l)
                             rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
-                                q_prim_vf(i)%sf(j,k,l) * dux(j,k,l)
+                                q_prim_vf(i)%sf(j,k,l) * 1/dx(j)*(qR_rs_vf(j,k,l,momxb) - qL_rs_vf(j,k,l,momxb))
+                            !rhs_vf(i)%sf(j,k,l) = &
+                                !q_prim_vf(momxb)%sf(j,k,l) * &
+                                !(1/(2*dx(j))) * (qL_rs_vf(j,k,l,i) + qR_rs_vf(j-1,k,l,i) - &
+                                !qR_rs_vf(j,k,l,i) - qL_rs_vf(j+1,k,l,i))
                         end do
                     end do
                 end do
@@ -1356,8 +1363,14 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
+                            !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
+                                !q_prim_vf(i)%sf(j,k,l) * dvy(j,k,l)
                             rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
-                                q_prim_vf(i)%sf(j,k,l) * dvy(j,k,l)
+                                q_prim_vf(i)%sf(j,k,l) * (1/dy(k))*(qR_rs_vf(j,k,l,momxb+1) - qL_rs_vf(j,k,l,momxb+1))
+                            !rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) + &
+                                !q_prim_vf(momxb+1)%sf(j,k,l) * &
+                                !(1/(2*dy(k))) * (qL_rs_vf(j,k,l,i) + qR_rs_vf(j,k-1,l,i) - &
+                                !qR_rs_vf(j,k,l,i) - qL_rs_vf(j,k+1,l,i))
                         end do
                     end do
                 end do
@@ -1382,8 +1395,17 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
+                            !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
+                                !q_prim_vf(i)%sf(j,k,l) * dwz(j,k,l)
                             rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
-                                q_prim_vf(i)%sf(j,k,l) * dwz(j,k,l)
+                                q_prim_vf(i)%sf(j,k,l) * (1/dz(l))*(qR_rs_vf(j,k,l,momxe) - qL_rs_vf(j,k,l,momxe))
+                            !rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
+                                !q_prim_vf(momxe)%sf(j,k,l) * &
+                                !(1/(12._wp*dz(l))) * ( &
+                                !8._wp*q_prim_vf(i)%sf(j,k,l+1) - &
+                                !8._wp*q_prim_vf(i)%sf(j,k,l-1) + &
+                                !q_prim_vf(i)%sf(j,k,l-2) - &
+                                !q_prim_vf(i)%sf(j,k,l+1) )
                         end do
                     end do
                 end do

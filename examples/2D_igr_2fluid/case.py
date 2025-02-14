@@ -93,7 +93,7 @@ data = {
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
     "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.1,
+    "patch_icpp(2)%smooth_coeff": 0.5,
     "patch_icpp(2)%geometry": 2,
     "patch_icpp(2)%x_centroid": 0,
     "patch_icpp(2)%y_centroid": 0,
