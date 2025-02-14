@@ -39,6 +39,7 @@ module m_global_parameters
     integer :: m
     integer :: n
     integer :: p
+    integer :: buff_size
 
     integer(8) :: nGlobal !< Global number of cells in the domain
 
@@ -271,6 +272,7 @@ contains
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
+        buff_size = 1
 
         cyl_coord = .false.
 
