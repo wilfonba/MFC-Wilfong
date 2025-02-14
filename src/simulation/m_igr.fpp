@@ -756,8 +756,8 @@ contains
             if(p == 0) then
                 !$acc parallel loop collapse(3) gang vector default(present) private(alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
                 do l = 0, p
-                    do k = -1, m+1
-                        do j = -1, n+1
+                    do k = -1, n+1
+                        do j = -1, m+1
 
                             !$acc loop seq
                             do i = 1, num_fluids
