@@ -21,7 +21,7 @@ Ny = Nx
 
 eps = 1e-6
 
-mydt = 1e-6
+mydt = 2e-6
 
 # Configuration case dictionary
 data = {
@@ -43,8 +43,8 @@ data = {
     # "n_start": 0,
     "dt": mydt,
     "t_step_start": 0,
-    "t_step_stop": 2000,
-    "t_step_save": 5,
+    "t_step_stop": 5000,
+    "t_step_save": 50,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -90,7 +90,7 @@ data = {
     "patch_icpp(1)%length_y": 2,
     "patch_icpp(1)%length_z": 2,
     "patch_icpp(1)%vel(1)": 100.0,
-    "patch_icpp(1)%vel(2)": 0.0,
+    "patch_icpp(1)%vel(2)": 100.0,
     "patch_icpp(1)%vel(3)": 0.0,
     "patch_icpp(1)%pres": 101325,
     "patch_icpp(1)%alpha_rho(1)": eps,
@@ -102,13 +102,13 @@ data = {
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
     "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.25,
-    "patch_icpp(2)%x_centroid": 0,
-    "patch_icpp(2)%y_centroid": 0,
+    "patch_icpp(2)%smooth_coeff": 0.5,
+    "patch_icpp(2)%x_centroid": -0.5,
+    "patch_icpp(2)%y_centroid": -0.5,
     "patch_icpp(2)%z_centroid": 0,
     "patch_icpp(2)%radius": r0,
     "patch_icpp(2)%vel(1)": 100.0,
-    "patch_icpp(2)%vel(2)": 0.0,
+    "patch_icpp(2)%vel(2)": 100.0,
     "patch_icpp(2)%vel(3)": 0.0,
     "patch_icpp(2)%pres": 101325,
     "patch_icpp(2)%alpha_rho(1)": 1 - eps,

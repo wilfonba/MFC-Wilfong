@@ -597,7 +597,9 @@ contains
                             pres_R = qR_rs_vf(j, k, l, E_idx)
 
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, &
+                                                     cfl, j, k, l, idir, alpha_L, alpha_rho_L, &
+                                                     alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
 
                             do i = 1, num_fluids
                                 flux_vf(advxb+i-1)%sf(j,k,l) = &
@@ -605,7 +607,7 @@ contains
                                     qL_rs_vf(j+1,k,l,momxb)) + &
                                     0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                     qR_rs_vf(j,k,l,momxb)) + &
-                                    05_wp*cfl * (qR_rs_vf(j, k, l, advxb+i-1) - qL_rs_vf(j+1, k, l, advxb+i-1))
+                                    0.5_wp*cfl * (qR_rs_vf(j, k, l, advxb+i-1) - qL_rs_vf(j+1, k, l, advxb+i-1))
                                 flux_vf(i)%sf(j,k,l) = &
                                     0.5_wp * (qL_rs_vf(j+1,k,l,i) * &
                                     qL_rs_vf(j+1,k,l, momxb)) + &
@@ -682,7 +684,9 @@ contains
                             pres_R = qR_rs_vf(j, k, l, E_idx)
 
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, &
+                                                     cfl, j, k, l, idir, alpha_L, alpha_rho_L, &
+                                                     alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -780,7 +784,9 @@ contains
                             pres_R = qR_rs_vf(j, k, l, E_idx)
 
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, &
+                                                     cfl, j, k, l, idir, alpha_L, alpha_rho_L, &
+                                                     alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
 
                             do i = 1, num_fluids
                                 flux_vf(advxb+i-1)%sf(j,k,l) = &
@@ -863,7 +869,9 @@ contains
                             pres_R = qR_rs_vf(j, k, l, E_idx)
 
                             call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
+                                                     pi_inf_L, pi_inf_R, Re_L, Re_r, &
+                                                     cfl, j, k, l, idir, alpha_L, alpha_rho_L, &
+                                                     alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
 
                             do i = 1, num_fluids
                                 flux_vf(advxb+i-1)%sf(j,k,l) = &
@@ -958,7 +966,9 @@ contains
                         pres_R = qR_rs_vf(j, k, l, E_idx)
 
                         call s_compute_mixture(rho_L, rho_R, gamma_L, gamma_R, &
-                                             pi_inf_L, pi_inf_R, Re_L, Re_r, cfl, j, k, l, idir, alpha_L, alpha_rho_L, alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
+                                                pi_inf_L, pi_inf_R, Re_L, Re_r, &
+                                                cfl, j, k, l, idir, alpha_L, alpha_rho_L, &
+                                                alpha_R, alpha_rho_R, vel_L, vel_R, pres_L, pres_R)
 
 
                         do i = 1, num_fluids
@@ -1052,7 +1062,7 @@ contains
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
-                    rho_igr(j,k,l) = 0d0
+                    rho_igr(j,k,l) = 0._wp
                     do i = 1, num_fluids
                         rho_igr(j,k,l) = rho_igr(j,k,l) + q_prim_vf(contxb + i - 1)%sf(j,k,l)
                     end do

@@ -2,7 +2,7 @@
 import math
 import json
 
-N =299
+N =199
 
 Re = 1600
 L = 1
@@ -40,16 +40,11 @@ print(
             "n": N,
             "p": N,
             "cyl_coord": "F",
-            # "dt": dt,
-            # "t_step_start": 0,
-            # "t_step_stop": Nt,
-            # "t_step_save": int(Nt / 100),
-            "cfl_adap_dt": "T",
-            "cfl_target": 0.5,
-            "t_stop": 20*tC,
-            "t_save": tC,
-            "n_start": 0,
-            # Simulation Algorithm Parameters
+            "dt": dt,
+            "t_step_start": 0,
+            "t_step_stop": Nt,
+            "t_step_save": int(Nt / 100),
+           # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
             "alt_soundspeed": "F",
