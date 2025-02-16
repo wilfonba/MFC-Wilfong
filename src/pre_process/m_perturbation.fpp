@@ -30,12 +30,6 @@ module m_perturbation
 contains
 
     subroutine s_initialize_perturbation_module()
-
-        !TODO add bc_x[y,z]%beg, bc_x[y,z]%end to src/pre_process/m_global_parameters
-        !TODO add bc_x[y,z] and bc_x[y,z] to the input namelist in src/pre_process/m_start_up
-        !     Look at simulations m_start_up if this doesn't work right away
-        !TODO add boundary conditions to the pre_process case_ditc in toolchain/mfc/run/case_dicts.py
-        !     See how this is done for simulation and replicate
         bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
 
         if (mixlayer_perturb) then
@@ -615,25 +609,17 @@ contains
 
     end subroutine s_generate_wave
 
-    subroutine s_igr_smooth(q_prim_vf)
+    subroutine s_elliptic_smoothing(q_prim_vf)
 
-        type(scalar_field), dimension(s:sys_size) :: q_prim_vf
+        type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(wp), dimension(0:m, 0:n, 0:p, 1:sys_size) :: q_prim_temp
-        integer :: i, j, k, l
+        integer :: i, j, k, l, q
 
-        !TODO add igr_smooth_iters as case parameter
-        !TODO idwbuff(1)%beg = idwbuff(2)%beg = idwbuff(3)%beg = 0
-        !TODO idwbuff(1)%end = m
-        !TODO idwbuff(2)%end = n
-        !TODO idwbuff(3)%end = p
-        do q = 1, igr_smooth_iters
-
+        do q = 1, elliptic_smoothing_ic
             if(bcxb >= -12) then
                 if(bcxb >= 0) then
-                    !TODO replace jac with q_prim_vf in all the MPI calls
-                    call s_mpi_sendrecv_variables_buffers(jac, 1, -1)
+                    call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1)
                 else if (bcxb == -1) then
-                    !TODO Repeat this loop structure add the loop over sys size
                     !$acc parallel loop gang vector collapse(3) default(present)
                     do l = 0, p
                         do k = 0, n
@@ -649,7 +635,9 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 1, buff_size
-                                jac(-j, k, l) = jac(j - 1,k,l)
+                                do i = 1, sys_size 
+                                    q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1,k,l)
+                                end do
                             end do
                         end do
                     end do
@@ -658,7 +646,9 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 1, buff_size
-                                jac(-j, k, l) = jac(0,k,l)
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0,k,l)
+                                end do
                             end do
                         end do
                     end do
@@ -667,13 +657,16 @@ contains
 
             if(bcxe >= -12) then
                 if(bcxe >= 0) then
-                    call s_mpi_sendrecv_variables_buffers(jac, 1, 1)
+                    call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1)
                 else if (bcxe == -1) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 0, n
                             do j = 1, buff_size
-                                jac(m+j, k, l) = jac(j-1,k,l)
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(j-1,k,l)
+                            
+                                end do
                             end do
                         end do
                     end do
@@ -682,8 +675,11 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 1, buff_size
-                                jac(m+j, k, l) = jac(m - (j - 1),k,l)
-                            end do
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(m - (j - 1),k,l)
+                            
+                                end do
+                            end do 
                         end do
                     end do
                 else
@@ -691,7 +687,10 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 1, buff_size
-                                jac(m+j, k, l) = jac(m,k,l)
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(m,k,l)
+                            
+                                end do
                             end do
                         end do
                     end do
@@ -700,13 +699,15 @@ contains
 
             if(bcyb >= -12) then
                 if(bcyb >= 0) then
-                    call s_mpi_sendrecv_variables_buffers(jac, 2, -1)
+                    call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1)
                 else if (bcyb == -1) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                jac(j,-k,l) = jac(j,n-k+1,l)
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,-k,l) = q_prim_vf(i)%sf(j,n-k+1,l)
+                                end do
                             end do
                         end do
                     end do
@@ -714,8 +715,10 @@ contains
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                jac(j,-k,l) = jac(j,k-1,l)
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,-k,l) = q_prim_vf(i)%sf(j,k-1,l)
+                                end do
                             end do
                         end do
                     end do
@@ -723,8 +726,10 @@ contains
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                jac(j,-k,l) = jac(j,0,l)
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,-k,l) = q_prim_vf(i)%sf(j,0,l)
+                                end do
                             end do
                         end do
                     end do
@@ -733,13 +738,15 @@ contains
 
             if(bcye >= -12) then
                 if(bcye >= 0) then
-                    call s_mpi_sendrecv_variables_buffers(jac, 2, 1)
+                    call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1)
                 else if (bcye == -1) then
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                jac(j,n+k,l) = jac(j,k-1,l)
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,n+k,l) = q_prim_vf(i)%sf(j,k-1,l)
+                                end do
                             end do
                         end do
                     end do
@@ -747,17 +754,21 @@ contains
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                jac(j,n+k,l) = jac(j,n - (k-1),l)
-                            end do
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,n+k,l) = q_prim_vf(i)%sf(j,n - (k-1),l)
+                                end do
+                            end do 
                         end do
                     end do
                 else
                     !$acc parallel loop collapse(3) gang vector default(present)
                     do l = 0, p
                         do k = 1, buff_size
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                jac(j,n+k,l) = jac(j,n,l)
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,n+k,l) = q_prim_vf(i)%sf(j,n,l)
+                                end do
                             end do
                         end do
                     end do
@@ -768,31 +779,37 @@ contains
             if(p > 0) then
                 if(bczb >= -12) then
                     if(bczb >= 0) then
-                        call s_mpi_sendrecv_variables_buffers(jac, 3, -1)
+                        call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1)
                     else if (bczb == -1) then
                         !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 1, buff_size
-                            do k = idwbuff(2)%beg, idwbuff(2)%end
-                                do j = idwbuff(1)%beg, idwbuff(1)%end
-                                    jac(j,k,-l) = jac(j,k,p-l+1)
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,-l) = q_prim_vf(i)%sf(j,k,p-l+1)
+                                    end do
                                 end do
                             end do
                         end do
                     else if (bczb == -2) then
                         !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 1, buff_size
-                            do k = idwbuff(2)%beg, idwbuff(2)%end
-                                do j = idwbuff(1)%beg, idwbuff(1)%end
-                                    jac(j,k,-l) = jac(j,k,l-1)
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,-l) = q_prim_vf(i)%sf(j,k,l-1)
+                                    end do
                                 end do
                             end do
                         end do
                     else
                         !$acc parallel loop collapse(3) gang vector default(present)
                         do l = 1, buff_size
-                            do k = idwbuff(2)%beg, idwbuff(2)%end
-                                do j = idwbuff(1)%beg, idwbuff(1)%end
-                                    jac(j,k,-l) = jac(j,k,0)
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,-l) = q_prim_vf(i)%sf(j,k,0)
+                                    end do
                                 end do
                             end do
                         end do
@@ -802,31 +819,37 @@ contains
 
                 if(bcze >= -12) then
                     if(bcze >= 0) then
-                        call s_mpi_sendrecv_variables_buffers(jac, 3, 1)
+                        call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1)
                     else if (bcze == -1) then
                         !$acc parallel loop gang vector collapse(3) default(present)
                         do l = 1, buff_size
-                            do k = idwbuff(2)%beg, idwbuff(2)%end
-                                do j = idwbuff(1)%beg, idwbuff(1)%end
-                                    jac(j,k,p+l) = jac(j,k,l-1)
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,k,p+l) = q_prim_vf(i)%sf(j,k,l-1)
+                                    end do
                                 end do
                             end do
                         end do
                     else if (bcze == -2) then
                         !$acc parallel loop gang vector collapse(3) default(present)
                         do l = 1, buff_size
-                            do k = idwbuff(2)%beg, idwbuff(2)%end
-                                do j = idwbuff(1)%beg, idwbuff(1)%end
-                                    jac(j,k,p+l) = jac(j,k,p - (l-1))
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,p+l) = q_prim_vf(i)%sf(j,k,p - (l-1))
+                                    end do
                                 end do
                             end do
                         end do
                     else
                         !$acc parallel loop gang vector collapse(3) default(present)
                         do l = 1, buff_size
-                            do k = idwbuff(2)%beg, idwbuff(2)%end
-                                do j = idwbuff(1)%beg, idwbuff(1)%end
-                                    jac(j,k,p+l) = jac(j,k,p)
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,p+l) = q_prim_vf(i)%sf(j,k,p)
+                                    end do
                                 end do
                             end do
                         end do
@@ -853,11 +876,11 @@ contains
                     do k = 0, n
                         do j = 0, m
                             do i = 1, sys_size
-                                q_prim_temp(j,k,l,i) = (1_wp/6_wp) * &
-                                    (q_prim_vf(i)%sf(j+1,k,l) + q_prim_vf(i)%sf(j-1,k,l) + &
-                                    q_prim_vf(i)%sf(j,k+1,l) + q_prim_vf(i)%sf(j,k-1,l) &
-                                    q_prim_vf(i)%sf(j,k,l+1) + q_prim_vf(i)%sf(j,k,l-1))
-                            end do
+                                    q_prim_temp(j,k,l,i) = (1_wp/6_wp) * &
+                                        (q_prim_vf(i)%sf(j+1,k,l) + q_prim_vf(i)%sf(j-1,k,l) + &
+                                        q_prim_vf(i)%sf(j,k+1,l) + q_prim_vf(i)%sf(j,k-1,l) + &
+                                        q_prim_vf(i)%sf(j,k,l+1) + q_prim_vf(i)%sf(j,k,l-1))
+                                end do
                         end do
                     end do
                 end do
@@ -868,7 +891,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         do i = 1, sys_size
-                            q_prim_vf(i)%sf(j,k,l) = q_prim_temp(j,k,k.i)
+                            q_prim_vf(i)%sf(j,k,l) = q_prim_temp(j,k,l,i)
                         end do
                     end do
                 end do
@@ -876,6 +899,6 @@ contains
 
         end do
 
-    end subroutine s_igr_smooth
+    end subroutine s_elliptic_smoothing
 
 end module m_perturbation

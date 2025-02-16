@@ -13,6 +13,8 @@ module m_mpi_proxy
     use mpi                     !< Message passing interface (MPI) module
 #endif
 
+    use m_helper
+
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
@@ -21,8 +23,18 @@ module m_mpi_proxy
 
     implicit none
 
-    integer, private :: err_code, ierr !<
+    integer, private :: err_code, ierr, v_size !<
     !! Generic flags used to identify and report MPI errors
+
+    real(wp), private, allocatable, dimension(:), target :: q_prims_buff_send !<
+    !! This variable is utilized to pack and send the buffer of the cell-average
+    !! primitive variables, for a single computational domain boundary at the
+    !! time, to the relevant neighboring processor.
+
+    real(wp), private, allocatable, dimension(:), target :: q_prims_buff_recv !<
+    !! q_prims_buff_recv is utilized to receive and unpack the buffer of the cell-
+    !! average primitive variables, for a single computational domain boundary
+    !! at the time, from the relevant neighboring processor.
 
 contains
 
@@ -544,13 +556,11 @@ contains
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
-    !TODO Replace q_cons_vf with q_prim_vf
-    !TODO look at s_mpi_sendrecv_variables_buffers in src/simulation/m_mpi_proxy and add all the buff_size variables I replaced with 1 back
-    subroutine s_mpi_sendrecv_variables_buffers(q_cons_vf, &
+    subroutine s_mpi_sendrecv_variables_buffers(q_prim_vf, &
                                                 mpi_dir, &
                                                 pbc_loc)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
@@ -569,13 +579,10 @@ contains
 
 #ifdef MFC_MPI
 
-        call nvtxStartRange("RHS-COMM-PACKBUF")
-        !$acc update device(v_size)
-
         buffer_counts = (/ &
-                1*sys_size*(n + 1)*(p + 1), &
-                1*sys_size*(m + 2*1 + 1)*(p + 1), &
-                1*v_size*(m + 2*1 + 1)*(n + 2*1 + 1) &
+                buff_size*sys_size*(n + 1)*(p + 1), &
+                buff_size*sys_size*(m + 2*buff_size + 1)*(p + 1), &
+                buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
                 /)
 
         buffer_count = buffer_counts(mpi_dir)
@@ -600,12 +607,12 @@ contains
 
         pack_offset = 0
         if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
-            pack_offset = grid_dims(mpi_dir) - 1 + 1
+            pack_offset = grid_dims(mpi_dir) - buff_size + 1
         end if
 
         unpack_offset = 0
         if (pbc_loc == 1) then
-            unpack_offset = grid_dims(mpi_dir) + 1 + 1
+            unpack_offset = grid_dims(mpi_dir) + buff_size + 1
         end if
 
         ! Pack Buffer to Send
@@ -615,10 +622,10 @@ contains
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do l = 0, p
                         do k = 0, n
-                            do j = 0, 1 - 1
+                            do j = 0, buff_size - 1
                                 do i = 1, sys_size
-                                    r = (i - 1) + v_size*(j + 1*(k + (n + 1)*l))
-                                    q_cons_buff_send(r) = q_cons_vf(i)%sf(j + pack_offset, k, l)
+                                    r = (i - 1) + v_size*(j + buff_size*(k + (n + 1)*l))
+                                    q_prims_buff_send(r) = q_prim_vf(i)%sf(j + pack_offset, k, l)
                                 end do
                             end do
                         end do
@@ -627,12 +634,12 @@ contains
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
                         do l = 0, p
-                            do k = 0, 1 - 1
+                            do k = 0, buff_size - 1
                                 do j = -1, m + 1
                                     r = (i - 1) + v_size* &
                                         ((j + 1) + (m + 2*1 + 1)* &
                                          (k + 1*l))
-                                    q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k + pack_offset, l)
+                                    q_prims_buff_send(r) = q_prim_vf(i)%sf(j, k + pack_offset, l)
                                 end do
                             end do
                         end do
@@ -640,13 +647,13 @@ contains
                 #:else
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
-                        do l = 0, 1 - 1
+                        do l = 0, buff_size - 1
                             do k = -1, n + 1
                                 do j = -1, m + 1
                                     r = (i - 1) + v_size* &
                                         ((j + 1) + (m + 2*1 + 1)* &
                                          ((k + 1) + (n + 2*1 + 1)*l))
-                                    q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k, l + pack_offset)
+                                    q_prims_buff_send(r) = q_prim_vf(i)%sf(j, k, l + pack_offset)
                                 end do
                             end do
                         end do
@@ -654,29 +661,26 @@ contains
                 #:endif
             end if
         #:endfor
-        call nvtxEndRange ! Packbuf
 
         call MPI_SENDRECV( &
             p_send, buffer_count, mpi_p, dst_proc, send_tag, &
             p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-        call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
 
         ! Unpack Received Buffer
-        call nvtxStartRange("RHS-COMM-UNPACKBUF")
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do l = 0, p
                         do k = 0, n
-                            do j = -1, -1
+                            do j = -buff_size, -1
                                 do i = 1, sys_size
                                     r = (i - 1) + v_size* &
                                         (j + 1*((k + 1) + (n + 1)*l))
-                                    q_cons_vf(i)%sf(j + unpack_offset, k, l) = q_cons_buff_recv(r)
+                                        q_prim_vf(i)%sf(j + unpack_offset, k, l) = q_prims_buff_recv(r)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
                                         error stop "NaN(s) in recv"
                                     end if
@@ -690,14 +694,14 @@ contains
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
                         do l = 0, p
-                            do k = -1, -1
+                            do k = -buff_size, -1
                                 do j = -1, m + 1
                                     r = (i - 1) + v_size* &
-                                        ((j + 1) + (m + 2*1 + 1)* &
+                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + 1) + 1*l))
-                                    q_cons_vf(i)%sf(j, k + unpack_offset, l) = q_cons_buff_recv(r)
+                                         q_prim_vf(i)%sf(j, k + unpack_offset, l) = q_prims_buff_recv(r)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
                                         error stop "NaN(s) in recv"
                                     end if
@@ -710,16 +714,16 @@ contains
                     ! Unpacking buffer from bc_z%beg
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
-                        do l = -1, -1
+                        do l = -buff_size, -1
                             do k = -1, n + 1
                                 do j = -1, m + 1
                                     r = (i - 1) + v_size* &
                                         ((j + 1) + (m + 2*1 + 1)* &
                                          ((k + 1) + (n + 2*1 + 1)* &
                                           (l + 1)))
-                                    q_cons_vf(i)%sf(j, k, l + unpack_offset) = q_cons_buff_recv(r)
+                                          q_prim_vf(i)%sf(j, k, l + unpack_offset) = q_prims_buff_recv(r)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
                                         error stop "NaN(s) in recv"
                                     end if
@@ -731,7 +735,6 @@ contains
                 #:endif
             end if
         #:endfor
-        call nvtxEndRange
 
 #endif
 

@@ -145,6 +145,12 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 
+    logical :: igr           !< Use information geometric regularization
+    integer :: alf_igr
+    logical :: elliptic_smoothing !< Enables Ellipitcal Smoothing in Patches
+    integer :: elliptic_smoothing_ic !< Iterations of Elliptic Smoothing done
+
+
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
@@ -490,6 +496,11 @@ contains
 
         ! Lagrangian solver
         rkck_adap_dt = .false.
+
+        igr = .false.
+        alf_igr = 0
+        elliptic_smoothing = .false.
+        elliptic_smoothing_ic = 1
 
     end subroutine s_assign_default_values_to_user_inputs
 

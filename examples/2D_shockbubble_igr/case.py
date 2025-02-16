@@ -57,7 +57,8 @@ print(
             "avg_state": 2,
             "igr": "T",
             "alf_igr": 10,
-            # smooth iteration variable, I forget the name
+            "elliptic_smoothing": "T",
+            "elliptic_smoothing_ic": 1,
             "bc_x%beg": -3,
             "bc_x%end": -3,
             "bc_y%beg": -3,

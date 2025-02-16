@@ -338,7 +338,7 @@ contains
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
         if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
 
-        if (igr) call s_igr_smooth(q_prim_vf)
+        if (igr .and. elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf)
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
