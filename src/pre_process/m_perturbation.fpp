@@ -15,6 +15,8 @@ module m_perturbation
     use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
     ! complex general matrix
 
+    use m_helper
+
     use ieee_arithmetic
 
     implicit none
@@ -25,9 +27,12 @@ module m_perturbation
     integer :: mixlayer_bc_fd ! Order of finite difference applied at the boundaries of mixing layer
     integer :: n_bc_skip ! Number of points skipped in the linear stability analysis due to the boundary condition
 
+    real(wp) :: bcxb, bcxe, bcyb, bcye, bczb, bcze
+
 contains
 
     subroutine s_initialize_perturbation_module()
+        bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
 
         if (mixlayer_perturb) then
             mixlayer_bc_fd = 2
@@ -311,23 +316,23 @@ contains
         bi = 0._wp
         ci = 0._wp
         do j = 0, nbp - 1
-            ii = mixlayer_var(1); jj = mixlayer_var(1); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j); 
-            ii = mixlayer_var(1); jj = mixlayer_var(2); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*rho_mean; 
-            ii = mixlayer_var(1); jj = mixlayer_var(3); bi((ii - 1)*nbp + j, (jj - 1)*nbp + j) = -drho_mean(j); 
-            ii = mixlayer_var(1); jj = mixlayer_var(4); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = beta*rho_mean; 
-            ii = mixlayer_var(2); jj = mixlayer_var(2); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j); 
-            ii = mixlayer_var(2); jj = mixlayer_var(3); bi((ii - 1)*nbp + j, (jj - 1)*nbp + j) = -du_mean(j); 
-            ii = mixlayer_var(2); jj = mixlayer_var(5); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha/rho_mean; 
-            ii = mixlayer_var(3); jj = mixlayer_var(3); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j); 
-            ii = mixlayer_var(4); jj = mixlayer_var(4); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j); 
-            ii = mixlayer_var(4); jj = mixlayer_var(5); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = beta/rho_mean; 
-            ii = mixlayer_var(5); jj = mixlayer_var(2); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = gam*(p_mean + pi_inf)*alpha; 
-            ii = mixlayer_var(5); jj = mixlayer_var(4); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = gam*(p_mean + pi_inf)*beta; 
-            ii = mixlayer_var(5); jj = mixlayer_var(5); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j); 
+            ii = mixlayer_var(1); jj = mixlayer_var(1); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j);
+            ii = mixlayer_var(1); jj = mixlayer_var(2); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*rho_mean;
+            ii = mixlayer_var(1); jj = mixlayer_var(3); bi((ii - 1)*nbp + j, (jj - 1)*nbp + j) = -drho_mean(j);
+            ii = mixlayer_var(1); jj = mixlayer_var(4); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = beta*rho_mean;
+            ii = mixlayer_var(2); jj = mixlayer_var(2); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j);
+            ii = mixlayer_var(2); jj = mixlayer_var(3); bi((ii - 1)*nbp + j, (jj - 1)*nbp + j) = -du_mean(j);
+            ii = mixlayer_var(2); jj = mixlayer_var(5); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha/rho_mean;
+            ii = mixlayer_var(3); jj = mixlayer_var(3); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j);
+            ii = mixlayer_var(4); jj = mixlayer_var(4); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j);
+            ii = mixlayer_var(4); jj = mixlayer_var(5); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = beta/rho_mean;
+            ii = mixlayer_var(5); jj = mixlayer_var(2); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = gam*(p_mean + pi_inf)*alpha;
+            ii = mixlayer_var(5); jj = mixlayer_var(4); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = gam*(p_mean + pi_inf)*beta;
+            ii = mixlayer_var(5); jj = mixlayer_var(5); br((ii - 1)*nbp + j, (jj - 1)*nbp + j) = alpha*u_mean(j);
             do k = 0, n + 1
-                ii = mixlayer_var(1); jj = mixlayer_var(3); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -rho_mean*d(j, k); 
-                ii = mixlayer_var(3); jj = mixlayer_var(5); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -d(j, k)/rho_mean; 
-                ii = mixlayer_var(5); jj = mixlayer_var(3); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -gam*(p_mean + pi_inf)*d(j, k); 
+                ii = mixlayer_var(1); jj = mixlayer_var(3); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -rho_mean*d(j, k);
+                ii = mixlayer_var(3); jj = mixlayer_var(5); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -d(j, k)/rho_mean;
+                ii = mixlayer_var(5); jj = mixlayer_var(3); ci((ii - 1)*nbp + j, (jj - 1)*nbp + k) = -gam*(p_mean + pi_inf)*d(j, k);
             end do
         end do
         ar = br
@@ -576,7 +581,7 @@ contains
         xbi(mixlayer_var(4)*nbp + nbp - 1) = xbi(mixlayer_var(4)*nbp + n) - xbi(mixlayer_var(2)*nbp + n)*rho_mean/mach
 
         ! Compute average to get cell-centered values
-        xcr = 0._wp
+        xcr = 1._wp
         xci = 0._wp
         do i = 1, mixlayer_nvar
             do k = 0, n
@@ -605,5 +610,294 @@ contains
         end do
 
     end subroutine s_generate_wave
+
+    subroutine s_elliptic_smoothing(q_prim_vf)
+
+        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        real(wp), dimension(0:m, 0:n, 0:p, 1:sys_size) :: q_prim_temp
+        integer :: i, j, k, l, q
+
+        do q = 1, elliptic_smoothing_iters
+            if(bcxb >= -12) then
+                if(bcxb >= 0) then
+                    call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1)
+                else if (bcxb == -1) then
+                    !$acc parallel loop gang vector collapse(3) default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(m-j+1,k,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                else if (bcxb == -2) then
+                    !$acc parallel loop gang vector collapse(3) default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1,k,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                else
+                    !$acc parallel loop gang vector collapse(3) default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0,k,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+            end if
+
+            if(bcxe >= -12) then
+                if(bcxe >= 0) then
+                    call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1)
+                else if (bcxe == -1) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(j-1,k,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                else if (bcxe == -2) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(m - (j - 1),k,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                else
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(m,k,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+            end if
+
+            if(bcyb >= -12) then
+                if(bcyb >= 0) then
+                    call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1)
+                else if (bcyb == -1) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,-k,l) = q_prim_vf(i)%sf(j,n-k+1,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                else if (bcyb == -2) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,-k,l) = q_prim_vf(i)%sf(j,k-1,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                else
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,-k,l) = q_prim_vf(i)%sf(j,0,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+            end if
+
+            if(bcye >= -12) then
+                if(bcye >= 0) then
+                    call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1)
+                else if (bcye == -1) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,n+k,l) = q_prim_vf(i)%sf(j,k-1,l)
+                                end do
+                            end do
+                        end do
+                    end do
+                else if (bcye == -2) then
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,n+k,l) = q_prim_vf(i)%sf(j,n - (k-1),l)
+                                end do
+                            end do
+                        end do
+                    end do
+                else
+                    !$acc parallel loop collapse(3) gang vector default(present)
+                    do l = 0, p
+                        do k = 1, buff_size
+                            do j = 0, m
+                                do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,n+k,l) = q_prim_vf(i)%sf(j,n,l)
+                                end do
+                            end do
+                        end do
+                    end do
+
+                end if
+            end if
+
+            if(p > 0) then
+                if(bczb >= -12) then
+                    if(bczb >= 0) then
+                        call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1)
+                    else if (bczb == -1) then
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 1, buff_size
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,-l) = q_prim_vf(i)%sf(j,k,p-l+1)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    else if (bczb == -2) then
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 1, buff_size
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,-l) = q_prim_vf(i)%sf(j,k,l-1)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    else
+                        !$acc parallel loop collapse(3) gang vector default(present)
+                        do l = 1, buff_size
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,-l) = q_prim_vf(i)%sf(j,k,0)
+                                    end do
+                                end do
+                            end do
+                        end do
+
+                    end if
+                end if
+
+                if(bcze >= -12) then
+                    if(bcze >= 0) then
+                        call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1)
+                    else if (bcze == -1) then
+                        !$acc parallel loop gang vector collapse(3) default(present)
+                        do l = 1, buff_size
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                    q_prim_vf(i)%sf(j,k,p+l) = q_prim_vf(i)%sf(j,k,l-1)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    else if (bcze == -2) then
+                        !$acc parallel loop gang vector collapse(3) default(present)
+                        do l = 1, buff_size
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,p+l) = q_prim_vf(i)%sf(j,k,p - (l-1))
+                                    end do
+                                end do
+                            end do
+                        end do
+                    else
+                        !$acc parallel loop gang vector collapse(3) default(present)
+                        do l = 1, buff_size
+                            do k = 0, n
+                                do j = 0, m
+                                    do i = 1, sys_size
+                                        q_prim_vf(i)%sf(j,k,p+l) = q_prim_vf(i)%sf(j,k,p)
+                                    end do
+                                end do
+                            end do
+                        end do
+
+                    end if
+                end if
+            end if
+
+            ! Perform smoothing and store in temp array
+            if (p == 0) then
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            do i = 1, sys_size
+                                q_prim_temp(j,k,l,i) = (1._wp/4._wp) * &
+                                    (q_prim_vf(i)%sf(j+1,k,l) + q_prim_vf(i)%sf(j-1,k,l) + &
+                                    q_prim_vf(i)%sf(j,k+1,l) + q_prim_vf(i)%sf(j,k-1,l))
+                            end do
+                        end do
+                    end do
+                end do
+            else
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            do i = 1, sys_size
+                                    q_prim_temp(j,k,l,i) = (1._wp/6._wp) * &
+                                        (q_prim_vf(i)%sf(j+1,k,l) + q_prim_vf(i)%sf(j-1,k,l) + &
+                                        q_prim_vf(i)%sf(j,k+1,l) + q_prim_vf(i)%sf(j,k-1,l) + &
+                                        q_prim_vf(i)%sf(j,k,l+1) + q_prim_vf(i)%sf(j,k,l-1))
+                                end do
+                        end do
+                    end do
+                end do
+            end if
+
+            ! Copy smoothed data back to array of scalar fields
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        do i = 1, sys_size
+                            q_prim_vf(i)%sf(j,k,l) = q_prim_temp(j,k,l,i)
+                        end do
+                    end do
+                end do
+            end do
+
+        end do
+
+    end subroutine s_elliptic_smoothing
 
 end module m_perturbation

@@ -74,8 +74,9 @@ contains
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
 
+        print*, proc_rank, buff_size
         do i = 1, sys_size
-            allocate (q_prim_vf(i)%sf(0:m, 0:n, 0:p))
+            allocate (q_prim_vf(i)%sf(-buff_size:m+buff_size, -buff_size:n + buff_size, -buff_size:p + buff_size))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
         end do
 
@@ -337,6 +338,8 @@ contains
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
         if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
+
+        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf)
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)

@@ -39,6 +39,7 @@ module m_global_parameters
     integer :: m
     integer :: n
     integer :: p
+    integer, parameter :: buff_size = 1 ! buff size for elliptic smoothing
 
     integer(8) :: nGlobal !< Global number of cells in the domain
 
@@ -143,6 +144,12 @@ module m_global_parameters
 
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
+
+    logical :: igr           !< Use information geometric regularization
+    integer :: alf_igr
+    logical :: elliptic_smoothing !< Enables Ellipitcal Smoothing in Patches
+    integer :: elliptic_smoothing_iters !< Iterations of Elliptic Smoothing done
+
 
 #ifdef MFC_MPI
 
@@ -271,7 +278,7 @@ contains
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
-
+        
         cyl_coord = .false.
 
         x_domain%beg = dflt_real
@@ -488,6 +495,11 @@ contains
 
         ! Lagrangian solver
         rkck_adap_dt = .false.
+
+        igr = .false.
+        alf_igr = 0
+        elliptic_smoothing = .false.
+        elliptic_smoothing_iters = 1
 
     end subroutine s_assign_default_values_to_user_inputs
 
