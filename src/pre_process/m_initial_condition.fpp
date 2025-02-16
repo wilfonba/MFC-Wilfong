@@ -74,7 +74,6 @@ contains
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
 
-        print*, proc_rank, buff_size
         do i = 1, sys_size
             allocate (q_prim_vf(i)%sf(-buff_size:m+buff_size, -buff_size:n + buff_size, -buff_size:p + buff_size))
             allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
