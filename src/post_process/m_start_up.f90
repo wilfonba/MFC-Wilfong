@@ -10,6 +10,8 @@ module m_start_up
 
     ! Dependencies
 
+    use, intrinsic :: iso_c_binding
+
     use m_derived_types         !< Definitions of the derived types
 
     use m_global_parameters     !< Global parameters for the code
@@ -42,6 +44,15 @@ module m_start_up
     use m_chemistry
 
     implicit none
+
+    include 'fftw3.f03'
+
+    type(c_ptr) :: fwd_plan
+    type(c_ptr) :: fftw_real_data, fftw_cmplx_data
+    complex(c_double_complex), pointer :: data_real(:,:,:) 
+    complex(c_double_complex), pointer :: data_cmplx(:,:,:)
+    real(kind(0d0)), allocatable, dimension(:, :, :) :: vel1_real, vel2_real, vel3_real, En_real
+    real(kind(0d0)), allocatable, dimension(:) :: En 
 
 contains
 
@@ -194,9 +205,10 @@ contains
         integer, intent(inout) :: t_step
         character(LEN=name_len), intent(inout) :: varname
         real(wp), intent(inout) :: pres, c, H
-
-        integer :: i, j, k, l
-
+        real(kind(0d0)) :: En_tot, rho_tot, omega_tot
+        character(20) :: filename
+        logical :: file_exists
+        integer :: i, j, k, l, kx, ky, kz, kf
         integer :: x_beg, x_end, y_beg, y_end, z_beg, z_end
 
         if (output_partial_domain) then
@@ -344,6 +356,156 @@ contains
 
         ! Adding the energy to the formatted database file
         if (E_wrt .or. cons_vars_wrt) then
+
+            if(all((/bc_x%beg,bc_x%end,bc_y%beg,bc_y%end,bc_z%beg,bc_z%end/) == -1)) then 
+
+                data_real = CMPLX(q_cons_vf(mom_idx%beg)%sf(0:m, 0:n, 0:p) / q_cons_vf(1)%sf(0:m, 0:n, 0:p), 0d0)
+
+                data_cmplx(:, :, :) = (0d0, 0d0)
+
+                call fftw_execute_dft(fwd_plan, data_real, data_cmplx) 
+
+                do j = 1, m+1
+                    do k = 1, n+1 
+                        do l = 2, (p+1)/2 
+
+                            if(j /= 1) then 
+                                kx = (m + 1) - (j - 1)
+                            else 
+                                kx = j - 1
+                            end if
+
+                            if(k /= 1) then 
+                                ky = (n + 1) - (k - 1) 
+                            else 
+                                ky = k - 1 
+                            end if
+
+                            kz = (p + 1) - (l - 1)
+
+                            data_cmplx(kx+1, ky+1, kz+1) = DCONJG(data_cmplx(j, k, l))
+
+                        end do 
+                    end do 
+                end do
+                
+                vel1_real = abs(data_cmplx) / ((m+1)*(n+1)*(p+1))
+
+                data_real = CMPLX(q_cons_vf(mom_idx%beg+1)%sf(0:m, 0:n, 0:p) / q_cons_vf(1)%sf(0:m, 0:n, 0:p), 0d0)
+
+                data_cmplx(:, :, :) = (0d0, 0d0)
+
+                call fftw_execute_dft(fwd_plan, data_real, data_cmplx)
+                
+                do j = 1, m+1
+                    do k = 1, n+1 
+                        do l = 2, (p+1)/2 
+
+                            if(j /= 1) then 
+                                kx = (m + 1) - (j - 1)
+                            else 
+                                kx = j - 1
+                            end if
+                            if(k /= 1) then 
+                                ky = (n + 1) - (k - 1) 
+                            else 
+                                ky = k - 1 
+                            end if
+
+                            kz = (p + 1) - (l - 1)
+
+                            data_cmplx(kx+1, ky+1, kz+1) = DCONJG(data_cmplx(j, k, l))
+
+                        end do 
+                    end do 
+                end do
+
+                vel2_real = abs(data_cmplx) / ((m+1)*(n+1)*(p+1))
+
+                data_real = CMPLX(q_cons_vf(mom_idx%beg+2)%sf(0:m, 0:n, 0:p) / q_cons_vf(1)%sf(0:m, 0:n, 0:p), 0d0)
+
+                data_cmplx(:, :, :) = (0d0, 0d0)
+
+                call fftw_execute_dft(fwd_plan, data_real, data_cmplx)
+
+                do j = 1, m+1
+                    do k = 1, n+1 
+                        do l = 2, (p+1)/2 
+
+                            if(j /= 1) then 
+                                kx = (m + 1) - (j - 1)
+                            else 
+                                kx = j - 1
+                            end if
+                            if(k /= 1) then 
+                                ky = (n + 1) - (k - 1) 
+                            else 
+                                ky = k - 1 
+                            end if
+
+                            kz = (p + 1) - (l - 1)
+
+                            data_cmplx(kx+1, ky+1, kz+1) = DCONJG(data_cmplx(j, k, l))
+
+                        end do 
+                    end do 
+                end do
+                
+                vel3_real = abs(data_cmplx) / ((m+1)*(n+1)*(p+1))
+
+                En_real = 0.5d0*(vel1_real**2d0 + vel2_real**2d0 + vel3_real**2d0) 
+
+                do kf = 1, m +1
+                    En(kf) = 0d0
+                end do
+
+                do j = 1, m+1
+                    do k = 1, n+1 
+                        do l = 1, p+1
+                            if(j >= (m+1)/ 2) then 
+                                kx = (j-1) - (m+1)
+                            else 
+                                kx = j -1
+                            end if
+
+                            if(k >= (n+1)/2) then 
+                                ky = (k-1) - (n+1)
+                            else 
+                                ky = k - 1 
+                            end if
+
+                            if(l >= (p+1)/2) then 
+                                kz = (l-1) - (p+1)
+                            else 
+                                kz = l - 1 
+                            end if
+
+                            kf = NINT(SQRT(kx**2d0 + ky**2d0 + kz**2d0)) + 1
+
+                            En(kf) = En(kf) + En_real(j, k, l)
+
+                        end do 
+                    end do 
+                end do
+
+                do kf = 1, m +1
+                    if(proc_rank == 0) then 
+                        !print *, "En_tot", En(kf) , proc_rank
+                    end if
+                    write(filename,'(a,i0,a)') 'En_tot',proc_rank,'.dat'
+                    inquire (FILE=filename, EXIST=file_exists)
+                    if (file_exists) then
+                        open (1, file=filename, position='append', status='old')
+                        write (1, *) En(kf), proc_rank, t_step
+                        close (1)
+                    else
+                        open (1, file=filename, status='new')
+                        write (1, *) En(kf), proc_rank, t_step
+                        close (1)
+                    end if
+                end do
+            end if
+
             q_sf = q_cons_vf(E_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
             write (varname, '(A)') 'E'
             call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -498,6 +660,59 @@ contains
                 if (omega_wrt(i)) then
 
                     call s_derive_vorticity_component(i, q_prim_vf, q_sf)
+
+                    if(i == 1) then 
+
+                        omega_tot = 0d0
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    omega_tot = omega_tot + q_cons_vf(1)%sf(j, k, l)*q_sf(j,k,l)**2d0 
+                                end do
+                            end do
+                        end do
+
+                        if(proc_rank == 0) then 
+                            !print *, "OMEGA1", omega_tot, proc_rank
+                        end if
+
+                    else if(i == 2) then 
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    omega_tot = omega_tot + q_cons_vf(1)%sf(j, k, l)*q_sf(j,k,l)**2d0
+                                end do
+                            end do
+                        end do
+
+                        if(proc_rank == 0) then
+                            !print *, "OMEGA2", omega_tot, proc_rank
+                        end if
+ 
+                    else
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    omega_tot = omega_tot + q_cons_vf(1)%sf(j, k, l)*q_sf(j,k,l)**2d0
+                                end do
+                            end do
+                        end do
+
+                        if(proc_rank == 0) then 
+                            !print *, "OMEGA3", omega_tot, proc_rank
+                        end if
+                        write(filename,'(a,i0,a)') 'omega_tot',proc_rank,'.dat'
+                        inquire (FILE=filename, EXIST=file_exists)
+                        if (file_exists) then
+                            open (1, file=filename, position='append', status='old')
+                            write (1, *) omega_tot, proc_rank, t_step
+                            close (1)
+                        else
+                            open (1, file=filename, status='new')
+                            write (1, *) omega_tot, proc_rank, t_step
+                            close (1)
+                        end if
+                    end if
 
                     write (varname, '(A,I0)') 'omega', i
                     call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -655,6 +870,18 @@ contains
             s_read_data_files => s_read_serial_data_files
         else
             s_read_data_files => s_read_parallel_data_files
+        end if      
+        fftw_real_data = fftw_alloc_complex(int((m+1)*(n+1)*(p+1),c_size_t))
+        fftw_cmplx_data = fftw_alloc_complex(int((m+1)*(n+1)*(p+1),c_size_t))
+
+        call c_f_pointer(fftw_real_data, data_real, [m+1,n+1,p+1])
+        call c_f_pointer(fftw_cmplx_data, data_cmplx, [m+1,n+1,p+1])
+
+        fwd_plan = fftw_plan_dft_3d(m+1, n+1, p+1, data_real, data_cmplx, FFTW_FORWARD, FFTW_ESTIMATE)
+
+        if(E_wrt) then 
+            allocate(vel1_real(1:m+1, 1:n+1, 1:p+1), vel2_real(1:m+1, 1:n+1, 1:p+1), vel3_real(1:m+1, 1:n+1, 1:p+1) , En_real(1:m+1, 1:n+1, 1:p+1))
+            allocate(En(1:m+1))   
         end if
     end subroutine s_initialize_modules
 
