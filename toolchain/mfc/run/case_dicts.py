@@ -95,7 +95,7 @@ PRE_PROCESS.update({
     'igr':ParamType.LOG,
     'alf_igr':ParamType.INT,
     'elliptic_smoothing':ParamType.LOG,
-    'elliptic_smoothing_ic':ParamType.INT,
+    'elliptic_smoothing_iters':ParamType.INT,
 })
 
 for ib_id in range(1, 10+1):

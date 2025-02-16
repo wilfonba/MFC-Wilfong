@@ -9,7 +9,7 @@ c_l = math.sqrt(1.4 * ps / rho)
 vel = 230.0
 
 leng = 1.0
-Ny = 100.0
+Ny = 200.0
 Nx = Ny * 3
 dx = leng / Nx
 
@@ -58,7 +58,7 @@ print(
             "igr": "T",
             "alf_igr": 10,
             "elliptic_smoothing": "T",
-            "elliptic_smoothing_ic": 1,
+            "elliptic_smoothing_iters": 10,
             "bc_x%beg": -3,
             "bc_x%end": -3,
             "bc_y%beg": -3,

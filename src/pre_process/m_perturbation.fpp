@@ -15,6 +15,8 @@ module m_perturbation
     use m_eigen_solver          ! Subroutines to solve eigenvalue problem for
     ! complex general matrix
 
+    use m_helper
+
     use ieee_arithmetic
 
     implicit none
@@ -615,7 +617,7 @@ contains
         real(wp), dimension(0:m, 0:n, 0:p, 1:sys_size) :: q_prim_temp
         integer :: i, j, k, l, q
 
-        do q = 1, elliptic_smoothing_ic
+        do q = 1, elliptic_smoothing_iters
             if(bcxb >= -12) then
                 if(bcxb >= 0) then
                     call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1)
@@ -635,7 +637,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 1, buff_size
-                                do i = 1, sys_size 
+                                do i = 1, sys_size
                                     q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1,k,l)
                                 end do
                             end do
@@ -665,7 +667,6 @@ contains
                             do j = 1, buff_size
                                 do i = 1, sys_size
                                     q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(j-1,k,l)
-                            
                                 end do
                             end do
                         end do
@@ -677,9 +678,8 @@ contains
                             do j = 1, buff_size
                                 do i = 1, sys_size
                                     q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(m - (j - 1),k,l)
-                            
                                 end do
-                            end do 
+                            end do
                         end do
                     end do
                 else
@@ -689,7 +689,6 @@ contains
                             do j = 1, buff_size
                                 do i = 1, sys_size
                                     q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(m,k,l)
-                            
                                 end do
                             end do
                         end do
@@ -758,7 +757,7 @@ contains
                                 do i = 1, sys_size
                                     q_prim_vf(i)%sf(j,n+k,l) = q_prim_vf(i)%sf(j,n - (k-1),l)
                                 end do
-                            end do 
+                            end do
                         end do
                     end do
                 else
@@ -864,7 +863,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             do i = 1, sys_size
-                                q_prim_temp(j,k,l,i) = (1_wp/4_wp) * &
+                                q_prim_temp(j,k,l,i) = (1._wp/4._wp) * &
                                     (q_prim_vf(i)%sf(j+1,k,l) + q_prim_vf(i)%sf(j-1,k,l) + &
                                     q_prim_vf(i)%sf(j,k+1,l) + q_prim_vf(i)%sf(j,k-1,l))
                             end do
@@ -876,7 +875,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             do i = 1, sys_size
-                                    q_prim_temp(j,k,l,i) = (1_wp/6_wp) * &
+                                    q_prim_temp(j,k,l,i) = (1._wp/6._wp) * &
                                         (q_prim_vf(i)%sf(j+1,k,l) + q_prim_vf(i)%sf(j-1,k,l) + &
                                         q_prim_vf(i)%sf(j,k+1,l) + q_prim_vf(i)%sf(j,k-1,l) + &
                                         q_prim_vf(i)%sf(j,k,l+1) + q_prim_vf(i)%sf(j,k,l-1))
