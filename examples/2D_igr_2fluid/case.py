@@ -39,6 +39,8 @@ data = {
     "t_step_start": 0,
     "t_step_stop": 5000,
     "t_step_save": 50,
+    # "t_step_stop": 1,
+    # "t_step_save": 1,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -61,6 +63,8 @@ data = {
     "num_patches": 2,
     "num_fluids": 2,
     "igr": "T",
+    "elliptic_smoothing": "T",
+    "elliptic_smoothing_iters": 10,
     "alf_factor": 10,
     "viscous": "T",
     # Database Structure Parameters
@@ -91,9 +95,6 @@ data = {
     "patch_icpp(1)%alpha(2)": eps,
     # High pressure
     "patch_icpp(2)%alter_patch(1)": "T",
-    "patch_icpp(2)%smoothen": "T",
-    "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.5,
     "patch_icpp(2)%geometry": 2,
     "patch_icpp(2)%x_centroid": 0,
     "patch_icpp(2)%y_centroid": 0,

@@ -702,7 +702,7 @@ contains
                     call nvtxEndRange
 
                     call nvtxStartRange("IGR_Jacobi")
-                    call s_igr_jacobi_iteration()
+                    call s_igr_jacobi_iteration(t_step)
                     call nvtxEndRange
                 end if
 
