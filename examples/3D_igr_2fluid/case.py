@@ -69,6 +69,8 @@ data = {
     "num_fluids": 2,
     "igr": "T",
     "alf_factor": 10,
+    "elliptic_smoothing": "T",
+    "elliptic_smoothing_iters": 40,
     "viscous": "T",
     # Database Structure Parameters
     "format": 1,
@@ -100,9 +102,6 @@ data = {
     "patch_icpp(1)%alpha(2)": eps,
     # High pressure
     "patch_icpp(2)%alter_patch(1)": "T",
-    "patch_icpp(2)%smoothen": "T",
-    "patch_icpp(2)%smooth_patch_id": 1,
-    "patch_icpp(2)%smooth_coeff": 0.25,
     "patch_icpp(2)%geometry": 8,
     "patch_icpp(2)%x_centroid": 0,
     "patch_icpp(2)%y_centroid": 0,
@@ -111,10 +110,10 @@ data = {
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
     "patch_icpp(2)%vel(3)": 0.0,
-    "patch_icpp(2)%pres": 10,
+    "patch_icpp(2)%pres": 9.518,
     "patch_icpp(2)%alpha_rho(1)": eps,
     "patch_icpp(2)%alpha(1)": eps,
-    "patch_icpp(2)%alpha_rho(2)": (1 - eps),
+    "patch_icpp(2)%alpha_rho(2)": (1 - eps)*5,
     "patch_icpp(2)%alpha(2)": 1 - eps,
 }
 

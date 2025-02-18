@@ -9,15 +9,17 @@ c_l = math.sqrt(1.4 * ps / rho)
 vel = 230.0
 
 leng = 1.0
-Ny = 200.0
+Ny = 400.00
 Nx = Ny * 3
 dx = leng / Nx
 
-time_end = 5 * leng / vel
-cfl = 0.1
+time_end = 1.5 * leng / vel
+cfl = 0.25
 
 dt = cfl * dx / c_l
 Nt = int(time_end / dt)
+
+eps = 1e-2
 
 # Configuring case dictionary
 print(
@@ -36,7 +38,9 @@ print(
             "dt": dt,
             "t_step_start": 0,
             "t_step_stop": Nt,
-            "t_step_save": int(Nt / 20.0),
+            "t_step_save": int(Nt / 100.0),
+            # "t_step_stop": 10,
+            # "t_step_save": 1,#int(Nt / 20.0),
             # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": 2,
@@ -44,7 +48,7 @@ print(
             "num_fluids": 2,
             "mpp_lim": "T",
             "mixture_err": "T",
-            "time_stepper": 3,
+            "time_stepper": 1,
             "weno_order": 5,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
@@ -58,7 +62,7 @@ print(
             "igr": "T",
             "alf_igr": 10,
             "elliptic_smoothing": "T",
-            "elliptic_smoothing_iters": 10,
+            "elliptic_smoothing_iters": 25,
             "bc_x%beg": -3,
             "bc_x%end": -3,
             "bc_y%beg": -3,
@@ -77,10 +81,10 @@ print(
             "patch_icpp(1)%vel(1)": vel,
             "patch_icpp(1)%vel(2)": 0.0e00,
             "patch_icpp(1)%pres": 101325.0,
-            "patch_icpp(1)%alpha_rho(1)": 1.29,
-            "patch_icpp(1)%alpha_rho(2)": 0.0e00,
-            "patch_icpp(1)%alpha(1)": 1.0e00,
-            "patch_icpp(1)%alpha(2)": 0.0e00,
+            "patch_icpp(1)%alpha_rho(1)": (1 - eps)*1.29,
+            "patch_icpp(1)%alpha_rho(2)": eps,
+            "patch_icpp(1)%alpha(1)": 1.0 - eps,
+            "patch_icpp(1)%alpha(2)": eps,
             # Patch 2: Shocked state
             "patch_icpp(2)%geometry": 3,
             "patch_icpp(2)%alter_patch(1)": "T",
@@ -88,13 +92,13 @@ print(
             "patch_icpp(2)%y_centroid": 0.0,
             "patch_icpp(2)%length_x": leng / 4.0,
             "patch_icpp(2)%length_y": leng,
-            "patch_icpp(2)%vel(1)": vel,
+            "patch_icpp(2)%vel(1)": 0.0,
             "patch_icpp(2)%vel(2)": 0.0e00,
             "patch_icpp(2)%pres": ps,
-            "patch_icpp(2)%alpha_rho(1)": 2.4,
-            "patch_icpp(2)%alpha_rho(2)": 0.0e00,
-            "patch_icpp(2)%alpha(1)": 1.0e00,
-            "patch_icpp(2)%alpha(2)": 0.0e00,
+            "patch_icpp(2)%alpha_rho(1)": (1 - eps)*2.4,
+            "patch_icpp(2)%alpha_rho(2)": eps,
+            "patch_icpp(2)%alpha(1)": 1.0 - eps,
+            "patch_icpp(2)%alpha(2)": eps,
             # Patch 3: Bubble
             "patch_icpp(3)%geometry": 2,
             "patch_icpp(3)%x_centroid": 0.0e00,
@@ -104,10 +108,10 @@ print(
             "patch_icpp(3)%vel(1)": 0.0,
             "patch_icpp(3)%vel(2)": 0.0e00,
             "patch_icpp(3)%pres": 101325.0,
-            "patch_icpp(3)%alpha_rho(1)": 0.0e00,
-            "patch_icpp(3)%alpha_rho(2)": 0.167,
-            "patch_icpp(3)%alpha(1)": 0.0e00,
-            "patch_icpp(3)%alpha(2)": 1.0e00,
+            "patch_icpp(3)%alpha_rho(1)": eps,
+            "patch_icpp(3)%alpha_rho(2)": (1.00 - eps)*0.167,
+            "patch_icpp(3)%alpha(1)": eps,
+            "patch_icpp(3)%alpha(2)": 1.0 - eps,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
