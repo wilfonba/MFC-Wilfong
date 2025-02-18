@@ -366,6 +366,29 @@ contains
 
             end if
 
+
+            if(.not. viscous) then 
+                do i = 1, num_dims
+                    @:ALLOCATE(dqL_prim_dx_n(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqL_prim_dy_n(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqL_prim_dz_n(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqR_prim_dx_n(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:sys_size))
+                    @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:sys_size))
+
+                    do l = momxb, momxe
+                        @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                        @:ALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                    end do
+                    @:ACC_SETUP_VFs(dqL_prim_dx_n(i), dqL_prim_dy_n(i), dqL_prim_dz_n(i))
+                    @:ACC_SETUP_VFs(dqR_prim_dx_n(i), dqR_prim_dy_n(i), dqR_prim_dz_n(i))
+                end do
+            end if
+
             if (viscous) then
 
                 @:ALLOCATE(tau_Re_vf(1:sys_size))
@@ -424,6 +447,9 @@ contains
                     @:ALLOCATE(dqR_prim_dx_n(i)%vf(1:sys_size))
                     @:ALLOCATE(dqR_prim_dy_n(i)%vf(1:sys_size))
                     @:ALLOCATE(dqR_prim_dz_n(i)%vf(1:sys_size))
+                end do
+
+                do i = 1, num_dims
 
                     do l = mom_idx%beg, mom_idx%end
                         @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf( &
@@ -799,7 +825,7 @@ contains
                 end if
                 irx%end = m; iry%end = n; irz%end = p
 
-                ! Computing Riemann Solver Flux and Source Flux
+                !Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
                 call s_riemann_solver(qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, &
                                       dqR_prim_dx_n(id)%vf, &
@@ -817,6 +843,35 @@ contains
                                       flux_gsrc_n(id)%vf, &
                                       id, irx, iry, irz)
                 call nvtxEndRange
+
+                if(riemann_solver == 4) then 
+                    if(id == 1) then 
+                        call s_igr_riemann_solver_alt(flux_n(id)%vf, flux_src_n(id)%vf, id, qL_rsx_vf, qR_rsx_vf, & 
+                            dqL_prim_dx_n(id)%vf(momxb)%sf,dqL_prim_dy_n(id)%vf(momxb)%sf,dqL_prim_dz_n(id)%vf(momxb)%sf, &
+                            dqL_prim_dx_n(id)%vf(momxb+1)%sf,dqL_prim_dy_n(id)%vf(momxb+1)%sf,dqL_prim_dz_n(id)%vf(momxb+1)%sf, &
+                            dqL_prim_dx_n(id)%vf(momxe)%sf,dqL_prim_dy_n(id)%vf(momxe)%sf,dqL_prim_dz_n(id)%vf(momxe)%sf, &
+                            dqR_prim_dx_n(id)%vf(momxb)%sf,dqR_prim_dy_n(id)%vf(momxb)%sf,dqR_prim_dz_n(id)%vf(momxb)%sf, &
+                            dqR_prim_dx_n(id)%vf(momxb+1)%sf,dqR_prim_dy_n(id)%vf(momxb+1)%sf,dqR_prim_dz_n(id)%vf(momxb+1)%sf, &
+                            dqR_prim_dx_n(id)%vf(momxe)%sf,dqR_prim_dy_n(id)%vf(momxe)%sf,dqR_prim_dz_n(id)%vf(momxe)%sf)
+                    else if(id == 2) then 
+                        call s_igr_riemann_solver_alt(flux_n(id)%vf, flux_src_n(id)%vf, id, qL_rsy_vf, qR_rsy_vf, & 
+                            dqL_prim_dx_n(id)%vf(momxb)%sf,dqL_prim_dy_n(id)%vf(momxb)%sf,dqL_prim_dz_n(id)%vf(momxb)%sf, &
+                            dqL_prim_dx_n(id)%vf(momxb+1)%sf,dqL_prim_dy_n(id)%vf(momxb+1)%sf,dqL_prim_dz_n(id)%vf(momxb+1)%sf, &
+                            dqL_prim_dx_n(id)%vf(momxe)%sf,dqL_prim_dy_n(id)%vf(momxe)%sf,dqL_prim_dz_n(id)%vf(momxe)%sf, &
+                            dqR_prim_dx_n(id)%vf(momxb)%sf,dqR_prim_dy_n(id)%vf(momxb)%sf,dqR_prim_dz_n(id)%vf(momxb)%sf, &
+                            dqR_prim_dx_n(id)%vf(momxb+1)%sf,dqR_prim_dy_n(id)%vf(momxb+1)%sf,dqR_prim_dz_n(id)%vf(momxb+1)%sf, &
+                            dqR_prim_dx_n(id)%vf(momxe)%sf,dqR_prim_dy_n(id)%vf(momxe)%sf,dqR_prim_dz_n(id)%vf(momxe)%sf)
+                    else if(id == 3) then 
+                        call s_igr_riemann_solver_alt(flux_n(id)%vf,flux_src_n(id)%vf, id,  qL_rsz_vf, qR_rsz_vf, & 
+                            dqL_prim_dx_n(id)%vf(momxb)%sf,dqL_prim_dy_n(id)%vf(momxb)%sf,dqL_prim_dz_n(id)%vf(momxb)%sf, &
+                            dqL_prim_dx_n(id)%vf(momxb+1)%sf,dqL_prim_dy_n(id)%vf(momxb+1)%sf,dqL_prim_dz_n(id)%vf(momxb+1)%sf, &
+                            dqL_prim_dx_n(id)%vf(momxe)%sf,dqL_prim_dy_n(id)%vf(momxe)%sf,dqL_prim_dz_n(id)%vf(momxe)%sf, &
+                            dqR_prim_dx_n(id)%vf(momxb)%sf,dqR_prim_dy_n(id)%vf(momxb)%sf,dqR_prim_dz_n(id)%vf(momxb)%sf, &
+                            dqR_prim_dx_n(id)%vf(momxb+1)%sf,dqR_prim_dy_n(id)%vf(momxb+1)%sf,dqR_prim_dz_n(id)%vf(momxb+1)%sf, &
+                            dqR_prim_dx_n(id)%vf(momxe)%sf,dqR_prim_dy_n(id)%vf(momxe)%sf,dqR_prim_dz_n(id)%vf(momxe)%sf)
+                    end if
+                end if
+
 
                 ! Additional physics and source terms
                 ! RHS addition for advection source

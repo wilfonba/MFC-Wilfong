@@ -1499,7 +1499,9 @@ contains
         ! and/or execution of any other tasks that are needed to properly configure
         ! the modules. The preparations below DO DEPEND on the grid being complete.
         if (.not. igr) call s_initialize_weno_module()
-        if (igr) call s_initialize_igr_module()
+        if(igr .or. riemann_solver == 4) then 
+		call s_initialize_igr_module()
+	end if
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         print *, "[MEM-INST] After: s_initialize_weno_module"
