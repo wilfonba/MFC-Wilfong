@@ -239,8 +239,10 @@ contains
         real(wp) :: resid
         integer :: num_iters, t_step
 
-        if (t_step == 0) then
-            num_iters = 500
+        print*, proc_rank, bcxb, bcxe
+
+        if (t_step <= 10) then
+            num_iters = 500 - 50*t_step
         else
             num_iters = num_igr_iters
         end if
@@ -277,12 +279,6 @@ contains
                     end do
                 end do
             end do
-
-            !$acc kernels
-            resid = maxval(jac - jac_old)
-            !$acc end kernels
-
-            print*, t_step, resid
 
             if(bcxb >= -12) then
                 if(bcxb >= 0) then
@@ -1356,12 +1352,12 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
-                                q_prim_vf(i)%sf(j,k,l) * dux(j,k,l)
                             !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
-                                !q_prim_vf(i)%sf(j,k,l) * (1._wp/(2._wp*dx(j))) * &
-                                !(qL_rs_vf(j+1,k,l,momxb) + qR_rs_vf(j,k,l,momxb) - &
-                                !qL_rs_vf(j,k,l,momxb) - qR_rs_vf(j-1,k,l,momxb))
+                                !q_prim_vf(i)%sf(j,k,l) * dux(j,k,l)
+                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
+                                q_prim_vf(i)%sf(j,k,l) * (1._wp/(2._wp*dx(j))) * &
+                                (qL_rs_vf(j+1,k,l,momxb) + qR_rs_vf(j,k,l,momxb) - &
+                                qL_rs_vf(j,k,l,momxb) - qR_rs_vf(j-1,k,l,momxb))
                         end do
                     end do
                 end do
@@ -1386,12 +1382,12 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
-                                q_prim_vf(i)%sf(j,k,l) * dvy(j,k,l)
                             !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
-                                !q_prim_vf(i)%sf(j,k,l) * (1._wp/(2._wp*dy(k))) * &
-                                !(qL_rs_vf(j,k+1,l,momxb+1) + qR_rs_vf(j,k,l,momxb+1) - &
-                                !qL_rs_vf(j,k,l,momxb+1) - qR_rs_vf(j,k-1,l,momxb+1))
+                                !q_prim_vf(i)%sf(j,k,l) * dvy(j,k,l)
+                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
+                                q_prim_vf(i)%sf(j,k,l) * (1._wp/(2._wp*dy(k))) * &
+                                (qL_rs_vf(j,k+1,l,momxb+1) + qR_rs_vf(j,k,l,momxb+1) - &
+                                qL_rs_vf(j,k,l,momxb+1) - qR_rs_vf(j,k-1,l,momxb+1))
                         end do
                     end do
                 end do
@@ -1416,8 +1412,8 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
-                                q_prim_vf(i)%sf(j,k,l) * dwz(j,k,l)
+                            !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
+                                !q_prim_vf(i)%sf(j,k,l) * dwz(j,k,l)
                             !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
                                 !q_prim_vf(i)%sf(j,k,l) * (1._wp/(2._wp*dz(l))) * &
                                 !(qL_rs_vf(j,k,l+1,momxe) + qR_rs_vf(j,k,l,momxe) - &
