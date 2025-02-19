@@ -53,68 +53,6 @@ contains
         !bcxb = -1; bcxe = -1; bcyb = -1; bcye = -1; bczb = -1; bcze = -1
         !$acc update device(bcxb, bcxe, bcyb, bcye, bczb, bcze)
 
-
-        #:for VAR in ['rho_igr', 'dux', 'duy', 'dvx', 'dvy', 'jac', 'jac_rhs', &
-                    & 'jac_old', 'fd_coeff']
-            @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
-                         idwbuff(2)%beg:idwbuff(2)%end, &
-                         idwbuff(3)%beg:idwbuff(3)%end))
-        #:endfor
-
-        if (p > 0) then
-            #:for VAR in ['duz', 'dvz', 'dwx', 'dwy', 'dwz']
-                @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
-                         idwbuff(2)%beg:idwbuff(2)%end, &
-                         idwbuff(3)%beg:idwbuff(3)%end))
-
-            #:endfor
-        end if
-
-        @:ALLOCATE(qL_rs_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                            idwbuff(2)%beg:idwbuff(2)%end, &
-                            idwbuff(3)%beg:idwbuff(3)%end, &
-                            1:sys_size))
-        @:ALLOCATE(qR_rs_vf(idwbuff(1)%beg:idwbuff(1)%end, &
-                            idwbuff(2)%beg:idwbuff(2)%end, &
-                            idwbuff(3)%beg:idwbuff(3)%end, &
-                            1:sys_size))
-
-        if(viscous) then
-            #:for VAR in ['duLx', 'duLy', 'dvLx', 'dvLy', 'duRx', 'duRy', &
-                        & 'dvRx', 'dvRy']
-                @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
-                                  idwbuff(2)%beg:idwbuff(2)%end, &
-                                  idwbuff(3)%beg:idwbuff(3)%end))
-            #:endfor
-
-            if (p > 0) then
-                #:for VAR in ['duLz', 'dvLz', 'dwLz', 'dwLx', 'dwLy', &
-                            & 'duRz', 'dvRz', 'dwRz', 'dwRx', 'dwRy']
-                    @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
-                                      idwbuff(2)%beg:idwbuff(2)%end, &
-                                      idwbuff(3)%beg:idwbuff(3)%end))
-                #:endfor
-            end if
-        end if
-
-        @:ALLOCATE(FR(idwbuff(1)%beg:idwbuff(1)%end, &
-                      idwbuff(2)%beg:idwbuff(2)%end, &
-                      idwbuff(3)%beg:idwbuff(3)%end))
-        @:ALLOCATE(FL(idwbuff(1)%beg:idwbuff(1)%end, &
-                      idwbuff(2)%beg:idwbuff(2)%end, &
-                      idwbuff(3)%beg:idwbuff(3)%end))
-
-        !$acc parallel loop collapse(3) gang vector default(present)
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
-                    jac(j, k, l) = 0._wp
-                    jac_old(j, k, l) = 0._wp
-                    jac_rhs(j, k, l) = 0._wp
-               end do
-            end do
-        end do
-
         if (viscous) then
             @:ALLOCATE(Res(1:2, 1:maxval(Re_size)))
             do i = 1, 2
@@ -123,6 +61,69 @@ contains
                 end do
             end do
             !$acc update device(Res, Re_idx, Re_size)
+        end if
+
+        if(igr) then 
+
+            @:ALLOCATE(qL_rs_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                            idwbuff(2)%beg:idwbuff(2)%end, &
+                            idwbuff(3)%beg:idwbuff(3)%end, &
+                                1:sys_size))
+            @:ALLOCATE(qR_rs_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                idwbuff(2)%beg:idwbuff(2)%end, &
+                                idwbuff(3)%beg:idwbuff(3)%end, &
+                                1:sys_size))
+            #:for VAR in ['rho_igr', 'dux', 'duy', 'dvx', 'dvy', 'jac', 'jac_rhs', &
+                        & 'jac_old', 'fd_coeff']
+                @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
+                             idwbuff(2)%beg:idwbuff(2)%end, &
+                             idwbuff(3)%beg:idwbuff(3)%end))
+            #:endfor
+
+            if (p > 0) then
+                #:for VAR in ['duz', 'dvz', 'dwx', 'dwy', 'dwz']
+                    @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
+                             idwbuff(2)%beg:idwbuff(2)%end, &
+                             idwbuff(3)%beg:idwbuff(3)%end))
+
+                #:endfor
+            end if
+
+            if(viscous) then
+                #:for VAR in ['duLx', 'duLy', 'dvLx', 'dvLy', 'duRx', 'duRy', &
+                            & 'dvRx', 'dvRy']
+                    @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end))
+                #:endfor
+
+                if (p > 0) then
+                    #:for VAR in ['duLz', 'dvLz', 'dwLz', 'dwLx', 'dwLy', &
+                                & 'duRz', 'dvRz', 'dwRz', 'dwRx', 'dwRy']
+                        @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
+                                          idwbuff(2)%beg:idwbuff(2)%end, &
+                                          idwbuff(3)%beg:idwbuff(3)%end))
+                    #:endfor
+                end if
+            end if
+
+            @:ALLOCATE(FR(idwbuff(1)%beg:idwbuff(1)%end, &
+                          idwbuff(2)%beg:idwbuff(2)%end, &
+                          idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(FL(idwbuff(1)%beg:idwbuff(1)%end, &
+                          idwbuff(2)%beg:idwbuff(2)%end, &
+                          idwbuff(3)%beg:idwbuff(3)%end))
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                        jac(j, k, l) = 0._wp
+                        jac_old(j, k, l) = 0._wp
+                        jac_rhs(j, k, l) = 0._wp
+                   end do
+                end do
+            end do
         end if
 
     end subroutine s_initialize_igr_module
