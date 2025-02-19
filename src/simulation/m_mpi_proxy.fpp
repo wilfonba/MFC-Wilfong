@@ -72,6 +72,9 @@ module m_mpi_proxy
     !> @}
     !$acc declare create(v_size)
 
+    integer :: halo_size
+    !$acc declare create(halo_size)
+
     integer :: nVars !< nVars for surface tension communication
     !$acc declare create(nVars)
 
@@ -81,8 +84,6 @@ contains
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_mpi_proxy_module
-
-    real(kind(0d0)) :: halo_size
 
 #ifdef MFC_MPI
 
@@ -107,10 +108,6 @@ contains
                 halo_size = -1 + buff_size*(sys_size + 2*nb*4)
             end if
 
-            @:ALLOCATE(q_cons_buff_send(0:halo_size))
-
-            @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
-
             v_size = sys_size + 2*nb*4
         else
 
@@ -130,13 +127,15 @@ contains
                 halo_size = -1 + buff_size*sys_size
             end if
 
-            @:ALLOCATE(q_cons_buff_send(0:halo_size))
-
-            @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
-
             v_size = sys_size
 
         end if
+
+        !$acc update device(halo_size)
+
+        @:ALLOCATE(q_cons_buff_send(0:halo_size))
+
+        @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
 
         if (surface_tension) then
             nVars = num_dims + 1
