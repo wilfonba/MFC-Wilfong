@@ -37,7 +37,7 @@ def __profiler_prepend() -> typing.List[str]:
             raise MFCException("Failed to locate [bold green]NVIDIA Nsight Compute[/bold green] (ncu).")
 
         return ["ncu", "--nvtx", "--mode=launch-and-attach",
-                       "--cache-control=none", "--clock-control=none"] + ARG("ncu")
+                       "--cache-control=none", "--clock-control=none --replay-mode=application"] + ARG("ncu")
 
     if ARG("nsys") is not None:
         if not does_command_exist("nsys"):
