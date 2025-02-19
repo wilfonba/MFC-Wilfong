@@ -83,7 +83,7 @@ contains
             hypoelasticity, G, &
             chem_wrt_Y, chem_wrt_T, avg_state, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
-            E_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
+            E_wrt, fft_wrt, enstrophy_wrt, pres_wrt, alpha_wrt, gamma_wrt, &
             heat_ratio_wrt, pi_inf_wrt, pres_inf_wrt, &
             cons_vars_wrt, prim_vars_wrt, c_wrt, &
             omega_wrt, qm_wrt, schlieren_wrt, schlieren_alpha, &
@@ -357,7 +357,17 @@ contains
         ! Adding the energy to the formatted database file
         if (E_wrt .or. cons_vars_wrt) then
 
-            if(all((/bc_x%beg,bc_x%end,bc_y%beg,bc_y%end,bc_z%beg,bc_z%end/) == -1)) then 
+            q_sf = q_cons_vf(E_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+            write (varname, '(A)') 'E'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+
+            varname(:) = ' '
+
+        end if
+
+        !Adding Energy cascade FFT
+        if(fft_wrt) then
+            if(num_procs == 1 .and. all((/bc_x%beg,bc_x%end,bc_y%beg,bc_y%end,bc_z%beg,bc_z%end/) == -1)) then 
 
                 data_real = CMPLX(q_cons_vf(mom_idx%beg)%sf(0:m, 0:n, 0:p) / q_cons_vf(1)%sf(0:m, 0:n, 0:p), 0d0)
 
@@ -505,13 +515,6 @@ contains
                     end if
                 end do
             end if
-
-            q_sf = q_cons_vf(E_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-            write (varname, '(A)') 'E'
-            call s_write_variable_to_formatted_database_file(varname, t_step)
-
-            varname(:) = ' '
-
         end if
 
         ! Adding the elastic shear stresses to the formatted database file
@@ -660,57 +663,44 @@ contains
                 if (omega_wrt(i)) then
 
                     call s_derive_vorticity_component(i, q_prim_vf, q_sf)
+                    if(enstrophy_wrt) then 
+                        if(i == 1) then 
 
-                    if(i == 1) then 
-
-                        omega_tot = 0d0
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    omega_tot = omega_tot + q_cons_vf(1)%sf(j, k, l)*q_sf(j,k,l)**2d0 
+                            omega_tot = 0d0
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        omega_tot = omega_tot + q_cons_vf(1)%sf(j, k, l)*q_sf(j,k,l)**2d0 
+                                    end do
                                 end do
                             end do
-                        end do
-
-                        if(proc_rank == 0) then 
-                            !print *, "OMEGA1", omega_tot, proc_rank
-                        end if
-
-                    else if(i == 2) then 
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    omega_tot = omega_tot + q_cons_vf(1)%sf(j, k, l)*q_sf(j,k,l)**2d0
+                        else if(i == 2) then 
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        omega_tot = omega_tot + q_cons_vf(1)%sf(j, k, l)*q_sf(j,k,l)**2d0
+                                    end do
                                 end do
-                            end do
-                        end do
-
-                        if(proc_rank == 0) then
-                            !print *, "OMEGA2", omega_tot, proc_rank
-                        end if
- 
-                    else
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    omega_tot = omega_tot + q_cons_vf(1)%sf(j, k, l)*q_sf(j,k,l)**2d0
-                                end do
-                            end do
-                        end do
-
-                        if(proc_rank == 0) then 
-                            !print *, "OMEGA3", omega_tot, proc_rank
-                        end if
-                        write(filename,'(a,i0,a)') 'omega_tot',proc_rank,'.dat'
-                        inquire (FILE=filename, EXIST=file_exists)
-                        if (file_exists) then
-                            open (1, file=filename, position='append', status='old')
-                            write (1, *) omega_tot, proc_rank, t_step
-                            close (1)
+                            end do    
                         else
-                            open (1, file=filename, status='new')
-                            write (1, *) omega_tot, proc_rank, t_step
-                            close (1)
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        omega_tot = omega_tot + q_cons_vf(1)%sf(j, k, l)*q_sf(j,k,l)**2d0
+                                    end do
+                                end do
+                            end do
+                            write(filename,'(a,i0,a)') 'omega_tot',proc_rank,'.dat'
+                            inquire (FILE=filename, EXIST=file_exists)
+                            if (file_exists) then
+                                open (1, file=filename, position='append', status='old')
+                                write (1, *) omega_tot, proc_rank, t_step
+                                close (1)
+                            else
+                                open (1, file=filename, status='new')
+                                write (1, *) omega_tot, proc_rank, t_step
+                                close (1)
+                            end if
                         end if
                     end if
 
@@ -870,18 +860,18 @@ contains
             s_read_data_files => s_read_serial_data_files
         else
             s_read_data_files => s_read_parallel_data_files
-        end if      
-        fftw_real_data = fftw_alloc_complex(int((m+1)*(n+1)*(p+1),c_size_t))
-        fftw_cmplx_data = fftw_alloc_complex(int((m+1)*(n+1)*(p+1),c_size_t))
+        end if    
 
-        call c_f_pointer(fftw_real_data, data_real, [m+1,n+1,p+1])
-        call c_f_pointer(fftw_cmplx_data, data_cmplx, [m+1,n+1,p+1])
-
-        fwd_plan = fftw_plan_dft_3d(m+1, n+1, p+1, data_real, data_cmplx, FFTW_FORWARD, FFTW_ESTIMATE)
-
-        if(E_wrt) then 
+        if(fft_wrt) then 
             allocate(vel1_real(1:m+1, 1:n+1, 1:p+1), vel2_real(1:m+1, 1:n+1, 1:p+1), vel3_real(1:m+1, 1:n+1, 1:p+1) , En_real(1:m+1, 1:n+1, 1:p+1))
-            allocate(En(1:m+1))   
+            allocate(En(1:m+1)) 
+            if(num_procs == 1) then 
+                fftw_real_data = fftw_alloc_complex(int((m+1)*(n+1)*(p+1),c_size_t))
+                fftw_cmplx_data = fftw_alloc_complex(int((m+1)*(n+1)*(p+1),c_size_t))        
+                call c_f_pointer(fftw_real_data, data_real, [m+1,n+1,p+1])
+                call c_f_pointer(fftw_cmplx_data, data_cmplx, [m+1,n+1,p+1])
+                fwd_plan = fftw_plan_dft_3d(p+1, n+1, m+1, data_real, data_cmplx, FFTW_FORWARD, FFTW_ESTIMATE)
+            end if  
         end if
     end subroutine s_initialize_modules
 
