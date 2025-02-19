@@ -2,7 +2,7 @@
 import math
 import json
 
-N =199
+N=199
 
 Re = 1600
 L = 1
@@ -53,7 +53,7 @@ print(
             "time_stepper": 3,
             "weno_order": 5,
             "weno_eps": 1.0e-16,
-            "weno_Re_flux": "F",
+            "weno_Re_flux": "T",
             "weno_avg": "F",
             "mapped_weno": "T",
             "riemann_solver": 2,

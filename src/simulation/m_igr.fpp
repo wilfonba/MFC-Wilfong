@@ -240,16 +240,9 @@ contains
         real(wp) :: resid
         integer :: num_iters, t_step
 
-        print*, proc_rank, bcxb, bcxe
-
-        if (t_step <= 10) then
-            num_iters = 500 - 50*t_step
-        else
-            num_iters = num_igr_iters
-        end if
+        num_iters = num_igr_iters
 
         do q = 1, num_iters
-            !print*, "Iter: ", q
             !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
             do l = 0, p
                 do k = 0, n
@@ -264,19 +257,13 @@ contains
                             rho_rz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l+1))
                         end if
 
-                        jac(j, k, l) = min(dx(j), dy(k))*jac_rhs(j, k, l)
+                        jac(j, k, l) = jac_rhs(j, k, l)
                         jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dx(j)**2._wp) * (rho_lx* jac_old(j-1,k,l) + rho_rx*jac_old(j+1,k,l))
                         jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dy(k)**2._wp) * (rho_ly* jac_old(j,k-1,l) + rho_ry*jac_old(j,k+1,l))
                         if(p > 0) then
                             jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dz(l)**2._wp) * (rho_lz* jac_old(j,k,l-1) + rho_rz*jac_old(j,k,l+1))
                         end if
-                        !if (k == 50) then
-                            !print*, j, omega, jac(j, k, l) - omega * (1._wp / fd_coeff(j,k,l))*jac(j,k,l) + (1._wp - omega)*jac_old(j, k, l)
-                        !end if
                         jac(j, k, l) = omega * (1._wp / fd_coeff(j,k,l))*jac(j,k,l) + (1._wp - omega)*jac_old(j, k, l)
-                        !if (k == 100) then
-                            !print*, j, jac(j,k,l) - jac_old(j,k,l)
-                        !end if
                     end do
                 end do
             end do
@@ -1933,10 +1920,10 @@ contains
                         do j = 0, m
                             !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
                                 !q_prim_vf(i)%sf(j,k,l) * dwz(j,k,l)
-                            !rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
-                                !q_prim_vf(i)%sf(j,k,l) * (1._wp/(2._wp*dz(l))) * &
-                                !(qL_rs_vf(j,k,l+1,momxe) + qR_rs_vf(j,k,l,momxe) - &
-                                !qL_rs_vf(j,k,l,momxe) - qR_rs_vf(j,k,l-1,momxe))
+                            rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + &
+                                q_prim_vf(i)%sf(j,k,l) * (1._wp/(2._wp*dz(l))) * &
+                                (qL_rs_vf(j,k,l+1,momxe) + qR_rs_vf(j,k,l,momxe) - &
+                                qL_rs_vf(j,k,l,momxe) - qR_rs_vf(j,k,l-1,momxe))
                         end do
                     end do
                 end do
