@@ -310,6 +310,8 @@ for ib_id in range(1, 10+1):
 for cmp in ["x", "y", "z"]:
     SIMULATION[f'bc_{cmp}%beg'] = ParamType.INT
     SIMULATION[f'bc_{cmp}%end'] = ParamType.INT
+    SIMULATION[f'bc_{cmp}%b_extrap_ic'] = ParamType.LOG
+    SIMULATION[f'bc_{cmp}%e_extrap_ic'] = ParamType.LOG
     SIMULATION[f'bc_{cmp}%vb1'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%vb2'] = ParamType.REAL
     SIMULATION[f'bc_{cmp}%vb3'] = ParamType.REAL
