@@ -75,6 +75,9 @@ module m_derived_types
         integer :: beg
         integer :: end
 
+        logical :: b_extrap_ic
+        logical :: e_extrap_ic
+
         real(wp) :: vb1
         real(wp) :: vb2
         real(wp) :: vb3

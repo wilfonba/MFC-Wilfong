@@ -560,6 +560,9 @@ contains
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
+        bc_x%b_extrap_ic = .false.; bc_x%e_extrap_ic = .false.
+        bc_y%b_extrap_ic = .false.; bc_y%e_extrap_ic = .false.
+        bc_z%b_extrap_ic = .false.; bc_z%e_extrap_ic = .false.
 
         #:for DIM in ['x', 'y', 'z']
             #:for DIR in [1, 2, 3]

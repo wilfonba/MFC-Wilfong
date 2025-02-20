@@ -2,6 +2,8 @@
 !! @file m_boundary_conditions.fpp
 !! @brief Contains module m_boundary_conditions
 
+#:include 'macros.fpp'
+
 !> @brief The purpose of the module is to apply noncharacteristic and processor
 !! boundary condiitons
 module m_boundary_conditions
@@ -14,13 +16,130 @@ module m_boundary_conditions
 
     use m_constants
 
+    use m_variables_conversion
+
     implicit none
 
-    private; 
-    public :: s_populate_variables_buffers, &
-              s_populate_capillary_buffers
+    type(scalar_field), dimension(:,:), allocatable :: buff_vals
+    type(scalar_field), dimension(:), allocatable :: q_prim_vf
+    !$acc declare create(buff_vals, q_prim_vf)
+
+    private; public :: s_populate_variables_buffers, &
+              s_populate_capillary_buffers, &
+              s_initialize_boundary_conditions_module
 
 contains
+
+    subroutine s_initialize_boundary_conditions_module(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size) :: q_cons_vf
+        type(vector_field) :: gm_alpha_qp
+        type(scalar_field) :: q_T_sf !<
+
+        integer :: i, j, k, l
+
+        @:ALLOCATE(q_prim_vf(1:sys_size))
+        do i = 1, sys_size
+            @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        end do
+
+        call s_convert_conservative_to_primitive_variables( &
+            q_cons_vf, &
+            q_T_sf, &
+            q_prim_vf, &
+            idwint, &
+            gm_alpha_qp%vf)
+
+        @:ALLOCATE(buff_vals(1:num_dims,-1:1))
+
+        if (bc_x%b_extrap_ic .and. bc_x%beg == -3) then
+            @:ALLOCATE(buff_vals(1,-1)%sf(1:sys_size,0:n,0:p))
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                            buff_vals(1,-1)%sf(i, k, l) = &
+                                q_prim_vf(i)%sf(0, k, l)
+                    end do
+                end do
+            end do
+            print*, buff_vals(1,-1)%sf(contxb,:,:)
+        end if
+
+        if (bc_x%e_extrap_ic .and. bc_x%end == -3) then
+            @:ALLOCATE(buff_vals(1,1)%sf(1:sys_size,0:n,0:p))
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        buff_vals(1,1)%sf(i, k, l) = &
+                            q_prim_vf(i)%sf(m, k, l)
+                    end do
+                end do
+            end do
+        end if
+
+        if (bc_y%b_extrap_ic .and. bc_y%beg == -3) then
+            @:ALLOCATE(buff_vals(2,-1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do k = 0, p
+                        do l = -buff_size, m + buff_size
+                            buff_vals(2,-1)%sf(l, i, k) = &
+                                q_prim_vf(i)%sf(l, 0, k)
+                        end do
+                end do
+            end do
+        end if
+
+        if (bc_y%e_extrap_ic .and. bc_y%end == -3) then
+            @:ALLOCATE(buff_vals(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do k = 0, p
+                    do l = -buff_size, m + buff_size
+                        buff_vals(2,1)%sf(l, i, k) = &
+                            q_prim_vf(i)%sf(l, n, k)
+                    end do
+                end do
+            end do
+        end if
+
+        if (p > 0) then
+            if (bc_z%b_extrap_ic .and. bc_z%beg == -3) then
+                @:ALLOCATE(buff_vals(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, sys_size
+                    do l = -buff_size, n + buff_size
+                        do k = -buff_size, m + buff_size
+                            buff_vals(3,-1)%sf(k, l, i) = &
+                                q_prim_vf(i)%sf(k, l, 0)
+                        end do
+                    end do
+                end do
+            end if
+
+            if (bc_z%e_extrap_ic .and. bc_z%end == -3) then
+                @:ALLOCATE(buff_vals(3,1)%sf(0:m,0:n,1:sys_size))
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, sys_size
+                        do l = -buff_size, n + buff_size
+                            do k = -buff_size, m + buff_size
+                                buff_vals(3,1)%sf(k, l, i) = &
+                                    q_prim_vf(i)%sf(k, l, p)
+                            end do
+                        end do
+                end do
+            end if
+        end if
+
+        do i = 1, sys_size
+            @:DEALLOCATE(q_prim_vf(i)%sf)
+        end do
+        @:DEALLOCATE(q_prim_vf)
+
+
+    end subroutine s_initialize_boundary_conditions_module
 
     !>  The purpose of this procedure is to populate the buffers
     !!      of the primitive variables, depending on the selected
@@ -224,31 +343,59 @@ contains
 
             if (bc_loc == -1) then !bc_x%beg
 
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 1, buff_size
-                                q_prim_vf(i)%sf(-j, k, l) = &
-                                    q_prim_vf(i)%sf(0, k, l)
+                if (bc_x%b_extrap_ic) then
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 1, buff_size
+                                    q_prim_vf(i)%sf(-j, k, l) = &
+                                        buff_vals(1,-1)%sf(i,k,l)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                else
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 1, buff_size
+                                    q_prim_vf(i)%sf(-j, k, l) = &
+                                        q_prim_vf(i)%sf(0, k, l)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
 
             else !< bc_x%end
 
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 1, buff_size
-                                q_prim_vf(i)%sf(m + j, k, l) = &
-                                    q_prim_vf(i)%sf(m, k, l)
+                if (bc_x%e_extrap_ic) then
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 1, buff_size
+                                    q_prim_vf(i)%sf(m + j, k, l) = &
+                                        buff_vals(1,1)%sf(i,k,l)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                else
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 1, buff_size
+                                    q_prim_vf(i)%sf(m + j, k, l) = &
+                                        q_prim_vf(i)%sf(m, k, l)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
 
             end if
 
@@ -257,31 +404,59 @@ contains
 
             if (bc_loc == -1) then !< bc_y%beg
 
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size
-                    do k = 0, p
-                        do j = 1, buff_size
-                            do l = -buff_size, m + buff_size
-                                q_prim_vf(i)%sf(l, -j, k) = &
-                                    q_prim_vf(i)%sf(l, 0, k)
+                if (bc_y%b_extrap_ic) then
+                    do i = 1, sys_size
+                        do k = 0, p
+                            do j = 1, buff_size
+                                do l = -buff_size, m + buff_size
+                                    q_prim_vf(i)%sf(l, -j, k) = &
+                                        buff_vals(2,-1)%sf(l, i, k)
+                                end do
                             end do
                         end do
                     end do
-                end do
+
+                else
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do k = 0, p
+                            do j = 1, buff_size
+                                do l = -buff_size, m + buff_size
+                                    q_prim_vf(i)%sf(l, -j, k) = &
+                                        q_prim_vf(i)%sf(l, 0, k)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
 
             else !< bc_y%end
 
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size
-                    do k = 0, p
-                        do j = 1, buff_size
-                            do l = -buff_size, m + buff_size
-                                q_prim_vf(i)%sf(l, n + j, k) = &
-                                    q_prim_vf(i)%sf(l, n, k)
+                if (bc_y%e_extrap_ic) then
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do k = 0, p
+                            do j = 1, buff_size
+                                do l = -buff_size, m + buff_size
+                                    q_prim_vf(i)%sf(l, n + j, k) = &
+                                        buff_vals(2,1)%sf(l,i,k)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                else
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do k = 0, p
+                            do j = 1, buff_size
+                                do l = -buff_size, m + buff_size
+                                    q_prim_vf(i)%sf(l, n + j, k) = &
+                                        q_prim_vf(i)%sf(l, n, k)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
 
             end if
 
@@ -290,31 +465,59 @@ contains
 
             if (bc_loc == -1) then !< bc_z%beg
 
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        do l = -buff_size, n + buff_size
-                            do k = -buff_size, m + buff_size
-                                q_prim_vf(i)%sf(k, l, -j) = &
-                                    q_prim_vf(i)%sf(k, l, 0)
+                if (bc_z%b_extrap_ic) then
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do j = 1, buff_size
+                            do l = -buff_size, n + buff_size
+                                do k = -buff_size, m + buff_size
+                                    q_prim_vf(i)%sf(k, l, -j) = &
+                                        buff_vals(3,-1)%sf(k,l,i)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                else
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do j = 1, buff_size
+                            do l = -buff_size, n + buff_size
+                                do k = -buff_size, m + buff_size
+                                    q_prim_vf(i)%sf(k, l, -j) = &
+                                        q_prim_vf(i)%sf(k, l, 0)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
 
             else !< bc_z%end
 
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        do l = -buff_size, n + buff_size
-                            do k = -buff_size, m + buff_size
-                                q_prim_vf(i)%sf(k, l, p + j) = &
-                                    q_prim_vf(i)%sf(k, l, p)
+                if (bc_z%e_extrap_ic) then
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do j = 1, buff_size
+                            do l = -buff_size, n + buff_size
+                                do k = -buff_size, m + buff_size
+                                    q_prim_vf(i)%sf(k, l, p + j) = &
+                                        buff_vals(3,1)%sf(k,l,i)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                else
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do i = 1, sys_size
+                        do j = 1, buff_size
+                            do l = -buff_size, n + buff_size
+                                do k = -buff_size, m + buff_size
+                                    q_prim_vf(i)%sf(k, l, p + j) = &
+                                        q_prim_vf(i)%sf(k, l, p)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
 
             end if
 

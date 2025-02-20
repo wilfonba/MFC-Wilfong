@@ -33,6 +33,8 @@ module m_start_up
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
 
+    use m_boundary_conditions
+
     use m_acoustic_src      !< Acoustic source calculations
 
     use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
@@ -1514,6 +1516,11 @@ contains
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
+
+        if (any((/bc_x%b_extrap_ic, bc_x%e_extrap_ic, bc_y%b_extrap_ic, &
+                bc_y%e_extrap_ic, bc_z%b_extrap_ic, bc_z%e_extrap_ic/))) then
+            call s_initialize_boundary_conditions_module(q_cons_ts(1)%vf)
+        end if
 
     end subroutine s_initialize_modules
 

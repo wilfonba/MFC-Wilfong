@@ -278,7 +278,7 @@ contains
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
-        
+
         cyl_coord = .false.
 
         x_domain%beg = dflt_real

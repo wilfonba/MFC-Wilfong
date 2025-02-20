@@ -344,6 +344,22 @@ contains
                     end if
                 end do
 
+                ! Boundary condition at the beginning
+                if (proc_coords(3) > 0 .or. (bc_z%beg == -1 .and. num_procs_z > 1)) then
+                    proc_coords(3) = proc_coords(3) - 1
+                    call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                       bc_z%beg, ierr)
+                    proc_coords(3) = proc_coords(3) + 1
+                end if
+
+                ! Boundary condition at the end
+                if (proc_coords(3) > 0 .or. (bc_z%end == -1 .and. num_procs_z > 1)) then
+                    proc_coords(3) = proc_coords(3) + 1
+                    call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                       bc_z%end, ierr)
+                    proc_coords(3) = proc_coords(3) - 1
+                end if
+
                 ! Beginning and end sub-domain boundary locations
                 if (parallel_io .neqv. .true.) then
                     if (old_grid .neqv. .true.) then
@@ -457,6 +473,22 @@ contains
                 end if
             end do
 
+            ! Boundary condition at the beginning
+            if (proc_coords(2) > 0 .or. (bc_y%beg == -1 .and. num_procs_y > 1)) then
+                proc_coords(2) = proc_coords(2) - 1
+                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                   bc_y%beg, ierr)
+                proc_coords(2) = proc_coords(2) + 1
+            end if
+
+            ! Boundary condition at the end
+            if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == -1 .and. num_procs_y > 1)) then
+                proc_coords(2) = proc_coords(2) + 1
+                call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
+                                   bc_y%end, ierr)
+                proc_coords(2) = proc_coords(2) - 1
+            end if
+
             ! Beginning and end sub-domain boundary locations
             if (parallel_io .neqv. .true.) then
                 if (old_grid .neqv. .true.) then
@@ -521,6 +553,20 @@ contains
                 exit
             end if
         end do
+
+        ! Boundary condition at the beginning
+        if (proc_coords(1) > 0 .or. (bc_x%beg == -1 .and. num_procs_x > 1)) then
+            proc_coords(1) = proc_coords(1) - 1
+            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
+            proc_coords(1) = proc_coords(1) + 1
+        end if
+
+        ! Boundary condition at the end
+        if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == -1 .and. num_procs_x > 1)) then
+            proc_coords(1) = proc_coords(1) + 1
+            call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
+            proc_coords(1) = proc_coords(1) - 1
+        end if
 
         ! Beginning and end sub-domain boundary locations
         if (parallel_io .neqv. .true.) then
