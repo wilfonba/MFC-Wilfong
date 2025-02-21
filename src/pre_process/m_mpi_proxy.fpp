@@ -36,7 +36,47 @@ module m_mpi_proxy
     !! average primitive variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
+    integer :: halo_size
+
 contains
+
+    !> The computation of parameters, the allocation of memory,
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.
+    subroutine s_initialize_mpi_proxy_module
+
+#ifdef MFC_MPI
+
+        ! Allocating q_prims_buff_send/recv. Please note that
+        ! for the sake of simplicity, both variables are provided sufficient
+        ! storage to hold the largest buffer in the computational domain.
+
+
+        if (n > 0) then
+            if (p > 0) then
+
+                halo_size = -1 + buff_size*sys_size* &
+                                         & (m + 2*buff_size + 1)* &
+                                         & (n + 2*buff_size + 1)* &
+                                         & (p + 2*buff_size + 1)/ &
+                                         & (min(m, n, p) + 2*buff_size + 1)
+            else
+                halo_size = -1 + buff_size*sys_size* &
+                                         & (max(m, n) + 2*buff_size + 1)
+            end if
+        else
+            halo_size = -1 + buff_size*sys_size
+        end if
+
+        v_size = sys_size
+
+        allocate(q_prims_buff_send(0:halo_size))
+
+        allocate(q_prims_buff_recv(0:ubound(q_prims_buff_send, 1)))
+
+#endif
+
+    end subroutine s_initialize_mpi_proxy_module
 
     !> Since only processor with rank 0 is in charge of reading
         !!       and checking the consistency of the user provided inputs,
@@ -558,6 +598,8 @@ contains
         if (proc_coords(1) > 0 .or. (bc_x%beg == -1 .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
+            print *, proc_rank, bc_x 
+            print *
             proc_coords(1) = proc_coords(1) + 1
         end if
 
@@ -621,8 +663,6 @@ contains
 
         integer :: pack_offset, unpack_offset
 
-        real(wp), pointer :: p_send, p_recv
-
 #ifdef MFC_MPI
 
         buffer_counts = (/ &
@@ -681,7 +721,7 @@ contains
                     do i = 1, sys_size
                         do l = 0, p
                             do k = 0, buff_size - 1
-                                do j = -1, m + 1
+                                do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size* &
                                         ((j + 1) + (m + 2*1 + 1)* &
                                          (k + 1*l))
@@ -695,10 +735,10 @@ contains
                     do i = 1, sys_size
                         do l = 0, buff_size - 1
                             do k = -1, n + 1
-                                do j = -1, m + 1
+                                do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size* &
-                                        ((j + 1) + (m + 2*1 + 1)* &
-                                         ((k + 1) + (n + 2*1 + 1)*l))
+                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                         ((k + buff_size) + (n + 2*buff_size + 1)*l))
                                     q_prims_buff_send(r) = q_prim_vf(i)%sf(j, k, l + pack_offset)
                                 end do
                             end do
@@ -708,10 +748,6 @@ contains
             end if
         #:endfor
 
-        call MPI_SENDRECV( &
-            p_send, buffer_count, mpi_p, dst_proc, send_tag, &
-            p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
-            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
         ! Unpack Received Buffer
         #:for mpi_dir in [1, 2, 3]
@@ -723,7 +759,7 @@ contains
                             do j = -buff_size, -1
                                 do i = 1, sys_size
                                     r = (i - 1) + v_size* &
-                                        (j + 1*((k + 1) + (n + 1)*l))
+                                        (j + buff_size*((k + 1) + (n + 1)*l))
                                         q_prim_vf(i)%sf(j + unpack_offset, k, l) = q_prims_buff_recv(r)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
@@ -741,10 +777,10 @@ contains
                     do i = 1, sys_size
                         do l = 0, p
                             do k = -buff_size, -1
-                                do j = -1, m + 1
+                                do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + 1) + 1*l))
+                                         ((k + buff_size) + buff_size*l))
                                          q_prim_vf(i)%sf(j, k + unpack_offset, l) = q_prims_buff_recv(r)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
@@ -761,12 +797,12 @@ contains
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
                         do l = -buff_size, -1
-                            do k = -1, n + 1
-                                do j = -1, m + 1
+                            do k = -buff_size, n + buff_size
+                                do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size* &
-                                        ((j + 1) + (m + 2*1 + 1)* &
-                                         ((k + 1) + (n + 2*1 + 1)* &
-                                          (l + 1)))
+                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                         ((k + buff_size) + (n + 2*buff_size + 1)* &
+                                          (l + buff_size)))
                                           q_prim_vf(i)%sf(j, k, l + unpack_offset) = q_prims_buff_recv(r)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
@@ -785,6 +821,16 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_variables_buffers
+
+    !> Module deallocation and/or disassociation procedures
+    subroutine s_finalize_mpi_proxy_module
+
+#ifdef MFC_MPI
+                deallocate(q_prims_buff_send, q_prims_buff_recv)
+#endif
+
+    end subroutine s_finalize_mpi_proxy_module
+        
 
 
 

@@ -611,7 +611,7 @@ contains
 
     end subroutine s_generate_wave
 
-    subroutine s_elliptic_smoothing(q_prim_vf)
+    subroutine  s_elliptic_smoothing(q_prim_vf)
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(wp), dimension(0:m, 0:n, 0:p, 1:sys_size) :: q_prim_temp
