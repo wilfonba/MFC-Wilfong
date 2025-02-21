@@ -63,12 +63,11 @@ contains
                     end do
                 end do
             end do
-            print*, buff_vals(1,-1)%sf(contxb,:,:)
         end if
 
         if (bc_x%e_extrap_ic .and. bc_x%end == -3) then
             @:ALLOCATE(buff_vals(1,1)%sf(1:sys_size,0:n,0:p))
-            !$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do i = 1, sys_size
                 do l = 0, p
                     do k = 0, n
@@ -81,7 +80,7 @@ contains
 
         if (bc_y%b_extrap_ic .and. bc_y%beg == -3) then
             @:ALLOCATE(buff_vals(2,-1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-            !$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do i = 1, sys_size
                 do k = 0, p
                         do l = -buff_size, m + buff_size
@@ -94,7 +93,7 @@ contains
 
         if (bc_y%e_extrap_ic .and. bc_y%end == -3) then
             @:ALLOCATE(buff_vals(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-            !$acc parallel loop collapse(4) gang vector default(present)
+            !$acc parallel loop collapse(3) gang vector default(present)
             do i = 1, sys_size
                 do k = 0, p
                     do l = -buff_size, m + buff_size
@@ -108,7 +107,7 @@ contains
         if (p > 0) then
             if (bc_z%b_extrap_ic .and. bc_z%beg == -3) then
                 @:ALLOCATE(buff_vals(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                !$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                     do l = -buff_size, n + buff_size
                         do k = -buff_size, m + buff_size
@@ -121,7 +120,7 @@ contains
 
             if (bc_z%e_extrap_ic .and. bc_z%end == -3) then
                 @:ALLOCATE(buff_vals(3,1)%sf(0:m,0:n,1:sys_size))
-                !$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do i = 1, sys_size
                         do l = -buff_size, n + buff_size
                             do k = -buff_size, m + buff_size
