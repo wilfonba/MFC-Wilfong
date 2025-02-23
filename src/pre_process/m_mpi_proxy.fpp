@@ -482,7 +482,6 @@ contains
                                                           num_procs_y/), (/.true., &
                                                                            .true./), .false., MPI_COMM_CART, &
                                      ierr)
-
                 ! Finding corresponding Cartesian coordinates of the local
                 ! processor rank in newly declared cartesian communicator
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, &
@@ -598,8 +597,6 @@ contains
         if (proc_coords(1) > 0 .or. (bc_x%beg == -1 .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
-            print *, proc_rank, bc_x 
-            print *
             proc_coords(1) = proc_coords(1) + 1
         end if
 
@@ -663,6 +660,8 @@ contains
 
         integer :: pack_offset, unpack_offset
 
+        real(wp), pointer :: p_send, p_recv
+
 #ifdef MFC_MPI
 
         buffer_counts = (/ &
@@ -723,8 +722,8 @@ contains
                             do k = 0, buff_size - 1
                                 do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size* &
-                                        ((j + 1) + (m + 2*1 + 1)* &
-                                         (k + 1*l))
+                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                         (k + buff_size*l))
                                     q_prims_buff_send(r) = q_prim_vf(i)%sf(j, k + pack_offset, l)
                                 end do
                             end do
@@ -734,7 +733,7 @@ contains
                     !$acc parallel loop collapse(4) gang vector default(present) private(r)
                     do i = 1, sys_size
                         do l = 0, buff_size - 1
-                            do k = -1, n + 1
+                            do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
@@ -748,7 +747,14 @@ contains
             end if
         #:endfor
 
+        p_send => q_prims_buff_send(0)
+        p_recv => q_prims_buff_recv(0)
 
+        call MPI_SENDRECV( &
+        p_send, buffer_count, mpi_p, dst_proc, send_tag, &
+        p_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        
         ! Unpack Received Buffer
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then

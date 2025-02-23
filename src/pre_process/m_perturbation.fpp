@@ -616,7 +616,6 @@ contains
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(wp), dimension(0:m, 0:n, 0:p, 1:sys_size) :: q_prim_temp
         integer :: i, j, k, l, q
-        print*, proc_rank, bcxb, bcxe
         do q = 1, elliptic_smoothing_iters
             if(bcxb >= -12) then
                 if(bcxb >= 0) then

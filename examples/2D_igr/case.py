@@ -41,8 +41,8 @@ data = {
     # "t_save": 2.5/100,
     "dt": dt,
     "t_step_start": 0,
-    "t_step_stop": 1,
-    "t_step_save": 1,
+    "t_step_stop": 500,
+    "t_step_save": 10,
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
