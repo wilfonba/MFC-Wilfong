@@ -180,13 +180,15 @@ contains
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
 
-        do l = 1, sys_size
-            @:ALLOCATE(q_cons_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-        end do
+        if(.not. igr) then 
+            do l = 1, sys_size
+                @:ALLOCATE(q_cons_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            end do        
+            do l = mom_idx%beg, E_idx
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            end do
 
-        do l = mom_idx%beg, E_idx
-            @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-        end do
+        end if
 
         if (surface_tension) then
             ! This assumes that the color function advection equation is
@@ -202,19 +204,24 @@ contains
 
         end if
 
-        @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
+        if(.not. igr) then 
+            @:ACC_SETUP_VFs( q_cons_qp)    
+            @:ACC_SETUP_VFs(q_prim_qp)
+        end if
 
-        do l = 1, cont_idx%end
-            q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
-            !$acc enter data copyin(q_prim_qp%vf(l)%sf)
-            !$acc enter data attach(q_prim_qp%vf(l)%sf)
-        end do
+        if(.not. igr) then 
+            do l = 1, cont_idx%end
+                q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
+                !$acc enter data copyin(q_prim_qp%vf(l)%sf)
+                !$acc enter data attach(q_prim_qp%vf(l)%sf)
+            end do
 
-        do l = adv_idx%beg, adv_idx%end
-            q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
-            !$acc enter data copyin(q_prim_qp%vf(l)%sf)
-            !$acc enter data attach(q_prim_qp%vf(l)%sf)
-        end do
+            do l = adv_idx%beg, adv_idx%end
+                q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
+                !$acc enter data copyin(q_prim_qp%vf(l)%sf)
+                !$acc enter data attach(q_prim_qp%vf(l)%sf)
+            end do
+        end if
 
         if (surface_tension) then
             q_prim_qp%vf(c_idx)%sf => &
@@ -240,27 +247,33 @@ contains
                              & idwbuff(1)%beg:idwbuff(1)%end, &
                              & idwbuff(2)%beg:idwbuff(2)%end, &
                              & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
-                            & idwbuff(1)%beg:idwbuff(1)%end, &
-                            & idwbuff(2)%beg:idwbuff(2)%end, &
-                            & idwbuff(3)%beg:idwbuff(3)%end))
+                    if(.not. igr) then 
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
+                                & idwbuff(1)%beg:idwbuff(1)%end, &
+                                & idwbuff(2)%beg:idwbuff(2)%end, &
+                                & idwbuff(3)%beg:idwbuff(3)%end))
+                    end if
                 end do
 
                 if (viscous .or. surface_tension) then
-                    do l = mom_idx%beg, E_idx
-                        @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
-                                 & idwbuff(1)%beg:idwbuff(1)%end, &
-                                 & idwbuff(2)%beg:idwbuff(2)%end, &
-                                 & idwbuff(3)%beg:idwbuff(3)%end))
-                    end do
+                    if(.not. igr) then 
+                        do l = mom_idx%beg, E_idx
+                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
+                                     & idwbuff(1)%beg:idwbuff(1)%end, &
+                                     & idwbuff(2)%beg:idwbuff(2)%end, &
+                                     & idwbuff(3)%beg:idwbuff(3)%end))
+                        end do
+                    end if
                 end if
 
-                @:ALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf( &
-                         & idwbuff(1)%beg:idwbuff(1)%end, &
-                         & idwbuff(2)%beg:idwbuff(2)%end, &
-                         & idwbuff(3)%beg:idwbuff(3)%end))
+                if(.not. igr) then 
+                    @:ALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf( &
+                             & idwbuff(1)%beg:idwbuff(1)%end, &
+                             & idwbuff(2)%beg:idwbuff(2)%end, &
+                             & idwbuff(3)%beg:idwbuff(3)%end))
+                end if
 
-                if (riemann_solver == 1) then
+                if (riemann_solver == 1 .and. (.not. igr)) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         @:ALLOCATE(flux_src_n(i)%vf(l)%sf( &
                                  & idwbuff(1)%beg:idwbuff(1)%end, &
@@ -279,18 +292,23 @@ contains
                 end if
 
             else
-                do l = 1, sys_size
-                    @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
-                        idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, &
-                        idwbuff(3)%beg:idwbuff(3)%end))
-                end do
+                if(.not. igr) then 
+                    do l = 1, sys_size
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf( &
+                            idwbuff(1)%beg:idwbuff(1)%end, &
+                            idwbuff(2)%beg:idwbuff(2)%end, &
+                            idwbuff(3)%beg:idwbuff(3)%end))
+                    end do
+                end if
             end if
 
-            @:ACC_SETUP_VFs(flux_n(i), flux_src_n(i), flux_gsrc_n(i))
+            @:ACC_SETUP_VFs(flux_n(i))
+            if(.not. igr) then 
+                @:ACC_SETUP_VFs(flux_src_n(i), flux_gsrc_n(i))
+            end if
 
             if (i == 1) then
-                if (riemann_solver /= 1) then
+                if (riemann_solver /= 1 .and. (.not. igr)) then
                     do l = adv_idx%beg + 1, adv_idx%end
                         flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(adv_idx%beg)%sf
                         !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
@@ -299,8 +317,11 @@ contains
             else
                 do l = 1, sys_size
                     flux_n(i)%vf(l)%sf => flux_n(1)%vf(l)%sf
-                    flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
-                    !$acc enter data attach(flux_n(i)%vf(l)%sf,flux_src_n(i)%vf(l)%sf)
+                    !$acc enter data attach(flux_n(i)%vf(l)%sf)
+                    if(.not. igr) then
+                        flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
+                        !$acc enter data attach(flux_src_n(i)%vf(l)%sf)
+                    end if
                 end do
             end if
         end do
@@ -638,51 +659,53 @@ contains
 
         call cpu_time(t_start)
 
-        ! Association/Population of Working Variables
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-
-        ! Converting Conservative to Primitive Variables
-
-        if (mpp_lim .and. bubbles_euler) then
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        alf_sum%sf(j, k, l) = 0._wp
-                        !$acc loop seq
-                        do i = advxb, advxe - 1
-                            alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
-                        end do
-                        !$acc loop seq
-                        do i = advxb, advxe - 1
-                            q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
-                                                          /alf_sum%sf(j, k, l)
+        if(.not. igr) then 
+            ! Association/Population of Working Variables
+            !$acc parallel loop collapse(4) gang vector default(present)
+            do i = 1, sys_size
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
             end do
-        end if
+
+            ! Converting Conservative to Primitive Variables
+
+            if (mpp_lim .and. bubbles_euler) then
+                !$acc parallel loop collapse(3) gang vector default(present)
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            alf_sum%sf(j, k, l) = 0._wp
+                            !$acc loop seq
+                            do i = advxb, advxe - 1
+                                alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
+                            end do
+                            !$acc loop seq
+                            do i = advxb, advxe - 1
+                                q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, l)*(1._wp - q_cons_qp%vf(alf_idx)%sf(j, k, l)) &
+                                                              /alf_sum%sf(j, k, l)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+        endif
 
         call nvtxStartRange("RHS-CONVERT")
         call s_convert_conservative_to_primitive_variables( &
-            q_cons_qp%vf, &
+            q_cons_vf, &
             q_T_sf, &
-            q_prim_qp%vf, &
+            q_prim_vf, &
             idwint, &
             gm_alpha_qp%vf)
         call nvtxEndRange
 
         call nvtxStartRange("RHS-COMMUNICATION")
-        call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+        call s_populate_variables_buffers(q_prim_vf, pb, mv)
         call nvtxEndRange
 
         call nvtxStartRange("RHS-ELASTIC")
@@ -724,30 +747,28 @@ contains
 
                 if (id == 1) then
                     call nvtxStartRange("IGR_SETUP")
-                    call s_initialize_igr(q_prim_qp%vf)
-                    call nvtxEndRange
-
-                    call nvtxStartRange("IGR_Jacobi")
-                    call s_igr_jacobi_iteration(t_step)
+                    call s_initialize_igr(q_prim_vf)
                     call nvtxEndRange
                 end if
 
-                call nvtxStartRange("IGR_WENO_PRIM")
-                call s_reconstruct_prim_vars_igr(q_prim_qp%vf, id)
-                call nvtxEndRange
-
-                call nvtxStartRange("IGR_VISC")
-                if(viscous) then
-                    call s_get_viscous_igr(id)
-                end if
-                call nvtxEndRange
 
                 call nvtxStartRange("IGR_RIEMANN")
                 call s_igr_riemann_solver(flux_n(id)%vf,id)
                 call nvtxEndRange
 
+                if(id == 1) then 
+                    call nvtxStartRange("IGR_Jacobi")
+                    call s_igr_jacobi_iteration(t_step)
+                    call nvtxEndRange
+                end if
+
+                call nvtxStartRange("IGR_SIGMA")
+                call s_igr_sigma(flux_n(id)%vf,id)
+                call nvtxEndRange
+
+
                 call nvtxStartRange("IGR_Flux_Add")
-                call s_igr_flux_add(q_prim_qp%vf, rhs_vf,flux_n(id)%vf, id)
+                call s_igr_flux_add(q_prim_vf, rhs_vf,flux_n(id)%vf, id)
                 call nvtxEndRange
 
             else ! Finite volume solve
@@ -843,34 +864,6 @@ contains
                                       flux_gsrc_n(id)%vf, &
                                       id, irx, iry, irz)
                 call nvtxEndRange
-
-                if(riemann_solver == 4) then 
-                    if(id == 1) then 
-                        call s_igr_riemann_solver_alt(flux_n(id)%vf, flux_src_n(id)%vf, id, qL_rsx_vf, qR_rsx_vf, & 
-                            dqL_prim_dx_n(id)%vf(momxb)%sf,dqL_prim_dy_n(id)%vf(momxb)%sf,dqL_prim_dz_n(id)%vf(momxb)%sf, &
-                            dqL_prim_dx_n(id)%vf(momxb+1)%sf,dqL_prim_dy_n(id)%vf(momxb+1)%sf,dqL_prim_dz_n(id)%vf(momxb+1)%sf, &
-                            dqL_prim_dx_n(id)%vf(momxe)%sf,dqL_prim_dy_n(id)%vf(momxe)%sf,dqL_prim_dz_n(id)%vf(momxe)%sf, &
-                            dqR_prim_dx_n(id)%vf(momxb)%sf,dqR_prim_dy_n(id)%vf(momxb)%sf,dqR_prim_dz_n(id)%vf(momxb)%sf, &
-                            dqR_prim_dx_n(id)%vf(momxb+1)%sf,dqR_prim_dy_n(id)%vf(momxb+1)%sf,dqR_prim_dz_n(id)%vf(momxb+1)%sf, &
-                            dqR_prim_dx_n(id)%vf(momxe)%sf,dqR_prim_dy_n(id)%vf(momxe)%sf,dqR_prim_dz_n(id)%vf(momxe)%sf)
-                    else if(id == 2) then 
-                        call s_igr_riemann_solver_alt(flux_n(id)%vf, flux_src_n(id)%vf, id, qL_rsy_vf, qR_rsy_vf, & 
-                            dqL_prim_dx_n(id)%vf(momxb)%sf,dqL_prim_dy_n(id)%vf(momxb)%sf,dqL_prim_dz_n(id)%vf(momxb)%sf, &
-                            dqL_prim_dx_n(id)%vf(momxb+1)%sf,dqL_prim_dy_n(id)%vf(momxb+1)%sf,dqL_prim_dz_n(id)%vf(momxb+1)%sf, &
-                            dqL_prim_dx_n(id)%vf(momxe)%sf,dqL_prim_dy_n(id)%vf(momxe)%sf,dqL_prim_dz_n(id)%vf(momxe)%sf, &
-                            dqR_prim_dx_n(id)%vf(momxb)%sf,dqR_prim_dy_n(id)%vf(momxb)%sf,dqR_prim_dz_n(id)%vf(momxb)%sf, &
-                            dqR_prim_dx_n(id)%vf(momxb+1)%sf,dqR_prim_dy_n(id)%vf(momxb+1)%sf,dqR_prim_dz_n(id)%vf(momxb+1)%sf, &
-                            dqR_prim_dx_n(id)%vf(momxe)%sf,dqR_prim_dy_n(id)%vf(momxe)%sf,dqR_prim_dz_n(id)%vf(momxe)%sf)
-                    else if(id == 3) then 
-                        call s_igr_riemann_solver_alt(flux_n(id)%vf,flux_src_n(id)%vf, id,  qL_rsz_vf, qR_rsz_vf, & 
-                            dqL_prim_dx_n(id)%vf(momxb)%sf,dqL_prim_dy_n(id)%vf(momxb)%sf,dqL_prim_dz_n(id)%vf(momxb)%sf, &
-                            dqL_prim_dx_n(id)%vf(momxb+1)%sf,dqL_prim_dy_n(id)%vf(momxb+1)%sf,dqL_prim_dz_n(id)%vf(momxb+1)%sf, &
-                            dqL_prim_dx_n(id)%vf(momxe)%sf,dqL_prim_dy_n(id)%vf(momxe)%sf,dqL_prim_dz_n(id)%vf(momxe)%sf, &
-                            dqR_prim_dx_n(id)%vf(momxb)%sf,dqR_prim_dy_n(id)%vf(momxb)%sf,dqR_prim_dz_n(id)%vf(momxb)%sf, &
-                            dqR_prim_dx_n(id)%vf(momxb+1)%sf,dqR_prim_dy_n(id)%vf(momxb+1)%sf,dqR_prim_dz_n(id)%vf(momxb+1)%sf, &
-                            dqR_prim_dx_n(id)%vf(momxe)%sf,dqR_prim_dy_n(id)%vf(momxe)%sf,dqR_prim_dz_n(id)%vf(momxe)%sf)
-                    end if
-                end if
 
 
                 ! Additional physics and source terms
@@ -976,16 +969,18 @@ contains
         ! END: Additional pphysics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do i = 1, sys_size
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            q_prim_vf(i)%sf(j, k, l) = q_prim_qp%vf(i)%sf(j, k, l)
+            if(.not. igr) then 
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, sys_size
+                    do l = idwbuff(3)%beg, idwbuff(3)%end
+                        do k = idwbuff(2)%beg, idwbuff(2)%end
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
+                                q_prim_vf(i)%sf(j, k, l) = q_prim_qp%vf(i)%sf(j, k, l)
+                            end do
                         end do
                     end do
                 end do
-            end do
+            end if
         end if
 
         call cpu_time(t_finish)
@@ -2293,32 +2288,40 @@ contains
             if (i /= 1) then
                 do l = 1, sys_size
                     nullify (flux_n(i)%vf(l)%sf)
-                    nullify (flux_src_n(i)%vf(l)%sf)
-                    @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
+                    if(.not. igr) then
+                        nullify (flux_src_n(i)%vf(l)%sf)
+                        @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
+                    end if
                 end do
             else
                 do l = 1, sys_size
                     @:DEALLOCATE(flux_n(i)%vf(l)%sf)
-                    @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
+                    if(.not. igr) then
+                        @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
+                    end if
                 end do
 
-                if (viscous) then
+                if (viscous .and. (.not. igr)) then
                     do l = mom_idx%beg, E_idx
                         @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                     end do
                 end if
 
-                if (riemann_solver == 1) then
-                    do l = adv_idx%beg + 1, adv_idx%end
-                        @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
-                    end do
-                else
-                    do l = adv_idx%beg + 1, adv_idx%end
-                        nullify (flux_src_n(i)%vf(l)%sf)
-                    end do
+                if(.not. igr) then 
+                    if (riemann_solver == 1) then
+                        do l = adv_idx%beg + 1, adv_idx%end
+                            @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
+                        end do
+                    else
+                        do l = adv_idx%beg + 1, adv_idx%end
+                            nullify (flux_src_n(i)%vf(l)%sf)
+                        end do
+                    end if
                 end if
 
-                @:DEALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf)
+                if(.not. igr) then 
+                    @:DEALLOCATE(flux_src_n(i)%vf(adv_idx%beg)%sf)
+                end if
             end if
 
             @:DEALLOCATE(flux_n(i)%vf, flux_src_n(i)%vf, flux_gsrc_n(i)%vf)
