@@ -578,6 +578,19 @@ contains
 
         end if ! end allocation for .not. igr
 
+        !$acc parallel loop collapse(4) gang vector default(present)
+        do id = 1, num_dims
+            do i = advxb, advxe
+                do l = startz, p - startz
+                    do k = starty, n - starty
+                        do j = startx, m - startx
+                            flux_n(id)%vf(i)%sf(j, k, l) = 0._wp
+                        end do
+                    end do
+                end do
+            end do
+        end do
+
         if (qbmm) then
             @:ALLOCATE(mom_sp(1:nmomsp), mom_3d(0:2, 0:2, nb))
 
