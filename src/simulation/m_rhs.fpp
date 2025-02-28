@@ -779,7 +779,6 @@ contains
                     call nvtxEndRange
                 end if
 
-
                 call nvtxStartRange("IGR_RIEMANN")
                 call s_igr_riemann_solver(q_prim_vf,flux_n(id)%vf,id)
                 call nvtxEndRange

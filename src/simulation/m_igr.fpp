@@ -984,7 +984,7 @@ contains
 
                             a_L = sqrt((qL_rs_vf(j+1,k,l,E_idx)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
-                            cfl(j,k,l) = 2_wp*(sqrt(qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp + qL_rs_vf(j+1,k,l,momxb+2)**2._wp) + a_L)
+                            cfl(j,k,l) = (sqrt(qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp + qL_rs_vf(j+1,k,l,momxb+2)**2._wp) + a_L)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -1288,7 +1288,7 @@ contains
 
                             dvel1(j,k,l) = dvel1(j,k,l) + dvel2(j,k,l)
 
-                            dvel2(j,k,l) = (1/(12._wp*dy(k))) * ( &
+                            dvel2(j,k,l) = (1/(12._wp*dz(l))) * ( &
                             8._wp*q_prim_vf(momxb+2)%sf(j,k,l+1) - &
                             8._wp*q_prim_vf(momxb+2)%sf(j,k,l-1) + &
                             q_prim_vf(momxb+2)%sf(j,k,l-2) - &
@@ -1769,7 +1769,7 @@ contains
 
                             a_L = sqrt((qL_rs_vf(j,k+1,l,E_idx)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
-                            cfl(j,k,l) = 2_wp*(sqrt(qL_rs_vf(j,k+1,l,momxb)**2._wp + qL_rs_vf(j,k+1,l,momxb+1)**2._wp + qL_rs_vf(j,k+1,l,momxb+2)**2._wp) + a_L)
+                            cfl(j,k,l) = (sqrt(qL_rs_vf(j,k+1,l,momxb)**2._wp + qL_rs_vf(j,k+1,l,momxb+1)**2._wp + qL_rs_vf(j,k+1,l,momxb+2)**2._wp) + a_L)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -2223,7 +2223,7 @@ contains
 
                         a_L = sqrt((qL_rs_vf(j,k,l+1,E_idx)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
-                        cfl(j,k,l) = 2_wp*(sqrt(qL_rs_vf(j,k,l+1,momxb)**2._wp + qL_rs_vf(j,k,l+1,momxb+1)**2._wp + qL_rs_vf(j,k,l+1,momxb+2)**2._wp) + a_L)
+                        cfl(j,k,l) = (sqrt(qL_rs_vf(j,k,l+1,momxb)**2._wp + qL_rs_vf(j,k,l+1,momxb+1)**2._wp + qL_rs_vf(j,k,l+1,momxb+2)**2._wp) + a_L)
 
                         !$acc loop seq
                         do i = 1, num_fluids
