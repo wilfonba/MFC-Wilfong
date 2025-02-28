@@ -929,7 +929,7 @@ contains
 
                             a_L = sqrt((qL_rs_vf(j+1,k,l,E_idx)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
-                            cfl = 2d0*(sqrt(qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp + qR_rs_vf(j+1,k,l,momxb+2)**2._wp) + a_L)
+                            cfl = 2d0*(sqrt(qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp + qL_rs_vf(j+1,k,l,momxb+2)**2._wp) + a_L)
 
                             !$acc loop seq
                             do i = 1, num_fluids
@@ -2403,17 +2403,6 @@ contains
                                             2._wp * q_prim_vf(i)%sf(j, k, l-2))
                         end do 
 
-                        if(num_fluids > 1) then 
-                            !$acc loop seq 
-                            do i = advxb, advxe
-                                qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k, l+2) + &
-                                            27._wp * q_prim_vf(i)%sf(j, k, l+1) + &
-                                            47._wp * q_prim_vf(i)%sf(j, k, l) -   &
-                                            13._wp * q_prim_vf(i)%sf(j, k, l-1) + &
-                                            2._wp * q_prim_vf(i)%sf(j, k, l-2))
-                            end do
-                        end if
-
                         if(sys_size > advxe) then 
                             do i = advxe + 1, sys_size
                                 qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k, l+2) + &
@@ -2437,17 +2426,6 @@ contains
                         end do
 
                         if(num_fluids > 1) then 
-                            !$acc loop seq
-                            do i = 1, num_fluids
-                                flux_vf(advxb+i-1)%sf(j,k,l) = &
-                                    0.5_wp * (qL_rs_vf(j,k,l,advxb+i-1) * &
-                                    qR_rs_vf(j,k,l,1)) + &
-                                    0.5_wp*cfl * (qL_rs_vf(j,k,l,advxb+i-1))
-
-                                flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
-                                - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qR_rs_vf(j,k,l,1)
-                            end do
-                        else 
                             !$acc loop seq
                             do i = 1, num_fluids
                                 flux_vf(advxb+i-1)%sf(j,k,l) = &
