@@ -817,14 +817,12 @@ contains
                         do j = -buff_size+2, m+buff_size-3
                             if(viscous) then
 
-                                if(num_fluids > 1) then 
-                                    mu_L = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(1)
-                                        mu_L =  qL_rs_vf(j+1,k,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                                  + mu_L
-                                    end do
-                                end if
+                                mu_L = 0._wp
+                                !$acc loop seq
+                                do q = 1, Re_size(1)
+                                    mu_L =  qL_rs_vf(j+1,k,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                              + mu_L
+                                end do
 
                                 dvel_L(j+1, k, l) = (1._wp/60._wp) * (-3._wp * dvel1(j-1, k, l) + &
                                                         27._wp * dvel1(j, k, l) + &
@@ -1136,14 +1134,12 @@ contains
                                                         13._wp * dvel1(j+2, k, l) + &
                                                         2._wp * dvel1(j+3, k, l))
 
-                                if(num_fluids > 1) then 
-                                    mu_L = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(1)
-                                        mu_L =  qL_rs_vf(j+1,k,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                                  + mu_L
-                                    end do
-                                end if
+                                mu_L = 0._wp
+                                !$acc loop seq
+                                do q = 1, Re_size(1)
+                                    mu_L =  qL_rs_vf(j+1,k,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                              + mu_L
+                                end do
 
                                 flux_vf(momxb+1)%sf(j,k,l) = flux_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*(dvel_L(j+1,k,l))
                                 flux_vf(E_idx)%sf(j,k,l) = flux_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*qL_rs_vf(j+1,k,l,momxb)*dvel_L(j+1,k,l) 
@@ -1227,14 +1223,12 @@ contains
 
                             if(viscous) then
 
-                                if(num_fluids > 1) then 
-                                    mu_L = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(1)
-                                        mu_L =  qL_rs_vf(j+1,k,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                                  + mu_L
-                                    end do
-                                end if
+                                mu_L = 0._wp
+                                !$acc loop seq
+                                do q = 1, Re_size(1)
+                                    mu_L =  qL_rs_vf(j+1,k,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                              + mu_L
+                                end do
 
                                 dvel_L(j+1, k, l) = (1._wp/60._wp) * (-3._wp * dvel1(j-1, k, l) + &
                                                         27._wp * dvel1(j, k, l) + &
@@ -1306,14 +1300,12 @@ contains
 
                             if(viscous) then
 
-                                if(num_fluids > 1) then 
-                                    mu_L = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(1)
-                                        mu_L =  qL_rs_vf(j+1,k,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                                  + mu_L
-                                    end do
-                                end if
+                                mu_L = 0._wp
+                                !$acc loop seq
+                                do q = 1, Re_size(1)
+                                    mu_L =  qL_rs_vf(j+1,k,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                              + mu_L
+                                end do
 
                                 dvel_L(j+1, k, l) = (1._wp/60._wp) * (-3._wp * dvel2(j-1, k, l) + &
                                                         27._wp * dvel2(j, k, l) + &
@@ -1607,14 +1599,13 @@ contains
                                                         13._wp * dvel1(j, k+2, l) + &
                                                         2._wp * dvel1(j, k+3, l))
 
-                                if(num_fluids > 1) then 
-                                    mu_L = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(1)
-                                        mu_L =  qL_rs_vf(j,k+1,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                                  + mu_L
-                                    end do
-                                end if
+
+                                mu_L = 0._wp
+                                !$acc loop seq
+                                do q = 1, Re_size(1)
+                                    mu_L =  qL_rs_vf(j,k+1,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                              + mu_L
+                                end do
                                 
 
                                 flux_vf(momxb+1)%sf(j,k,l) = flux_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((4._wp/3._wp)*dvel_L(j,k+1,l))
@@ -1919,14 +1910,12 @@ contains
                                                         13._wp * dvel1(j, k+2, l) + &
                                                         2._wp * dvel1(j, k+3, l))
 
-                                if(num_fluids > 1) then 
-                                    mu_L = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(1)
-                                        mu_L =  qL_rs_vf(j,k+1,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                                  + mu_L
-                                    end do
-                                end if
+                                mu_L = 0._wp
+                                !$acc loop seq
+                                do q = 1, Re_size(1)
+                                    mu_L =  qL_rs_vf(j,k+1,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                              + mu_L
+                                end do
                                 
 
                                 flux_vf(momxb+2)%sf(j,k,l) = flux_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*(dvel_L(j,k+1,l))
@@ -2001,14 +1990,12 @@ contains
                                                         13._wp * dvel1(j, k+2, l) + &
                                                         2._wp * dvel1(j, k+3, l))
 
-                                if(num_fluids > 1) then 
-                                    mu_L = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(1)
-                                        mu_L =  qL_rs_vf(j,k+1,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                                  + mu_L
-                                    end do
-                                end if
+                                mu_L = 0._wp
+                                !$acc loop seq
+                                do q = 1, Re_size(1)
+                                    mu_L =  qL_rs_vf(j,k+1,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                              + mu_L
+                                end do
                                 
 
                                 flux_vf(momxb+1)%sf(j,k,l) = flux_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((4._wp/3._wp)*dvel_L(j,k+1,l))
@@ -2070,14 +2057,12 @@ contains
 
                             if(viscous) then
 
-                                if(num_fluids > 1) then 
-                                    mu_L = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(1)
-                                        mu_L =  qL_rs_vf(j,k+1,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                                  + mu_L
-                                    end do
-                                end if
+                                mu_L = 0._wp
+                                !$acc loop seq
+                                do q = 1, Re_size(1)
+                                    mu_L =  qL_rs_vf(j,k+1,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                              + mu_L
+                                end do
 
                                 dvel_L(j, k+1, l) = (1._wp/60._wp) * (-3._wp * dvel2(j, k-1, l) + &
                                                         27._wp * dvel2(j, k, l) + &
@@ -2372,14 +2357,12 @@ contains
                                                     13._wp * dvel1(j, k, l+2) + &
                                                     2._wp * dvel1(j, k, l+3))
 
-                            if(num_fluids > 1) then 
-                                mu_L = 0._wp
-                                !$acc loop seq
-                                do q = 1, Re_size(1)
-                                    mu_L =  qL_rs_vf(j,k,l+1,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                              + mu_L
-                                end do
-                            end if
+                            mu_L = 0._wp
+                            !$acc loop seq
+                            do q = 1, Re_size(1)
+                                mu_L =  qL_rs_vf(j,k,l+1,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                          + mu_L
+                            end do
                             
 
                             flux_vf(momxb+1)%sf(j,k,l) = flux_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*(dvel_L(j,k,l+1))
@@ -2452,15 +2435,13 @@ contains
                                                     47._wp * dvel1(j, k, l+1) -   &
                                                     13._wp * dvel1(j, k, l+2) + &
                                                     2._wp * dvel1(j, k, l+3))
-
-                            if(num_fluids > 1) then 
-                                mu_L = 0._wp
-                                !$acc loop seq
-                                do q = 1, Re_size(1)
-                                    mu_L =  qL_rs_vf(j,k,l+1,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                              + mu_L
-                                end do
-                            end if
+ 
+                            mu_L = 0._wp
+                            !$acc loop seq
+                            do q = 1, Re_size(1)
+                                mu_L =  qL_rs_vf(j,k,l+1,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                          + mu_L
+                            end do
                             
 
                             flux_vf(momxb+2)%sf(j,k,l) = flux_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((4._wp/3._wp)*dvel_L(j,k,l+1))
@@ -2522,14 +2503,12 @@ contains
 
                         if(viscous) then
 
-                            if(num_fluids > 1) then 
-                                mu_L = 0._wp
-                                !$acc loop seq
-                                do q = 1, Re_size(1)
-                                    mu_L =  qL_rs_vf(j,k,l+1,advxb+Re_idx(1, q)-1) / Res(1, q) &
-                                              + mu_L
-                                end do
-                            end if
+                            mu_L = 0._wp
+                            !$acc loop seq
+                            do q = 1, Re_size(1)
+                                mu_L =  qL_rs_vf(j,k,l+1,advxb+Re_idx(1, q)-1) / Res(1, q) &
+                                          + mu_L
+                            end do
 
                             dvel_L(j, k, l+1) = (1._wp/60._wp) * (-3._wp * dvel2(j, k, l-1) + &
                                                     27._wp * dvel2(j, k, l) + &
