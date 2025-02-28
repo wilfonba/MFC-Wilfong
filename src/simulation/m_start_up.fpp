@@ -1510,8 +1510,10 @@ contains
         print *, "[MEM-INST] After: s_initialize_weno_module"
         call acc_present_dump()
 #endif
+#if defined(MFC_OpenACC)
         call acc_present_dump()
         print *, "BYTES", acc_bytesalloc()
+#endif
 
         if (.not. igr) call s_initialize_cbc_module()
         call s_initialize_derived_variables()
