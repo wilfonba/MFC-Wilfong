@@ -67,6 +67,7 @@ module m_start_up
 
 #ifdef MFC_OpenACC
     use openacc
+    use accel_lib
 #endif
 
     use m_nvtx
@@ -1509,6 +1510,8 @@ contains
         print *, "[MEM-INST] After: s_initialize_weno_module"
         call acc_present_dump()
 #endif
+        call acc_present_dump()
+        print *, "BYTES", acc_bytesalloc()
 
         if (.not. igr) call s_initialize_cbc_module()
         call s_initialize_derived_variables()

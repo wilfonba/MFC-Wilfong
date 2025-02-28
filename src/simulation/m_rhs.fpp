@@ -695,18 +695,33 @@ contains
             end if
         endif
 
-        call nvtxStartRange("RHS-CONVERT")
-        call s_convert_conservative_to_primitive_variables( &
-            q_cons_vf, &
-            q_T_sf, &
-            q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
-        call nvtxEndRange
+        if(igr) then 
+            call nvtxStartRange("RHS-CONVERT")
+            call s_convert_conservative_to_primitive_variables( &
+                q_cons_vf, &
+                q_T_sf, &
+                q_prim_vf, &
+                idwint, &
+                gm_alpha_qp%vf)
+            call nvtxEndRange
 
-        call nvtxStartRange("RHS-COMMUNICATION")
-        call s_populate_variables_buffers(q_prim_vf, pb, mv)
-        call nvtxEndRange
+            call nvtxStartRange("RHS-COMMUNICATION")
+            call s_populate_variables_buffers(q_prim_vf, pb, mv)
+            call nvtxEndRange
+        else
+            call nvtxStartRange("RHS-CONVERT")
+            call s_convert_conservative_to_primitive_variables( &
+                q_cons_qp%vf, &
+                q_T_sf, &
+                q_prim_qp%vf, &
+                idwint, &
+                gm_alpha_qp%vf)
+            call nvtxEndRange
+
+            call nvtxStartRange("RHS-COMMUNICATION")
+            call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+            call nvtxEndRange
+        end if            
 
         call nvtxStartRange("RHS-ELASTIC")
         if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
@@ -753,12 +768,12 @@ contains
 
 
                 call nvtxStartRange("IGR_RIEMANN")
-                call s_igr_riemann_solver(flux_n(id)%vf,id)
+                call s_igr_riemann_solver(q_prim_vf,flux_n(id)%vf,id)
                 call nvtxEndRange
 
                 if(id == 1) then 
                     call nvtxStartRange("IGR_Jacobi")
-                    call s_igr_jacobi_iteration(t_step)
+                    call s_igr_jacobi_iteration(q_prim_vf,t_step)
                     call nvtxEndRange
                 end if
 
