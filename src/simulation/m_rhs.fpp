@@ -1000,8 +1000,8 @@ contains
 
         call cpu_time(t_finish)
 
-        if (t_step >= 4) then
-            time_avg = (abs(t_finish - t_start) + (t_step - 4)*time_avg)/(t_step - 3)
+        if (t_step >= 2) then
+            time_avg = (abs(t_finish - t_start) + (t_step - 2)*time_avg)/(t_step - 1)
         else
             time_avg = 0._wp
         end if
@@ -2189,20 +2189,22 @@ contains
 
         integer :: i, j, l
 
-        do j = cont_idx%beg, cont_idx%end
-            !$acc exit data detach(q_prim_qp%vf(j)%sf)
-            nullify (q_prim_qp%vf(j)%sf)
-        end do
+        if(.not. igr) then 
+            do j = cont_idx%beg, cont_idx%end
+                !$acc exit data detach(q_prim_qp%vf(j)%sf)
+                nullify (q_prim_qp%vf(j)%sf)
+            end do
 
-        do j = adv_idx%beg, adv_idx%end
-            !$acc exit data detach(q_prim_qp%vf(j)%sf)
-            nullify (q_prim_qp%vf(j)%sf)
-        end do
+            do j = adv_idx%beg, adv_idx%end
+                !$acc exit data detach(q_prim_qp%vf(j)%sf)
+                nullify (q_prim_qp%vf(j)%sf)
+            end do
 
-        do j = mom_idx%beg, E_idx
-            @:DEALLOCATE(q_cons_qp%vf(j)%sf)
-            @:DEALLOCATE(q_prim_qp%vf(j)%sf)
-        end do
+            do j = mom_idx%beg, E_idx
+                @:DEALLOCATE(q_cons_qp%vf(j)%sf)
+                @:DEALLOCATE(q_prim_qp%vf(j)%sf)
+            end do
+        end if
 
         @:DEALLOCATE(q_cons_qp%vf, q_prim_qp%vf)
 
