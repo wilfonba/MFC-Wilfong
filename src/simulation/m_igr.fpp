@@ -22,9 +22,9 @@ module m_igr
         s_igr_flux_add
 
     real(wp), allocatable, dimension(:, :, :) :: fd_coeff
-    real(wp), allocatable, dimension(:, :, :) :: jac, jac_old, rho_igr
+    real(wp), allocatable, dimension(:, :, :) :: jac,jac_rhs,rho_igr,cfl
     real(wp), allocatable, dimension(:, :, :) :: dvel1, dvel2, dvel_L, FL
-    !$acc declare create(fd_coeff,jac, jac_old, rho_igr)
+    !$acc declare create(fd_coeff,jac, jac_rhs,rho_igr,cfl)
     !$acc declare create(dvel1, dvel2, dvel_L, FL)
 
     real(wp), allocatable, dimension(:, :, :, :) :: qL_rs_vf, qR_rs_vf
@@ -77,7 +77,7 @@ contains
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
             end if
-            #:for VAR in [ 'jac', 'jac_old', 'fd_coeff', 'dvel1', 'dvel2']
+            #:for VAR in [ 'jac','jac_rhs','fd_coeff', 'dvel1', 'dvel2','cfl']
                 @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
                              idwbuff(2)%beg:idwbuff(2)%end, &
                              idwbuff(3)%beg:idwbuff(3)%end))
@@ -101,7 +101,6 @@ contains
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         jac(j, k, l) = 0._wp
-                        jac_old(j, k, l) = 0._wp
                    end do
                 end do
             end do
@@ -120,6 +119,58 @@ contains
 
         num_iters = num_igr_iters
 
+        if(num_fluids > 1) then 
+            !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rho_lx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j-1,k,l))
+                        rho_rx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j+1,k,l))
+                        rho_ly = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k-1,l))
+                        rho_ry = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k+1,l))
+
+                        if(p > 0) then
+                            rho_lz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l-1))
+                            rho_rz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l+1))
+                        end if
+
+                        fd_coeff(j,k,l) = (1._wp / rho_igr(j,k,l))
+
+                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (rho_lx + rho_rx) +  (1._wp / dy(k)**2._wp) *(rho_ly + rho_ry) )
+
+                        if(p > 0) then 
+                            fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr* (1._wp / dz(l)**2._wp) * (rho_lz + rho_rz)
+                        end if
+                    end do 
+                end do 
+            end do
+        else 
+            !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rho_lx = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j-1,k,l))
+                        rho_rx = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j+1,k,l))
+                        rho_ly = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k-1,l))
+                        rho_ry = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k+1,l))
+
+                        if(p > 0) then
+                            rho_lz = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k,l-1))
+                            rho_rz = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k,l+1))
+                        end if
+
+                        fd_coeff(j,k,l) = (1._wp / q_prim_vf(1)%sf(j,k,l))
+
+                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (rho_lx + rho_rx) +  (1._wp / dy(k)**2._wp) *(rho_ly + rho_ry) )
+
+                        if(p > 0) then 
+                            fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr* (1._wp / dz(l)**2._wp) * (rho_lz + rho_rz)
+                        end if
+                    end do 
+                end do 
+            end do
+        end if
+
         do q = 1, num_iters
             if(num_fluids > 1) then 
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
@@ -136,20 +187,16 @@ contains
                                 rho_rz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l+1))
                             end if
 
-                            fd_coeff(j,k,l) = (1._wp / rho_igr(j,k,l))
-
-                            fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (rho_lx + rho_rx) +  (1._wp / dy(k)**2._wp) *(rho_ly + rho_ry) )
-
-                            if(p > 0) then 
-                                fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr* (1._wp / dz(l)**2._wp) * (rho_lz + rho_rz)
-                            end if
-
-                            jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dx(j)**2._wp) * (rho_lx* jac_old(j-1,k,l) + rho_rx*jac_old(j+1,k,l))
-                            jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dy(k)**2._wp) * (rho_ly* jac_old(j,k-1,l) + rho_ry*jac_old(j,k+1,l))
                             if(p > 0) then
-                                jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dz(l)**2._wp) * (rho_lz* jac_old(j,k,l-1) + rho_rz*jac_old(j,k,l+1))
-                            end if
-                            jac(j, k, l) = omega * (1._wp / fd_coeff(j,k,l))*jac(j,k,l) + (1._wp - omega)*jac_old(j, k, l)
+                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
+                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) + &
+                                                        (1._wp / dz(l)**2._wp) * (rho_lz* jac(j,k,l-1) + rho_rz*jac(j,k,l+1)) ) + &
+                                                        jac_rhs(j,k,l) / fd_coeff(j, k, l)
+                           else 
+                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
+                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) ) + &
+                                                        jac_rhs(j,k,l) / fd_coeff(j, k, l)                              
+                           end if
                         end do
                     end do
                 end do
@@ -168,20 +215,16 @@ contains
                                 rho_rz = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k,l+1))
                             end if
 
-                            fd_coeff(j,k,l) = (1._wp / q_prim_vf(1)%sf(j,k,l))
-
-                            fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (rho_lx + rho_rx) +  (1._wp / dy(k)**2._wp) *(rho_ly + rho_ry) )
-
-                            if(p > 0) then 
-                                fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr* (1._wp / dz(l)**2._wp) * (rho_lz + rho_rz)
-                            end if
-
-                            jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dx(j)**2._wp) * (rho_lx* jac_old(j-1,k,l) + rho_rx*jac_old(j+1,k,l))
-                            jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dy(k)**2._wp) * (rho_ly* jac_old(j,k-1,l) + rho_ry*jac_old(j,k+1,l))
                             if(p > 0) then
-                                jac(j, k, l) = jac(j, k, l) + alf_igr * (1._wp / dz(l)**2._wp) * (rho_lz* jac_old(j,k,l-1) + rho_rz*jac_old(j,k,l+1))
-                            end if
-                            jac(j, k, l) = omega * (1._wp / fd_coeff(j,k,l))*jac(j,k,l) + (1._wp - omega)*jac_old(j, k, l)
+                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
+                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) + &
+                                                        (1._wp / dz(l)**2._wp) * (rho_lz* jac(j,k,l-1) + rho_rz*jac(j,k,l+1)) ) + &
+                                                        jac_rhs(j,k,l) / fd_coeff(j, k, l) 
+                           else 
+                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
+                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) ) + &
+                                                        jac_rhs(j,k,l) / fd_coeff(j, k, l)                               
+                           end if
                         end do
                     end do
                 end do
@@ -390,16 +433,6 @@ contains
                     end if
                 end if
             end if
-
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        jac_old(j, k, l) = jac(j, k, l)
-                    end do
-                end do
-            end do
-
         end do
 
     end subroutine s_igr_jacobi_iteration
@@ -441,7 +474,7 @@ contains
                                                       0.5_wp * FL(j,k,l)
 
                             flux_vf(E_idx)%sf(j,k,l) = flux_vf(E_idx)%sf(j,k,l) + &
-                                                      0.5_wp * qR_rs_vf(j, k, l, 1) * FL(j,k,l)                            
+                                                      0.5_wp * qR_rs_vf(j, k, l, 1) * FL(j,k,l)                         
 
 
                         end do 
@@ -512,7 +545,6 @@ contains
 
                             flux_vf(E_idx)%sf(j,k,l) = flux_vf(E_idx)%sf(j,k,l) + &
                                                       0.5_wp * qR_rs_vf(j, k, l, 1) * FL(j,k,l)                            
-
 
                         end do 
                     end do 
@@ -601,11 +633,10 @@ contains
         integer, intent(in) :: idir
 
         real(wp) :: rho_L, gamma_L, pi_inf_L, mu_L, a_L
-        real(wp) :: cfl
 
         if (idir == 1) then
             if(p == 0) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,cfl,a_L)
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
                 do l = 0, p
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
@@ -642,14 +673,14 @@ contains
 
                             a_L = sqrt((qL_rs_vf(j+1,k,l,E_idx)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
-                            cfl = 2d0*(sqrt(qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp) + a_L)
+                            cfl(j,k,l) = 2_wp*(sqrt(qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp) + a_L)
 
                             !$acc loop seq
                             do i = 1, num_fluids
                                 flux_vf(i)%sf(j,k,l) = &
                                     0.5_wp * (qL_rs_vf(j+1,k,l,i) * &
                                     qL_rs_vf(j+1,k,l,momxb)) - &
-                                    0.5_wp*cfl * (qL_rs_vf(j+1,k,l,i))
+                                    0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,i))
                             end do
 
                             if(num_fluids > 1) then 
@@ -658,7 +689,7 @@ contains
                                     flux_vf(advxb+i-1)%sf(j,k,l) = &
                                         0.5_wp * (qL_rs_vf(j+1,k,l,advxb+i-1) * &
                                         qL_rs_vf(j+1,k,l,momxb )) - &
-                                        0.5_wp*cfl * (qL_rs_vf(j+1,k,l,advxb+i-1))
+                                        0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,advxb+i-1))
 
                                     flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                     - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qL_rs_vf(j+1,k,l,momxb)
@@ -669,17 +700,17 @@ contains
                             flux_vf(momxb)%sf(j,k,l) = &
                                  0.5_wp* (rho_L * (qL_rs_vf(j+1,k,l,momxb))**2.0 + &
                                  qL_rs_vf(j+1,k,l,E_idx)) - &
-                                 0.5_wp*cfl * (qL_rs_vf(j+1,k,l,momxb))
+                                 0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,momxb))
 
                             flux_vf(momxb+1)%sf(j, k, l) =  &
                                 0.5_wp * rho_L * qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxb+1) - &
-                                0.5_wp*cfl * (qL_rs_vf(j+1,k,l,momxb+1))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,momxb+1))
 
                              flux_vf(E_idx)%sf(j, k, l) = &
                                 0.5_wp * (qL_rs_vf(j+1,k,l,momxb) * (qL_rs_vf(j+1,k,l,E_idx)*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp ) + &
                                 qL_rs_vf(j+1,k,l,E_idx)) ) - &
-                                0.5_wp*cfl * (qL_rs_vf(j+1,k,l,E_idx))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,E_idx))
 
                             !! duy & dvx
                             dvel1(j,k,l) = (1/(12._wp*dy(k))) * ( &
@@ -694,7 +725,16 @@ contains
                             q_prim_vf(momxb+1)%sf(j-2,k,l) - &
                             q_prim_vf(momxb+1)%sf(j+2,k,l) )
 
-                            jac(j, k, l) = alf_igr* (2d0 * dvel1(j,k,l)* dvel2(j,k,l))
+                            jac_rhs(j, k, l) = alf_igr* (2_wp * dvel1(j,k,l)* dvel2(j,k,l))
+
+                        end do 
+                    end do 
+                end do
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = 0, p
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
                                 dvel_L(j+1, k, l) = (1._wp/60._wp) * (-3._wp * dvel1(j-1, k, l) + &
@@ -709,7 +749,6 @@ contains
                                     mu_L =  qL_rs_vf(j+1,k,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
                                               + mu_L
                                 end do
-                                
 
                                 flux_vf(momxb+1)%sf(j,k,l) = flux_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*(dvel_L(j+1,k,l))
                                 flux_vf(E_idx)%sf(j,k,l) = flux_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*qL_rs_vf(j+1,k,l,momxb)*dvel_L(j+1,k,l) 
@@ -766,8 +805,16 @@ contains
                             q_prim_vf(momxb+1)%sf(j,k-2,l) - &
                             q_prim_vf(momxb+1)%sf(j,k+2,l) )
 
-                            jac(j, k, l) = jac(j,k,l) + alf_igr* (dvel1(j,k,l)**2d0 + dvel2(j,k,l)**2d0 + (dvel1(j,k,l) + dvel2(j,k,l))**2d0)
+                            jac_rhs(j, k, l) = jac_rhs(j,k,l) + alf_igr* (dvel1(j,k,l)**2_wp + dvel2(j,k,l)**2_wp + (dvel1(j,k,l) + dvel2(j,k,l))**2_wp)
 
+                        end do 
+                    end do 
+                end do
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = 0, p
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
                             if(viscous) then
 
                                 if(num_fluids > 1) then 
@@ -837,7 +884,7 @@ contains
                             end do
 
                             !$acc loop seq 
-                            do i = momxb+1,advxb-1
+                            do i = momxb+1,advxe
                                 qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j+2, k, l) + &
                                                 27._wp * q_prim_vf(i)%sf(j+1, k, l) + &
                                                 47._wp * q_prim_vf(i)%sf(j, k, l) -   &
@@ -859,13 +906,21 @@ contains
                             gamma_L = sum(qL_rs_vf(j,k,l,advxb:advxb+num_fluids-1)*gammas)
                             pi_inf_L = sum(qL_rs_vf(j,k,l,advxb:advxb+num_fluids-1)*pi_infs)
 
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                flux_vf(i)%sf(j,k,l) = flux_vf(i)%sf(j,k,l) + &
+                                    0.5_wp * (qL_rs_vf(j,k,l,i) * &
+                                    qR_rs_vf(j,k,l,1)) + &
+                                    0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,i))
+                            end do
+
                             if(num_fluids > 1) then 
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     flux_vf(advxb+i-1)%sf(j,k,l) = &
                                         0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                         qR_rs_vf(j,k,l,1)) + &
-                                        0.5_wp*cfl * (qR_rs_vf(j,k,l,advxb+i-1))
+                                        0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,advxb+i-1))
 
                                     flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                     - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qR_rs_vf(j,k,l,1)
@@ -876,23 +931,23 @@ contains
                             flux_vf(momxb)%sf(j,k,l) = flux_vf(momxb)%sf(j,k,l) + &
                                  0.5_wp* (rho_L * (qR_rs_vf(j,k,l,1))**2.0 + &
                                  qL_rs_vf(j,k,l,E_idx)) + &
-                                 0.5_wp*cfl * (qR_rs_vf(j,k,l,1))
+                                 0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,1))
 
                             flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) + &
                                 0.5_wp * rho_L * qR_rs_vf(j,k,l,1)*qL_rs_vf(j,k,l,momxb+1) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,momxb+1))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,momxb+1))
 
                              flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) +  &
                                 0.5_wp * (qR_rs_vf(j,k,l,1) * (qL_rs_vf(j,k,l,E_idx)*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (qR_rs_vf(j,k,l,1)**2._wp + qL_rs_vf(j,k,l,momxb+1)**2._wp  ) + &
                                 qL_rs_vf(j,k,l,E_idx)) ) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,E_idx))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,E_idx))
 
                         end do
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,cfl,a_L)
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
                 do l = -buff_size+2,p+buff_size-3
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
@@ -929,14 +984,14 @@ contains
 
                             a_L = sqrt((qL_rs_vf(j+1,k,l,E_idx)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
-                            cfl = 2d0*(sqrt(qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp + qL_rs_vf(j+1,k,l,momxb+2)**2._wp) + a_L)
+                            cfl(j,k,l) = 2_wp*(sqrt(qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp + qL_rs_vf(j+1,k,l,momxb+2)**2._wp) + a_L)
 
                             !$acc loop seq
                             do i = 1, num_fluids
                                 flux_vf(i)%sf(j,k,l) = &
                                     0.5_wp * (qL_rs_vf(j+1,k,l,i) * &
                                     qL_rs_vf(j+1,k,l,momxb)) - &
-                                    0.5_wp*cfl * (qL_rs_vf(j+1,k,l,i))
+                                    0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,i))
                             end do
 
                             if(num_fluids > 1) then 
@@ -945,7 +1000,7 @@ contains
                                     flux_vf(advxb+i-1)%sf(j,k,l) = &
                                         0.5_wp * (qL_rs_vf(j+1,k,l,advxb+i-1) * &
                                         qL_rs_vf(j+1,k,l,momxb )) - &
-                                        0.5_wp*cfl * (qL_rs_vf(j+1,k,l,advxb+i-1))
+                                        0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,advxb+i-1))
 
                                     flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                     - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qL_rs_vf(j+1,k,l,momxb)
@@ -956,21 +1011,21 @@ contains
                             flux_vf(momxb)%sf(j,k,l) = &
                                  0.5_wp* (rho_L * (qL_rs_vf(j+1,k,l,momxb))**2.0 + &
                                  qL_rs_vf(j+1,k,l,E_idx)) - &
-                                 0.5_wp*cfl * (qL_rs_vf(j+1,k,l,momxb))
+                                 0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,momxb))
 
                             flux_vf(momxb+1)%sf(j, k, l) =  &
                                 0.5_wp * rho_L * qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxb+1) - &
-                                0.5_wp*cfl * (qL_rs_vf(j+1,k,l,momxb+1))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,momxb+1))
 
                             flux_vf(momxb+2)%sf(j, k, l) = &
                                 0.5_wp * rho_L * qL_rs_vf(j+1,k,l,momxb)*qL_rs_vf(j+1,k,l,momxb+2) - &
-                                0.5_wp*cfl * (qL_rs_vf(j+1,k,l,momxb+2))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,momxb+2))
 
                              flux_vf(E_idx)%sf(j, k, l) = &
                                 0.5_wp * (qL_rs_vf(j+1,k,l,momxb) * (qL_rs_vf(j+1,k,l,E_idx)*gamma_L + pi_inf_L + &
-                                0.5_wp * rho_L * (qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp + + qL_rs_vf(j+1,k,l,momxb+2)**2._wp ) + &
+                                0.5_wp * rho_L * (qL_rs_vf(j+1,k,l,momxb)**2._wp + qL_rs_vf(j+1,k,l,momxb+1)**2._wp  + qL_rs_vf(j+1,k,l,momxb+2)**2._wp ) + &
                                 qL_rs_vf(j+1,k,l,E_idx)) ) - &
-                                0.5_wp*cfl * (qL_rs_vf(j+1,k,l,E_idx))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j+1,k,l,E_idx))
 
                             !! duz & dwx
                             dvel1(j,k,l) = (1/(12._wp*dz(l))) * ( &
@@ -985,7 +1040,15 @@ contains
                             q_prim_vf(momxb+2)%sf(j-2,k,l) - &
                             q_prim_vf(momxb+2)%sf(j+2,k,l) )
 
-                            jac(j, k, l) =  alf_igr* (2d0 * dvel1(j,k,l)* dvel2(j,k,l))
+                            jac_rhs(j, k, l) =  alf_igr* (2_wp * dvel1(j,k,l)* dvel2(j,k,l))
+                        end do 
+                    end do 
+                end do 
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = -buff_size+2,p+buff_size-3
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
                                 dvel_L(j+1, k, l) = (1._wp/60._wp) * (-3._wp * dvel1(j-1, k, l) + &
@@ -1056,7 +1119,15 @@ contains
                             q_prim_vf(momxb+1)%sf(j-2,k,l) - &
                             q_prim_vf(momxb+1)%sf(j+2,k,l) )
 
-                            jac(j, k, l) = jac(j,k,l) + alf_igr* (2d0 * dvel1(j,k,l)* dvel2(j,k,l))
+                            jac_rhs(j, k, l) = jac_rhs(j,k,l) + alf_igr* (2_wp * dvel1(j,k,l)* dvel2(j,k,l))
+                        end do 
+                    end do 
+                end do 
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = -buff_size+2,p+buff_size-3
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
                                 dvel_L(j+1, k, l) = (1._wp/60._wp) * (-3._wp * dvel1(j-1, k, l) + &
@@ -1129,7 +1200,7 @@ contains
                             q_prim_vf(momxb+2)%sf(j,k-2,l) - &
                             q_prim_vf(momxb+2)%sf(j,k+2,l))
 
-                            jac(j,k,l) = jac(j,k,l) + alf_igr*(2d0*dvel1(j,k,l)*dvel2(j,k,l))
+                            jac_rhs(j,k,l) = jac_rhs(j,k,l) + alf_igr*(2_wp*dvel1(j,k,l)*dvel2(j,k,l))
 
                             !! dux & dvy
                             dvel1(j,k,l) = (1/(12._wp*dx(j))) * ( &
@@ -1144,7 +1215,15 @@ contains
                             q_prim_vf(momxb+1)%sf(j,k-2,l) - &
                             q_prim_vf(momxb+1)%sf(j,k+2,l) )
 
-                            jac(j, k, l) = jac(j,k,l) + alf_igr* (dvel1(j,k,l)**2d0 + dvel2(j,k,l)**2d0)
+                            jac_rhs(j, k, l) = jac_rhs(j,k,l) + alf_igr* (dvel1(j,k,l)**2_wp + dvel2(j,k,l)**2_wp)
+                        end do 
+                    end do 
+                end do 
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = -buff_size+2,p+buff_size-3
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
 
@@ -1215,7 +1294,15 @@ contains
                             q_prim_vf(momxb+2)%sf(j,k,l-2) - &
                             q_prim_vf(momxb+2)%sf(j,k,l+2) )
 
-                            jac(j,k,l) = jac(j,k,l) + alf_igr * (dvel2(j,k,l) **2d0 + (dvel1(j,k,l) + dvel2(j,k,l))**2d0)
+                            jac_rhs(j,k,l) = jac_rhs(j,k,l) + alf_igr * (dvel2(j,k,l) **2_wp + (dvel1(j,k,l) + dvel2(j,k,l))**2_wp)
+                        end do 
+                    end do 
+                end do 
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = -buff_size+2,p+buff_size-3
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
 
@@ -1267,7 +1354,7 @@ contains
                             end do
 
                             !$acc loop seq 
-                            do i = momxb+1,advxb-1
+                            do i = momxb+1,advxe
                                 qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j+2, k, l) + &
                                                 27._wp * q_prim_vf(i)%sf(j+1, k, l) + &
                                                 47._wp * q_prim_vf(i)%sf(j, k, l) -   &
@@ -1291,10 +1378,10 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_fluids
-                                flux_vf(i)%sf(j,k,l) = &
+                                flux_vf(i)%sf(j,k,l) = flux_vf(i)%sf(j,k,l) + &
                                     0.5_wp * (qL_rs_vf(j,k,l,i) * &
                                     qR_rs_vf(j,k,l,1)) + &
-                                    0.5_wp*cfl * (qL_rs_vf(j,k,l,i))
+                                    0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,i))
                             end do
 
                             if(num_fluids > 1) then 
@@ -1303,7 +1390,7 @@ contains
                                     flux_vf(advxb+i-1)%sf(j,k,l) = &
                                         0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                         qR_rs_vf(j,k,l,1)) + &
-                                        0.5_wp*cfl * (qR_rs_vf(j,k,l,advxb+i-1))
+                                        0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,advxb+i-1))
 
                                     flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                     - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qR_rs_vf(j,k,l,1)
@@ -1315,21 +1402,21 @@ contains
                             flux_vf(momxb)%sf(j,k,l) = flux_vf(momxb)%sf(j,k,l) + &
                                  0.5_wp* (rho_L * (qR_rs_vf(j,k,l,1))**2.0 + &
                                  qL_rs_vf(j,k,l,E_idx)) + &
-                                 0.5_wp*cfl * (qR_rs_vf(j,k,l,1))
+                                 0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,1))
 
                             flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) + &
                                 0.5_wp * rho_L * qR_rs_vf(j,k,l,1)*qL_rs_vf(j,k,l,momxb+1) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,momxb+1))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,momxb+1))
 
                             flux_vf(momxb+2)%sf(j, k, l) = flux_vf(momxb+2)%sf(j, k, l) + &
                                 0.5_wp * rho_L * qR_rs_vf(j,k,l,1)*qL_rs_vf(j,k,l,momxb+2) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,momxb+2))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,momxb+2))
 
                              flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) +  &
                                 0.5_wp * (qR_rs_vf(j,k,l,1) * (qL_rs_vf(j,k,l,E_idx)*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (qR_rs_vf(j,k,l,1)**2._wp + qL_rs_vf(j,k,l,momxb+1)**2._wp + qL_rs_vf(j,k,l,momxb+2)**2._wp ) + &
                                 qL_rs_vf(j,k,l,E_idx)) ) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,E_idx))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,E_idx))
 
                         end do
                     end do
@@ -1337,7 +1424,7 @@ contains
             end if
         else if (idir == 2) then
             if(p == 0) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,cfl,a_L)
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
                 do l = 0, p
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
@@ -1374,14 +1461,14 @@ contains
 
                             a_L = sqrt((qL_rs_vf(j,k+1,l,E_idx)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
-                            cfl = 2d0*(sqrt(qL_rs_vf(j,k+1,l,momxb)**2._wp + qL_rs_vf(j,k+1,l,momxb+1)**2._wp) + a_L)
+                            cfl(j,k,l) = 2_wp*(sqrt(qL_rs_vf(j,k+1,l,momxb)**2._wp + qL_rs_vf(j,k+1,l,momxb+1)**2._wp) + a_L)
 
                             !$acc loop seq
                             do i = 1, num_fluids
                                 flux_vf(i)%sf(j,k,l) = &
                                     0.5_wp * (qL_rs_vf(j,k+1,l,i) * &
-                                    qL_rs_vf(j,k,l,momxb+1)) - &
-                                    0.5_wp*cfl * (qL_rs_vf(j,k+1,l,i))
+                                    qL_rs_vf(j,k+1,l,momxb+1)) - &
+                                    0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,i))
                             end do
 
                             if(num_fluids > 1) then 
@@ -1390,7 +1477,7 @@ contains
                                     flux_vf(advxb+i-1)%sf(j,k,l) = &
                                         0.5_wp * (qL_rs_vf(j,k+1,l,advxb+i-1) * &
                                         qL_rs_vf(j,k+1,l,momxb+1 )) - &
-                                        0.5_wp*cfl * (qL_rs_vf(j,k+1,l,advxb+i-1))
+                                        0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,advxb+i-1))
 
                                     flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                     - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qL_rs_vf(j,k+1,l,momxb+1)
@@ -1401,17 +1488,17 @@ contains
                             flux_vf(momxb+1)%sf(j,k,l) = &
                                  0.5_wp* (rho_L * (qL_rs_vf(j,k+1,l,momxb+1))**2.0 + &
                                  qL_rs_vf(j,k+1,l,E_idx)) - &
-                                 0.5_wp*cfl * (qL_rs_vf(j,k+1,l,momxb+1))
+                                 0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,momxb+1))
 
                             flux_vf(momxb)%sf(j, k, l) =  &
                                 0.5_wp * rho_L * qL_rs_vf(j,k+1,l,momxb)*qL_rs_vf(j,k+1,l,momxb+1) - &
-                                0.5_wp*cfl * (qL_rs_vf(j,k+1,l,momxb))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,momxb))
 
                              flux_vf(E_idx)%sf(j, k, l) = &
                                 0.5_wp * (qL_rs_vf(j,k+1,l,momxb+1) * (qL_rs_vf(j,k+1,l,E_idx)*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (qL_rs_vf(j,k+1,l,momxb)**2._wp + qL_rs_vf(j,k+1,l,momxb+1)**2._wp ) + &
                                 qL_rs_vf(j,k+1,l,E_idx)) ) - &
-                                0.5_wp*cfl * (qL_rs_vf(j,k+1,l,E_idx))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,E_idx))
 
                             !! duy & dvx
                             dvel1(j,k,l) = (1/(12._wp*dy(k))) * ( &
@@ -1425,6 +1512,14 @@ contains
                             8._wp*q_prim_vf(momxb+1)%sf(j-1,k,l) + &
                             q_prim_vf(momxb+1)%sf(j-2,k,l) - &
                             q_prim_vf(momxb+1)%sf(j+2,k,l) )
+                        end do 
+                    end do 
+                end do
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = 0, p
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
                                 dvel_L(j, k+1, l) = (1._wp/60._wp) * (-3._wp * dvel1(j, k-1, l) + &
@@ -1439,7 +1534,6 @@ contains
                                     mu_L =  qL_rs_vf(j,k+1,l,advxb+Re_idx(1, q)-1) / Res(1, q) &
                                               + mu_L
                                 end do
-                                
 
                                 flux_vf(momxb)%sf(j,k,l) = flux_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*(dvel_L(j,k+1,l))
                                 flux_vf(E_idx)%sf(j,k,l) = flux_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*qL_rs_vf(j,k+1,l,momxb+1)*dvel_L(j,k+1,l) 
@@ -1496,6 +1590,15 @@ contains
                             8._wp*q_prim_vf(momxb)%sf(j-1,k,l) + &
                             q_prim_vf(momxb)%sf(j-2,k,l) - &
                             q_prim_vf(momxb)%sf(j+2,k,l) )
+
+                        end do 
+                    end do 
+                end do
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = 0, p
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
                                 dvel_L(j, k+1, l) = (1._wp/60._wp) * (-3._wp * dvel1(j, k-1, l) + &
@@ -1566,7 +1669,7 @@ contains
                             end do
 
                             !$acc loop seq 
-                            do i = momxb+2,advxb-1
+                            do i = momxb+2,advxe
                                 qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k+2, l) + &
                                                 27._wp * q_prim_vf(i)%sf(j, k+1, l) + &
                                                 47._wp * q_prim_vf(i)%sf(j, k, l) -   &
@@ -1584,6 +1687,14 @@ contains
                                 end do
                             end if  
 
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                flux_vf(i)%sf(j,k,l) = flux_vf(i)%sf(j,k,l) + &
+                                    0.5_wp * (qL_rs_vf(j,k,l,i) * &
+                                    qR_rs_vf(j,k,l,1)) + &
+                                    0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,i))
+                            end do
+
                             rho_L = sum(qL_rs_vf(j,k,l,1:num_fluids))
                             gamma_L = sum(qL_rs_vf(j,k,l,advxb:advxb+num_fluids-1)*gammas)
                             pi_inf_L = sum(qL_rs_vf(j,k,l,advxb:advxb+num_fluids-1)*pi_infs)
@@ -1594,7 +1705,7 @@ contains
                                     flux_vf(advxb+i-1)%sf(j,k,l) = &
                                         0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                         qR_rs_vf(j,k,l,1)) + &
-                                        0.5_wp*cfl * (qR_rs_vf(j,k,l,advxb+i-1))
+                                        0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,advxb+i-1))
 
                                     flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                     - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qR_rs_vf(j,k,l,1)
@@ -1605,23 +1716,23 @@ contains
                             flux_vf(momxb+1)%sf(j,k,l) = flux_vf(momxb+1)%sf(j,k,l) + &
                                  0.5_wp* (rho_L * (qR_rs_vf(j,k,l,1))**2.0 + &
                                  qL_rs_vf(j,k,l,E_idx)) + &
-                                 0.5_wp*cfl * (qR_rs_vf(j,k,l,1))
+                                 0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,1))
 
                             flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) +  &
                                 0.5_wp * rho_L * qL_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,1) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,momxb))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,momxb))
 
                              flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) + &
                                 0.5_wp * (qR_rs_vf(j,k,l,1) * (qL_rs_vf(j,k,l,E_idx)*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (qL_rs_vf(j,k,l,momxb)**2._wp + qR_rs_vf(j,k,l,1)**2._wp ) + &
                                 qL_rs_vf(j,k,l,E_idx)) ) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,E_idx))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,E_idx))
 
                         end do
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,cfl,a_L)
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
                 do l = -buff_size+2, p+buff_size-3
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
@@ -1658,14 +1769,14 @@ contains
 
                             a_L = sqrt((qL_rs_vf(j,k+1,l,E_idx)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
-                            cfl = 2d0*(sqrt(qL_rs_vf(j,k+1,l,momxb)**2._wp + qL_rs_vf(j,k+1,l,momxb+1)**2._wp + qL_rs_vf(j,k+1,l,momxb+2)**2._wp) + a_L)
+                            cfl(j,k,l) = 2_wp*(sqrt(qL_rs_vf(j,k+1,l,momxb)**2._wp + qL_rs_vf(j,k+1,l,momxb+1)**2._wp + qL_rs_vf(j,k+1,l,momxb+2)**2._wp) + a_L)
 
                             !$acc loop seq
                             do i = 1, num_fluids
                                 flux_vf(i)%sf(j,k,l) = &
                                     0.5_wp * (qL_rs_vf(j,k+1,l,i) * &
-                                    qL_rs_vf(j,k,l,momxb+1)) - &
-                                    0.5_wp*cfl * (qL_rs_vf(j,k+1,l,i))
+                                    qL_rs_vf(j,k+1,l,momxb+1)) - &
+                                    0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,i))
                             end do
 
                             if(num_fluids > 1) then 
@@ -1674,7 +1785,7 @@ contains
                                     flux_vf(advxb+i-1)%sf(j,k,l) = &
                                         0.5_wp * (qL_rs_vf(j,k+1,l,advxb+i-1) * &
                                         qL_rs_vf(j,k+1,l,momxb+1 )) - &
-                                        0.5_wp*cfl * (qL_rs_vf(j,k+1,l,advxb+i-1))
+                                        0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,advxb+i-1))
 
                                     flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                     - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qL_rs_vf(j,k+1,l,momxb+1)
@@ -1685,21 +1796,21 @@ contains
                             flux_vf(momxb+1)%sf(j,k,l) = &
                                  0.5_wp* (rho_L * (qL_rs_vf(j,k+1,l,momxb+1))**2.0 + &
                                  qL_rs_vf(j,k+1,l,E_idx)) - &
-                                 0.5_wp*cfl * (qL_rs_vf(j,k+1,l,momxb+1))
+                                 0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,momxb+1))
 
                             flux_vf(momxb)%sf(j, k, l) =  &
                                 0.5_wp * rho_L * qL_rs_vf(j,k+1,l,momxb)*qL_rs_vf(j,k+1,l,momxb+1) - &
-                                0.5_wp*cfl * (qL_rs_vf(j,k+1,l,momxb))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,momxb))
 
                             flux_vf(momxb+2)%sf(j, k, l) =  &
                                 0.5_wp * rho_L * qL_rs_vf(j,k+1,l,momxb+2)*qL_rs_vf(j,k+1,l,momxb+1) - &
-                                0.5_wp*cfl * (qL_rs_vf(j,k+1,l,momxb+2))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,momxb+2))
 
                              flux_vf(E_idx)%sf(j, k, l) = &
                                 0.5_wp * (qL_rs_vf(j,k+1,l,momxb+1) * (qL_rs_vf(j,k+1,l,E_idx)*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (qL_rs_vf(j,k+1,l,momxb)**2._wp + qL_rs_vf(j,k+1,l,momxb+1)**2._wp +qL_rs_vf(j,k+1,l,momxb+2)**2._wp) + &
                                 qL_rs_vf(j,k+1,l,E_idx)) ) - &
-                                0.5_wp*cfl * (qL_rs_vf(j,k+1,l,E_idx))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k+1,l,E_idx))
 
                             !! duy & dvx
                             dvel1(j,k,l) = (1/(12._wp*dy(k))) * ( &
@@ -1713,6 +1824,14 @@ contains
                             8._wp*q_prim_vf(momxb+1)%sf(j-1,k,l) + &
                             q_prim_vf(momxb+1)%sf(j-2,k,l) - &
                             q_prim_vf(momxb+1)%sf(j+2,k,l) )
+                        end do 
+                    end do 
+                end do 
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = -buff_size+2,p+buff_size-3
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
                                 dvel_L(j, k+1, l) = (1._wp/60._wp) * (-3._wp * dvel1(j, k-1, l) + &
@@ -1783,6 +1902,14 @@ contains
                             8._wp*q_prim_vf(momxb+1)%sf(j,k,l-1) + &
                             q_prim_vf(momxb+1)%sf(j,k,l-2) - &
                             q_prim_vf(momxb+1)%sf(j,k,l+2) )
+                        end do 
+                    end do 
+                end do 
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = -buff_size+2,p+buff_size-3
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
 
@@ -1858,6 +1985,14 @@ contains
                             8._wp*q_prim_vf(momxb)%sf(j-1,k,l) + &
                             q_prim_vf(momxb)%sf(j-2,k,l) - &
                             q_prim_vf(momxb)%sf(j+2,k,l) )
+                        end do 
+                    end do 
+                end do 
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = -buff_size+2,p+buff_size-3
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
                                 dvel_L(j, k+1, l) = (1._wp/60._wp) * (-3._wp * dvel1(j, k-1, l) + &
@@ -1924,6 +2059,14 @@ contains
                             8._wp*q_prim_vf(momxb+2)%sf(j,k,l-1) + &
                             q_prim_vf(momxb+2)%sf(j,k,l-2) - &
                             q_prim_vf(momxb+2)%sf(j,k,l+2) )
+                        end do 
+                    end do 
+                end do 
+
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+                do l = -buff_size+2,p+buff_size-3
+                    do k = -buff_size+2, n+buff_size-3
+                        do j = -buff_size+2, m+buff_size-3
 
                             if(viscous) then
 
@@ -1975,7 +2118,7 @@ contains
                             end do
 
                             !$acc loop seq 
-                            do i = momxb+2,advxb-1
+                            do i = momxb+2,advxe
                                 qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k+2, l) + &
                                                 27._wp * q_prim_vf(i)%sf(j, k+1, l) + &
                                                 47._wp * q_prim_vf(i)%sf(j, k, l) -   &
@@ -1999,10 +2142,10 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_fluids
-                                flux_vf(i)%sf(j,k,l) = &
+                                flux_vf(i)%sf(j,k,l) = flux_vf(i)%sf(j,k,l) + &
                                     0.5_wp * (qL_rs_vf(j,k,l,i) * &
                                     qR_rs_vf(j,k,l,1)) + &
-                                    0.5_wp*cfl * (qL_rs_vf(j,k,l,i))
+                                    0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,i))
                             end do
 
                             if(num_fluids > 1) then 
@@ -2011,7 +2154,7 @@ contains
                                     flux_vf(advxb+i-1)%sf(j,k,l) = &
                                         0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                         qR_rs_vf(j,k,l,1)) + &
-                                        0.5_wp*cfl * (qR_rs_vf(j,k,l,advxb+i-1))
+                                        0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,advxb+i-1))
 
                                     flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                     - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qR_rs_vf(j,k,l,1)
@@ -2022,28 +2165,28 @@ contains
                             flux_vf(momxb+1)%sf(j,k,l) = flux_vf(momxb+1)%sf(j,k,l) + &
                                  0.5_wp* (rho_L * (qR_rs_vf(j,k,l,1))**2.0 + &
                                  qL_rs_vf(j,k,l,E_idx)) + &
-                                 0.5_wp*cfl * (qR_rs_vf(j,k,l,1))
+                                 0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,1))
 
                             flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) +  &
                                 0.5_wp * rho_L * qL_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,1) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,momxb))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,momxb))
 
                             flux_vf(momxb+2)%sf(j, k, l) = flux_vf(momxb+2)%sf(j, k, l) +  &
                                 0.5_wp * rho_L * qL_rs_vf(j,k,l,momxb+2)*qR_rs_vf(j,k,l,1) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,momxb+2))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,momxb+2))
 
                              flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) + &
                                 0.5_wp * (qR_rs_vf(j,k,l,1) * (qL_rs_vf(j,k,l,E_idx)*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (qL_rs_vf(j,k,l,momxb)**2._wp + qR_rs_vf(j,k,l,1)**2._wp + qL_rs_vf(j,k,l,momxb+2)**2._wp ) + &
                                 qL_rs_vf(j,k,l,E_idx)) ) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,E_idx))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,E_idx))
 
                         end do
                     end do
                 end do
             end if
         elseif (idir == 3) then
-           !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,cfl,a_L)
+           !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
             do l = -buff_size+2, p+buff_size-3
                 do k = -buff_size+2, n+buff_size-3
                     do j = -buff_size+2, m+buff_size-3
@@ -2080,14 +2223,14 @@ contains
 
                         a_L = sqrt((qL_rs_vf(j,k,l+1,E_idx)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
-                        cfl = 2d0*(sqrt(qL_rs_vf(j,k,l+1,momxb)**2._wp + qL_rs_vf(j,k,l+1,momxb+1)**2._wp + qL_rs_vf(j,k,l+1,momxb+2)**2._wp) + a_L)
+                        cfl(j,k,l) = 2_wp*(sqrt(qL_rs_vf(j,k,l+1,momxb)**2._wp + qL_rs_vf(j,k,l+1,momxb+1)**2._wp + qL_rs_vf(j,k,l+1,momxb+2)**2._wp) + a_L)
 
                         !$acc loop seq
                         do i = 1, num_fluids
                             flux_vf(i)%sf(j,k,l) = &
                                 0.5_wp * (qL_rs_vf(j,k,l+1,i) * &
-                                qL_rs_vf(j,k,l,momxb+2)) - &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l+1,i))
+                                qL_rs_vf(j,k,l+1,momxb+2)) - &
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l+1,i))
                         end do
 
                         if(num_fluids > 1) then 
@@ -2096,7 +2239,7 @@ contains
                                 flux_vf(advxb+i-1)%sf(j,k,l) = &
                                     0.5_wp * (qL_rs_vf(j,k,l+1,advxb+i-1) * &
                                     qL_rs_vf(j,k,l+1,momxb+2 )) - &
-                                    0.5_wp*cfl * (qL_rs_vf(j,k,l+1,advxb+i-1))
+                                    0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l+1,advxb+i-1))
 
                                 flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                 - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qL_rs_vf(j,k,l+1,momxb+2)
@@ -2107,21 +2250,21 @@ contains
                         flux_vf(momxb+2)%sf(j,k,l) = &
                              0.5_wp* (rho_L * (qL_rs_vf(j,k,l+1,momxb+2))**2.0 + &
                              qL_rs_vf(j,k,l+1,E_idx)) - &
-                             0.5_wp*cfl * (qL_rs_vf(j,k,l+1,momxb+2))
+                             0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l+1,momxb+2))
 
                         flux_vf(momxb)%sf(j, k, l) =  &
                             0.5_wp * rho_L * qL_rs_vf(j,k,l+1,momxb)*qL_rs_vf(j,k,l+1,momxb+2) - &
-                            0.5_wp*cfl * (qL_rs_vf(j,k,l+1,momxb))
+                            0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l+1,momxb))
 
                         flux_vf(momxb+1)%sf(j, k, l) =  &
                             0.5_wp * rho_L * qL_rs_vf(j,k,l+1,momxb+2)*qL_rs_vf(j,k,l+1,momxb+1) - &
-                            0.5_wp*cfl * (qL_rs_vf(j,k,l+1,momxb+1))
+                            0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l+1,momxb+1))
 
                          flux_vf(E_idx)%sf(j, k, l) = &
                             0.5_wp * (qL_rs_vf(j,k,l+1,momxb+2) * (qL_rs_vf(j,k,l+1,E_idx)*gamma_L + pi_inf_L + &
                             0.5_wp * rho_L * (qL_rs_vf(j,k,l+1,momxb)**2._wp + qL_rs_vf(j,k,l+1,momxb+1)**2._wp +qL_rs_vf(j,k,l+1,momxb+2)**2._wp) + &
                             qL_rs_vf(j,k,l+1,E_idx)) ) - &
-                            0.5_wp*cfl * (qL_rs_vf(j,k+1,l,E_idx))
+                            0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l+1,E_idx))
 
                         !! duz & dwx
                         dvel1(j,k,l) = (1/(12._wp*dz(l))) * ( &
@@ -2135,6 +2278,14 @@ contains
                         8._wp*q_prim_vf(momxb+2)%sf(j-1,k,l) + &
                         q_prim_vf(momxb+2)%sf(j-2,k,l) - &
                         q_prim_vf(momxb+2)%sf(j+2,k,l) )
+                    end do 
+                end do 
+            end do 
+
+            !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+            do l = -buff_size+2,p+buff_size-3
+                do k = -buff_size+2, n+buff_size-3
+                    do j = -buff_size+2, m+buff_size-3
 
                         if(viscous) then
                             dvel_L(j, k, l+1) = (1._wp/60._wp) * (-3._wp * dvel1(j, k, l-1) + &
@@ -2205,6 +2356,14 @@ contains
                         8._wp*q_prim_vf(momxb+2)%sf(j,k-1,l) + &
                         q_prim_vf(momxb+2)%sf(j,k-2,l) - &
                         q_prim_vf(momxb+2)%sf(j,k+2,l) )
+                    end do 
+                end do 
+            end do 
+
+            !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+            do l = -buff_size+2,p+buff_size-3
+                do k = -buff_size+2, n+buff_size-3
+                    do j = -buff_size+2, m+buff_size-3
 
                         if(viscous) then
                             dvel_L(j, k, l+1) = (1._wp/60._wp) * (-3._wp * dvel1(j, k, l-1) + &
@@ -2278,6 +2437,14 @@ contains
                         8._wp*q_prim_vf(momxb)%sf(j-1,k,l) + &
                         q_prim_vf(momxb)%sf(j-2,k,l) - &
                         q_prim_vf(momxb)%sf(j+2,k,l) )
+                    end do 
+                end do 
+            end do 
+
+            !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+            do l = -buff_size+2,p+buff_size-3
+                do k = -buff_size+2, n+buff_size-3
+                    do j = -buff_size+2, m+buff_size-3
 
                         if(viscous) then
                             dvel_L(j, k, l+1) = (1._wp/60._wp) * (-3._wp * dvel1(j, k, l-1) + &
@@ -2344,6 +2511,14 @@ contains
                         8._wp*q_prim_vf(momxb+1)%sf(j,k-1,l) + &
                         q_prim_vf(momxb+1)%sf(j,k-2,l) - &
                         q_prim_vf(momxb+1)%sf(j,k+2,l) )
+                    end do 
+                end do 
+            end do 
+
+            !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L)
+            do l = -buff_size+2,p+buff_size-3
+                do k = -buff_size+2, n+buff_size-3
+                    do j = -buff_size+2, m+buff_size-3
 
                         if(viscous) then
 
@@ -2395,7 +2570,7 @@ contains
                         end do
 
                         !$acc loop seq 
-                        do i = momxb+3,advxb-1
+                        do i = momxb+3,advxe
                             qL_rs_vf(j, k, l, i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(i)%sf(j, k, l+2) + &
                                             27._wp * q_prim_vf(i)%sf(j, k, l+1) + &
                                             47._wp * q_prim_vf(i)%sf(j, k, l) -   &
@@ -2419,10 +2594,10 @@ contains
 
                         !$acc loop seq
                         do i = 1, num_fluids
-                            flux_vf(i)%sf(j,k,l) = &
+                            flux_vf(i)%sf(j,k,l) = flux_vf(i)%sf(j,k,l) + &
                                 0.5_wp * (qL_rs_vf(j,k,l,i) * &
                                 qR_rs_vf(j,k,l,1)) + &
-                                0.5_wp*cfl * (qL_rs_vf(j,k,l,i))
+                                0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,i))
                         end do
 
                         if(num_fluids > 1) then 
@@ -2431,7 +2606,7 @@ contains
                                 flux_vf(advxb+i-1)%sf(j,k,l) = &
                                     0.5_wp * (qR_rs_vf(j,k,l,advxb+i-1) * &
                                     qR_rs_vf(j,k,l,1)) + &
-                                    0.5_wp*cfl * (qR_rs_vf(j,k,l,advxb+i-1))
+                                    0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,advxb+i-1))
 
                                 flux_vf(advxb+i-1)%sf(j,k,l) = flux_vf(advxb+i-1)%sf(j,k,l) &
                                 - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * qR_rs_vf(j,k,l,1)
@@ -2442,21 +2617,21 @@ contains
                         flux_vf(momxb+2)%sf(j,k,l) = flux_vf(momxb+2)%sf(j,k,l) + &
                              0.5_wp* (rho_L * (qR_rs_vf(j,k,l,1))**2.0 + &
                              qL_rs_vf(j,k,l,E_idx)) + &
-                             0.5_wp*cfl * (qR_rs_vf(j,k,l,1))
+                             0.5_wp*cfl(j,k,l) * (qR_rs_vf(j,k,l,1))
 
                         flux_vf(momxb)%sf(j, k, l) = flux_vf(momxb)%sf(j, k, l) +  &
                             0.5_wp * rho_L * qL_rs_vf(j,k,l,momxb)*qR_rs_vf(j,k,l,1) + &
-                            0.5_wp*cfl * (qL_rs_vf(j,k,l,momxb))
+                            0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,momxb))
 
                         flux_vf(momxb+1)%sf(j, k, l) = flux_vf(momxb+1)%sf(j, k, l) +  &
                             0.5_wp * rho_L * qL_rs_vf(j,k,l,momxb+1)*qR_rs_vf(j,k,l,1) + &
-                            0.5_wp*cfl * (qL_rs_vf(j,k,l,momxb+1))
+                            0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,momxb+1))
 
                          flux_vf(E_idx)%sf(j, k, l) = flux_vf(E_idx)%sf(j, k, l) + &
                             0.5_wp * (qR_rs_vf(j,k,l,1) * (qL_rs_vf(j,k,l,E_idx)*gamma_L + pi_inf_L + &
                             0.5_wp * rho_L * (qL_rs_vf(j,k,l,momxb)**2._wp + qL_rs_vf(j,k,l,momxb+1)**2._wp + qR_rs_vf(j,k,l,1)**2._wp) + &
                             qL_rs_vf(j,k,l,E_idx)) ) + &
-                            0.5_wp*cfl * (qL_rs_vf(j,k,l,E_idx))
+                            0.5_wp*cfl(j,k,l) * (qL_rs_vf(j,k,l,E_idx))
 
                     end do
                 end do
