@@ -393,7 +393,7 @@ contains
                 end if
 
                 ! Boundary condition at the end
-                if (proc_coords(3) > 0 .or. (bc_z%end == -1 .and. num_procs_z > 1)) then
+                if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == -1 .and. num_procs_z > 1)) then
                     proc_coords(3) = proc_coords(3) + 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%end, ierr)
