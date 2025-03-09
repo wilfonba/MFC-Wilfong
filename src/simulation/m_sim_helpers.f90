@@ -65,7 +65,7 @@ contains
         if(igr) then 
             !$acc loop seq
             do i = 1, num_dims
-                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l) / q_prim_vf(i)%sf(j, k, l)
+                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l) / rho
             end do
         else 
             !$acc loop seq
@@ -82,6 +82,7 @@ contains
 
         if(igr) then 
             E = q_prim_vf(E_idx)%sf(j, k, l)
+            pres = (E - pi_inf - qv - 5e-1_wp*rho*vel_sum)/gamma
         else 
             pres = q_prim_vf(E_idx)%sf(j, k, l)
             E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
