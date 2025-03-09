@@ -450,17 +450,17 @@ contains
                                                 2._wp * vel_sf(3))
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
-                                                      0.5_wp * F_L * (dt/dx(j+1))
+                                                      0.5_wp * F_L * (1._wp/dx(j+1))
 
                             rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + &
-                                                      0.5_wp * vel_L * F_L * (dt/dx(j+1))
+                                                      0.5_wp * vel_L * F_L * (1._wp/dx(j+1))
 
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
-                                                      0.5_wp * F_L * (dt/dx(j))
+                                                      0.5_wp * F_L * (1._wp/dx(j))
 
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
-                                                      0.5_wp * vel_L * F_L * (dt/dx(j))
+                                                      0.5_wp * vel_L * F_L * (1._wp/dx(j))
 
 
                             F_L = (1._wp/60._wp) * (-3._wp * jac(j+2, k, l) + &
@@ -476,17 +476,17 @@ contains
                                                 2._wp * vel_sf(-2))
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
-                                                      0.5_wp * F_L * (dt/dx(j+1))
+                                                      0.5_wp * F_L * (1._wp/dx(j+1))
 
                             rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + &
-                                                      0.5_wp * vel_L * F_L * (dt/dx(j+1))
+                                                      0.5_wp * vel_L * F_L * (1._wp/dx(j+1))
 
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
-                                                      0.5_wp * F_L * (dt/dx(j))
+                                                      0.5_wp * F_L * (1._wp/dx(j))
 
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
-                                                      0.5_wp * vel_L * F_L * (dt/dx(j))                   
+                                                      0.5_wp * vel_L * F_L * (1._wp/dx(j))                   
 
                         end do 
                     end do 
@@ -520,17 +520,17 @@ contains
                                                 2._wp * vel_sf(3))
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
-                                                      0.5_wp * F_L * (dt/dx(j+1))
+                                                      0.5_wp * F_L * (1._wp/dx(j+1))
 
                             rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + &
-                                                      0.5_wp * vel_L * F_L * (dt/dx(j+1))
+                                                      0.5_wp * vel_L * F_L * (1._wp/dx(j+1))
 
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
-                                                      0.5_wp * F_L * (dt/dx(j))
+                                                      0.5_wp * F_L * (1._wp/dx(j))
 
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
-                                                      0.5_wp * vel_L * F_L * (dt/dx(j))
+                                                      0.5_wp * vel_L * F_L * (1._wp/dx(j))
 
 
                             F_L = (1._wp/60._wp) * (-3._wp * jac(j+2, k, l) + &
@@ -546,17 +546,17 @@ contains
                                                 2._wp * vel_sf(-2))
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
-                                                      0.5_wp * F_L * (dt/dx(j+1))
+                                                      0.5_wp * F_L * (1._wp/dx(j+1))
 
                             rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + &
-                                                      0.5_wp * vel_L * F_L * (dt/dx(j+1))
+                                                      0.5_wp * vel_L * F_L * (1._wp/dx(j+1))
 
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
-                                                      0.5_wp * F_L * (dt/dx(j))
+                                                      0.5_wp * F_L * (1._wp/dx(j))
 
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
-                                                      0.5_wp * vel_L * F_L * (dt/dx(j))  
+                                                      0.5_wp * vel_L * F_L * (1._wp/dx(j))  
 
                         end do 
                     end do 
@@ -664,13 +664,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j+1,k,l) = rhs_vf(i)%sf(j+1,k,l) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(1))*(dt/dx(j+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dx(j+1))
+                                    vel_L(1))*(1._wp/dx(j+1)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dx(j+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(1))*(dt/dx(j)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dx(j)) 
+                                    vel_L(1))*(1._wp/dx(j)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dx(j)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -678,51 +678,51 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) + &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(1))*(dt/dx(j+1)) - &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dx(j+1))
+                                        vel_L(1))*(1._wp/dx(j+1)) - &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dx(j+1))
 
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) &
-                                    - 0.5_wp * alpha_L(i) * vel_L(1)*(dt/dx(j+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l) * vel_L(1)*(1._wp/dx(j+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(1))*(dt/dx(j)) + &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dx(j))
+                                        vel_L(1))*(1._wp/dx(j)) + &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dx(j))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_L(i) * vel_L(1)*(dt/dx(j))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(1)*(1._wp/dx(j))
                                 end do
                             end if
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
                                  0.5_wp* (rho_L * (vel_L(1))**2.0 + &
-                                 pres_L)*(dt/dx(j)) - &
-                                 0.5_wp*cfl * (vel_L(1))*(dt/dx(j+1))
+                                 pres_L)*(1._wp/dx(j+1)) - &
+                                 0.5_wp*cfl * (vel_L(1))*(1._wp/dx(j+1))
 
                             rhs_vf(momxb+1)%sf(j+1, k, l) =  rhs_vf(momxb+1)%sf(j+1, k, l) + &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dx(j+1))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dx(j+1)) - &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dx(j+1))
 
                              rhs_vf(E_idx)%sf(j+1, k, l) = rhs_vf(E_idx)%sf(j+1, k, l) +  &
                                 0.5_wp * (vel_L(1) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp ) + &
-                                pres_L) )*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dx(j+1))
+                                pres_L) )*(1._wp/dx(j+1)) - &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dx(j+1))
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_L(1))**2.0 + &
-                                 pres_L)*(dt/dx(j)) + &
-                                 0.5_wp*cfl * (vel_L(1))*(dt/dx(j))
+                                 pres_L)*(1._wp/dx(j)) + &
+                                 0.5_wp*cfl * (vel_L(1))*(1._wp/dx(j))
 
                             rhs_vf(momxb+1)%sf(j, k, l) =  rhs_vf(momxb+1)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(dt/dx(j)) + &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dx(j))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dx(j)) + &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dx(j))
 
                              rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_L(1) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp ) + &
-                                pres_L) )*(dt/dx(j)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dx(j))
+                                pres_L) )*(1._wp/dx(j)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dx(j))
 
                             !! duy & dvx
                             dvel1 = (1/(12._wp*dy(k))) * ( &
@@ -748,29 +748,29 @@ contains
                                               + mu_L
                                 end do
 
-                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+2))
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-2))
+                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-2))
 
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-2))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-2))
 
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-2))
-                                rhs_vf(momxb+1)%sf(j-3,k,l) = rhs_vf(momxb+1)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-3))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-2))
+                                rhs_vf(momxb+1)%sf(j-3,k,l) = rhs_vf(momxb+1)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)**(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-3))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)**(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -781,29 +781,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+2))
-                                rhs_vf(momxb+1)%sf(j+3,k,l) = rhs_vf(momxb+1)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-3))
+                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
+                                rhs_vf(momxb+1)%sf(j+3,k,l) = rhs_vf(momxb+1)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+3)) 
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+3)) 
 
-                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-2))
-                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+2))
+                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-2))
+                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
 
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+2))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+2))
 
                             end if
 
@@ -833,29 +833,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+2))
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
+                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+2))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-2))
 
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-2))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-2))
 
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
-                                rhs_vf(momxb)%sf(j-3,k,l) = rhs_vf(momxb)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-3))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-2))
+                                rhs_vf(momxb)%sf(j-3,k,l) = rhs_vf(momxb)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)**(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-3))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)**(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -866,29 +866,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+2))
-                                rhs_vf(momxb)%sf(j+3,k,l) = rhs_vf(momxb)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-3))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+2))
+                                rhs_vf(momxb)%sf(j+3,k,l) = rhs_vf(momxb)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+3)) 
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+3)) 
 
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+2))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-2))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+2))
 
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+2))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+2))
 
                             end if
 
@@ -929,13 +929,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j+1,k,l) = rhs_vf(i)%sf(j+1,k,l) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dx(j+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dx(j+1))
+                                    vel_R)*(1._wp/dx(j+1)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dx(j+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dx(j)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dx(j)) 
+                                    vel_R)*(1._wp/dx(j)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dx(j)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -943,51 +943,51 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) + &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dx(j+1)) - &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dx(j+1))
+                                        vel_R)*(1._wp/dx(j+1)) + &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dx(j+1))
 
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) &
-                                    - 0.5_wp * alpha_R(i) * vel_R*(dt/dx(j+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_R*(1._wp/dx(j+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dx(j)) + &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dx(j))
+                                        vel_R)*(1._wp/dx(j)) - &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dx(j))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_R(i) * vel_R*(dt/dx(j))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_R*(1._wp/dx(j))
                                 end do
                             end if
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L)*(dt/dx(j+1)) - &
-                                 0.5_wp*cfl * (vel_R)*(dt/dx(j+1))
+                                 pres_L)*(1._wp/dx(j+1)) + &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dx(j+1))
 
                             rhs_vf(momxb+1)%sf(j+1, k, l) =  rhs_vf(momxb+1)%sf(j+1, k, l) + &
-                                0.5_wp * rho_L * vel_R*vel_L(2)*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dx(j+1))
+                                0.5_wp * rho_L * vel_R*vel_L(2)*(1._wp/dx(j+1)) + &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dx(j+1))
 
                              rhs_vf(E_idx)%sf(j+1, k, l) = rhs_vf(E_idx)%sf(j+1, k, l) +  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_R**2._wp + vel_L(2)**2._wp ) + &
-                                pres_L) )*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dx(j+1))
+                                pres_L) )*(1._wp/dx(j+1)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dx(j+1))
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L)*(dt/dx(j)) + &
-                                 0.5_wp*cfl * (vel_R)*(dt/dx(j))
+                                 pres_L)*(1._wp/dx(j)) - &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dx(j))
 
                             rhs_vf(momxb+1)%sf(j, k, l) =  rhs_vf(momxb+1)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_R*vel_L(2)*(dt/dx(j)) + &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dx(j))
+                                0.5_wp * rho_L * vel_R*vel_L(2)*(1._wp/dx(j)) - &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dx(j))
 
                              rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_R**2._wp + vel_L(2)**2._wp ) + &
-                                pres_L) )*(dt/dx(j)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dx(j))
+                                pres_L) )*(1._wp/dx(j)) - &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dx(j))
 
                         end do
                     end do
@@ -1074,13 +1074,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j+1,k,l) = rhs_vf(i)%sf(j+1,k,l) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(1))*(dt/dx(j+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dx(j+1))
+                                    vel_L(1))*(1._wp/dx(j+1)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dx(j+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(1))*(dt/dx(j)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dx(j)) 
+                                    vel_L(1))*(1._wp/dx(j)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dx(j)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -1088,59 +1088,59 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) + &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(1))*(dt/dx(j+1)) - &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dx(j+1))
+                                        vel_L(1))*(1._wp/dx(j+1)) - &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dx(j+1))
 
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) &
-                                    - 0.5_wp * alpha_L(i) * vel_L(1)*(dt/dx(j+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_L(1)*(1._wp/dx(j+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(1))*(dt/dx(j)) + &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dx(j))
+                                        vel_L(1))*(1._wp/dx(j)) + &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dx(j))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_L(i) * vel_L(1)*(dt/dx(j))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(1)*(1._wp/dx(j))
                                 end do
                             end if
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
                                  0.5_wp* (rho_L * (vel_L(1))**2.0 + &
-                                 pres_L)*(dt/dx(j)) - &
-                                 0.5_wp*cfl * (vel_L(1))*(dt/dx(j+1))
+                                 pres_L)*(1._wp/dx(j+1)) - &
+                                 0.5_wp*cfl * (vel_L(1))*(1._wp/dx(j+1))
 
                             rhs_vf(momxb+1)%sf(j+1, k, l) =  rhs_vf(momxb+1)%sf(j+1, k, l) + &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dx(j+1))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dx(j+1)) - &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dx(j+1))
 
                             rhs_vf(momxb+2)%sf(j+1, k, l) =  rhs_vf(momxb+2)%sf(j+1, k, l) + &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(3)*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (vel_L(3))*(dt/dx(j+1))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(3)*(1._wp/dx(j+1)) - &
+                                0.5_wp*cfl * (vel_L(3))*(1._wp/dx(j+1))
 
                              rhs_vf(E_idx)%sf(j+1, k, l) = rhs_vf(E_idx)%sf(j+1, k, l) +  &
                                 0.5_wp * (vel_L(1) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp) + &
-                                pres_L) )*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dx(j+1))
+                                pres_L) )*(1._wp/dx(j+1)) - &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dx(j+1))
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_L(1))**2.0 + &
-                                 pres_L)*(dt/dx(j)) + &
-                                 0.5_wp*cfl * (vel_L(1))*(dt/dx(j))
+                                 pres_L)*(1._wp/dx(j)) + &
+                                 0.5_wp*cfl * (vel_L(1))*(1._wp/dx(j))
 
                             rhs_vf(momxb+1)%sf(j, k, l) =  rhs_vf(momxb+1)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(dt/dx(j)) + &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dx(j))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dx(j)) + &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dx(j))
 
                             rhs_vf(momxb+2)%sf(j, k, l) =  rhs_vf(momxb+2)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(3)*(dt/dx(j)) + &
-                                0.5_wp*cfl * (vel_L(3))*(dt/dx(j))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(3)*(1._wp/dx(j)) + &
+                                0.5_wp*cfl * (vel_L(3))*(1._wp/dx(j))
 
                              rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_L(1) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp) + &
-                                pres_L) )*(dt/dx(j)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dx(j))
+                                pres_L) )*(1._wp/dx(j)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dx(j))
 
                             !! duy & dvx
                             dvel1 = (1/(12._wp*dy(k))) * ( &
@@ -1166,29 +1166,29 @@ contains
                                               + mu_L
                                 end do
 
-                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+2))
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-2))
+                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-2))
 
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-2))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-2))
 
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-2))
-                                rhs_vf(momxb+1)%sf(j-3,k,l) = rhs_vf(momxb+1)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-3))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-2))
+                                rhs_vf(momxb+1)%sf(j-3,k,l) = rhs_vf(momxb+1)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)**(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-3))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)**(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -1199,29 +1199,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+2))
-                                rhs_vf(momxb+1)%sf(j+3,k,l) = rhs_vf(momxb+1)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-3))
+                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
+                                rhs_vf(momxb+1)%sf(j+3,k,l) = rhs_vf(momxb+1)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+3)) 
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+3)) 
 
-                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-2))
-                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+2))
+                                rhs_vf(momxb+1)%sf(j-2,k,l) = rhs_vf(momxb+1)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-2))
+                                rhs_vf(momxb+1)%sf(j-1,k,l) = rhs_vf(momxb+1)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+1)%sf(j+1,k,l) = rhs_vf(momxb+1)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
 
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+2))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+2))
 
                             end if
 
@@ -1251,29 +1251,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb+2)%sf(j+2,k,l) = rhs_vf(momxb+2)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+2))
-                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+2)%sf(j-1,k,l) = rhs_vf(momxb+2)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+2)%sf(j-2,k,l) = rhs_vf(momxb+2)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-2))
+                                rhs_vf(momxb+2)%sf(j+2,k,l) = rhs_vf(momxb+2)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
+                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+2)%sf(j-1,k,l) = rhs_vf(momxb+2)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+2)%sf(j-2,k,l) = rhs_vf(momxb+2)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-2))
 
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-2))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-2))
 
-                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+2)%sf(j-1,k,l) = rhs_vf(momxb+2)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+2)%sf(j-2,k,l) = rhs_vf(momxb+2)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-2))
-                                rhs_vf(momxb+2)%sf(j-3,k,l) = rhs_vf(momxb+2)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-3))
+                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+2)%sf(j-1,k,l) = rhs_vf(momxb+2)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+2)%sf(j-2,k,l) = rhs_vf(momxb+2)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-2))
+                                rhs_vf(momxb+2)%sf(j-3,k,l) = rhs_vf(momxb+2)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)**(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(dt/dx(j-3))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(1)**(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(1)*(1._wp/dx(j-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -1284,29 +1284,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+2)%sf(j-1,k,l) = rhs_vf(momxb+2)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+2)%sf(j+2,k,l) = rhs_vf(momxb+2)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+2))
-                                rhs_vf(momxb+2)%sf(j+3,k,l) = rhs_vf(momxb+2)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-3))
+                                rhs_vf(momxb+2)%sf(j-1,k,l) = rhs_vf(momxb+2)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+2)%sf(j+2,k,l) = rhs_vf(momxb+2)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
+                                rhs_vf(momxb+2)%sf(j+3,k,l) = rhs_vf(momxb+2)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+3)) 
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+3)) 
 
-                                rhs_vf(momxb+2)%sf(j-2,k,l) = rhs_vf(momxb+2)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-2))
-                                rhs_vf(momxb+2)%sf(j-1,k,l) = rhs_vf(momxb+2)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j-1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j))
-                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+1))
-                                rhs_vf(momxb+2)%sf(j+2,k,l) = rhs_vf(momxb+2)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dx(j+2))
+                                rhs_vf(momxb+2)%sf(j-2,k,l) = rhs_vf(momxb+2)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-2))
+                                rhs_vf(momxb+2)%sf(j-1,k,l) = rhs_vf(momxb+2)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j-1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j))
+                                rhs_vf(momxb+2)%sf(j+1,k,l) = rhs_vf(momxb+2)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+1))
+                                rhs_vf(momxb+2)%sf(j+2,k,l) = rhs_vf(momxb+2)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
 
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dx(j+2))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dx(j+2))
 
                             end if
 
@@ -1351,29 +1351,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+2))
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
+                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+2))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-2))
 
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-2))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-2))
 
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
-                                rhs_vf(momxb)%sf(j-3,k,l) = rhs_vf(momxb)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-3))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-2))
+                                rhs_vf(momxb)%sf(j-3,k,l) = rhs_vf(momxb)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)**(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-3))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)**(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -1384,29 +1384,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+2))
-                                rhs_vf(momxb)%sf(j+3,k,l) = rhs_vf(momxb)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-3))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+2))
+                                rhs_vf(momxb)%sf(j+3,k,l) = rhs_vf(momxb)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+3)) 
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+3)) 
 
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+2))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-2))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dx(j+2))
 
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+2))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+2))
 
                             end if
 
@@ -1433,29 +1433,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j+2))
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
+                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j+2))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j-2))
 
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-2))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-2))
 
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
-                                rhs_vf(momxb)%sf(j-3,k,l) = rhs_vf(momxb)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-3))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j-2))
+                                rhs_vf(momxb)%sf(j-3,k,l) = rhs_vf(momxb)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)**(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j-3))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)**(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-3,k,l) = rhs_vf(E_idx)%sf(j-3,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(1._wp/dx(j-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -1466,29 +1466,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j+2))
-                                rhs_vf(momxb)%sf(j+3,k,l) = rhs_vf(momxb)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-3))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j+2))
+                                rhs_vf(momxb)%sf(j+3,k,l) = rhs_vf(momxb)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j-3))
 
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+2))
-                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+3)) 
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+2))
+                                rhs_vf(E_idx)%sf(j+3,k,l) = rhs_vf(E_idx)%sf(j+3,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+3)) 
 
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
-                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j))
-                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
-                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j+2))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j-2))
+                                rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j))
+                                rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j+1))
+                                rhs_vf(momxb)%sf(j+2,k,l) = rhs_vf(momxb)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dx(j+2))
 
-                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j-2))
-                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j))
-                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+1))
-                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dx(j+2))
+                                rhs_vf(E_idx)%sf(j-2,k,l) = rhs_vf(E_idx)%sf(j-2,k,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j-2))
+                                rhs_vf(E_idx)%sf(j-1,k,l) = rhs_vf(E_idx)%sf(j-1,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j))
+                                rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+1))
+                                rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dx(j+2))
 
                             end if
 
@@ -1529,13 +1529,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j+1,k,l) = rhs_vf(i)%sf(j+1,k,l) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dx(j+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dx(j+1))
+                                    vel_R)*(1._wp/dx(j+1)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dx(j+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dx(j)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dx(j)) 
+                                    vel_R)*(1._wp/dx(j)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dx(j)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -1543,59 +1543,59 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) + &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dx(j+1)) - &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dx(j+1))
+                                        vel_R)*(1._wp/dx(j+1)) + &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dx(j+1))
 
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) &
-                                    - 0.5_wp * alpha_R(i) * vel_R*(dt/dx(j+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_R*(1._wp/dx(j+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dx(j)) + &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dx(j))
+                                        vel_R)*(1._wp/dx(j)) - &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dx(j))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_R(i) * vel_R*(dt/dx(j))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l) * vel_R*(1._wp/dx(j))
                                 end do
                             end if
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L)*(dt/dx(j+1)) - &
-                                 0.5_wp*cfl * (vel_R)*(dt/dx(j+1))
+                                 pres_L)*(1._wp/dx(j+1)) + &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dx(j+1))
 
                             rhs_vf(momxb+1)%sf(j+1, k, l) =  rhs_vf(momxb+1)%sf(j+1, k, l) + &
-                                0.5_wp * rho_L * vel_R*vel_L(2)*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dx(j+1))
+                                0.5_wp * rho_L * vel_R*vel_L(2)*(1._wp/dx(j+1)) + &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dx(j+1))
 
                             rhs_vf(momxb+2)%sf(j+1, k, l) =  rhs_vf(momxb+2)%sf(j+1, k, l) + &
-                                0.5_wp * rho_L * vel_R*vel_L(3)*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (vel_L(3))*(dt/dx(j+1))
+                                0.5_wp * rho_L * vel_R*vel_L(3)*(1._wp/dx(j+1)) + &
+                                0.5_wp*cfl * (vel_L(3))*(1._wp/dx(j+1))
 
                              rhs_vf(E_idx)%sf(j+1, k, l) = rhs_vf(E_idx)%sf(j+1, k, l) +  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_R**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ) + &
-                                pres_L) )*(dt/dx(j+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dx(j+1))
+                                pres_L) )*(1._wp/dx(j+1)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dx(j+1))
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L)*(dt/dx(j)) + &
-                                 0.5_wp*cfl * (vel_R)*(dt/dx(j))
+                                 pres_L)*(1._wp/dx(j)) - &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dx(j))
 
                             rhs_vf(momxb+1)%sf(j, k, l) =  rhs_vf(momxb+1)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_R*vel_L(2)*(dt/dx(j)) + &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dx(j))
+                                0.5_wp * rho_L * vel_R*vel_L(2)*(1._wp/dx(j)) - &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dx(j))
 
                             rhs_vf(momxb+2)%sf(j, k, l) =  rhs_vf(momxb+2)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_R*vel_L(3)*(dt/dx(j)) + &
-                                0.5_wp*cfl * (vel_L(3))*(dt/dx(j))
+                                0.5_wp * rho_L * vel_R*vel_L(3)*(1._wp/dx(j)) - &
+                                0.5_wp*cfl * (vel_L(3))*(1._wp/dx(j))
 
                              rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_R**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp) + &
-                                pres_L) )*(dt/dx(j)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dx(j))
+                                pres_L) )*(1._wp/dx(j)) - &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dx(j))
                         end do
                     end do
                 end do
@@ -1689,13 +1689,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j,k+1,l) = rhs_vf(i)%sf(j,k+1,l) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(2))*(dt/dy(k+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dy(k+1))
+                                    vel_L(2))*(1._wp/dy(k+1)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dy(k+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(2))*(dt/dy(k)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dy(k)) 
+                                    vel_L(2))*(1._wp/dy(k)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dy(k)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -1703,51 +1703,51 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) + &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(2))*(dt/dy(k+1)) - &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dy(k+1))
+                                        vel_L(2))*(1._wp/dy(k+1)) - &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dy(k+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) &
-                                    - 0.5_wp * alpha_L(i) * vel_L(2)*(dt/dy(k+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_L(2)*(1._wp/dy(k+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(2))*(dt/dy(k)) + &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dy(k))
+                                        vel_L(2))*(1._wp/dy(k)) + &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dy(k))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_L(i) * vel_L(2)*(dt/dy(k))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(2)*(1._wp/dy(k))
                                 end do
                             end if
 
                             rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + &
                                  0.5_wp* (rho_L * (vel_L(2))**2.0 + &
-                                 pres_L + F_L)*(dt/dy(k+1)) - &
-                                 0.5_wp*cfl * (vel_L(2))*(dt/dy(k+1))
+                                 pres_L + F_L)*(1._wp/dy(k+1)) - &
+                                 0.5_wp*cfl * (vel_L(2))*(1._wp/dy(k+1))
 
                             rhs_vf(momxb)%sf(j, k+1, l) =  rhs_vf(momxb)%sf(j, k+1, l) + &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dy(k+1))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dy(k+1)) - &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dy(k+1))
 
                             rhs_vf(E_idx)%sf(j, k+1, l) = rhs_vf(E_idx)%sf(j, k+1, l) +  &
                                 0.5_wp * (vel_L(2) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp ) + &
-                                pres_L + F_L) )*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dy(k+1))
+                                pres_L + F_L) )*(1._wp/dy(k+1)) - &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dy(k+1))
 
                             rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_L(2))**2.0 + &
-                                 pres_L + F_L)*(dt/dy(k)) + &
-                                 0.5_wp*cfl * (vel_L(2))*(dt/dy(k))
+                                 pres_L + F_L)*(1._wp/dy(k)) + &
+                                 0.5_wp*cfl * (vel_L(2))*(1._wp/dy(k))
 
                             rhs_vf(momxb)%sf(j, k, l) =  rhs_vf(momxb)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(dt/dy(k)) + &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dy(k))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dy(k)) + &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dy(k))
 
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_L(2) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp ) + &
-                                pres_L + F_L) )*(dt/dy(k)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dy(k))
+                                pres_L + F_L) )*(1._wp/dy(k)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dy(k))
 
                             !! duy & dvx
                             dvel1 = (1/(12._wp*dy(k))) * ( &
@@ -1773,29 +1773,29 @@ contains
                                               + mu_L
                                 end do
 
-                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+2))
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-2))
+                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-2))
 
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-2))
 
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-2))
-                                rhs_vf(momxb)%sf(j,k-3,l) = rhs_vf(momxb)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-3))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-2))
+                                rhs_vf(momxb)%sf(j,k-3,l) = rhs_vf(momxb)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)**(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-3))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)**(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -1806,29 +1806,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+2))
-                                rhs_vf(momxb)%sf(j,k+3,l) = rhs_vf(momxb)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-3))
+                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
+                                rhs_vf(momxb)%sf(j,k+3,l) = rhs_vf(momxb)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+3)) 
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+3)) 
 
-                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-2))
-                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+2))
+                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-2))
+                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
 
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+2))
 
                             end if
 
@@ -1858,29 +1858,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+2))
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-2))
+                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+2))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-2))
 
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-2))
 
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-2))
-                                rhs_vf(momxb+1)%sf(j,k-3,l) = rhs_vf(momxb+1)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-3))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-2))
+                                rhs_vf(momxb+1)%sf(j,k-3,l) = rhs_vf(momxb+1)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)**(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-3))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)**(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -1891,29 +1891,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+2))
-                                rhs_vf(momxb+1)%sf(j,k+3,l) = rhs_vf(momxb+1)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-3))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+2))
+                                rhs_vf(momxb+1)%sf(j,k+3,l) = rhs_vf(momxb+1)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+3)) 
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+3)) 
 
-                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-2))
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+2))
+                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-2))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+2))
 
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+2))
 
                             end if
 
@@ -1958,13 +1958,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j,k+1,l) = rhs_vf(i)%sf(j,k+1,l) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dy(k+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dy(k+1))
+                                    vel_R)*(1._wp/dy(k+1)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dy(k+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dy(k)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dy(k)) 
+                                    vel_R)*(1._wp/dy(k)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dy(k)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -1972,51 +1972,51 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) + &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dy(k+1)) - &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dy(k+1))
+                                        vel_R)*(1._wp/dy(k+1)) + &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dy(k+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) &
-                                    - 0.5_wp * alpha_R(i) * vel_R*(dt/dy(k+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_R*(1._wp/dy(k+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dy(k)) + &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dy(k))
+                                        vel_R)*(1._wp/dy(k)) - &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dy(k))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_R(i) * vel_R*(dt/dy(k))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_R*(1._wp/dy(k))
                                 end do
                             end if
 
                             rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L+F_L)*(dt/dy(k+1)) - &
-                                 0.5_wp*cfl * (vel_R)*(dt/dy(k+1))
+                                 pres_L+F_L)*(1._wp/dy(k+1)) + &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dy(k+1))
 
                             rhs_vf(momxb)%sf(j, k+1, l) =  rhs_vf(momxb)%sf(j, k+1, l) + &
-                                0.5_wp * rho_L * vel_R*vel_L(1)*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dy(k+1))
+                                0.5_wp * rho_L * vel_R*vel_L(1)*(1._wp/dy(k+1)) + &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dy(k+1))
 
                              rhs_vf(E_idx)%sf(j, k+1, l) = rhs_vf(E_idx)%sf(j, k+1, l) +  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_R**2._wp ) + &
-                                pres_L+F_L ) )*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dy(k+1))
+                                pres_L+F_L ) )*(1._wp/dy(k+1)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dy(k+1))
 
                             rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L+F_L)*(dt/dy(k)) + &
-                                 0.5_wp*cfl * (vel_R)*(dt/dy(k))
+                                 pres_L+F_L)*(1._wp/dy(k)) - &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dy(k))
 
                             rhs_vf(momxb)%sf(j, k, l) =  rhs_vf(momxb)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_R*vel_L(1)*(dt/dy(k)) + &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dy(k))
+                                0.5_wp * rho_L * vel_R*vel_L(1)*(1._wp/dy(k)) - &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dy(k))
 
                              rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
-                                0.5_wp * rho_L * (vel_L(1)**2._wp + vel_R**2._wp ) + &
-                                pres_L+F_L) )*(dt/dy(k)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dy(k))
+                                0.5_wp * rho_L * (vel_L(1)**2._wp + vel_R**2._wp ) - &
+                                pres_L+F_L) )*(1._wp/dy(k)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dy(k))
 
                         end do
                     end do
@@ -2110,13 +2110,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j,k+1,l) = rhs_vf(i)%sf(j,k+1,l) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(2))*(dt/dy(k+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dy(k+1))
+                                    vel_L(2))*(1._wp/dy(k+1)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dy(k+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(2))*(dt/dy(k)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dy(k)) 
+                                    vel_L(2))*(1._wp/dy(k)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dy(k)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -2124,59 +2124,59 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) + &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(2))*(dt/dy(k+1)) - &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dy(k+1))
+                                        vel_L(2))*(1._wp/dy(k+1)) - &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dy(k+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) &
-                                    - 0.5_wp * alpha_L(i) * vel_L(2)*(dt/dy(k+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_L(2)*(1._wp/dy(k+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(2))*(dt/dy(k)) + &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dy(k))
+                                        vel_L(2))*(1._wp/dy(k)) + &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dy(k))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_L(i) * vel_L(2)*(dt/dy(k))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(2)*(1._wp/dy(k))
                                 end do
                             end if
 
                             rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + &
                                  0.5_wp* (rho_L * (vel_L(2))**2.0 + &
-                                 pres_L+F_L)*(dt/dy(k+1)) - &
-                                 0.5_wp*cfl * (vel_L(2))*(dt/dy(k+1))
+                                 pres_L+F_L)*(1._wp/dy(k+1)) - &
+                                 0.5_wp*cfl * (vel_L(2))*(1._wp/dy(k+1))
 
                             rhs_vf(momxb)%sf(j, k+1, l) =  rhs_vf(momxb)%sf(j, k+1, l) + &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dy(k+1))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dy(k+1)) - &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dy(k+1))
 
                             rhs_vf(momxb+2)%sf(j, k+1, l) =  rhs_vf(momxb+2)%sf(j, k+1, l) + &
-                                0.5_wp * rho_L * vel_L(3)*vel_L(2)*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (vel_L(3))*(dt/dy(k+1))
+                                0.5_wp * rho_L * vel_L(3)*vel_L(2)*(1._wp/dy(k+1)) - &
+                                0.5_wp*cfl * (vel_L(3))*(1._wp/dy(k+1))
 
                             rhs_vf(E_idx)%sf(j, k+1, l) = rhs_vf(E_idx)%sf(j, k+1, l) +  &
                                 0.5_wp * (vel_L(2) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ) + &
-                                pres_L+F_L) )*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dy(k+1))
+                                pres_L+F_L) )*(1._wp/dy(k+1)) - &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dy(k+1))
 
                             rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_L(2))**2.0 + &
-                                 pres_L+F_L)*(dt/dy(k)) + &
-                                 0.5_wp*cfl * (vel_L(2))*(dt/dy(k))
+                                 pres_L+F_L)*(1._wp/dy(k)) + &
+                                 0.5_wp*cfl * (vel_L(2))*(1._wp/dy(k))
 
                             rhs_vf(momxb)%sf(j, k, l) =  rhs_vf(momxb)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(dt/dy(k)) + &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dy(k))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dy(k)) + &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dy(k))
 
                             rhs_vf(momxb+2)%sf(j, k, l) =  rhs_vf(momxb+2)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(3)*vel_L(2)*(dt/dy(k)) + &
-                                0.5_wp*cfl * (vel_L(3))*(dt/dy(k))
+                                0.5_wp * rho_L * vel_L(3)*vel_L(2)*(1._wp/dy(k)) + &
+                                0.5_wp*cfl * (vel_L(3))*(1._wp/dy(k))
 
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_L(2) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ) + &
-                                pres_L+F_L) )*(dt/dy(k)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dy(k))
+                                pres_L+F_L) )*(1._wp/dy(k)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dy(k))
 
                             !! duy & dvx
                             dvel1 = (1/(12._wp*dy(k))) * ( &
@@ -2200,29 +2200,29 @@ contains
                                               + mu_L
                                 end do
 
-                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+2))
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-2))
+                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-2))
 
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-2))
 
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-2))
-                                rhs_vf(momxb)%sf(j,k-3,l) = rhs_vf(momxb)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-3))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-2))
+                                rhs_vf(momxb)%sf(j,k-3,l) = rhs_vf(momxb)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)**(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-3))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)**(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -2233,29 +2233,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+2))
-                                rhs_vf(momxb)%sf(j,k+3,l) = rhs_vf(momxb)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-3))
+                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
+                                rhs_vf(momxb)%sf(j,k+3,l) = rhs_vf(momxb)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+3)) 
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+3)) 
 
-                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-2))
-                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+2))
+                                rhs_vf(momxb)%sf(j,k-2,l) = rhs_vf(momxb)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-2))
+                                rhs_vf(momxb)%sf(j,k-1,l) = rhs_vf(momxb)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb)%sf(j,k+1,l) = rhs_vf(momxb)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
 
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+2))
 
                             end if
 
@@ -2283,29 +2283,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb+2)%sf(j,k+2,l) = rhs_vf(momxb+2)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+2))
-                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb+2)%sf(j,k-1,l) = rhs_vf(momxb+2)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb+2)%sf(j,k-2,l) = rhs_vf(momxb+2)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-2))
+                                rhs_vf(momxb+2)%sf(j,k+2,l) = rhs_vf(momxb+2)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
+                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb+2)%sf(j,k-1,l) = rhs_vf(momxb+2)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb+2)%sf(j,k-2,l) = rhs_vf(momxb+2)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-2))
 
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-2))
 
-                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb+2)%sf(j,k-1,l) = rhs_vf(momxb+2)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb+2)%sf(j,k-2,l) = rhs_vf(momxb+2)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-2))
-                                rhs_vf(momxb+2)%sf(j,k-3,l) = rhs_vf(momxb+2)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-3))
+                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb+2)%sf(j,k-1,l) = rhs_vf(momxb+2)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb+2)%sf(j,k-2,l) = rhs_vf(momxb+2)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-2))
+                                rhs_vf(momxb+2)%sf(j,k-3,l) = rhs_vf(momxb+2)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)**(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(dt/dy(k-3))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(2)**(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(2)*(1._wp/dy(k-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -2316,29 +2316,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+2)%sf(j,k-1,l) = rhs_vf(momxb+2)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb+2)%sf(j,k+2,l) = rhs_vf(momxb+2)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+2))
-                                rhs_vf(momxb+2)%sf(j,k+3,l) = rhs_vf(momxb+2)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-3))
+                                rhs_vf(momxb+2)%sf(j,k-1,l) = rhs_vf(momxb+2)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb+2)%sf(j,k+2,l) = rhs_vf(momxb+2)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
+                                rhs_vf(momxb+2)%sf(j,k+3,l) = rhs_vf(momxb+2)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+3)) 
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+3)) 
 
-                                rhs_vf(momxb+2)%sf(j,k-2,l) = rhs_vf(momxb+2)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-2))
-                                rhs_vf(momxb+2)%sf(j,k-1,l) = rhs_vf(momxb+2)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k-1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k))
-                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+1))
-                                rhs_vf(momxb+2)%sf(j,k+2,l) = rhs_vf(momxb+2)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dy(k+2))
+                                rhs_vf(momxb+2)%sf(j,k-2,l) = rhs_vf(momxb+2)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-2))
+                                rhs_vf(momxb+2)%sf(j,k-1,l) = rhs_vf(momxb+2)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k-1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k))
+                                rhs_vf(momxb+2)%sf(j,k+1,l) = rhs_vf(momxb+2)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+1))
+                                rhs_vf(momxb+2)%sf(j,k+2,l) = rhs_vf(momxb+2)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
 
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dy(k+2))
 
                             end if
 
@@ -2366,29 +2366,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+2))
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-2))
+                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+2))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-2))
 
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-2))
 
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-2))
-                                rhs_vf(momxb+1)%sf(j,k-3,l) = rhs_vf(momxb+1)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-3))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-2))
+                                rhs_vf(momxb+1)%sf(j,k-3,l) = rhs_vf(momxb+1)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)**(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-3))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)**(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -2399,29 +2399,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+2))
-                                rhs_vf(momxb+1)%sf(j,k+3,l) = rhs_vf(momxb+1)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-3))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+2))
+                                rhs_vf(momxb+1)%sf(j,k+3,l) = rhs_vf(momxb+1)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+3)) 
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+3)) 
 
-                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-2))
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dy(k+2))
+                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-2))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(1._wp/dy(k+2))
 
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+2))
 
                             end if
 
@@ -2443,29 +2443,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k+2))
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k-2))
+                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k+2))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k-2))
 
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-2))
 
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k-2))
-                                rhs_vf(momxb+1)%sf(j,k-3,l) = rhs_vf(momxb+1)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k-3))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k-2))
+                                rhs_vf(momxb+1)%sf(j,k-3,l) = rhs_vf(momxb+1)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)**(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(dt/dy(k-3))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)**(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-3,l) = rhs_vf(E_idx)%sf(j,k-3,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(2)*(1._wp/dy(k-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -2476,29 +2476,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k+2))
-                                rhs_vf(momxb+1)%sf(j,k+3,l) = rhs_vf(momxb+1)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k-3))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k+2))
+                                rhs_vf(momxb+1)%sf(j,k+3,l) = rhs_vf(momxb+1)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k-3))
 
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+2))
-                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+3)) 
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k+3,l) = rhs_vf(E_idx)%sf(j,k+3,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+3)) 
 
-                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k-2))
-                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k))
-                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k+1))
-                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dy(k+2))
+                                rhs_vf(momxb+1)%sf(j,k-2,l) = rhs_vf(momxb+1)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k-2))
+                                rhs_vf(momxb+1)%sf(j,k-1,l) = rhs_vf(momxb+1)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k))
+                                rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k+1))
+                                rhs_vf(momxb+1)%sf(j,k+2,l) = rhs_vf(momxb+1)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(1._wp/dy(k+2))
 
-                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k-2))
-                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k))
-                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+1))
-                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(dt/dy(k+2))
+                                rhs_vf(E_idx)%sf(j,k-2,l) = rhs_vf(E_idx)%sf(j,k-2,l) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k-2))
+                                rhs_vf(E_idx)%sf(j,k-1,l) = rhs_vf(E_idx)%sf(j,k-1,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k))
+                                rhs_vf(E_idx)%sf(j,k+1,l) = rhs_vf(E_idx)%sf(j,k+1,l) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+1))
+                                rhs_vf(E_idx)%sf(j,k+2,l) = rhs_vf(E_idx)%sf(j,k+2,l) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_R*(1._wp/dy(k+2))
 
                             end if
 
@@ -2549,13 +2549,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j,k+1,l) = rhs_vf(i)%sf(j,k+1,l) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dy(k+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dy(k+1))
+                                    vel_R)*(1._wp/dy(k+1)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dy(k+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dy(k)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dy(k)) 
+                                    vel_R)*(1._wp/dy(k)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dy(k)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -2563,59 +2563,59 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) + &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dy(k+1)) - &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dy(k+1))
+                                        vel_R)*(1._wp/dy(k+1)) + &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dy(k+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) &
-                                    - 0.5_wp * alpha_R(i) * vel_R*(dt/dy(k+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_R*(1._wp/dy(k+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dy(k)) + &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dy(k))
+                                        vel_R)*(1._wp/dy(k)) - &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dy(k))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_R(i) * vel_R*(dt/dy(k))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_R*(1._wp/dy(k))
                                 end do
                             end if
 
                             rhs_vf(momxb+1)%sf(j,k+1,l) = rhs_vf(momxb+1)%sf(j,k+1,l) + &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L+F_L)*(dt/dy(k+1)) - &
-                                 0.5_wp*cfl * (vel_R)*(dt/dy(k+1))
+                                 pres_L+F_L)*(1._wp/dy(k+1)) + &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dy(k+1))
 
                             rhs_vf(momxb)%sf(j, k+1, l) =  rhs_vf(momxb)%sf(j, k+1, l) + &
-                                0.5_wp * rho_L * vel_R*vel_L(1)*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dy(k+1))
+                                0.5_wp * rho_L * vel_R*vel_L(1)*(1._wp/dy(k+1)) + &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dy(k+1))
 
                             rhs_vf(momxb+2)%sf(j, k+1, l) =  rhs_vf(momxb+2)%sf(j, k+1, l) + &
-                                0.5_wp * rho_L * vel_R*vel_L(3)*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (vel_L(3))*(dt/dy(k+1))
+                                0.5_wp * rho_L * vel_R*vel_L(3)*(1._wp/dy(k+1)) + &
+                                0.5_wp*cfl * (vel_L(3))*(1._wp/dy(k+1))
 
                              rhs_vf(E_idx)%sf(j, k+1, l) = rhs_vf(E_idx)%sf(j, k+1, l) +  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_R**2._wp + vel_L(3)**2._wp ) + &
-                                pres_L+F_L ) )*(dt/dy(k+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dy(k+1))
+                                pres_L+F_L ) )*(1._wp/dy(k+1)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dy(k+1))
 
                             rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L+F_L)*(dt/dy(k)) + &
-                                 0.5_wp*cfl * (vel_R)*(dt/dy(k))
+                                 pres_L+F_L)*(1._wp/dy(k)) - &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dy(k))
 
                             rhs_vf(momxb)%sf(j, k, l) =  rhs_vf(momxb)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_R*vel_L(1)*(dt/dy(k)) + &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dy(k))
+                                0.5_wp * rho_L * vel_R*vel_L(1)*(1._wp/dy(k)) - &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dy(k))
 
                             rhs_vf(momxb+2)%sf(j, k, l) =  rhs_vf(momxb+2)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_R*vel_L(3)*(dt/dy(k)) + &
-                                0.5_wp*cfl * (vel_L(3))*(dt/dy(k))
+                                0.5_wp * rho_L * vel_R*vel_L(3)*(1._wp/dy(k)) - &
+                                0.5_wp*cfl * (vel_L(3))*(1._wp/dy(k))
 
                              rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_R**2._wp + vel_L(3)**2._wp ) + &
-                                pres_L+F_L) )*(dt/dy(k)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dy(k))
+                                pres_L+F_L) )*(1._wp/dy(k)) - &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dy(k))
 
                         end do
                     end do
@@ -2710,13 +2710,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j,k,l+1) = rhs_vf(i)%sf(j,k,l+1) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(3))*(dt/dz(l+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dz(l+1))
+                                    vel_L(3))*(1._wp/dz(l+1)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dz(l+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_L(3))*(dt/dz(l)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dz(l)) 
+                                    vel_L(3))*(1._wp/dz(l)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dz(l)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -2724,59 +2724,59 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) + &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(3))*(dt/dz(l+1)) - &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dz(l+1))
+                                        vel_L(3))*(1._wp/dz(l+1)) - &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dz(l+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) &
-                                    - 0.5_wp * alpha_L(i) * vel_L(3)*(dt/dz(l+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_L(3)*(1._wp/dz(l+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_L(i) * &
-                                        vel_L(3))*(dt/dz(l)) + &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dz(l))
+                                        vel_L(3))*(1._wp/dz(l)) + &
+                                        0.5_wp*cfl*(alpha_L(i))*(1._wp/dz(l))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_L(i) * vel_L(3)*(dt/dz(l))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_L(3)*(1._wp/dz(l))
                                 end do
                             end if
 
                             rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + &
                                  0.5_wp* (rho_L * (vel_L(3))**2.0 + &
-                                 pres_L+F_L)*(dt/dz(l+1)) - &
-                                 0.5_wp*cfl * (vel_L(3))*(dt/dz(l+1))
+                                 pres_L+F_L)*(1._wp/dz(l+1)) - &
+                                 0.5_wp*cfl * (vel_L(3))*(1._wp/dz(l+1))
 
                             rhs_vf(momxb)%sf(j, k,l+1) =  rhs_vf(momxb)%sf(j, k,l+1) + &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(3)*(dt/dz(l+1)) - &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dz(l+1))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(3)*(1._wp/dz(l+1)) - &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dz(l+1))
 
                             rhs_vf(momxb+1)%sf(j,k,l+1) =  rhs_vf(momxb+1)%sf(j,k,l+1) + &
-                                0.5_wp * rho_L * vel_L(2)*vel_L(3)*(dt/dz(l+1)) - &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dz(l+1))
+                                0.5_wp * rho_L * vel_L(2)*vel_L(3)*(1._wp/dz(l+1)) - &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dz(l+1))
 
                             rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) +  &
                                 0.5_wp * (vel_L(3) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ) + &
-                                pres_L+F_L) )*(dt/dz(l+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dz(l+1))
+                                pres_L+F_L) )*(1._wp/dz(l+1)) - &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dz(l+1))
 
                             rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_L(3))**2.0 + &
-                                 pres_L+F_L)*(dt/dz(l)) + &
-                                 0.5_wp*cfl * (vel_L(3))*(dt/dz(l))
+                                 pres_L+F_L)*(1._wp/dz(l)) + &
+                                 0.5_wp*cfl * (vel_L(3))*(1._wp/dz(l))
 
                             rhs_vf(momxb)%sf(j, k, l) =  rhs_vf(momxb)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(1)*vel_L(3)*(dt/dz(l)) + &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dz(l))
+                                0.5_wp * rho_L * vel_L(1)*vel_L(3)*(1._wp/dz(l)) + &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dz(l))
 
                             rhs_vf(momxb+1)%sf(j, k, l) =  rhs_vf(momxb+1)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(2)*vel_L(3)*(dt/dz(l)) + &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dz(l))
+                                0.5_wp * rho_L * vel_L(2)*vel_L(3)*(1._wp/dz(l)) + &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dz(l))
 
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_L(3) * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ) + &
-                                pres_L+F_L) )*(dt/dz(l)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dz(l))
+                                pres_L+F_L) )*(1._wp/dz(l)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dz(l))
 
                             !! dwx & duz
                             dvel1 = (1/(12._wp*dy(k))) * ( &
@@ -2800,29 +2800,29 @@ contains
                                               + mu_L
                                 end do
 
-                                rhs_vf(momxb)%sf(j,k,l+2) = rhs_vf(momxb)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+2))
-                                rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l))
-                                rhs_vf(momxb)%sf(j,k,l-1) = rhs_vf(momxb)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-1))
-                                rhs_vf(momxb)%sf(j,k,l-2) = rhs_vf(momxb)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-2))
+                                rhs_vf(momxb)%sf(j,k,l+2) = rhs_vf(momxb)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+2))
+                                rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l))
+                                rhs_vf(momxb)%sf(j,k,l-1) = rhs_vf(momxb)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-1))
+                                rhs_vf(momxb)%sf(j,k,l-2) = rhs_vf(momxb)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-2))
 
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l+2))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-2))
 
-                                rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l))
-                                rhs_vf(momxb)%sf(j,k,l-1) = rhs_vf(momxb)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-1))
-                                rhs_vf(momxb)%sf(j,k,l-2) = rhs_vf(momxb)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-2))
-                                rhs_vf(momxb)%sf(j,k,l-3) = rhs_vf(momxb)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-3))
+                                rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l))
+                                rhs_vf(momxb)%sf(j,k,l-1) = rhs_vf(momxb)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-1))
+                                rhs_vf(momxb)%sf(j,k,l-2) = rhs_vf(momxb)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-2))
+                                rhs_vf(momxb)%sf(j,k,l-3) = rhs_vf(momxb)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-3))
 
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(3)**(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-2))
-                                rhs_vf(E_idx)%sf(j,k,l-3) = rhs_vf(E_idx)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-3))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(3)**(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l-3) = rhs_vf(E_idx)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -2833,29 +2833,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb)%sf(j,k,l-1) = rhs_vf(momxb)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l))
-                                rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+1))
-                                rhs_vf(momxb)%sf(j,k,l+2) = rhs_vf(momxb)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+2))
-                                rhs_vf(momxb)%sf(j,k,l+3) = rhs_vf(momxb)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-3))
+                                rhs_vf(momxb)%sf(j,k,l-1) = rhs_vf(momxb)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l))
+                                rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+1))
+                                rhs_vf(momxb)%sf(j,k,l+2) = rhs_vf(momxb)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+2))
+                                rhs_vf(momxb)%sf(j,k,l+3) = rhs_vf(momxb)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-3))
 
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+2))
-                                rhs_vf(E_idx)%sf(j,k,l+3) = rhs_vf(E_idx)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+3)) 
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l+3) = rhs_vf(E_idx)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+3)) 
 
-                                rhs_vf(momxb)%sf(j,k,l-2) = rhs_vf(momxb)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-2))
-                                rhs_vf(momxb)%sf(j,k,l-1) = rhs_vf(momxb)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-1))
-                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l))
-                                rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+1))
-                                rhs_vf(momxb)%sf(j,k,l+2) = rhs_vf(momxb)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+2))
+                                rhs_vf(momxb)%sf(j,k,l-2) = rhs_vf(momxb)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-2))
+                                rhs_vf(momxb)%sf(j,k,l-1) = rhs_vf(momxb)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-1))
+                                rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l))
+                                rhs_vf(momxb)%sf(j,k,l+1) = rhs_vf(momxb)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+1))
+                                rhs_vf(momxb)%sf(j,k,l+2) = rhs_vf(momxb)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+2))
 
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l-2))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+2))
 
                             end if
 
@@ -2883,29 +2883,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb+1)%sf(j,k,l+2) = rhs_vf(momxb+1)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+2))
-                                rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l))
-                                rhs_vf(momxb+1)%sf(j,k,l-1) = rhs_vf(momxb+1)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-1))
-                                rhs_vf(momxb+1)%sf(j,k,l-2) = rhs_vf(momxb+1)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-2))
+                                rhs_vf(momxb+1)%sf(j,k,l+2) = rhs_vf(momxb+1)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+2))
+                                rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l))
+                                rhs_vf(momxb+1)%sf(j,k,l-1) = rhs_vf(momxb+1)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-1))
+                                rhs_vf(momxb+1)%sf(j,k,l-2) = rhs_vf(momxb+1)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-2))
 
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l+2))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-2))
 
-                                rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l))
-                                rhs_vf(momxb+1)%sf(j,k,l-1) = rhs_vf(momxb+1)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-1))
-                                rhs_vf(momxb+1)%sf(j,k,l-2) = rhs_vf(momxb+1)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-2))
-                                rhs_vf(momxb+1)%sf(j,k,l-3) = rhs_vf(momxb+1)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-3))
+                                rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l))
+                                rhs_vf(momxb+1)%sf(j,k,l-1) = rhs_vf(momxb+1)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-1))
+                                rhs_vf(momxb+1)%sf(j,k,l-2) = rhs_vf(momxb+1)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-2))
+                                rhs_vf(momxb+1)%sf(j,k,l-3) = rhs_vf(momxb+1)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-3))
 
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(3)**(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-2))
-                                rhs_vf(E_idx)%sf(j,k,l-3) = rhs_vf(E_idx)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(dt/dz(l-3))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_L(3)**(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l-3) = rhs_vf(E_idx)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_L(3)*(1._wp/dz(l-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -2916,29 +2916,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+1)%sf(j,k,l-1) = rhs_vf(momxb+1)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l))
-                                rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+1))
-                                rhs_vf(momxb+1)%sf(j,k,l+2) = rhs_vf(momxb+1)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+2))
-                                rhs_vf(momxb+1)%sf(j,k,l+3) = rhs_vf(momxb+1)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-3))
+                                rhs_vf(momxb+1)%sf(j,k,l-1) = rhs_vf(momxb+1)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l))
+                                rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+1))
+                                rhs_vf(momxb+1)%sf(j,k,l+2) = rhs_vf(momxb+1)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+2))
+                                rhs_vf(momxb+1)%sf(j,k,l+3) = rhs_vf(momxb+1)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-3))
 
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+2))
-                                rhs_vf(E_idx)%sf(j,k,l+3) = rhs_vf(E_idx)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+3)) 
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l+3) = rhs_vf(E_idx)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+3)) 
 
-                                rhs_vf(momxb+1)%sf(j,k,l-2) = rhs_vf(momxb+1)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-2))
-                                rhs_vf(momxb+1)%sf(j,k,l-1) = rhs_vf(momxb+1)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l-1))
-                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l))
-                                rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+1))
-                                rhs_vf(momxb+1)%sf(j,k,l+2) = rhs_vf(momxb+1)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(dt/dz(l+2))
+                                rhs_vf(momxb+1)%sf(j,k,l-2) = rhs_vf(momxb+1)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-2))
+                                rhs_vf(momxb+1)%sf(j,k,l-1) = rhs_vf(momxb+1)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l-1))
+                                rhs_vf(momxb+1)%sf(j,k,l) = rhs_vf(momxb+1)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l))
+                                rhs_vf(momxb+1)%sf(j,k,l+1) = rhs_vf(momxb+1)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+1))
+                                rhs_vf(momxb+1)%sf(j,k,l+2) = rhs_vf(momxb+1)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+2))
 
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l-2))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(dt/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(dvel1+dvel2))*vel_R*(1._wp/dz(l+2))
 
                             end if
 
@@ -2966,29 +2966,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l+2))
-                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l+1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l))
-                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l-1))
-                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l-2))
+                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l+2))
+                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l+1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l))
+                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l-1))
+                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l-2))
 
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l+2))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-2))
 
-                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l+1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l))
-                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l-1))
-                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l-2))
-                                rhs_vf(momxb+2)%sf(j,k,l-3) = rhs_vf(momxb+2)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l-3))
+                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l+1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l))
+                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l-1))
+                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l-2))
+                                rhs_vf(momxb+2)%sf(j,k,l-3) = rhs_vf(momxb+2)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l-3))
 
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)**(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-2))
-                                rhs_vf(E_idx)%sf(j,k,l-3) = rhs_vf(E_idx)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-3))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)**(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l-3) = rhs_vf(E_idx)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -2999,29 +2999,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l-1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l))
-                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l+1))
-                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l+2))
-                                rhs_vf(momxb+2)%sf(j,k,l+3) = rhs_vf(momxb+2)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l-3))
+                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l-1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l))
+                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l+1))
+                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l+2))
+                                rhs_vf(momxb+2)%sf(j,k,l+3) = rhs_vf(momxb+2)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l-3))
 
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+2))
-                                rhs_vf(E_idx)%sf(j,k,l+3) = rhs_vf(E_idx)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+3)) 
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l+3) = rhs_vf(E_idx)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+3)) 
 
-                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l-2))
-                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l-1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l))
-                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l+1))
-                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(dt/dz(l+2))
+                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l-2))
+                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l-1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l))
+                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l+1))
+                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l+2))
 
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l-2))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+2))
 
                             end if
 
@@ -3044,29 +3044,29 @@ contains
                                     end do
                                 end if
 
-                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l+2))
-                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l+1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l))
-                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l-1))
-                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l-2))
+                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l+2))
+                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l+1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l))
+                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l-1))
+                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l-2))
 
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l+2))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-2))
 
-                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l+1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l))
-                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l-1))
-                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l-2))
-                                rhs_vf(momxb+2)%sf(j,k,l-3) = rhs_vf(momxb+2)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l-3))
+                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l+1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l))
+                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l-1))
+                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l-2))
+                                rhs_vf(momxb+2)%sf(j,k,l-3) = rhs_vf(momxb+2)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l-3))
 
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)**(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-2))
-                                rhs_vf(E_idx)%sf(j,k,l-3) = rhs_vf(E_idx)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(dt/dz(l-3))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)**(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l-3) = rhs_vf(E_idx)%sf(j,k,l-3) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_L(3)*(1._wp/dz(l-3))
 
                                 if(num_fluids > 1) then 
                                     mu_L = 0._wp
@@ -3077,29 +3077,29 @@ contains
                                     end do
                                 end if
                                
-                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l-1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l))
-                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l+1))
-                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l+2))
-                                rhs_vf(momxb+2)%sf(j,k,l+3) = rhs_vf(momxb+2)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l-3))
+                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l-1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l))
+                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l+1))
+                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l+2))
+                                rhs_vf(momxb+2)%sf(j,k,l+3) = rhs_vf(momxb+2)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l-3))
 
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+2))
-                                rhs_vf(E_idx)%sf(j,k,l+3) = rhs_vf(E_idx)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+3)) 
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l+3) = rhs_vf(E_idx)%sf(j,k,l+3) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+3)) 
 
-                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l-2))
-                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l-1))
-                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l))
-                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l+1))
-                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(dt/dz(l+2))
+                                rhs_vf(momxb+2)%sf(j,k,l-2) = rhs_vf(momxb+2)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l-2))
+                                rhs_vf(momxb+2)%sf(j,k,l-1) = rhs_vf(momxb+2)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l-1))
+                                rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l))
+                                rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l+1))
+                                rhs_vf(momxb+2)%sf(j,k,l+2) = rhs_vf(momxb+2)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l+2))
 
-                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l-2))
-                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l-1))
-                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l))
-                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+1))
-                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(dt/dz(l+2))
+                                rhs_vf(E_idx)%sf(j,k,l-2) = rhs_vf(E_idx)%sf(j,k,l-2) + 0.5_wp*mu_L*((-3._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l-2))
+                                rhs_vf(E_idx)%sf(j,k,l-1) = rhs_vf(E_idx)%sf(j,k,l-1) + 0.5_wp*mu_L*((27._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l-1))
+                                rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) + 0.5_wp*mu_L*((47._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l))
+                                rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) + 0.5_wp*mu_L*((-13._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+1))
+                                rhs_vf(E_idx)%sf(j,k,l+2) = rhs_vf(E_idx)%sf(j,k,l+2) + 0.5_wp*mu_L*((2._wp/60._wp)*(-2_wp*dvel2)/3_wp)*vel_R*(1._wp/dz(l+2))
 
                             end if
 
@@ -3146,13 +3146,13 @@ contains
                             do i = 1, num_fluids
                                 rhs_vf(i)%sf(j,k,l+1) = rhs_vf(i)%sf(j,k,l+1) + &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dz(l+1)) - &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dz(l+1))
+                                    vel_R)*(1._wp/dz(l+1)) + &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dz(l+1))
 
                                 rhs_vf(i)%sf(j,k,l) = rhs_vf(i)%sf(j,k,l) - &
                                     0.5_wp * (alpha_rho_L(i) * &
-                                    vel_R)*(dt/dz(l)) + &
-                                    0.5_wp*cfl * (alpha_rho_L(i))*(dt/dz(l)) 
+                                    vel_R)*(1._wp/dz(l)) - &
+                                    0.5_wp*cfl * (alpha_rho_L(i))*(1._wp/dz(l)) 
                             end do
 
                             if(num_fluids > 1) then 
@@ -3160,59 +3160,59 @@ contains
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) + &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dz(l+1)) - &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dz(l+1))
+                                        vel_R)*(1._wp/dz(l+1)) + &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dz(l+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) &
-                                    - 0.5_wp * alpha_L(i) * vel_R*(dt/dz(l+1))
+                                    - 0.5_wp * q_prim_vf(advxb+i-1)%sf(j+1,k,l)  * vel_R*(1._wp/dz(l+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R)*(dt/dz(l)) + &
-                                        0.5_wp*cfl*(alpha_R(i))*(dt/dz(l))
+                                        vel_R)*(1._wp/dz(l)) - &
+                                        0.5_wp*cfl*(alpha_R(i))*(1._wp/dz(l))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_R(i) * vel_R*(dt/dz(l))
+                                    + 0.5_wp * q_prim_vf(advxb+i-1)%sf(j,k,l)  * vel_R*(1._wp/dz(l))
                                 end do
                             end if
 
                             rhs_vf(momxb+2)%sf(j,k,l+1) = rhs_vf(momxb+2)%sf(j,k,l+1) + &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L+F_L)*(dt/dz(l+1)) - &
-                                 0.5_wp*cfl * (vel_R)*(dt/dz(l+1))
+                                 pres_L+F_L)*(1._wp/dz(l+1)) + &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dz(l+1))
 
                             rhs_vf(momxb)%sf(j, k,l+1) =  rhs_vf(momxb)%sf(j, k,l+1) + &
-                                0.5_wp * rho_L * vel_L(1)*vel_R*(dt/dz(l+1)) - &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dz(l+1))
+                                0.5_wp * rho_L * vel_L(1)*vel_R*(1._wp/dz(l+1)) + &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dz(l+1))
 
                             rhs_vf(momxb+1)%sf(j,k,l+1) =  rhs_vf(momxb+1)%sf(j,k,l+1) + &
-                                0.5_wp * rho_L * vel_L(2)*vel_R*(dt/dz(l+1)) - &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dz(l+1))
+                                0.5_wp * rho_L * vel_L(2)*vel_R*(1._wp/dz(l+1)) + &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dz(l+1))
 
                             rhs_vf(E_idx)%sf(j,k,l+1) = rhs_vf(E_idx)%sf(j,k,l+1) +  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp + vel_R**2._wp ) + &
-                                pres_L+F_L) )*(dt/dz(l+1)) - &
-                                0.5_wp*cfl * (pres_L)*(dt/dz(l+1))
+                                pres_L+F_L) )*(1._wp/dz(l+1)) + &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dz(l+1))
 
                             rhs_vf(momxb+2)%sf(j,k,l) = rhs_vf(momxb+2)%sf(j,k,l) - &
                                  0.5_wp* (rho_L * (vel_R)**2.0 + &
-                                 pres_L+F_L)*(dt/dz(l)) + &
-                                 0.5_wp*cfl * (vel_R)*(dt/dz(l))
+                                 pres_L+F_L)*(1._wp/dz(l)) - &
+                                 0.5_wp*cfl * (vel_R)*(1._wp/dz(l))
 
                             rhs_vf(momxb)%sf(j, k, l) =  rhs_vf(momxb)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(1)*vel_R*(dt/dz(l)) + &
-                                0.5_wp*cfl * (vel_L(1))*(dt/dz(l))
+                                0.5_wp * rho_L * vel_L(1)*vel_R*(1._wp/dz(l)) - &
+                                0.5_wp*cfl * (vel_L(1))*(1._wp/dz(l))
 
                             rhs_vf(momxb+1)%sf(j, k, l) =  rhs_vf(momxb+1)%sf(j, k, l) - &
-                                0.5_wp * rho_L * vel_L(2)*vel_R*(dt/dz(l)) + &
-                                0.5_wp*cfl * (vel_L(2))*(dt/dz(l))
+                                0.5_wp * rho_L * vel_L(2)*vel_R*(1._wp/dz(l)) - &
+                                0.5_wp*cfl * (vel_L(2))*(1._wp/dz(l))
 
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) -  &
                                 0.5_wp * (vel_R * (pres_L*gamma_L + pi_inf_L + &
                                 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp + vel_R**2._wp ) + &
-                                pres_L+F_L) )*(dt/dz(l)) + &
-                                0.5_wp*cfl * (pres_L)*(dt/dz(l))
+                                pres_L+F_L) )*(1._wp/dz(l)) - &
+                                0.5_wp*cfl * (pres_L)*(1._wp/dz(l))
 
                         end do
                     end do
