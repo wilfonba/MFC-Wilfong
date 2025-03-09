@@ -51,8 +51,8 @@ module m_start_up
     type(c_ptr) :: fftw_real_data, fftw_cmplx_data
     complex(c_double_complex), pointer :: data_real(:,:,:) 
     complex(c_double_complex), pointer :: data_cmplx(:,:,:)
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: vel1_real, vel2_real, vel3_real, En_real
-    real(kind(0d0)), allocatable, dimension(:) :: En 
+    real(wp), allocatable, dimension(:, :, :) :: vel1_real, vel2_real, vel3_real, En_real
+    real(wp), allocatable, dimension(:) :: En 
 
 contains
 
@@ -205,7 +205,7 @@ contains
         integer, intent(inout) :: t_step
         character(LEN=name_len), intent(inout) :: varname
         real(wp), intent(inout) :: pres, c, H
-        real(kind(0d0)) :: En_tot, rho_tot, omega_tot
+        real(wp) :: En_tot, rho_tot, omega_tot
         character(20) :: filename
         logical :: file_exists
         integer :: i, j, k, l, kx, ky, kz, kf
@@ -666,7 +666,7 @@ contains
                     if(enstrophy_wrt) then 
                         if(i == 1) then 
 
-                            omega_tot = 0d0
+                            omega_tot = 0._wp
                             do l = 0, p
                                 do k = 0, n
                                     do j = 0, m

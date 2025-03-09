@@ -2157,7 +2157,7 @@ contains
 
     subroutine s_mpi_sendrecv_F_igr(F_igr, mpi_dir, pbc_loc)
 
-        real(kind(0d0)), dimension(startx:, starty:, startz:), intent (INOUT) :: F_igr
+        real(wp), dimension(startx:, starty:, startz:), intent (INOUT) :: F_igr
 
         integer, intent(IN) :: mpi_dir
         integer, intent(IN) :: pbc_loc

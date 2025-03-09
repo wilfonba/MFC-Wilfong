@@ -42,6 +42,7 @@ contains
     subroutine s_check_inputs_output_format
         @:PROHIBIT(format /= 1 .and. format /= 2)
         @:PROHIBIT(precision /= 1 .and. precision /= 2)
+        @:PROHIBIT(precision /= 1 .and. wp == single_precision)
     end subroutine s_check_inputs_output_format
 
     !> Checks constraints on partial domain parameters

@@ -18,7 +18,7 @@ y1 = l
 z0 = -l
 z1 = l
 
-Nx = 200
+Nx = 300
 Ny = Nx
 Nz = Nx
 
@@ -42,7 +42,7 @@ data = {
     "dt": mydt,
     "t_step_start": 0,
     "t_step_stop": int(2.5/mydt),
-    "t_step_save": int(2.5/mydt/100),
+    "t_step_save": int(2.5/mydt/10),
     # Simulation Algorithm
     "model_eqns": 2,
     "alt_soundspeed": "F",
@@ -67,9 +67,11 @@ data = {
     "num_patches": 2,
     "num_fluids": 1,
     "igr": "T",
+    "elliptic_smoothing": "T",
+    "elliptic_smoothing_iters": 50,
     # Database Structure Parameters
     "format": 1,
-    "precision": 2,
+    "precision": 1,
     "prim_vars_wrt": "T",
     "parallel_io": "T",
     # Fluid Parameters (Gas)
