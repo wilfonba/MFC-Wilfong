@@ -427,7 +427,7 @@ contains
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
 
-                            FL = (1._wp/60._wp) * (-3._wp * jac(j-1, k, l) + &
+                            F_L = (1._wp/60._wp) * (-3._wp * jac(j-1, k, l) + &
                                                 27._wp * jac(j, k, l) + &
                                                 47._wp * jac(j+1, k, l) -   &
                                                 13._wp * jac(j+2, k, l) + &
@@ -435,7 +435,11 @@ contains
 
                             !$acc loop seq 
                             do i = -2, 3
-                                rho_L = sum(q_prim_vf(1:num_fluids)%sf(j+i,k,l))
+                                rho_L = 0_wp
+                                !$acc loop seq 
+                                do q = 1, num_fluids
+                                    rho_L = rho_L + q_prim_vf(q)%sf(j+i,k,l)
+                                end do
                                 vel_sf(i) = q_prim_vf(momxb)%sf(j+i,k,l)/rho_L
                             end do
 
@@ -446,20 +450,20 @@ contains
                                                 2._wp * vel_sf(3))
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
-                                                      0.5_wp * FL * (dt/dx(j+1))
+                                                      0.5_wp * F_L * (dt/dx(j+1))
 
                             rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + &
-                                                      0.5_wp * vel_L * FL * (dt/dx(j+1))
+                                                      0.5_wp * vel_L * F_L * (dt/dx(j+1))
 
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
-                                                      0.5_wp * FL * (dt/dx(j))
+                                                      0.5_wp * F_L * (dt/dx(j))
 
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
-                                                      0.5_wp * vel_L * FL * (dt/dx(j))
+                                                      0.5_wp * vel_L * F_L * (dt/dx(j))
 
 
-                            FL = (1._wp/60._wp) * (-3._wp * jac(j+2, k, l) + &
+                            F_L = (1._wp/60._wp) * (-3._wp * jac(j+2, k, l) + &
                                                 27._wp * jac(j+1, k, l) + &
                                                 47._wp * jac(j, k, l) -   &
                                                 13._wp * jac(j-1, k, l) + &
@@ -472,17 +476,17 @@ contains
                                                 2._wp * vel_sf(-2))
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
-                                                      0.5_wp * FL * (dt/dx(j+1))
+                                                      0.5_wp * F_L * (dt/dx(j+1))
 
                             rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + &
-                                                      0.5_wp * vel_L * FL * (dt/dx(j+1))
+                                                      0.5_wp * vel_L * F_L * (dt/dx(j+1))
 
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
-                                                      0.5_wp * FL * (dt/dx(j))
+                                                      0.5_wp * F_L * (dt/dx(j))
 
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
-                                                      0.5_wp * vel_L * FL * (dt/dx(j))                   
+                                                      0.5_wp * vel_L * F_L * (dt/dx(j))                   
 
                         end do 
                     end do 
@@ -493,7 +497,7 @@ contains
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
 
-                            FL = (1._wp/60._wp) * (-3._wp * jac(j-1, k, l) + &
+                            F_L = (1._wp/60._wp) * (-3._wp * jac(j-1, k, l) + &
                                                 27._wp * jac(j, k, l) + &
                                                 47._wp * jac(j+1, k, l) -   &
                                                 13._wp * jac(j+2, k, l) + &
@@ -501,7 +505,11 @@ contains
 
                             !$acc loop seq 
                             do i = -2, 3
-                                rho_L = sum(q_prim_vf(1:num_fluids)%sf(j+i,k,l))
+                                rho_L = 0_wp
+                                !$acc loop seq 
+                                do q = 1, num_fluids
+                                    rho_L = rho_L + q_prim_vf(q)%sf(j+i,k,l)
+                                end do
                                 vel_sf(i) = q_prim_vf(momxb)%sf(j+i,k,l)/rho_L
                             end do
 
@@ -512,20 +520,20 @@ contains
                                                 2._wp * vel_sf(3))
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
-                                                      0.5_wp * FL * (dt/dx(j+1))
+                                                      0.5_wp * F_L * (dt/dx(j+1))
 
                             rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + &
-                                                      0.5_wp * vel_L * FL * (dt/dx(j+1))
+                                                      0.5_wp * vel_L * F_L * (dt/dx(j+1))
 
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
-                                                      0.5_wp * FL * (dt/dx(j))
+                                                      0.5_wp * F_L * (dt/dx(j))
 
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
-                                                      0.5_wp * vel_L * FL * (dt/dx(j))
+                                                      0.5_wp * vel_L * F_L * (dt/dx(j))
 
 
-                            FL = (1._wp/60._wp) * (-3._wp * jac(j+2, k, l) + &
+                            F_L = (1._wp/60._wp) * (-3._wp * jac(j+2, k, l) + &
                                                 27._wp * jac(j+1, k, l) + &
                                                 47._wp * jac(j, k, l) -   &
                                                 13._wp * jac(j-1, k, l) + &
@@ -538,17 +546,17 @@ contains
                                                 2._wp * vel_sf(-2))
 
                             rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) + &
-                                                      0.5_wp * FL * (dt/dx(j+1))
+                                                      0.5_wp * F_L * (dt/dx(j+1))
 
                             rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) + &
-                                                      0.5_wp * vel_L * FL * (dt/dx(j+1))
+                                                      0.5_wp * vel_L * F_L * (dt/dx(j+1))
 
 
                             rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - &
-                                                      0.5_wp * FL * (dt/dx(j))
+                                                      0.5_wp * F_L * (dt/dx(j))
 
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
-                                                      0.5_wp * vel_L * FL * (dt/dx(j))  
+                                                      0.5_wp * vel_L * F_L * (dt/dx(j))  
 
                         end do 
                     end do 
@@ -568,14 +576,15 @@ contains
             intent(inout) :: q_prim_vf
         integer, intent(in) :: idir
 
-        real(wp) :: rho_L, gamma_L, pi_inf_L, mu_L, a_L, cfl, pres_L, dvel1, dvel2, vel_R
+        real(wp) :: rho_L, gamma_L, pi_inf_L, mu_L, a_L, cfl, pres_L, dvel1, dvel2, vel_R, F_L
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_L, alpha_R
+        real(wp), dimension(num_dims) :: vel_L
         real(wp), dimension(-2:3,3) :: vel_sf
         real(wp), dimension(-2:3) :: pres_sf
 
         if (idir == 1) then
             if(p == 0) then
-                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,pres_sf,vel_sf)
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,pres_sf,vel_sf,F_L)
                 do l = 0, p
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
@@ -589,10 +598,10 @@ contains
                                                 2._wp * q_prim_vf(i)%sf(j+3, k, l))
 
                                 alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
-                                                27._wp * q_prim_vf((E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf((E_idx+i)%sf(j+1, k, l) -   &
-                                                13._wp * q_prim_vf((E_idx+i)%sf(j+2, k, l) + &
-                                                2._wp * q_prim_vf((E_idx+i)%sf(j+3, k, l))
+                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                47._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) -   &
+                                                13._wp * q_prim_vf(E_idx+i)%sf(j+2, k, l) + &
+                                                2._wp * q_prim_vf(E_idx+i)%sf(j+3, k, l))
                             end do 
 
                             if(num_fluids > 1) then  
@@ -608,9 +617,15 @@ contains
 
                             !$acc loop seq 
                             do i = -2, 3
-                                rho_L = sum(q_prim_vf(1:num_fluids)%sf(j+i,k,l))
-                                gamma_L = sum(q_prim_vf(advxb:advxe)%sf(j+i,k,l)*gammas)
-                                pi_inf_L = sum(q_prim_vf(advxb:advxe)%sf(j+i,k,l)*pi_infs)
+                                rho_L = 0._wp
+                                gamma_L = 0._wp
+                                pi_inf_L = 0._wp
+                                !$acc loop seq 
+                                do q = 1, num_fluids
+                                    rho_L = rho_L + q_prim_vf(q)%sf(j+i,k,l)
+                                    pi_inf_L = pi_inf_L + q_prim_vf(advxb+q-1)%sf(j+i,k,l)*pi_infs(q)
+                                    gamma_L = gamma_L + q_prim_vf(advxb+q-1)%sf(j+i,k,l)*gammas(q)
+                                end do
                                 vel_sf(i,1) = q_prim_vf(momxb)%sf(j+i,k,l)/rho_L
                                 vel_sf(i,2) = q_prim_vf(momxb+1)%sf(j+i,k,l)/rho_L
                                 pres_sf(i) = (q_prim_vf(E_idx)%sf(j+i,k,l) - rho_L*(vel_sf(i,1)**2_wp + vel_sf(i,2)**2_wp) - pi_inf_L) / gamma_L
@@ -641,7 +656,7 @@ contains
                             gamma_L = sum(alpha_L*gammas)
                             pi_inf_L = sum(alpha_L*pi_infs)                          
 
-                            a_L = sqrt((pres_L)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+                            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
                             cfl = 2_wp*(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp) + a_L)
 
@@ -822,7 +837,7 @@ contains
                                 rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
                                 rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
                                 rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*((4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
 
                                 rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+2))
                                 rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+1))
@@ -936,7 +951,7 @@ contains
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R(1))*(dt/dx(j)) + &
+                                        vel_R)*(dt/dx(j)) + &
                                         0.5_wp*cfl*(alpha_R(i))*(dt/dx(j))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
@@ -978,7 +993,7 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,pres_sf,vel_sf)
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,pres_sf,vel_sf,F_L)
                 do l = -buff_size+2,p+buff_size-3
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
@@ -992,10 +1007,10 @@ contains
                                                 2._wp * q_prim_vf(i)%sf(j+3, k, l))
 
                                 alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
-                                                27._wp * q_prim_vf((E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf((E_idx+i)%sf(j+1, k, l) -   &
-                                                13._wp * q_prim_vf((E_idx+i)%sf(j+2, k, l) + &
-                                                2._wp * q_prim_vf((E_idx+i)%sf(j+3, k, l))
+                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                47._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) -   &
+                                                13._wp * q_prim_vf(E_idx+i)%sf(j+2, k, l) + &
+                                                2._wp * q_prim_vf(E_idx+i)%sf(j+3, k, l))
                             end do 
                             
                             if(num_fluids > 1) then  
@@ -1011,9 +1026,15 @@ contains
 
                             !$acc loop seq 
                             do i = -2, 3
-                                rho_L = sum(q_prim_vf(1:num_fluids)%sf(j+i,k,l))
-                                gamma_L = sum(q_prim_vf(advxb:advxe)%sf(j+i,k,l)*gammas)
-                                pi_inf_L = sum(q_prim_vf(advxb:advxe)%sf(j+i,k,l)*pi_infs)
+                                rho_L = 0._wp
+                                gamma_L = 0._wp
+                                pi_inf_L = 0._wp
+                                !$acc loop seq 
+                                do q = 1, num_fluids
+                                    rho_L = rho_L + q_prim_vf(q)%sf(j+i,k,l)
+                                    pi_inf_L = pi_inf_L + q_prim_vf(advxb+q-1)%sf(j+i,k,l)*pi_infs(q)
+                                    gamma_L = gamma_L + q_prim_vf(advxb+q-1)%sf(j+i,k,l)*gammas(q)
+                                end do
                                 vel_sf(i,1) = q_prim_vf(momxb)%sf(j+i,k,l)/rho_L
                                 vel_sf(i,2) = q_prim_vf(momxb+1)%sf(j+i,k,l)/rho_L
                                 vel_sf(i,3) = q_prim_vf(momxb+2)%sf(j+i,k,l)/rho_L
@@ -1045,7 +1066,7 @@ contains
                             gamma_L = sum(alpha_L*gammas)
                             pi_inf_L = sum(alpha_L*pi_infs)
 
-                            a_L = sqrt((pres_L)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+                            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
                             cfl = 2_wp*(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp) + a_L)
 
@@ -1334,7 +1355,7 @@ contains
                                 rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
                                 rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j))
                                 rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*((4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
 
                                 rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+2))
                                 rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(4._wp*dvel1-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+1))
@@ -1416,7 +1437,7 @@ contains
                                 rhs_vf(momxb)%sf(j+1,k,l) = rhs_vf(momxb)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j+1))
                                 rhs_vf(momxb)%sf(j,k,l) = rhs_vf(momxb)%sf(j,k,l) - 0.5_wp*mu_L*((47._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j))
                                 rhs_vf(momxb)%sf(j-1,k,l) = rhs_vf(momxb)%sf(j-1,k,l) - 0.5_wp*mu_L*((-13._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-1))
-                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*((-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
+                                rhs_vf(momxb)%sf(j-2,k,l) = rhs_vf(momxb)%sf(j-2,k,l) - 0.5_wp*mu_L*((2._wp/60._wp)*(-2._wp*dvel2)/3._wp)*(dt/dx(j-2))
 
                                 rhs_vf(E_idx)%sf(j+2,k,l) = rhs_vf(E_idx)%sf(j+2,k,l) - 0.5_wp*mu_L*((-3._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+2))
                                 rhs_vf(E_idx)%sf(j+1,k,l) = rhs_vf(E_idx)%sf(j+1,k,l) - 0.5_wp*mu_L*((27._wp/60._wp)*(-2._wp*dvel2)/3._wp)*vel_L(1)*(dt/dx(j+1))
@@ -1530,7 +1551,7 @@ contains
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R(1))*(dt/dx(j)) + &
+                                        vel_R)*(dt/dx(j)) + &
                                         0.5_wp*cfl*(alpha_R(i))*(dt/dx(j))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
@@ -1595,10 +1616,10 @@ contains
                                                 2._wp * q_prim_vf(i)%sf(j, k+3, l))
 
                                 alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1, l) + &
-                                                27._wp * q_prim_vf((E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf((E_idx+i)%sf(j, k+1, l) -   &
-                                                13._wp * q_prim_vf((E_idx+i)%sf(j, k+2, l) + &
-                                                2._wp * q_prim_vf((E_idx+i)%sf(j, k+3, l))
+                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+1, l) -   &
+                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k+2, l) + &
+                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k+3, l))
                             end do 
 
                             if(num_fluids > 1) then  
@@ -1614,9 +1635,15 @@ contains
 
                             !$acc loop seq 
                             do i = -2, 3
-                                rho_L = sum(q_prim_vf(1:num_fluids)%sf(j,k+i,l))
-                                gamma_L = sum(q_prim_vf(advxb:advxe)%sf(j,k+i,l)*gammas)
-                                pi_inf_L = sum(q_prim_vf(advxb:advxe)%sf(j,k+i,l)*pi_infs)
+                                rho_L = 0._wp
+                                gamma_L = 0._wp
+                                pi_inf_L = 0._wp
+                                !$acc loop seq 
+                                do q = 1, num_fluids
+                                    rho_L = rho_L + q_prim_vf(q)%sf(j,k+i,l)
+                                    pi_inf_L = pi_inf_L + q_prim_vf(advxb+q-1)%sf(j,k+i,l)*pi_infs(q)
+                                    gamma_L = gamma_L + q_prim_vf(advxb+q-1)%sf(j,k+i,l)*gammas(q)
+                                end do
                                 vel_sf(i,1) = q_prim_vf(momxb)%sf(j,k+i,l)/rho_L
                                 vel_sf(i,2) = q_prim_vf(momxb+1)%sf(j,k+i,l)/rho_L
                                 pres_sf(i) = (q_prim_vf(E_idx)%sf(j,k+i,l) - rho_L*(vel_sf(i,1)**2_wp + vel_sf(i,2)**2_wp) - pi_inf_L) / gamma_L
@@ -1654,7 +1681,7 @@ contains
                             gamma_L = sum(alpha_L*gammas)
                             pi_inf_L = sum(alpha_L*pi_infs)
 
-                            a_L = sqrt((pres_L)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+                            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
                             cfl = 2_wp*(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp) + a_L)
 
@@ -1953,7 +1980,7 @@ contains
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R(1))*(dt/dy(k)) + &
+                                        vel_R)*(dt/dy(k)) + &
                                         0.5_wp*cfl*(alpha_R(i))*(dt/dy(k))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
@@ -1995,7 +2022,7 @@ contains
                     end do
                 end do
             else
-                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2)
+                !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,F_L,pres_sf,vel_sf)
                 do l = -buff_size+2,p+buff_size-3
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
@@ -2009,10 +2036,10 @@ contains
                                                 2._wp * q_prim_vf(i)%sf(j, k+3, l))
 
                                 alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1, l) + &
-                                                27._wp * q_prim_vf((E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf((E_idx+i)%sf(j, k+1, l) -   &
-                                                13._wp * q_prim_vf((E_idx+i)%sf(j, k+2, l) + &
-                                                2._wp * q_prim_vf((E_idx+i)%sf(j, k+3, l))
+                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+1, l) -   &
+                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k+2, l) + &
+                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k+3, l))
                             end do 
 
                             if(num_fluids > 1) then  
@@ -2028,9 +2055,15 @@ contains
 
                             !$acc loop seq 
                             do i = -2, 3
-                                rho_L = sum(q_prim_vf(1:num_fluids)%sf(j,k+i,l))
-                                gamma_L = sum(q_prim_vf(advxb:advxe)%sf(j,k+i,l)*gammas)
-                                pi_inf_L = sum(q_prim_vf(advxb:advxe)%sf(j,k+i,l)*pi_infs)
+                                rho_L = 0._wp
+                                gamma_L = 0._wp
+                                pi_inf_L = 0._wp
+                                !$acc loop seq 
+                                do q = 1, num_fluids
+                                    rho_L = rho_L + q_prim_vf(q)%sf(j,k+i,l)
+                                    pi_inf_L = pi_inf_L + q_prim_vf(advxb+q-1)%sf(j,k+i,l)*pi_infs(q)
+                                    gamma_L = gamma_L + q_prim_vf(advxb+q-1)%sf(j,k+i,l)*gammas(q)
+                                end do
                                 vel_sf(i,1) = q_prim_vf(momxb)%sf(j,k+i,l)/rho_L
                                 vel_sf(i,2) = q_prim_vf(momxb+1)%sf(j,k+i,l)/rho_L
                                 vel_sf(i,3) = q_prim_vf(momxb+2)%sf(j,k+i,l)/rho_L
@@ -2069,7 +2102,7 @@ contains
                             gamma_L = sum(alpha_L*gammas)
                             pi_inf_L = sum(alpha_L*pi_infs)
 
-                            a_L = sqrt((pres_L)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+                            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
                             cfl = 2_wp*(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp) + a_L)
 
@@ -2538,7 +2571,7 @@ contains
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
                                         0.5_wp * (alpha_R(i) * &
-                                        vel_R(1))*(dt/dy(k)) + &
+                                        vel_R)*(dt/dy(k)) + &
                                         0.5_wp*cfl*(alpha_R(i))*(dt/dy(k))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
@@ -2589,7 +2622,7 @@ contains
                 end do
             end if
         elseif (idir == 3) then
-            !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2)
+            !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,F_L,pres_sf,vel_sf)
                 do l = -buff_size+2,p+buff_size-3
                     do k = -buff_size+2, n+buff_size-3
                         do j = -buff_size+2, m+buff_size-3
@@ -2603,10 +2636,10 @@ contains
                                                 2._wp * q_prim_vf(i)%sf(j, k, l+3))
 
                                 alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1) + &
-                                                27._wp * q_prim_vf((E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf((E_idx+i)%sf(j, k, l+1) -   &
-                                                13._wp * q_prim_vf((E_idx+i)%sf(j, k, l+2) + &
-                                                2._wp * q_prim_vf((E_idx+i)%sf(j, k, l+3))
+                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1) -   &
+                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2) + &
+                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k, l+3))
                             end do 
 
                             if(num_fluids > 1) then  
@@ -2622,9 +2655,15 @@ contains
 
                             !$acc loop seq 
                             do i = -2, 3
-                                rho_L = sum(q_prim_vf(1:num_fluids)%sf(j,k,l+i))
-                                gamma_L = sum(q_prim_vf(advxb:advxe)%sf(j,k,l+i)*gammas)
-                                pi_inf_L = sum(q_prim_vf(advxb:advxe)%sf(j,k,l+i)*pi_infs)
+                                rho_L = 0._wp
+                                gamma_L = 0._wp
+                                pi_inf_L = 0._wp
+                                !$acc loop seq 
+                                do q = 1, num_fluids
+                                    rho_L = rho_L + q_prim_vf(q)%sf(j,k,l+i)
+                                    pi_inf_L = pi_inf_L + q_prim_vf(advxb+q-1)%sf(j,k,l+i)*pi_infs(q)
+                                    gamma_L = gamma_L + q_prim_vf(advxb+q-1)%sf(j,k,l+i)*gammas(q)
+                                end do
                                 vel_sf(i,1) = q_prim_vf(momxb)%sf(j,k,l+i)/rho_L
                                 vel_sf(i,2) = q_prim_vf(momxb+1)%sf(j,k,l+i)/rho_L
                                 vel_sf(i,3) = q_prim_vf(momxb+2)%sf(j,k,l+i)/rho_L
@@ -2663,13 +2702,13 @@ contains
                             gamma_L = sum(alpha_L*gammas)
                             pi_inf_L = sum(alpha_L*pi_infs)
 
-                            a_L = sqrt((pres_L)*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
+                            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
 
                             cfl = 2_wp*(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp) + a_L)
 
                             !$acc loop seq
                             do i = 1, num_fluids
-                                rhs_vf(i)%sf(jk,l+1) = rhs_vf(i)%sf(jk,l+1) + &
+                                rhs_vf(i)%sf(j,k,l+1) = rhs_vf(i)%sf(j,k,l+1) + &
                                     0.5_wp * (alpha_rho_L(i) * &
                                     vel_L(3))*(dt/dz(l+1)) - &
                                     0.5_wp*cfl * (alpha_rho_L(i))*(dt/dz(l+1))
@@ -3105,7 +3144,7 @@ contains
 
                             !$acc loop seq
                             do i = 1, num_fluids
-                                rhs_vf(i)%sf(jk,l+1) = rhs_vf(i)%sf(jk,l+1) + &
+                                rhs_vf(i)%sf(j,k,l+1) = rhs_vf(i)%sf(j,k,l+1) + &
                                     0.5_wp * (alpha_rho_L(i) * &
                                     vel_R)*(dt/dz(l+1)) - &
                                     0.5_wp*cfl * (alpha_rho_L(i))*(dt/dz(l+1))
@@ -3120,20 +3159,20 @@ contains
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) + &
-                                        0.5_wp * (alpha_L(i) * &
+                                        0.5_wp * (alpha_R(i) * &
                                         vel_R)*(dt/dz(l+1)) - &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dz(l+1))
+                                        0.5_wp*cfl*(alpha_R(i))*(dt/dz(l+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) &
                                     - 0.5_wp * alpha_L(i) * vel_R*(dt/dz(l+1))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) - &
-                                        0.5_wp * (alpha_L(i) * &
+                                        0.5_wp * (alpha_R(i) * &
                                         vel_R)*(dt/dz(l)) + &
-                                        0.5_wp*cfl*(alpha_L(i))*(dt/dz(l))
+                                        0.5_wp*cfl*(alpha_R(i))*(dt/dz(l))
 
                                     rhs_vf(advxb+i-1)%sf(j,k,l) = rhs_vf(advxb+i-1)%sf(j,k,l) &
-                                    + 0.5_wp * alpha_L(i) * vel_R*(dt/dz(l))
+                                    + 0.5_wp * alpha_R(i) * vel_R*(dt/dz(l))
                                 end do
                             end if
 
@@ -3203,10 +3242,7 @@ contains
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        rho_igr(j,k,l) = 0._wp
-                        do i = 1, num_fluids
-                            rhs_vf(i)%sf(j,k,l) = 0._wp 
-                        end do
+                        rhs_vf(i)%sf(j,k,l) = 0._wp 
                     end do
                 end do
             end do
