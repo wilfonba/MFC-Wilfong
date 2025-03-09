@@ -1238,33 +1238,35 @@ contains
             @:DEALLOCATE(q_prim_ts)
         end if
 
-        ! Deallocating the cell-average primitive variables
-        do i = 1, adv_idx%end
-            @:DEALLOCATE(q_prim_vf(i)%sf)
-        end do
-
-        if (elasticity) then
-            do i = stress_idx%beg, stress_idx%end
+        if(.not. igr) then 
+            ! Deallocating the cell-average primitive variables
+            do i = 1, adv_idx%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
-        end if
 
-        if (hyperelasticity) then
-            do i = xibeg, xiend + 1
-                @:DEALLOCATE(q_prim_vf(i)%sf)
-            end do
-        end if
+            if (elasticity) then
+                do i = stress_idx%beg, stress_idx%end
+                    @:DEALLOCATE(q_prim_vf(i)%sf)
+                end do
+            end if
 
-        if (bubbles_euler) then
-            do i = bub_idx%beg, bub_idx%end
-                @:DEALLOCATE(q_prim_vf(i)%sf)
-            end do
-        end if
+            if (hyperelasticity) then
+                do i = xibeg, xiend + 1
+                    @:DEALLOCATE(q_prim_vf(i)%sf)
+                end do
+            end if
 
-        if (model_eqns == 3) then
-            do i = internalEnergies_idx%beg, internalEnergies_idx%end
-                @:DEALLOCATE(q_prim_vf(i)%sf)
-            end do
+            if (bubbles_euler) then
+                do i = bub_idx%beg, bub_idx%end
+                    @:DEALLOCATE(q_prim_vf(i)%sf)
+                end do
+            end if
+
+            if (model_eqns == 3) then
+                do i = internalEnergies_idx%beg, internalEnergies_idx%end
+                    @:DEALLOCATE(q_prim_vf(i)%sf)
+                end do
+            end if
         end if
 
         @:DEALLOCATE(q_prim_vf)

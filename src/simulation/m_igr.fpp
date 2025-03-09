@@ -425,7 +425,7 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present) private(F_L,vel_L,rho_L,vel_sf)
                 do l = 0, p
                     do k = 0, n
-                        do j = 0, m
+                        do j = -3, m+3
 
                             F_L = (1._wp/60._wp) * (-3._wp * jac(j-1, k, l) + &
                                                 27._wp * jac(j, k, l) + &
@@ -495,7 +495,7 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present) private(F_L, vel_L,rho_L,vel_sf)
                 do l = 0, p
                     do k = 0, n
-                        do j = 0, m
+                        do j = -3, m+3
 
                             F_L = (1._wp/60._wp) * (-3._wp * jac(j-1, k, l) + &
                                                 27._wp * jac(j, k, l) + &
@@ -587,7 +587,7 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,pres_sf,vel_sf,F_L)
                 do l = 0, p
                     do k = 0, n
-                        do j = 0, m
+                        do j = -3, m+3
 
                             !$acc loop seq 
                             do i = 1, num_fluids
@@ -996,7 +996,7 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,pres_sf,vel_sf,F_L)
                 do l = 0, p
                     do k = 0, n
-                        do j = 0, m
+                        do j = -3, m+3
 
                             !$acc loop seq 
                             do i = 1, num_fluids
@@ -1604,7 +1604,7 @@ contains
             if(p == 0) then
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,F_L,pres_sf,vel_sf)
                 do l = 0, p
-                    do k = 0, n
+                    do k = -3, n+3
                         do j = 0, m
 
                             !$acc loop seq 
@@ -2020,7 +2020,7 @@ contains
             else
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,F_L,pres_sf,vel_sf)
                 do l = 0, p
-                    do k = 0, n
+                    do k = -3, n+3
                         do j = 0, m
 
                             !$acc loop seq 
@@ -2619,7 +2619,7 @@ contains
             end if
         elseif (idir == 3) then
             !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R, pres_L,alpha_L,alpha_rho_L,cfl,dvel1,dvel2,F_L,pres_sf,vel_sf)
-                do l = 0, p
+                do l = -3, p+3
                     do k = 0, n
                         do j = 0, m
 
