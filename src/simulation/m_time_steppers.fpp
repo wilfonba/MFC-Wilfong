@@ -202,71 +202,71 @@ contains
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_T_sf)
             end if
+        end if
 
-            @:ALLOCATE(pb_ts(1:2))
-            !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
-            if (qbmm .and. (.not. polytropic)) then
-                @:ALLOCATE(pb_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
-                @:ACC_SETUP_SFs(pb_ts(1))
+        @:ALLOCATE(pb_ts(1:2))
+        !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
+        if (qbmm .and. (.not. polytropic)) then
+            @:ALLOCATE(pb_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(pb_ts(1))
 
-                @:ALLOCATE(pb_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
-                @:ACC_SETUP_SFs(pb_ts(2))
+            @:ALLOCATE(pb_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(pb_ts(2))
 
-                @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
-            else if (qbmm .and. polytropic) then
-                @:ALLOCATE(pb_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
-                    idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                    idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
-                @:ACC_SETUP_SFs(pb_ts(1))
+            @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
+        else if (qbmm .and. polytropic) then
+            @:ALLOCATE(pb_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+                idwbuff(2)%beg:idwbuff(2)%beg + 1, &
+                idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(pb_ts(1))
 
-                @:ALLOCATE(pb_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
-                    idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                    idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
-                @:ACC_SETUP_SFs(pb_ts(2))
+            @:ALLOCATE(pb_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+                idwbuff(2)%beg:idwbuff(2)%beg + 1, &
+                idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(pb_ts(2))
 
-                @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
-                    idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                    idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
-            end if
+            @:ALLOCATE(rhs_pb(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+                idwbuff(2)%beg:idwbuff(2)%beg + 1, &
+                idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+        end if
 
-            @:ALLOCATE(mv_ts(1:2))
+        @:ALLOCATE(mv_ts(1:2))
 
-            if (qbmm .and. (.not. polytropic)) then
-                @:ALLOCATE(mv_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
-                @:ACC_SETUP_SFs(mv_ts(1))
+        if (qbmm .and. (.not. polytropic)) then
+            @:ALLOCATE(mv_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(mv_ts(1))
 
-                @:ALLOCATE(mv_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
-                @:ACC_SETUP_SFs(mv_ts(2))
+            @:ALLOCATE(mv_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(mv_ts(2))
 
-                @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
+            @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end, 1:nnode, 1:nb))
 
-            else if (qbmm .and. polytropic) then
-                @:ALLOCATE(mv_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
-                    idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                    idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
-                @:ACC_SETUP_SFs(mv_ts(1))
+        else if (qbmm .and. polytropic) then
+            @:ALLOCATE(mv_ts(1)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+                idwbuff(2)%beg:idwbuff(2)%beg + 1, &
+                idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(mv_ts(1))
 
-                @:ALLOCATE(mv_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
-                    idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                    idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
-                @:ACC_SETUP_SFs(mv_ts(2))
+            @:ALLOCATE(mv_ts(2)%sf(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+                idwbuff(2)%beg:idwbuff(2)%beg + 1, &
+                idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(mv_ts(2))
 
-                @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
-                    idwbuff(2)%beg:idwbuff(2)%beg + 1, &
-                    idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
-            end if
+            @:ALLOCATE(rhs_mv(idwbuff(1)%beg:idwbuff(1)%beg + 1, &
+                idwbuff(2)%beg:idwbuff(2)%beg + 1, &
+                idwbuff(3)%beg:idwbuff(3)%beg + 1, 1:nnode, 1:nb))
         end if
 
         ! Allocating the cell-average RHS time-stages for adaptive RKCK stepper
@@ -285,10 +285,18 @@ contains
             ! Allocating the cell-average RHS variables
             @:ALLOCATE(rhs_vf(1:sys_size))
 
-            do i = 1, sys_size
-                @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
-                @:ACC_SETUP_SFs(rhs_vf(i))
-            end do
+            if(.not. igr) then 
+                do i = 1, sys_size
+                    @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
+                    @:ACC_SETUP_SFs(rhs_vf(i))
+                end do
+            else 
+                do i = 1, sys_size
+                    @:ALLOCATE(rhs_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end &
+                    , idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ACC_SETUP_SFs(rhs_vf(i))
+                end do
+            end if
         end if
 
         ! Opening and writing the header of the run-time information file
@@ -321,7 +329,11 @@ contains
 #endif
 
         if (run_time_info) then
-            call s_write_run_time_information(q_prim_vf, t_step)
+            if(igr) then 
+                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+            else 
+                call s_write_run_time_information(q_prim_vf, t_step)
+            end if
         end if
 
 #ifdef DEBUG
@@ -430,7 +442,11 @@ contains
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (run_time_info) then
-            call s_write_run_time_information(q_prim_vf, t_step)
+            if(igr) then 
+                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+            else 
+                call s_write_run_time_information(q_prim_vf, t_step)
+            end if
         end if
 
         if (probe_wrt) then
@@ -618,7 +634,11 @@ contains
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (run_time_info) then
-            call s_write_run_time_information(q_prim_vf, t_step)
+            if(igr) then 
+                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+            else 
+                call s_write_run_time_information(q_prim_vf, t_step)
+            end if
         end if
 
         if (probe_wrt) then
@@ -1180,7 +1200,11 @@ contains
         end if
 
         if (run_time_info) then
-            call s_write_run_time_information(q_prim_vf, t_step)
+            if(igr) then 
+                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+            else 
+                call s_write_run_time_information(q_prim_vf, t_step)
+            end if
         end if
 
     end subroutine s_4th_5th_order_rkck

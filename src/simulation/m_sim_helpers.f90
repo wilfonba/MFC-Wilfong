@@ -62,10 +62,17 @@ contains
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
         end if
 
-        !$acc loop seq
-        do i = 1, num_dims
-            vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
-        end do
+        if(igr) then 
+            !$acc loop seq
+            do i = 1, num_dims
+                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l) / q_prim_vf(i)%sf(j, k, l)
+            end do
+        else 
+            !$acc loop seq
+            do i = 1, num_dims
+                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
+            end do
+        end if
 
         vel_sum = 0._wp
         !$acc loop seq
@@ -73,9 +80,12 @@ contains
             vel_sum = vel_sum + vel(i)**2._wp
         end do
 
-        pres = q_prim_vf(E_idx)%sf(j, k, l)
-
-        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
+        if(igr) then 
+            E = q_prim_vf(E_idx)%sf(j, k, l)
+        else 
+            pres = q_prim_vf(E_idx)%sf(j, k, l)
+            E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
+        end if
 
         ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
         if (hyperelasticity) then
