@@ -524,7 +524,7 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
-        if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
+        if ((prim_vars_wrt .or. (n == 0 .and. p == 0)) .and. (.not. igr)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
@@ -538,7 +538,7 @@ contains
         !1D
         if (n == 0 .and. p == 0) then
 
-            if (model_eqns == 2) then
+            if (model_eqns == 2 .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -652,7 +652,7 @@ contains
                 end do
             end if
 
-            if (prim_vars_wrt) then
+            if (prim_vars_wrt .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
@@ -749,7 +749,7 @@ contains
                 end do
             end if
 
-            if (prim_vars_wrt) then
+            if (prim_vars_wrt .and. (.not. igr)) then
                 do i = 1, sys_size
                     write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/prim.', i, '.', proc_rank, '.', t_step, '.dat'
 
