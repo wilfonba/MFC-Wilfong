@@ -48,7 +48,7 @@ export MPICH_GPU_SUPPORT_ENABLED=1
     % else:
         (set -x; srun \
         % if engine == 'interactive':
-                --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
+                --unbuffered --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
                 --cpus-per-task 7                                    \
             % if gpu:
                 --gpus-per-task 1 --gpu-bind closest                 \

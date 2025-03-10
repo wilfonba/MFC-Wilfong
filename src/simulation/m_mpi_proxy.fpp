@@ -94,7 +94,7 @@ contains
         if (qbmm .and. .not. polytropic) then
             if (n > 0) then
                 if (p > 0) then
-                    halo_size = NINT(-1d0 + 1d0 * buff_size*(sys_size + 2*nb*4)* &
+                    halo_size = NINT(-1_wp + 1_wp * buff_size*(sys_size + 2*nb*4)* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ & 
@@ -113,7 +113,7 @@ contains
             if (n > 0) then
                 if (p > 0) then
 
-                    halo_size = NINT(-1d0 + 1d0 * buff_size*sys_size* &
+                    halo_size = NINT(-1._wp + 1._wp * buff_size*sys_size* &
                                              & (m + 2*buff_size + 1)* &
                                              & (n + 2*buff_size + 1)* &
                                              & (p + 2*buff_size + 1)/ & 

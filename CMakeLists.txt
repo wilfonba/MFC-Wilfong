@@ -159,9 +159,10 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
         "SHELL: -h list=adm"
+        "SHELL: -munsafe-fp-atomics"
     )
 
-    add_link_options("SHELL:-hkeepfiles")
+    add_link_options("SHELL:-hkeepfiles" "SHELL:-munsafe-fp-atomics")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
