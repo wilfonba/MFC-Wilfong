@@ -772,10 +772,11 @@ contains
                             q_prim_vf(momxb)%sf(j,k+2,l)/rho_sf(2,2) )
 
                             dvel2 = (1/(12._wp*dx(j))) * ( &
-                            8._wp*q_prim_vf(momxb+1)%sf(j+1,k,l)/rho_sf(1,1) - &
-                            8._wp*q_prim_vf(momxb+1)%sf(j-1,k,l)/rho_sf(-1,1) + &
-                            q_prim_vf(momxb+1)%sf(j-2,k,l)/rho_sf(-2,1) - &
-                            q_prim_vf(momxb+1)%sf(j+2,k,l)/rho_sf(2,1) )
+                            8._wp*vel_sf(1,2) - &
+                            8._wp*vel_sf(-1,2) + &
+                            vel_sf(-2,2) - &
+                            vel_sf(2,2) )
+
 
                             jac_rhs(j, k, l) = alf_igr* (2._wp*dvel1*dvel2)
 
@@ -887,10 +888,11 @@ contains
 
                             !! dux & dvy
                             dvel1 = (1/(12._wp*dx(j))) * ( &
-                            8._wp*q_prim_vf(momxb)%sf(j+1,k,l)/rho_sf(1,1) - &
-                            8._wp*q_prim_vf(momxb)%sf(j-1,k,l)/rho_sf(-1,1) + &
-                            q_prim_vf(momxb)%sf(j-2,k,l)/rho_sf(-2,1) - &
-                            q_prim_vf(momxb)%sf(j+2,k,l)/rho_sf(2,1) )
+                            8._wp*vel_sf(1,1) - &
+                            8._wp*vel_sf(-1,1) + &
+                            vel_sf(-2,1) - &
+                            vel_sf(2,1) )
+
 
                             dvel2 = (1/(12._wp*dy(k))) * ( &
                             8._wp*q_prim_vf(momxb+1)%sf(j,k+1,l)/rho_sf(1,2) - &
@@ -1296,10 +1298,10 @@ contains
                             q_prim_vf(momxb)%sf(j,k+2,l)/rho_sf(2,2) )
 
                             dvel2 = (1/(12._wp*dx(j))) * ( &
-                            8._wp*q_prim_vf(momxb+1)%sf(j+1,k,l)/rho_sf(1,1) - &
-                            8._wp*q_prim_vf(momxb+1)%sf(j-1,k,l)/rho_sf(-1,1) + &
-                            q_prim_vf(momxb+1)%sf(j-2,k,l)/rho_sf(-2,1) - &
-                            q_prim_vf(momxb+1)%sf(j+2,k,l)/rho_sf(2,1) )
+                            8._wp*vel_sf(1,2) - &
+                            8._wp*vel_sf(-1,2) + &
+                            vel_sf(-2,2) - &
+                            vel_sf(2,2) )
 
                             jac_rhs(j, k, l) = alf_igr* (2._wp*dvel1*dvel2)
 
@@ -1417,10 +1419,10 @@ contains
                             q_prim_vf(momxb)%sf(j,k,l+2)/rho_sf(2,3) )
 
                             dvel2 = (1/(12._wp*dx(j))) * ( &
-                            8._wp*q_prim_vf(momxb+2)%sf(j+1,k,l)/rho_sf(1,1) - &
-                            8._wp*q_prim_vf(momxb+2)%sf(j-1,k,l)/rho_sf(-1,1) + &
-                            q_prim_vf(momxb+2)%sf(j-2,k,l)/rho_sf(-2,1) - &
-                            q_prim_vf(momxb+2)%sf(j+2,k,l)/rho_sf(2,1) )
+                            8._wp*vel_sf(1,3) - &
+                            8._wp*vel_sf(-1,3) + &
+                            vel_sf(-2,3) - &
+                            vel_sf(2,3) )
 
                             jac_rhs(j, k, l) = jac_rhs(j,k,l) + alf_igr* (2_wp * dvel1* dvel2)
 
@@ -1533,10 +1535,11 @@ contains
 
                             !! dux & dvy
                             dvel1 = (1/(12._wp*dx(j))) * ( &
-                            8._wp*q_prim_vf(momxb)%sf(j+1,k,l)/rho_sf(1,1) - &
-                            8._wp*q_prim_vf(momxb)%sf(j-1,k,l)/rho_sf(-1,1) + &
-                            q_prim_vf(momxb)%sf(j-2,k,l)/rho_sf(-2,1) - &
-                            q_prim_vf(momxb)%sf(j+2,k,l)/rho_sf(2,1) )
+                            8._wp*vel_sf(1,1) - &
+                            8._wp*vel_sf(-1,1) + &
+                            vel_sf(-2,1) - &
+                            vel_sf(2,1) )
+
 
                             dvel2 = (1/(12._wp*dy(k))) * ( &
                             8._wp*q_prim_vf(momxb+1)%sf(j,k+1,l)/rho_sf(1,2) - &
@@ -2036,10 +2039,11 @@ contains
 
                             !! duy & dvx
                             dvel1 = (1/(12._wp*dy(k))) * ( &
-                            8._wp*q_prim_vf(momxb)%sf(j,k+1,l)/rho_sf(1,2) - &
-                            8._wp*q_prim_vf(momxb)%sf(j,k-1,l)/rho_sf(-1,2) + &
-                            q_prim_vf(momxb)%sf(j,k-2,l)/rho_sf(-2,2) - &
-                            q_prim_vf(momxb)%sf(j,k+2,l)/rho_sf(2,2) )
+                            8._wp*vel_sf(1,1) - &
+                            8._wp*vel_sf(-1,1) + &
+                            vel_sf(-2,1) - &
+                            vel_sf(2,1) )
+
 
                             dvel2 = (1/(12._wp*dx(j))) * ( &
                             8._wp*q_prim_vf(momxb+1)%sf(j+1,k,l)/rho_sf(1,1) - &
@@ -2155,10 +2159,10 @@ contains
 
                             !! dvy & dux
                             dvel1 = (1/(12._wp*dy(k))) * ( &
-                            8._wp*q_prim_vf(momxb+1)%sf(j,k+1,l)/rho_sf(1,2) - &
-                            8._wp*q_prim_vf(momxb+1)%sf(j,k-1,l)/rho_sf(-1,2) + &
-                            q_prim_vf(momxb+1)%sf(j,k-2,l)/rho_sf(-2,2) - &
-                            q_prim_vf(momxb+1)%sf(j,k+2,l)/rho_sf(2,2) )
+                            8._wp*vel_sf(1,2) - &
+                            8._wp*vel_sf(-1,2) + &
+                            vel_sf(-2,2) - &
+                            vel_sf(2,2) )
 
                             dvel2 = (1/(12._wp*dx(j))) * ( &
                             8._wp*q_prim_vf(momxb)%sf(j+1,k,l)/rho_sf(1,1) - &
@@ -2566,10 +2570,10 @@ contains
 
                             !! duy & dvx
                             dvel1 = (1/(12._wp*dy(k))) * ( &
-                            8._wp*q_prim_vf(momxb)%sf(j,k+1,l)/rho_sf(1,2) - &
-                            8._wp*q_prim_vf(momxb)%sf(j,k-1,l)/rho_sf(-1,2) + &
-                            q_prim_vf(momxb)%sf(j,k-2,l)/rho_sf(-2,2) - &
-                            q_prim_vf(momxb)%sf(j,k+2,l)/rho_sf(2,2) )
+                            8._wp*vel_sf(1,1) - &
+                            8._wp*vel_sf(-1,1) + &
+                            vel_sf(-2,1) - &
+                            vel_sf(2,1) )
 
                             dvel2 = (1/(12._wp*dx(j))) * ( &
                             8._wp*q_prim_vf(momxb+1)%sf(j+1,k,l)/rho_sf(1,1) - &
@@ -2685,12 +2689,12 @@ contains
 
                             !! dwy & dvz
                             dvel1 = (1/(12._wp*dy(k))) * ( &
-                            8._wp*q_prim_vf(momxb+2)%sf(j,k+1,l)/rho_sf(1,2) - &
-                            8._wp*q_prim_vf(momxb+2)%sf(j,k-1,l)/rho_sf(-1,2)  + &
-                            q_prim_vf(momxb+2)%sf(j,k-2,l)/rho_sf(-2,2)  - &
-                            q_prim_vf(momxb+2)%sf(j,k+2,l)/rho_sf(2,2)  )
+                            8._wp*vel_sf(1,3) - &
+                            8._wp*vel_sf(-1,3) + &
+                            vel_sf(-2,3) - &
+                            vel_sf(2,3) )
 
-                            dvel2 = (1/(12._wp*dx(j))) * ( &
+                            dvel2 = (1/(12._wp*dz(l))) * ( &
                             8._wp*q_prim_vf(momxb+1)%sf(j,k,l+1)/rho_sf(1,3)  - &
                             8._wp*q_prim_vf(momxb+1)%sf(j,k,l-1)/rho_sf(-1,3) + &
                             q_prim_vf(momxb+1)%sf(j,k,l-2)/rho_sf(-2,3) - &
@@ -2790,10 +2794,10 @@ contains
 
                             !! dvy & dux
                             dvel1 = (1/(12._wp*dy(k))) * ( &
-                            8._wp*q_prim_vf(momxb+1)%sf(j,k+1,l)/rho_sf(1,2) - &
-                            8._wp*q_prim_vf(momxb+1)%sf(j,k-1,l)/rho_sf(-1,2) + &
-                            q_prim_vf(momxb+1)%sf(j,k-2,l)/rho_sf(-2,2) - &
-                            q_prim_vf(momxb+1)%sf(j,k+2,l)/rho_sf(2,2) )
+                            8._wp*vel_sf(1,2) - &
+                            8._wp*vel_sf(-1,2) + &
+                            vel_sf(-2,2) - &
+                            vel_sf(2,2) )
 
                             dvel2 = (1/(12._wp*dx(j))) * ( &
                             8._wp*q_prim_vf(momxb)%sf(j+1,k,l)/rho_sf(1,1) - &
@@ -3317,10 +3321,10 @@ contains
 
                             !! dwx & duz
                             dvel1 = (1/(12._wp*dz(l))) * ( &
-                            8._wp*q_prim_vf(momxb)%sf(j,k,l+1)/rho_sf(1,3) - &
-                            8._wp*q_prim_vf(momxb)%sf(j,k,l-1)/rho_sf(-1,3) + &
-                            q_prim_vf(momxb)%sf(j,k,l-2)/rho_sf(-2,3) - &
-                            q_prim_vf(momxb)%sf(j,k,l+2)/rho_sf(2,3) )
+                            8._wp*vel_sf(1,1) - &
+                            8._wp*vel_sf(-1,1) + &
+                            vel_sf(-2,1) - &
+                            vel_sf(2,1) )
 
                             dvel2 = (1/(12._wp*dx(j))) * ( &
                             8._wp*q_prim_vf(momxb+2)%sf(j+1,k,l)/rho_sf(1,1) - &
@@ -3441,11 +3445,11 @@ contains
                             q_prim_vf(momxb+2)%sf(j,k-2,l)/rho_sf(-2,2)  - &
                             q_prim_vf(momxb+2)%sf(j,k+2,l)/rho_sf(2,2)  )
 
-                            dvel2 = (1/(12._wp*dx(j))) * ( &
-                            8._wp*q_prim_vf(momxb+1)%sf(j,k,l+1)/rho_sf(1,3)  - &
-                            8._wp*q_prim_vf(momxb+1)%sf(j,k,l-1)/rho_sf(-1,3) + &
-                            q_prim_vf(momxb+1)%sf(j,k,l-2)/rho_sf(-2,3) - &
-                            q_prim_vf(momxb+1)%sf(j,k,l+2)/rho_sf(2,3) )
+                            dvel2 = (1/(12._wp*dz(l))) * ( &
+                            8._wp*vel_sf(1,2) - &
+                            8._wp*vel_sf(-1,2) + &
+                            vel_sf(-2,2) - &
+                            vel_sf(2,2) )
 
                             if(viscous) then
 
@@ -3541,10 +3545,10 @@ contains
 
                             !! dwz & dux
                             dvel1 = (1/(12._wp*dz(l))) * ( &
-                            8._wp*q_prim_vf(momxb+2)%sf(j,k,l+1)/rho_sf(1,3) - &
-                            8._wp*q_prim_vf(momxb+2)%sf(j,k,l-1)/rho_sf(-1,3) + &
-                            q_prim_vf(momxb+2)%sf(j,k,l-2)/rho_sf(-2,3) - &
-                            q_prim_vf(momxb+2)%sf(j,k,l+2)/rho_sf(2,3) )
+                            8._wp*vel_sf(1,3) - &
+                            8._wp*vel_sf(-1,3) + &
+                            vel_sf(-2,3) - &
+                            vel_sf(2,3) )
 
                             dvel2 = (1/(12._wp*dx(j))) * ( &
                             8._wp*q_prim_vf(momxb)%sf(j+1,k,l)/rho_sf(1,1) - &
