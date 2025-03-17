@@ -656,11 +656,11 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
                             + dt*rhs_vf(i)%sf(j, k, l)
@@ -731,11 +731,11 @@ contains
             call s_update_lagrange_tdv_rk(stage=2)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
@@ -807,11 +807,11 @@ contains
             call s_update_lagrange_tdv_rk(stage=3)
         end if
 
-        !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, sys_size
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
