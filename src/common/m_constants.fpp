@@ -22,6 +22,7 @@ module m_constants
     integer, parameter :: num_fluids_max = 10                     !< Maximum number of fluids in the simulation
     integer, parameter :: num_probes_max = 10                     !< Maximum number of flow probes in the simulation
     integer, parameter :: num_patches_max = 10
+    integer, parameter :: num_bc_patches_max = 10
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
     integer, parameter :: num_igr_iters = 2

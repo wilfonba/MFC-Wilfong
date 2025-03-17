@@ -97,7 +97,8 @@ contains
             & 'loops_x', 'loops_y', 'loops_z', 'model_eqns', 'num_fluids',     &
             & 'weno_order', 'precision', 'perturb_flow_fluid', &
             & 'perturb_sph_fluid', 'num_patches', 'thermal', 'nb', 'dist_type',&
-            & 'R0_type', 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters' ]
+            & 'R0_type', 'relax_model', 'num_ibs', 'n_start', 'elliptic_smoothing_iters', &
+            & 'num_bc_patches' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -107,7 +108,8 @@ contains
             & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',&
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
-            & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing' ]
+            & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous', &
+            & 'bubbles_lagrange', 'igr' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -122,6 +124,20 @@ contains
             & 'mixlayer_domain' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
+
+        do i = 1, num_bc_patches_max
+            #:for VAR in ['geometry', 'type', 'dir', 'loc']
+                call MPI_BCAST(patch_bc(i)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in ['pres', 'radius']
+                call MPI_BCAST(patch_bc(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            #:for VAR in ['vel', 'alpha_rho', 'alpha', 'centroid', 'length']
+                call MPI_BCAST(patch_bc(i)%${VAR}$, size(patch_bc(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end do
 
         do i = 1, num_patches_max
             #:for VAR in [ 'geometry', 'smooth_patch_id']

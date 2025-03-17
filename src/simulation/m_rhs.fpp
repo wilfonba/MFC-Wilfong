@@ -643,11 +643,12 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
+    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, rhs_pb
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: mv, rhs_mv
@@ -700,7 +701,7 @@ contains
 
         if(igr) then 
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_populate_variables_buffers(q_cons_vf, pb, mv)
+            call s_populate_variables_buffers(q_cons_vf, pb, mv, bc_type)
             call nvtxEndRange
         else
             call nvtxStartRange("RHS-CONVERT")
@@ -713,7 +714,7 @@ contains
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_populate_variables_buffers(q_prim_qp%vf, pb, mv)
+            call s_populate_variables_buffers(q_prim_qp%vf, pb, mv, bc_type)
             call nvtxEndRange
         end if            
 

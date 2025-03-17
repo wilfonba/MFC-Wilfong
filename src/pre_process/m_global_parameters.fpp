@@ -39,7 +39,7 @@ module m_global_parameters
     integer :: m
     integer :: n
     integer :: p
-    integer, parameter :: buff_size = 1 ! buff size for elliptic smoothing
+    integer :: buff_size ! buff size for elliptic smoothing
 
     integer(8) :: nGlobal !< Global number of cells in the domain
 
@@ -83,6 +83,7 @@ module m_global_parameters
     integer :: num_fluids            !< Number of different fluids present in the flow
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
+    integer :: weno_polyn
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
     logical :: hypoelasticity        !< activate hypoelasticity
     logical :: hyperelasticity       !< activate hyperelasticity
@@ -90,6 +91,8 @@ module m_global_parameters
     integer :: b_size                !< Number of components in the b tensor
     integer :: tensor_size           !< Number of components in the nonsymmetric tensor
     logical :: pre_stress            !< activate pre_stressed domain
+    logical :: viscous
+    logical :: bubbles_lagrange
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
@@ -146,7 +149,6 @@ module m_global_parameters
     !! Starting cell-center index of local processor in global grid
 
     logical :: igr           !< Use information geometric regularization
-    integer :: alf_igr
     logical :: elliptic_smoothing !< Enables Ellipitcal Smoothing in Patches
     integer :: elliptic_smoothing_iters !< Iterations of Elliptic Smoothing done
 
@@ -175,6 +177,12 @@ module m_global_parameters
     !! patches employed in the configuration of the initial condition. Note that
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
+
+    integer :: num_bc_patches  !< Number of boundary condition patches
+    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc
+    !! Database of the boundary condition patch parameters for each of the patches
+    !! employed in the configuration of the boundary conditions
+
 
     ! Fluids Physical Parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
@@ -321,6 +329,9 @@ contains
         b_size = dflt_int
         tensor_size = dflt_int
 
+        viscous = .false.
+        bubbles_lagrange = .false.
+
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
         bc_z%beg = dflt_int; bc_z%end = dflt_int
@@ -405,6 +416,22 @@ contains
             if (chemistry) then
                 patch_icpp(i)%Y(:) = 0._wp
             end if
+        end do
+
+        num_bc_patches = 0
+
+        do i = 1, num_bc_patches_max
+            patch_bc(i)%geometry = dflt_int
+            patch_bc(i)%type = dflt_int
+            patch_bc(i)%dir = dflt_int
+            patch_bc(i)%loc = dflt_int
+            patch_bc(i)%vel(:) = dflt_real
+            patch_bc(i)%alpha_rho(:) = dflt_real
+            patch_bc(i)%alpha(:) = dflt_real
+            patch_bc(i)%pres = dflt_real
+            patch_bc(i)%centroid(:) = dflt_real
+            patch_bc(i)%length(:) = dflt_real
+            patch_bc(i)%radius = dflt_real
         end do
 
         ! Tait EOS
@@ -497,7 +524,6 @@ contains
         rkck_adap_dt = .false.
 
         igr = .false.
-        alf_igr = 0
         elliptic_smoothing = .false.
         elliptic_smoothing_iters = 1
 
@@ -508,6 +534,8 @@ contains
     subroutine s_initialize_global_parameters_module
 
         integer :: i, j, fac
+
+        weno_polyn = (weno_order - 1)/2
 
         ! Determining the layout of the state vectors and overall size of
         ! the system of equations, given the dimensionality and choice of
@@ -790,6 +818,22 @@ contains
         xiend = xi_idx%end
         chemxb = species_idx%beg
         chemxe = species_idx%end
+
+
+        if (viscous) then
+            buff_size = 2*weno_polyn + 2
+        else
+            buff_size = weno_polyn + 2
+        end if
+
+        if(igr) then
+            buff_size = 2*weno_polyn + 2
+        end if
+
+        ! Correction for smearing function in the lagrangian subgrid bubble model
+        if (bubbles_lagrange) then
+            buff_size = max(buff_size, 6)
+        end if
 
         ! Configuring Coordinate Direction Indexes
         idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0

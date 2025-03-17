@@ -109,6 +109,20 @@ module m_derived_types
         integer, dimension(:, :, :), allocatable :: fullmom !< Moment indices for qbmm
     end type bub_bounds_info
 
+    type bc_patch_parameters
+        integer :: geometry
+        integer :: type
+        integer :: dir
+        integer :: loc
+        real(wp), dimension(3) :: vel
+        real(wp), dimension(num_fluids_max) :: alpha_rho
+        real(wp), dimension(num_fluids_max) :: alpha
+        real(wp) :: pres
+        real(wp), dimension(3) :: centroid
+        real(wp), dimension(3) :: length
+        real(wp) :: radius
+    end type bc_patch_parameters
+
     !> Defines parameters for a Model Patch
     type ic_model_parameters
         character(LEN=pathlen_max) :: filepath !<

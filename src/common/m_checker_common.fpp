@@ -42,6 +42,7 @@ contains
         call s_check_inputs_hypoelasticity
         call s_check_inputs_phase_change
         call s_check_inputs_ibm
+        call s_check_inputs_bc_patches
 #endif
 
         ! Run by all three stages
@@ -363,5 +364,11 @@ contains
             end if
         #:endfor
     end subroutine s_check_inputs_moving_bc
+
+    subroutine s_check_inputs_bc_patches
+
+
+
+    end subroutine s_check_inputs_bc_patches
 
 end module m_checker_common

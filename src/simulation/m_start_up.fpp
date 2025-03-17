@@ -108,17 +108,20 @@ contains
 
    !> Read data files. Dispatch subroutine that replaces procedure pointer.
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_data_files(q_cons_vf)
+    subroutine s_read_data_files(q_cons_vf, bc_type)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf
 
+        type(integer_field), &
+            dimension(1:num_dims, -1:1), &
+            intent(inout) :: bc_type
 
         if (.not. parallel_io) then
-            call s_read_serial_data_files(q_cons_vf)
+            call s_read_serial_data_files(q_cons_vf, bc_type)
         else
-            call s_read_parallel_data_files(q_cons_vf)
+            call s_read_parallel_data_files(q_cons_vf, bc_type)
         end if
 
     end subroutine s_read_data_files
@@ -246,9 +249,13 @@ contains
         !!              up the latter. This procedure also calculates the cell-
         !!              width distributions from the cell-boundary locations.
         !! @param q_cons_vf Cell-averaged conservative variables
-    subroutine s_read_serial_data_files(q_cons_vf)
+    subroutine s_read_serial_data_files(q_cons_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+
+        type(integer_field), &
+            dimension(1:num_dims, -1:1), &
+            intent(inout) :: bc_type
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
             !! Relative path to the starting time-step directory
@@ -277,6 +284,8 @@ contains
         if (file_exist .neqv. .true.) then
             call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
         end if
+
+        call s_read_serial_boundary_condition_files(t_step_dir, bc_type)
 
         ! Cell-boundary Locations in x-direction
         file_path = trim(t_step_dir)//'/x_cb.dat'
@@ -484,11 +493,15 @@ contains
     end subroutine s_read_serial_data_files
 
         !! @param q_cons_vf Conservative variables
-    subroutine s_read_parallel_data_files(q_cons_vf)
+    subroutine s_read_parallel_data_files(q_cons_vf, bc_type)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(INOUT) :: q_cons_vf
+
+        type(integer_field), &
+            dimension(1:num_dims, -1:1), &
+            intent(inout) :: bc_type
 
 #ifdef MFC_MPI
 
@@ -931,6 +944,8 @@ contains
         end if
 
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
+
+        call s_read_parallel_boundary_condition_files(bc_type)
 
 #endif
 
@@ -1478,13 +1493,14 @@ contains
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
+        call s_initialize_boundary_conditions_module()
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
 
         ! Reading in the user provided initial condition and grid data
-        call s_read_data_files(q_cons_ts(1)%vf)
+        call s_read_data_files(q_cons_ts(1)%vf, bc_type)
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
@@ -1515,11 +1531,6 @@ contains
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
-
-        if (any((/bc_x%b_extrap_ic, bc_x%e_extrap_ic, bc_y%b_extrap_ic, &
-                bc_y%e_extrap_ic, bc_z%b_extrap_ic, bc_z%e_extrap_ic/))) then
-            call s_initialize_boundary_conditions_module(q_cons_ts(1)%vf)
-        end if
 
     end subroutine s_initialize_modules
 
@@ -1650,6 +1661,7 @@ contains
             call s_finalize_riemann_solvers_module()
             call s_finalize_weno_module()
         end if
+        call s_finalize_boundary_conditions_module()
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_proxy_module()
