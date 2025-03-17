@@ -268,20 +268,68 @@ contains
         real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
-        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(wp), dimension(num_fluids) :: alpha, alpha_rho, Gs   !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(wp) :: c          !< Cell-avg. sound speed
         real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp) :: qv, E, G
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
-        integer :: j, k, l
+        integer :: i, j, k, l
 
         ! Computing Stability Criteria at Current Time-step
         !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+
+                    !$acc loop seq
+                    do i = 1, num_fluids
+                        alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
+                        alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                    end do
+
+                    if (elasticity) then
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
+                                                                        alpha_rho, Re, j, k, l, G, Gs)
+                    elseif (bubbles_euler) then
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
+                    else
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
+                    end if
+
+                    if(igr) then 
+                        !$acc loop seq
+                        do i = 1, num_dims
+                            vel(i) = q_prim_vf(contxe + i)%sf(j, k, l) / rho
+                        end do
+                    else 
+                        !$acc loop seq
+                        do i = 1, num_dims
+                            vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
+                        end do
+                    end if
+
+                    vel_sum = 0._wp
+                    !$acc loop seq
+                    do i = 1, num_dims
+                        vel_sum = vel_sum + vel(i)**2._wp
+                    end do
+
+                    if(igr) then 
+                        E = q_prim_vf(E_idx)%sf(j, k, l)
+                        pres = (E - pi_inf - qv - 5e-1_wp*rho*vel_sum)/gamma
+                    else 
+                        pres = q_prim_vf(E_idx)%sf(j, k, l)
+                        E = gamma*pres + pi_inf + 5e-1_wp*rho*vel_sum + qv
+                    end if
+
+                    ! ENERGY ADJUSTMENTS FOR HYPERELASTIC ENERGY
+                    if (hyperelasticity) then
+                        E = E + G*q_prim_vf(xiend + 1)%sf(j, k, l)
+                    end if
+
+                    H = (E + pres)/rho
 
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
 
