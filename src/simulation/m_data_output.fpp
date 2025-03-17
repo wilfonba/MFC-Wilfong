@@ -1734,19 +1734,23 @@ contains
     subroutine s_initialize_data_output_module
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
-        @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
-        icfl_max = 0._wp
+        if(run_time_info)then 
+            @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
+            icfl_max = 0._wp
+        end if
 
         if (probe_wrt) then
             @:ALLOCATE(c_mass(num_fluids,5))
         end if
 
-        if (viscous) then
-            @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
-            @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
+        if(run_time_info) then 
+            if (viscous) then
+                @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
+                @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
 
-            vcfl_max = 0._wp
-            Rc_min = 1e3_wp
+                vcfl_max = 0._wp
+                Rc_min = 1e3_wp
+            end if
         end if
 
     end subroutine s_initialize_data_output_module
@@ -1758,10 +1762,12 @@ contains
             @:DEALLOCATE(c_mass)
         end if
 
-        ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
-        @:DEALLOCATE(icfl_sf)
-        if (viscous) then
-            @:DEALLOCATE(vcfl_sf, Rc_sf)
+        if(run_time_info) then 
+            ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
+            @:DEALLOCATE(icfl_sf)
+            if (viscous) then
+                @:DEALLOCATE(vcfl_sf, Rc_sf)
+            end if
         end if
 
     end subroutine s_finalize_data_output_module
