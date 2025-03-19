@@ -22,8 +22,8 @@ module m_igr
         s_igr_flux_add
 
     real(wp), allocatable, dimension(:, :, :) :: fd_coeff
-    real(wp), allocatable, dimension(:, :, :) :: jac,jac_rhs,rho_igr,jac_old
-    !$acc declare create(fd_coeff,jac, jac_rhs,rho_igr,jac_old)
+    real(wp), allocatable, dimension(:, :, :) :: jac,jac_rhs,rho_igr
+    !$acc declare create(fd_coeff,jac, jac_rhs,rho_igr)
 
     real(wp) :: alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze
     !$acc declare create(alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze)
@@ -60,7 +60,7 @@ contains
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
             end if
-            #:for VAR in [ 'jac','jac_rhs','fd_coeff','jac_old']
+            #:for VAR in [ 'jac','jac_rhs','fd_coeff']
                 @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
                              idwbuff(2)%beg:idwbuff(2)%end, &
                              idwbuff(3)%beg:idwbuff(3)%end))
@@ -71,7 +71,6 @@ contains
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         jac(j, k, l) = 0._wp
-                        jac_old(j, k, l) = 0._wp
                    end do
                 end do
             end do
@@ -164,8 +163,8 @@ contains
                                                         (1._wp / dz(l)**2._wp) * (rho_lz* jac(j,k,l-1) + rho_rz*jac(j,k,l+1)) ) + &
                                                         jac_rhs(j,k,l) / fd_coeff(j, k, l)
                            else 
-                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac_old(j-1,k,l) + rho_rx*jac_old(j+1,k,l)) + &
-                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac_old(j,k-1,l) + rho_ry*jac_old(j,k+1,l)) ) + &
+                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
+                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) ) + &
                                                         jac_rhs(j,k,l) / fd_coeff(j, k, l)                              
                            end if
                         end do
@@ -192,8 +191,8 @@ contains
                                                         (1._wp / dz(l)**2._wp) * (rho_lz* jac(j,k,l-1) + rho_rz*jac(j,k,l+1)) ) + &
                                                         jac_rhs(j,k,l) / fd_coeff(j, k, l) 
                            else 
-                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac_old(j-1,k,l) + rho_rx*jac_old(j+1,k,l)) + &
-                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac_old(j,k-1,l) + rho_ry*jac_old(j,k+1,l)) ) + &
+                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
+                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) ) + &
                                                         jac_rhs(j,k,l) / fd_coeff(j, k, l)                               
                            end if
                         end do
@@ -403,8 +402,7 @@ contains
 
                     end if
                 end if
-            end if 
-            jac_old = jac         
+            end if        
         end do
     end subroutine s_igr_jacobi_iteration
 
