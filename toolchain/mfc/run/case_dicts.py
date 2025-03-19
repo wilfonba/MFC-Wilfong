@@ -291,7 +291,7 @@ SIMULATION.update({
     'bubbles_lagrange': ParamType.LOG,
     'rkck_tolerance': ParamType.REAL,
     'igr': ParamType.LOG,
-    'igr_order': ParamType.INT,
+    'num_igr_iters': ParamType.INT,
     'alf_factor': ParamType.REAL,
 })
 

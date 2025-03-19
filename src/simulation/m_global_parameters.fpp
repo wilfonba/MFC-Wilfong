@@ -153,6 +153,7 @@ module m_global_parameters
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
     logical :: igr           !< Use information geometric regularization
+    integer :: num_igr_iters !< number of iterations for elliptic solve
     real(wp) :: alf_factor  !< alpha factor for IGR
 
     !$acc declare create(chemistry, igr)
@@ -617,6 +618,7 @@ contains
             igr_order = dflt_int
         #:endif
 
+        num_igr_iters = dflt_num_igr_iters
         alf_factor = dflt_alf_factor
 
         R0_type = dflt_int

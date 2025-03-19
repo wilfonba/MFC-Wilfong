@@ -25,7 +25,7 @@ module m_constants
     integer, parameter :: num_bc_patches_max = 10
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
-    integer, parameter :: num_igr_iters = 2
+    integer, parameter :: dflt_num_igr_iters = 2
     real(wp), parameter :: dflt_alf_factor = 10._wp
     integer, parameter :: gp_layers = 3 !< Number of ghost point layers for IBM
     real(wp), parameter :: capillary_cutoff = 1e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
