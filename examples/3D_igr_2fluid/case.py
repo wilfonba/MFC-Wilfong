@@ -19,7 +19,7 @@ y1 = l
 z0 = -l
 z1 = l
 
-Nx = 29
+Nx = 299
 Ny = Nx
 Nz = Nx
 
@@ -110,10 +110,10 @@ data = {
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%vel(2)": 0.0,
     "patch_icpp(2)%vel(3)": 0.0,
-    "patch_icpp(2)%pres": 2.5,
-    "patch_icpp(2)%alpha_rho(1)": eps*2,
+    "patch_icpp(2)%pres": 9.518,
+    "patch_icpp(2)%alpha_rho(1)": eps*5,
     "patch_icpp(2)%alpha(1)": eps,
-    "patch_icpp(2)%alpha_rho(2)": (1 - eps)*2,
+    "patch_icpp(2)%alpha_rho(2)": (1 - eps)*5,
     "patch_icpp(2)%alpha(2)": 1 - eps,
 }
 
