@@ -1120,7 +1120,7 @@ contains
         end if
 
         if(igr) then 
-            buff_size = buff_size + 3
+            buff_size = buff_size + 2
         end if
 
         if (elasticity) then
