@@ -1119,6 +1119,10 @@ contains
             buff_size = weno_polyn + 2
         end if
 
+        if(igr) then 
+            buff_size = buff_size + 3
+        end if
+
         if (elasticity) then
             fd_number = max(1, fd_order/2)
             !buff_size = buff_size + fd_number
