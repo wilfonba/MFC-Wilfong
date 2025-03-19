@@ -827,7 +827,7 @@ contains
         end if
 
         if(igr) then
-            buff_size = 2*weno_polyn + 2
+            buff_size = buff_size + 2
         end if
 
         ! Correction for smearing function in the lagrangian subgrid bubble model

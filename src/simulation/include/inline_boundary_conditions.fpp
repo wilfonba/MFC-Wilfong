@@ -1,5 +1,5 @@
 #:def PRIM_GHOST_CELL_EXTRAPOLATION_BC(DEST, SRC)
-    do i = 1, sys_size
+    do i = 1, vec_size
         do j = 1, buff_size
             q_prim_vf(i)%sf(${DEST}$) = q_prim_vf(i)%sf(${SRC}$)
         end do
@@ -14,7 +14,7 @@
 
         q_prim_vf(i)%sf(${DEST}$) = -q_prim_vf(i)%sf(${SRC}$)
 
-        do i = momxb+${DIR}$, sys_size
+        do i = momxb+${DIR}$, vec_size
             q_prim_vf(i)%sf(${DEST}$) = q_prim_vf(i)%sf(${SRC}$)
         end do
 
@@ -26,7 +26,7 @@
 #:enddef
 
 #:def PRIM_PERIODIC_BC(DEST, SRC)
-    do i = 1, sys_size
+    do i = 1, vec_size
         do j = 1, buff_size
             q_prim_vf(i)%sf(${DEST}$) = q_prim_vf(i)%sf(${SRC}$)
         end do
@@ -36,7 +36,7 @@
 #:def PRIM_SLIP_WALL_BC(DIR,LOC)
     #:if DIR == "x"
         #:if LOC == "L"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb) then
                         !q_prim_vf(i)%sf(-j, k, l) = &
@@ -49,7 +49,7 @@
                 end do
             end do
         #:elif LOC == "R"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb) then
                         q_prim_vf(i)%sf(m + j, k, l) = &
@@ -63,7 +63,7 @@
         #:endif
     #:elif DIR == "y"
         #:if LOC == "L"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb + 1) then
                         q_prim_vf(i)%sf(k, -j, l) = &
@@ -75,7 +75,7 @@
                 end do
             end do
         #:elif LOC == "R"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb + 1) then
                         q_prim_vf(i)%sf(k, n + j, l) = &
@@ -89,7 +89,7 @@
         #:endif
     #:elif DIR == "z"
         #:if LOC == "L"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxe) then
                         q_prim_vf(i)%sf(k, l, -j) = &
@@ -101,7 +101,7 @@
                 end do
             end do
         #:elif LOC == "R"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxe) then
                         q_prim_vf(i)%sf(k, l, p + j) = &
@@ -119,7 +119,7 @@
 #:def PRIM_NO_SLIP_WALL_BC(DIR,LOC)
     #:if DIR == "x"
         #:if LOC == "L"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb) then
                         !q_prim_vf(i)%sf(-j, k, l) = &
@@ -140,7 +140,7 @@
                 end do
             end do
         #:elif LOC == "R"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb) then
                         q_prim_vf(i)%sf(m + j, k, l) = &
@@ -160,7 +160,7 @@
         #:endif
     #:elif DIR == "y"
         #:if LOC == "L"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb) then
                         q_prim_vf(i)%sf(k, -j, l) = &
@@ -178,7 +178,7 @@
                 end do
             end do
         #:elif LOC == "R"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb) then
                         q_prim_vf(i)%sf(k, n + j, l) = &
@@ -198,7 +198,7 @@
         #:endif
     #:elif DIR == "z"
         #:if LOC == "L"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb) then
                         q_prim_vf(i)%sf(k, l, -j) = &
@@ -216,7 +216,7 @@
                 end do
             end do
         #:elif LOC == "R"
-            do i = 1, sys_size
+            do i = 1, vec_size
                 do j = 1, buff_size
                     if (i == momxb) then
                         q_prim_vf(i)%sf(k, l, p + j) = &
@@ -238,7 +238,7 @@
 #:enddef
 
 #:def PRIM_DIRICHLET_BC(DIR, LOC, DEST, SRC)
-    do i = 1, sys_size
+    do i = 1, vec_size
         do j = 1, buff_size
             q_prim_vf(i)%sf(${DEST}$) = bc_buffers(${DIR}$,${LOC}$)%sf(${SRC}$)
         end do

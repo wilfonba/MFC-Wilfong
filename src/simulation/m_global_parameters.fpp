@@ -475,6 +475,8 @@ module m_global_parameters
     !$acc declare create(bubbles_lagrange, lag_params, rkck_adap_dt, dt_max, rkck_time_tmp, rkck_tolerance)
     !> @}
 
+    integer :: vec_size 
+    !$acc declare create(vec_size)
 contains
 
     !> Assigns default values to the user inputs before reading
@@ -1198,8 +1200,14 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
+        if(igr) then 
+            vec_size = sys_size - 1
+        else 
+            vec_size = sys_size
+        end if
+
         !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, pi_fac, strxb, strxe, chemxb, chemxe)
-        !$acc update device(b_size, xibeg, xiend, tensor_size)
+        !$acc update device(b_size, xibeg, xiend, tensor_size, vec_size, igr)
 
         !$acc update device(species_idx)
         !$acc update device(cfl_target, m, n, p)

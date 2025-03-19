@@ -180,7 +180,7 @@ contains
                                 -q_prim_vf(momxe)%sf(l, j - 1, k + ((p + 1)/2))
 
                             !$acc loop seq
-                            do i = E_idx, sys_size
+                            do i = E_idx, vec_size
                                 q_prim_vf(i)%sf(l, -j, k) = &
                                     q_prim_vf(i)%sf(l, j - 1, k + ((p + 1)/2))
                             end do
@@ -198,7 +198,7 @@ contains
                                 -q_prim_vf(momxe)%sf(l, j - 1, k - ((p + 1)/2))
 
                             !$acc loop seq
-                            do i = E_idx, sys_size
+                            do i = E_idx, vec_size
                                 q_prim_vf(i)%sf(l, -j, k) = &
                                     q_prim_vf(i)%sf(l, j - 1, k - ((p + 1)/2))
                             end do

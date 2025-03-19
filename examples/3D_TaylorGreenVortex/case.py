@@ -2,7 +2,7 @@
 import math
 import json
 
-N=199
+N=29
 
 Re = 1600
 L = 1

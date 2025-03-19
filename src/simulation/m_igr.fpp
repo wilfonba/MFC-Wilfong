@@ -11,7 +11,7 @@ module m_igr
     use m_mpi_proxy
 
     use m_helper
-
+    
     implicit none
 
     private; public :: s_initialize_igr_module, &
@@ -464,6 +464,11 @@ contains
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
                                                       0.5_wp * vel_L * F_L * (1._wp/dx(j))
 
+                            F_L = (1._wp/60._wp) * (-3._wp * jac(j+2, k, l) + &
+                                                27._wp * jac(j+1, k, l) + &
+                                                47._wp * jac(j, k, l) -   &
+                                                13._wp * jac(j-1, k, l) + &
+                                                2._wp * jac(j-2, k, l))
 
                             !$acc loop seq 
                             do i = 1, num_fluids
@@ -544,6 +549,11 @@ contains
                             rhs_vf(E_idx)%sf(j,k,l) = rhs_vf(E_idx)%sf(j,k,l) - &
                                                       0.5_wp * vel_L * F_L * (1._wp/dx(j))
 
+                            F_L = (1._wp/60._wp) * (-3._wp * jac(j+2, k, l) + &
+                                                27._wp * jac(j+1, k, l) + &
+                                                47._wp * jac(j, k, l) -   &
+                                                13._wp * jac(j-1, k, l) + &
+                                                2._wp * jac(j-2, k, l))
 
                             !$acc loop seq 
                             do i = 1, num_fluids
@@ -621,24 +631,27 @@ contains
                                                 47._wp * q_prim_vf(i)%sf(j, k, l) -   &
                                                 13._wp * q_prim_vf(i)%sf(j-1, k, l) + &
                                                 2._wp * q_prim_vf(i)%sf(j-2, k, l))
-
-                                alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j+2, k, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j+3, k, l))
                             end do 
 
-                            if(num_fluids > 1) then  
+                            if(num_fluids > 1) then 
                                 !$acc loop seq 
-                                do i = 1,num_fluids                           
+                                do i = 1, num_fluids - 1
+                                    alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j+2, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j+3, k, l))
                                     alpha_R(i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j+2, k, l) + &
-                                                        27._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) + &
-                                                        47._wp * q_prim_vf(E_idx+i)%sf(j, k, l) -   &
-                                                        13._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
-                                                        2._wp * q_prim_vf(E_idx+i)%sf(j-2, k, l))
-                                end do 
+                                                            27._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) + &
+                                                            47._wp * q_prim_vf(E_idx+i)%sf(j, k, l) -   &
+                                                            13._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
+                                                            2._wp * q_prim_vf(E_idx+i)%sf(j-2, k, l))
+                                end do
+
+                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
+                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))    
                             else 
+                                alpha_L(1) = 1._wp 
                                 alpha_R(1) = 1._wp
                             end if
 
@@ -729,7 +742,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) + &
                                         (0.5_wp * (alpha_L(i) * &
@@ -801,35 +814,53 @@ contains
 
                             jac_rhs(j, k, l) = alf_igr* (2._wp*dvel1*dvel2)
 
-                            if(num_fluids > 1) then 
-                                !$acc loop seq
-                                do q = -3, 2 
-                                    mu_L(q) = 0._wp
-                                    mu_R(q) = 0._wp
-                                    !$acc loop seq 
-                                    do i = 1, num_fluids
-                                        mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j+3+q, k, l)) / Res(1, i) + mu_L(q)
-
-                                        mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j-2+q, k, l)) / Res(1, i) + mu_R(q)
-                                    end do
-                                end do
-                            else
-                                !$acc loop seq
-                                do q = -3, 2
-                                    mu_L(q) = 1._wp / Res(1, 1) 
-                                    mu_R(q) = 1._wp / Res(1, 1) 
-                                end do
-                            end if
-
                             if(viscous) then
+
+                                if(num_fluids > 1) then 
+                                    !$acc loop seq
+                                    do q = -3, 2 
+                                        mu_L(q) = 0._wp
+                                        mu_R(q) = 0._wp
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j+3+q, k, l)) / Res(1, i) + mu_L(q)
+
+                                            mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j-2+q, k, l)) / Res(1, i) + mu_R(q)
+                                        end do
+
+                                        mu_L(q) = 1._wp / Res(1, num_fluids) + mu_L(q)
+                                        mu_R(q) = 1._wp / Res(1, num_fluids) + mu_R(q)
+
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j+3+q, k, l)) / Res(1, num_fluids) + mu_L(q)
+
+                                            mu_R(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j-2+q, k, l)) / Res(1, num_fluids) + mu_R(q)
+                                        end do
+                                    end do
+                                else
+                                    !$acc loop seq
+                                    do q = -3, 2
+                                        mu_L(q) = 1._wp / Res(1, 1) 
+                                        mu_R(q) = 1._wp / Res(1, 1) 
+                                    end do
+                                end if
 
                                 !$acc atomic
                                 rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L(1)*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
@@ -1047,7 +1078,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) + &
                                         (0.5_wp * (alpha_R(i) * &
@@ -1125,24 +1156,27 @@ contains
                                                 47._wp * q_prim_vf(i)%sf(j, k, l) -   &
                                                 13._wp * q_prim_vf(i)%sf(j-1, k, l) + &
                                                 2._wp * q_prim_vf(i)%sf(j-2, k, l))
-
-                                alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j+2, k, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j+3, k, l))
                             end do 
-                            
-                            if(num_fluids > 1) then  
+
+                             if(num_fluids > 1) then 
                                 !$acc loop seq 
-                                do i = 1,num_fluids                           
+                                do i = 1, num_fluids - 1
+                                    alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j+2, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j+3, k, l))
                                     alpha_R(i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j+2, k, l) + &
-                                                        27._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) + &
-                                                        47._wp * q_prim_vf(E_idx+i)%sf(j, k, l) -   &
-                                                        13._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
-                                                        2._wp * q_prim_vf(E_idx+i)%sf(j-2, k, l))
-                                end do 
+                                                            27._wp * q_prim_vf(E_idx+i)%sf(j+1, k, l) + &
+                                                            47._wp * q_prim_vf(E_idx+i)%sf(j, k, l) -   &
+                                                            13._wp * q_prim_vf(E_idx+i)%sf(j-1, k, l) + &
+                                                            2._wp * q_prim_vf(E_idx+i)%sf(j-2, k, l))
+                                end do
+
+                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
+                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))    
                             else 
+                                alpha_L(1) = 1._wp 
                                 alpha_R(1) = 1._wp
                             end if
 
@@ -1243,7 +1277,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) + &
                                         (0.5_wp * (alpha_L(i) * &
@@ -1325,35 +1359,53 @@ contains
 
                             jac_rhs(j, k, l) = alf_igr* (2._wp*dvel1*dvel2)
 
-                            if(num_fluids > 1) then 
-                                !$acc loop seq
-                                do q = -3, 2 
-                                    mu_L(q) = 0._wp
-                                    mu_R(q) = 0._wp
-                                    !$acc loop seq 
-                                    do i = 1, num_fluids
-                                        mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j+3+q, k, l)) / Res(1, i) + mu_L(q)
-                                        
-                                        mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j-2+q, k, l)) / Res(1, i) + mu_R(q)
-                                    end do
-                                end do
-                            else
-                                !$acc loop seq
-                                do q = -3, 2
-                                    mu_L(q) = 1._wp / Res(1, 1) 
-                                    mu_R(q) = 1._wp / Res(1, 1) 
-                                end do
-                            end if
-
                             if(viscous) then
+
+                                if(num_fluids > 1) then 
+                                    !$acc loop seq
+                                    do q = -3, 2 
+                                        mu_L(q) = 0._wp
+                                        mu_R(q) = 0._wp
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j+3+q, k, l)) / Res(1, i) + mu_L(q)
+
+                                            mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j-2+q, k, l)) / Res(1, i) + mu_R(q)
+                                        end do
+
+                                        mu_L(q) = 1._wp / Res(1, num_fluids) + mu_L(q)
+                                        mu_R(q) = 1._wp / Res(1, num_fluids) + mu_R(q)
+
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j+3+q, k, l)) / Res(1, num_fluids) + mu_L(q)
+
+                                            mu_R(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j+2+q, k, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j+1+q, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j+q, k, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j-1+q, k, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j-2+q, k, l)) / Res(1, num_fluids) + mu_R(q)
+                                        end do
+                                    end do
+                                else
+                                    !$acc loop seq
+                                    do q = -3, 2
+                                        mu_L(q) = 1._wp / Res(1, 1) 
+                                        mu_R(q) = 1._wp / Res(1, 1) 
+                                    end do
+                                end if
 
                                 !$acc atomic
                                 rhs_vf(momxb+1)%sf(j+2,k,l) = rhs_vf(momxb+1)%sf(j+2,k,l) - 0.5_wp*mu_L(1)*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dx(j+2))
@@ -1796,7 +1848,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j+1,k,l) = rhs_vf(advxb+i-1)%sf(j+1,k,l) + &
                                         (0.5_wp * (alpha_R(i) * &
@@ -1886,24 +1938,26 @@ contains
                                                 47._wp * q_prim_vf(i)%sf(j, k, l) -   &
                                                 13._wp * q_prim_vf(i)%sf(j, k-1, l) + &
                                                 2._wp * q_prim_vf(i)%sf(j, k-2, l))
-
-                                alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+1, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k+2, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k+3, l))
                             end do 
 
                             if(num_fluids > 1) then  
                                 !$acc loop seq 
-                                do i = 1,num_fluids                           
+                                do i = 1,num_fluids - 1
+                                    alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1, l) + &
+                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+1, l) -   &
+                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k+2, l) + &
+                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k+3, l))                          
                                     alpha_R(i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k+2, l) + &
                                                         27._wp * q_prim_vf(E_idx+i)%sf(j, k+1, l) + &
                                                         47._wp * q_prim_vf(E_idx+i)%sf(j, k, l) -   &
                                                         13._wp * q_prim_vf(E_idx+i)%sf(j, k-1, l) + &
                                                         2._wp * q_prim_vf(E_idx+i)%sf(j, k-2, l))
                                 end do
+                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids-1))
+                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids-1))
                             else 
+                                alpha_L(1) = 1._wp
                                 alpha_R(1) = 1._wp 
                             end if
 
@@ -2001,7 +2055,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) + &
                                         (0.5_wp * (alpha_L(i) * &
@@ -2072,35 +2126,53 @@ contains
                             q_prim_vf(momxb+1)%sf(j-2,k,l)/rho_sf(-2,1) - &
                             q_prim_vf(momxb+1)%sf(j+2,k,l)/rho_sf(2,1) )
 
-                            if(num_fluids > 1) then 
-                                !$acc loop seq
-                                do q = -3, 2 
-                                    mu_L(q) = 0._wp
-                                    mu_R(q) = 0._wp
-                                    !$acc loop seq 
-                                    do i = 1, num_fluids
-                                        mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k+3+q, l)) / Res(1, i) + mu_L(q)
-                                        
-                                        mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k-2+q, l)) / Res(1, i) + mu_R(q)
-                                    end do
-                                end do
-                            else
-                                !$acc loop seq
-                                do q = -3, 2
-                                    mu_L(q) = 1._wp / Res(1, 1) 
-                                    mu_R(q) = 1._wp / Res(1, 1) 
-                                end do
-                            end if
-
                             if(viscous) then
+
+                                if(num_fluids > 1) then 
+                                    !$acc loop seq
+                                    do q = -3, 2 
+                                        mu_L(q) = 0._wp
+                                        mu_R(q) = 0._wp
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k+3+q, l)) / Res(1, i) + mu_L(q)
+
+                                            mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k-2+q, l)) / Res(1, i) + mu_R(q)
+                                        end do
+
+                                        mu_L(q) = 1._wp / Res(1, num_fluids) + mu_L(q)
+                                        mu_R(q) = 1._wp / Res(1, num_fluids) + mu_R(q)
+
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k+3+q, l)) / Res(1, num_fluids) + mu_L(q)
+
+                                            mu_R(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k-2+q, l)) / Res(1, num_fluids) + mu_R(q)
+                                        end do
+                                    end do
+                                else
+                                    !$acc loop seq
+                                    do q = -3, 2
+                                        mu_L(q) = 1._wp / Res(1, 1) 
+                                        mu_R(q) = 1._wp / Res(1, 1) 
+                                    end do
+                                end if
 
                                 !$acc atomic
                                 rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L(1)*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
@@ -2320,7 +2392,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) + &
                                         (0.5_wp * (alpha_R(i) * &
@@ -2399,25 +2471,27 @@ contains
                                                 47._wp * q_prim_vf(i)%sf(j, k, l) -   &
                                                 13._wp * q_prim_vf(i)%sf(j, k-1, l) + &
                                                 2._wp * q_prim_vf(i)%sf(j, k-2, l))
-
-                                alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+1, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k+2, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k+3, l))
                             end do 
 
                             if(num_fluids > 1) then  
                                 !$acc loop seq 
-                                do i = 1,num_fluids                           
+                                do i = 1,num_fluids - 1
+                                    alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1, l) + &
+                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+1, l) -   &
+                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k+2, l) + &
+                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k+3, l))                          
                                     alpha_R(i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k+2, l) + &
                                                         27._wp * q_prim_vf(E_idx+i)%sf(j, k+1, l) + &
                                                         47._wp * q_prim_vf(E_idx+i)%sf(j, k, l) -   &
                                                         13._wp * q_prim_vf(E_idx+i)%sf(j, k-1, l) + &
                                                         2._wp * q_prim_vf(E_idx+i)%sf(j, k-2, l))
-                                end do 
+                                end do
+                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids-1))
+                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids-1))
                             else 
-                                alpha_R(1) = 1._wp
+                                alpha_L(1) = 1._wp
+                                alpha_R(1) = 1._wp 
                             end if
 
                             F_L = (1._wp/60._wp) * (-3._wp * jac(j, k-1, l) + &
@@ -2522,7 +2596,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) + &
                                         (0.5_wp * (alpha_L(i) * &
@@ -2602,35 +2676,53 @@ contains
                             q_prim_vf(momxb+1)%sf(j-2,k,l)/rho_sf(-2,1) - &
                             q_prim_vf(momxb+1)%sf(j+2,k,l)/rho_sf(2,1) )
 
-                            if(num_fluids > 1) then 
-                                !$acc loop seq
-                                do q = -3, 2 
-                                    mu_L(q) = 0._wp
-                                    mu_R(q) = 0._wp
-                                    !$acc loop seq 
-                                    do i = 1, num_fluids
-                                        mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k+3+q, l)) / Res(1, i) + mu_L(q)
-                                        
-                                        mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k-2+q, l)) / Res(1, i) + mu_R(q)
-                                    end do
-                                end do
-                            else
-                                !$acc loop seq
-                                do q = -3, 2
-                                    mu_L(q) = 1._wp / Res(1, 1) 
-                                    mu_R(q) = 1._wp / Res(1, 1) 
-                                end do
-                            end if
-                            
                             if(viscous) then
+
+                                if(num_fluids > 1) then 
+                                    !$acc loop seq
+                                    do q = -3, 2 
+                                        mu_L(q) = 0._wp
+                                        mu_R(q) = 0._wp
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k+3+q, l)) / Res(1, i) + mu_L(q)
+
+                                            mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k-2+q, l)) / Res(1, i) + mu_R(q)
+                                        end do
+
+                                        mu_L(q) = 1._wp / Res(1, num_fluids) + mu_L(q)
+                                        mu_R(q) = 1._wp / Res(1, num_fluids) + mu_R(q)
+
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k+3+q, l)) / Res(1, num_fluids) + mu_L(q)
+
+                                            mu_R(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k+2+q, l) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k+1+q, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k+q, l) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k-1+q, l) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k-2+q, l)) / Res(1, num_fluids) + mu_R(q)
+                                        end do
+                                    end do
+                                else
+                                    !$acc loop seq
+                                    do q = -3, 2
+                                        mu_L(q) = 1._wp / Res(1, 1) 
+                                        mu_R(q) = 1._wp / Res(1, 1) 
+                                    end do
+                                end if
 
                                 !$acc atomic
                                 rhs_vf(momxb)%sf(j,k+2,l) = rhs_vf(momxb)%sf(j,k+2,l) - 0.5_wp*mu_L(1)*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dy(k+2))
@@ -3055,7 +3147,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k+1,l) = rhs_vf(advxb+i-1)%sf(j,k+1,l) + &
                                         (0.5_wp * (alpha_R(i) * &
@@ -3145,24 +3237,26 @@ contains
                                                 47._wp * q_prim_vf(i)%sf(j, k, l) -   &
                                                 13._wp * q_prim_vf(i)%sf(j, k, l-1) + &
                                                 2._wp * q_prim_vf(i)%sf(j, k, l-2))
-
-                                alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k, l+3))
                             end do 
 
                             if(num_fluids > 1) then  
                                 !$acc loop seq 
-                                do i = 1,num_fluids                           
+                                do i = 1,num_fluids - 1
+                                    alpha_L(i) =  (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k, l) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k, l+3))                          
                                     alpha_R(i) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2) + &
                                                         27._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1) + &
                                                         47._wp * q_prim_vf(E_idx+i)%sf(j, k, l) -   &
                                                         13._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1) + &
                                                         2._wp * q_prim_vf(E_idx+i)%sf(j, k, l-2))
                                 end do 
+                                alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids-1))
+                                alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids-1))
                             else 
+                                alpha_L(1) = 1._wp
                                 alpha_R(1) = 1._wp
                             end if
 
@@ -3269,7 +3363,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) + &
                                         (0.5_wp * (alpha_L(i) * &
@@ -3350,34 +3444,53 @@ contains
                             q_prim_vf(momxb+2)%sf(j-2,k,l)/rho_sf(-2,1) - &
                             q_prim_vf(momxb+2)%sf(j+2,k,l)/rho_sf(2,1) )
 
-                            if(num_fluids > 1) then 
-                                !$acc loop seq
-                                do q = -3, 2 
-                                    mu_L(q) = 0._wp
-                                    mu_R(q) = 0._wp
-                                    !$acc loop seq 
-                                    do i = 1, num_fluids
-                                        mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1+q) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l+q) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1+q) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2+q) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k, l+3+q)) / Res(1, i) + mu_L(q)
-                                        
-                                        mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2+q) + &
-                                                27._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1+q) + &
-                                                47._wp * q_prim_vf(E_idx+i)%sf(j, k, l+q) -   &
-                                                13._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1+q) + &
-                                                2._wp * q_prim_vf(E_idx+i)%sf(j, k, l-2+q)) / Res(1, i) + mu_R(q)
-                                    end do
-                                end do
-                            else
-                                !$acc loop seq
-                                do q = -3, 2
-                                    mu_L(q) = 1._wp / Res(1, 1) 
-                                    mu_R(q) = 1._wp / Res(1, 1) 
-                                end do
-                            end if
                             if(viscous) then
+
+                                if(num_fluids > 1) then 
+                                    !$acc loop seq
+                                    do q = -3, 2 
+                                        mu_L(q) = 0._wp
+                                        mu_R(q) = 0._wp
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1+q) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k, l+q) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1+q) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2+q) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k, l+3+q)) / Res(1, i) + mu_L(q)
+
+                                            mu_R(q) = (1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2+q) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1+q) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k, l+q) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1+q) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k, l-2+q)) / Res(1, i) + mu_R(q)
+                                        end do
+
+                                        mu_L(q) = 1._wp / Res(1, num_fluids) + mu_L(q)
+                                        mu_R(q) = 1._wp / Res(1, num_fluids) + mu_R(q)
+
+                                        !$acc loop seq 
+                                        do i = 1, num_fluids - 1
+                                            mu_L(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1+q) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k, l+q) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1+q) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2+q) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k, l+3+q)) / Res(1, num_fluids) + mu_L(q)
+
+                                            mu_R(q) = -(1._wp/60._wp) * (-3._wp * q_prim_vf(E_idx+i)%sf(j, k, l+2+q) + &
+                                                    27._wp * q_prim_vf(E_idx+i)%sf(j, k, l+1+q) + &
+                                                    47._wp * q_prim_vf(E_idx+i)%sf(j, k, l+q) -   &
+                                                    13._wp * q_prim_vf(E_idx+i)%sf(j, k, l-1+q) + &
+                                                    2._wp * q_prim_vf(E_idx+i)%sf(j, k, l-2+q)) / Res(1, num_fluids) + mu_R(q)
+                                        end do
+                                    end do
+                                else
+                                    !$acc loop seq
+                                    do q = -3, 2
+                                        mu_L(q) = 1._wp / Res(1, 1) 
+                                        mu_R(q) = 1._wp / Res(1, 1) 
+                                    end do
+                                end if
 
                                 !$acc atomic
                                 rhs_vf(momxb)%sf(j,k,l+2) = rhs_vf(momxb)%sf(j,k,l+2) - 0.5_wp*mu_L(1)*((-3._wp/60._wp)*(dvel1+dvel2))*(1._wp/dz(l+2))
@@ -3802,7 +3915,7 @@ contains
 
                             if(num_fluids > 1) then 
                                 !$acc loop seq
-                                do i = 1, num_fluids
+                                do i = 1, num_fluids - 1
                                     !$acc atomic
                                     rhs_vf(advxb+i-1)%sf(j,k,l+1) = rhs_vf(advxb+i-1)%sf(j,k,l+1) + &
                                         (0.5_wp * (alpha_R(i) * &
@@ -3896,7 +4009,7 @@ contains
         do l = idwbuff(3)%beg, idwbuff(3)%end
            do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
-                    do i = 1, sys_size
+                    do i = 1, vec_size
                         rhs_vf(i)%sf(j,k,l) = 0._wp 
                     end do
                 end do
@@ -3909,7 +4022,7 @@ contains
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         rho_igr(j,k,l) = 0._wp
-                        do i = 1, num_fluids
+                        do i = 1, num_fluids 
                             rho_igr(j,k,l) = rho_igr(j,k,l) + q_prim_vf(contxb + i - 1)%sf(j,k,l)
                         end do
                     end do

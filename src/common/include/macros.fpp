@@ -45,6 +45,29 @@
 #endif
 #:enddef
 
+#:def ACC_SETUP_VFs_IGR(*args)
+#ifdef _CRAYFTN
+    block
+        integer :: macros_setup_vfs_i
+
+        @:LOG({'@:ACC_SETUP_VFs(${', '.join(args)}$)'})
+
+        #:for arg in args
+            !$acc enter data copyin(${arg}$)
+            !$acc enter data copyin(${arg}$%vf)
+            if (allocated(${arg}$%vf)) then
+                do macros_setup_vfs_i = lbound(${arg}$%vf, 1), ubound(${arg}$%vf, 1) - 1
+                    if (associated(${arg}$%vf(macros_setup_vfs_i)%sf)) then
+                        !$acc enter data copyin(${arg}$%vf(macros_setup_vfs_i))
+                        !$acc enter data create(${arg}$%vf(macros_setup_vfs_i)%sf)
+                    end if
+                end do
+            end if
+        #:endfor
+    end block
+#endif
+#:enddef
+
 #:def ACC_SETUP_SFs(*args)
 #ifdef _CRAYFTN
     block

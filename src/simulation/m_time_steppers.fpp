@@ -102,14 +102,28 @@ contains
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
         end do
 
-        do i = 1, num_ts
-            do j = 1, sys_size
-                @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end))
+        if(igr) then 
+            do i = 1, num_ts
+                do j = 1, vec_size
+                    @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+                end do
+                @:ACC_SETUP_VFs_IGR(q_cons_ts(i))
+                allocate(q_cons_ts(i)%vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
             end do
-            @:ACC_SETUP_VFs(q_cons_ts(i))
-        end do
+        else 
+            do i = 1, num_ts
+                do j = 1, sys_size 
+                    @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+                end do
+                @:ACC_SETUP_VFs(q_cons_ts(i))
+            end do
+        end if
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -289,16 +303,18 @@ contains
             @:ALLOCATE(rhs_vf(1:sys_size))
 
             if(.not. igr) then 
-                do i = 1, sys_size
+                do i = 1, sys_size 
                     @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
                     @:ACC_SETUP_SFs(rhs_vf(i))
                 end do
             else 
-                do i = 1, sys_size
+                do i = 1, vec_size
                     @:ALLOCATE(rhs_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end &
                     , idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(rhs_vf(i))
                 end do
+                allocate(rhs_vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end &
+                    , idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             end if
         end if
 
@@ -379,7 +395,7 @@ contains
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, vec_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -488,7 +504,7 @@ contains
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, vec_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -563,7 +579,7 @@ contains
         end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
-        do i = 1, sys_size
+        do i = 1, vec_size
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -648,7 +664,6 @@ contains
         real(wp) :: start, finish
 
         ! Stage 1 of 3
-
         if (.not. adap_dt) then
             call cpu_time(start)
             call nvtxStartRange("TIMESTEP")
@@ -683,7 +698,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    do i = 1, sys_size
+                    do i = 1, vec_size
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
                             + dt*rhs_vf(i)%sf(j, k, l)
@@ -758,7 +773,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    do i = 1, sys_size
+                    do i = 1, vec_size
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
@@ -829,12 +844,12 @@ contains
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
             call s_update_lagrange_tdv_rk(stage=3)
         end if
-
+        
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    do i = 1, sys_size
+                    do i = 1, vec_size
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
@@ -1240,7 +1255,7 @@ contains
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
 
-            do j = 1, sys_size
+            do j = 1, vec_size
                 @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
             end do
 
@@ -1305,7 +1320,7 @@ contains
             @:DEALLOCATE(rhs_ts_rkck)
         else
             ! Deallocating the cell-average RHS variables
-            do i = 1, sys_size
+            do i = 1, vec_size
                 @:DEALLOCATE(rhs_vf(i)%sf)
             end do
 

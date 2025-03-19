@@ -1387,7 +1387,7 @@ contains
 
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
-        do i = 1, sys_size
+        do i = 1, vec_size
             !$acc update host(q_cons_ts(1)%vf(i)%sf)
             do l = 0, p
                 do k = 0, n
@@ -1400,6 +1400,21 @@ contains
                 end do
             end do
         end do
+
+        if(igr) then 
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_ts(1)%vf(sys_size)%sf(j,k,l) = 1._wp
+                        if(num_fluids > 1) then 
+                            do i = 1, num_fluids - 1
+                                q_cons_ts(1)%vf(sys_size)%sf(j,k,l) = q_cons_ts(1)%vf(sys_size)%sf(j,k,l)  - q_cons_ts(1)%vf(E_idx+i)%sf(j,k,l)
+                            end do
+                        end if
+                    end do
+                end do
+            end do
+        end if
 
         if (qbmm .and. .not. polytropic) then
             !$acc update host(pb_ts(1)%sf)
@@ -1519,8 +1534,8 @@ contains
         ! the modules. The preparations below DO DEPEND on the grid being complete.
         if (.not. igr) call s_initialize_weno_module()
         if(igr .or. riemann_solver == 4) then 
-		call s_initialize_igr_module()
-	end if
+		  call s_initialize_igr_module()
+        end if
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         print *, "[MEM-INST] After: s_initialize_weno_module"
