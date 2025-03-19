@@ -1625,7 +1625,7 @@ contains
     subroutine s_initialize_gpu_vars
         integer :: i
         !Update GPU DATA
-        do i = 1, sys_size
+        do i = 1, vec_size
             !$acc update device(q_cons_ts(1)%vf(i)%sf)
         end do
 
