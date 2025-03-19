@@ -591,9 +591,9 @@ contains
 
         real(wp) :: rho_L, gamma_L, pi_inf_L, mu_L, a_L, cfl, pres_L, dvel1, dvel2, F_L,E_L,mu_R,pres_R,a_R,rho_R,gamma_R,pi_inf_R,E_R
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_L, alpha_R, alpha_rho_R
-        real(wp), dimension(num_dims,-3:3) :: vel_L, vel_R
+        real(wp), dimension(num_dims,-3:2) :: vel_L, vel_R
         real(wp), dimension(-2:3,3) :: rho_sf
-        real(wp), dimension(-5:6,3) :: vel_sf
+        real(wp), dimension(-5:5,3) :: vel_sf
         real(wp), dimension(-2:3) :: pres_sf
 
         if (idir == 1) then
@@ -638,7 +638,7 @@ contains
                             end if
 
                             !$acc loop seq 
-                            do i = -5, 6
+                            do i = -5, 5
                                 rho_L = 0._wp
                                 !$acc loop seq 
                                 do q = 1, num_fluids
@@ -674,7 +674,7 @@ contains
                             end do
 
                             !$acc loop seq 
-                            do q = -3, 3
+                            do q = -3, 2
                                 !$acc loop seq 
                                 do i = 1, num_dims
                                     vel_L(i,q) = (1._wp/60._wp) * (-3._wp * vel_sf(-1+q,i) + &
@@ -1146,7 +1146,7 @@ contains
                             end if
 
                             !$acc loop seq 
-                            do i = -5, 6
+                            do i = -5, 5
                                 rho_L = 0._wp
                                 !$acc loop seq 
                                 do q = 1, num_fluids
@@ -1194,7 +1194,7 @@ contains
                             end do
 
                             !$acc loop seq 
-                            do q = -3, 3
+                            do q = -3, 2
                                 !$acc loop seq 
                                 do i = 1, num_dims
                                     vel_L(i,q) = (1._wp/60._wp) * (-3._wp * vel_sf(-1+q,i) + &
@@ -1912,7 +1912,7 @@ contains
                             end if
 
                             !$acc loop seq 
-                            do i = -5, 6
+                            do i = -5, 5
                                 rho_L = 0._wp
                                 !$acc loop seq 
                                 do q = 1, num_fluids
@@ -1948,7 +1948,7 @@ contains
                             end do
 
                             !$acc loop seq 
-                            do q = -3, 3
+                            do q = -3, 2
                                 !$acc loop seq 
                                 do i = 1, num_dims
                                     vel_L(i,q) = (1._wp/60._wp) * (-3._wp * vel_sf(-1+q,i) + &
@@ -2428,7 +2428,7 @@ contains
                             end if
 
                             !$acc loop seq 
-                            do i = -5, 6
+                            do i = -5, 5
                                 rho_L = 0._wp
                                 !$acc loop seq 
                                 do q = 1, num_fluids
@@ -2475,7 +2475,7 @@ contains
                             end do
 
                             !$acc loop seq 
-                            do q = -3, 3
+                            do q = -3, 2
                                 !$acc loop seq 
                                 do i = 1, num_dims
                                     vel_L(i,q) = (1._wp/60._wp) * (-3._wp * vel_sf(-1+q,i) + &
@@ -3180,7 +3180,7 @@ contains
                             end if
 
                             !$acc loop seq 
-                            do i = -5, 6
+                            do i = -5, 5
                                 rho_L = 0._wp
                                 !$acc loop seq 
                                 do q = 1, num_fluids
@@ -3227,7 +3227,7 @@ contains
                             end do
 
                             !$acc loop seq 
-                            do q = -3, 3
+                            do q = -3, 2
                                 !$acc loop seq 
                                 do i = 1, num_dims
                                     vel_L(i,q) = (1._wp/60._wp) * (-3._wp * vel_sf(-1+q,i) + &
