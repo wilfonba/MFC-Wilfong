@@ -81,6 +81,11 @@ else
     module purge > /dev/null 2>&1
 fi
 
+# FIXME - for Frontier, load Steve's private CCE install
+if [ "$u_c" == 'f' ]; then
+    module use /ccs/home/sabbott/soft/modulefiles/
+fi
+
 ELEMENTS="$(__extract "$u_c-all") $(__extract "$u_c-$cg")"
 MODULES=`echo "$ELEMENTS" | tr ' ' '\n' | grep -v = | xargs`
 VARIABLES=`echo "$ELEMENTS" | tr ' ' '\n' | grep = | xargs`
