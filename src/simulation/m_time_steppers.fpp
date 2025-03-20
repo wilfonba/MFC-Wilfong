@@ -149,7 +149,7 @@ contains
         ! Allocating the cell-average primitive variables
         @:ALLOCATE(q_prim_vf(1:sys_size))
 
-        if(.not. igr) then 
+        if(.not. igr) then
             do i = 1, adv_idx%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                     idwbuff(2)%beg:idwbuff(2)%end, &
@@ -368,9 +368,9 @@ contains
 #endif
 
         if (run_time_info) then
-            if(igr) then 
+            if(igr) then
                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else 
+            else
                 call s_write_run_time_information(q_prim_vf, t_step)
             end if
         end if
@@ -481,9 +481,9 @@ contains
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (run_time_info) then
-            if(igr) then 
+            if(igr) then
                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else 
+            else
                 call s_write_run_time_information(q_prim_vf, t_step)
             end if
         end if
@@ -672,9 +672,9 @@ contains
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
         if (run_time_info) then
-            if(igr) then 
+            if(igr) then
                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else 
+            else
                 call s_write_run_time_information(q_prim_vf, t_step)
             end if
         end if
@@ -978,37 +978,60 @@ contains
 
     end subroutine s_adaptive_dt_bubble
 
-    subroutine s_compute_dt()
+    subroutine s_compute_dt(q_prim_vf)
 
+        type(scalar_field), dimension(sys_size) :: q_prim_vf
         real(wp) :: rho        !< Cell-avg. density
         real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
-        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(wp), dimension(num_fluids) :: alpha, alpha_rho, Gs      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(wp) :: c          !< Cell-avg. sound speed
         real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp) :: qv, E, G
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
-        type(vector_field) :: gm_alpha_qp
 
         real(wp) :: dt_local
-        integer :: j, k, l !< Generic loop iterators
+        integer :: i, j, k, l !< Generic loop iterators
 
-        call s_convert_conservative_to_primitive_variables( &
-            q_cons_ts(1)%vf, &
-            q_T_sf, &
-            q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
-
-        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re)
+        !$acc parallel loop collapse(3) gang vector default(present) private(vel, alpha, Re, alpha_rho, Gs)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
 
-                    ! Compute mixture sound speed
+                    !$acc loop seq
+                    do i = 1, num_fluids
+                        alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
+                        alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                    end do
+
+                    if (elasticity) then
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
+                                                                        alpha_rho, Re, j, k, l, G, Gs)
+                    elseif (bubbles_euler) then
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
+                    else
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, j, k, l)
+                    end if
+
+                    !$acc loop seq
+                    do i = 1, num_dims
+                        vel(i) = q_prim_vf(contxe + i)%sf(j, k, l) / rho
+                    end do
+
+                    vel_sum = 0._wp
+                    !$acc loop seq
+                    do i = 1, num_dims
+                        vel_sum = vel_sum + vel(i)**2._wp
+                    end do
+
+                    E = q_prim_vf(E_idx)%sf(j, k, l)
+                    pres = (E - pi_inf - qv - 5e-1_wp*rho*vel_sum)/gamma
+
+                    H = (E + pres)/rho
+
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
 
                     call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
@@ -1238,9 +1261,9 @@ contains
         end if
 
         if (run_time_info) then
-            if(igr) then 
+            if(igr) then
                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else 
+            else
                 call s_write_run_time_information(q_prim_vf, t_step)
             end if
         end if
@@ -1276,7 +1299,7 @@ contains
             @:DEALLOCATE(q_prim_ts)
         end if
 
-        if(.not. igr) then 
+        if(.not. igr) then
             ! Deallocating the cell-average primitive variables
             do i = 1, adv_idx%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
@@ -1334,4 +1357,6 @@ contains
 
     end subroutine s_finalize_time_steppers_module
 
+
 end module m_time_steppers
+

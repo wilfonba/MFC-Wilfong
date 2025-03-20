@@ -214,7 +214,7 @@ contains
 
         real(wp) :: icfl_dt, vcfl_dt
         real(wp) :: fltr_dtheta   !<
-             !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
+         !! Modified dtheta accounting for Fourier filtering in azimuthal direction.
 
         integer :: Nfq
 

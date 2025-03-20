@@ -1222,6 +1222,7 @@ contains
     end subroutine s_initialize_internal_energy_equations
 
     subroutine s_perform_time_step(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: time_avg, time_final
         real(wp), intent(inout) :: io_time_avg, io_time_final
@@ -1231,13 +1232,12 @@ contains
         real(wp), intent(inout) :: start, finish
         integer, intent(inout) :: nt
 
-
         integer :: i
 
         if (cfl_dt) then
-            if (cfl_const_dt .and. t_step == 0 .and. .not. rkck_adap_dt) call s_compute_dt()
 
-            if (cfl_adap_dt .and. .not. rkck_adap_dt) call s_compute_dt()
+            if (cfl_const_dt .and. t_step == 0 .and. .not. rkck_adap_dt) call s_compute_dt(q_cons_ts(1)%vf)
+            if (cfl_adap_dt .and. .not. rkck_adap_dt) call s_compute_dt(q_cons_ts(1)%vf)
 
             if (t_step == 0) dt_init = dt
 
@@ -1533,8 +1533,8 @@ contains
         ! and/or execution of any other tasks that are needed to properly configure
         ! the modules. The preparations below DO DEPEND on the grid being complete.
         if (.not. igr) call s_initialize_weno_module()
-        if(igr .or. riemann_solver == 4) then 
-		  call s_initialize_igr_module()
+        if(igr .or. riemann_solver == 4) then
+            call s_initialize_igr_module()
         end if
 
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
@@ -1651,7 +1651,7 @@ contains
         !$acc update device(bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out)
         !$acc update device(bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out)
 
-        !$acc update device(alf_factor)
+        !$acc update device(alf_factor, igr)
 
         !$acc update device(relax, relax_model)
         if (relax) then

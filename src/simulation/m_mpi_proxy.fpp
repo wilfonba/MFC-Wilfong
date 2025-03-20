@@ -2165,6 +2165,8 @@ contains
         integer :: i, j, k, l, r, q
         real(wp), pointer :: p_send, p_recv
 
+#ifdef MFC_MPI
+
         if(mpi_dir == 1) then
             if(pbc_loc == -1) then
 
@@ -2743,6 +2745,8 @@ contains
                 end do
             end if
         end if
+
+#endif
 
     end subroutine s_mpi_sendrecv_F_igr
 
