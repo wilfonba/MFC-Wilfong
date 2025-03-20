@@ -582,8 +582,8 @@ contains
             do k = 0, p
                 do j = 1, sys_size
                     do i = 0, m
-                        bc_buffers(2,-1)%sf(i,j,k) = q_prim_vf(j)%sf(i,-1,k)
-                        bc_buffers(2,1)%sf(i,j,k) = q_prim_vf(j)%sf(i,n+1,k)
+                        bc_buffers(2,-1)%sf(i,j,k) = q_prim_vf(j)%sf(i,0,k)
+                        bc_buffers(2,1)%sf(i,j,k) = q_prim_vf(j)%sf(i,n,k)
                     end do
                 end do
             end do
@@ -592,8 +592,8 @@ contains
                 do k = 1, sys_size
                     do j = 0, n
                         do i = 0, m
-                            bc_buffers(3,-1)%sf(i,j,k) = q_prim_vf(k)%sf(i,j,-1)
-                            bc_buffers(3,1)%sf(i,j,k) = q_prim_vf(k)%sf(i,j,p+1)
+                            bc_buffers(3,-1)%sf(i,j,k) = q_prim_vf(k)%sf(i,j,0)
+                            bc_buffers(3,1)%sf(i,j,k) = q_prim_vf(k)%sf(i,j,p)
                         end do
                     end do
                 end do

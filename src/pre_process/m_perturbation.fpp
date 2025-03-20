@@ -664,7 +664,7 @@ contains
                                     q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(m - (j - 1),k,l)
                                 end do
                             end do
-                        elseif (bc_type(1,1)%sf(0,k,l) >= -16) then
+                        elseif (bc_type(1,1)%sf(0,k,l) >= -17) then
                              do j = 1, buff_size
                                 do i = 1, sys_size
                                     q_prim_vf(i)%sf(m+j, k, l) = q_prim_vf(i)%sf(m,k,l)
@@ -720,7 +720,7 @@ contains
                                     q_prim_vf(i)%sf(j,n+k,l) = q_prim_vf(i)%sf(j,n - (k-1),l)
                                 end do
                             end do
-                        elseif (bc_type(2,1)%sf(j,0,l) >= -16) then
+                        elseif (bc_type(2,1)%sf(j,0,l) >= -17) then
                             do k = 1, buff_size
                                 do i = 1, sys_size
                                     q_prim_vf(i)%sf(j,n+k,l) = q_prim_vf(i)%sf(j,n,l)
@@ -749,7 +749,7 @@ contains
                                         q_prim_vf(i)%sf(j,k,-l) = q_prim_vf(i)%sf(j,k,l-1)
                                     end do
                                 end do
-                            elseif (bc_type(3,-1)%sf(j,k,0) >= -16) then
+                            elseif (bc_type(3,-1)%sf(j,k,0) >= -17) then
                                 do l = 1, buff_size
                                     do i = 1, sys_size
                                         q_prim_vf(i)%sf(j,k,-l) = q_prim_vf(i)%sf(j,k,0)
@@ -777,7 +777,7 @@ contains
                                         q_prim_vf(i)%sf(j,k,p+l) = q_prim_vf(i)%sf(j,k,p - (l-1))
                                     end do
                                 end do
-                            elseif (bc_type(3,1)%sf(j,k,0) >= -16) then
+                            elseif (bc_type(3,1)%sf(j,k,0) >= -17) then
                                 do l = 1, buff_size
                                     do i = 1, sys_size
                                         q_prim_vf(i)%sf(j,k,p+l) = q_prim_vf(i)%sf(j,k,p)
