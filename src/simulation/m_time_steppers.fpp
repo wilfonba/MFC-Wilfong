@@ -1004,8 +1004,17 @@ contains
                     !$acc loop seq
                     do i = 1, num_fluids
                         alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                        alpha(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
                     end do
+
+                    if(num_fluids > 1) then 
+                        !$acc loop seq
+                        do i = 1, num_fluids - 1
+                            alpha(i) = q_prim_vf(E_idx+i)%sf(j, k, l)
+                        end do
+                        alpha(num_fluids) = 1._wp - sum(alpha(1:num_fluids-1))
+                    else
+                        alpha(1) = 1._wp
+                    end if
 
                     if (elasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
