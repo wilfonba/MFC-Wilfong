@@ -60,7 +60,7 @@ print(
             "wave_speeds": 1,
             "avg_state": 2,
             "igr": "T",
-            "alf_igr": 10,
+            "alf_factor": 10,
             "elliptic_smoothing": "T",
             "elliptic_smoothing_iters": 25,
             "bc_x%beg": -3,

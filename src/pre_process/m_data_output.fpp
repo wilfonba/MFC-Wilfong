@@ -232,7 +232,7 @@ contains
                        //'.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
                   STATUS=status)
-            write (1) q_cons_vf(i)%sf
+            write (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
             close (1)
         end do
 

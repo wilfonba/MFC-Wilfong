@@ -79,8 +79,12 @@ contains
         allocate (q_cons_vf(1:sys_size))
 
         do i = 1, sys_size
-            allocate (q_prim_vf(i)%sf(-buff_size:m+buff_size, -buff_size:n + buff_size, -buff_size:p + buff_size))
-            allocate (q_cons_vf(i)%sf(-buff_size:m+buff_size, -buff_size:n + buff_size, -buff_size:p + buff_size))
+            allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (q_cons_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         if (chemistry) then
@@ -100,6 +104,7 @@ contains
             allocate (pb%sf(0:m, &
                             0:n, &
                             0:p, 1:nnode, 1:nb))
+            print*, m, n, p
             allocate (mv%sf(0:m, &
                             0:n, &
                             0:p, 1:nnode, 1:nb))
@@ -174,7 +179,7 @@ contains
         character(len=10) :: iStr
 
         ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up

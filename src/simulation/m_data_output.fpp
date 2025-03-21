@@ -295,7 +295,11 @@ contains
                         end do
                         alpha(num_fluids) = 1._wp - sum(alpha(1:num_fluids-1))
                     else
-                        alpha(1) = 1._wp
+                        if (bubbles_euler) then
+                            alpha(1) = q_prim_vf(advxb)%sf(j,k,l) 
+                        else
+                            alpha(1) = 1._wp
+                        end if
                     end if
 
                     if (elasticity) then

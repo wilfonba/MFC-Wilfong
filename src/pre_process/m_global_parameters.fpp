@@ -839,8 +839,13 @@ contains
         idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
         idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
 
-        ! There is no buffer region in pre_process.
-        idwbuff(1) = idwint(1); idwbuff(2) = idwint(2); idwbuff(3) = idwint(3)
+        idwbuff(1)%beg = -buff_size
+        if (num_dims > 1) then; idwbuff(2)%beg = -buff_size; else; idwbuff(2)%beg = 0; end if
+        if (num_dims > 2) then; idwbuff(3)%beg = -buff_size; else; idwbuff(3)%beg = 0; end if
+
+        idwbuff(1)%end = idwint(1)%end - idwbuff(1)%beg
+        idwbuff(2)%end = idwint(2)%end - idwbuff(2)%beg
+        idwbuff(3)%end = idwint(3)%end - idwbuff(3)%beg
 
 #ifdef MFC_MPI
 
