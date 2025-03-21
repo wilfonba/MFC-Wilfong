@@ -3,7 +3,7 @@ import math
 import json
 import argparse
 
-parser = argparse.ArgumentParser(prog="nD_perfect_reactor", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser = argparse.ArgumentParser(prog="3D IGR Performance Test", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument(
     "--mfc",
@@ -59,7 +59,7 @@ case = {
         "dt": dt,
         "t_step_start": 0,
         "t_step_stop": args.nt,
-        "t_step_save": (args.nt/args.ns),
+        "t_step_save": int(args.nt/args.ns),
 
         # Simulation Algorithm Parameters
         "num_patches": 2,
@@ -94,7 +94,6 @@ case = {
 
         # Formatted Database Files Structure Parameters
         "format": 1,
-        "precision": 1,
         "prim_vars_wrt": "T",
         "parallel_io": "T",
 
@@ -116,7 +115,7 @@ case = {
         "patch_icpp(1)%alpha(2)": 1-eps,
 
         # Patch 2: Shocked state
-        "patch_icpp(2)%geometry": 10,
+        "patch_icpp(2)%geometry": 8,
         "patch_icpp(2)%alter_patch(1)": "T",
         "patch_icpp(2)%smoothen": "T",
         "patch_icpp(2)%smooth_patch_id": 1,
@@ -142,17 +141,15 @@ if args.dim == 1:
         {
         "patch_bc(1)%dir": 1,
         "patch_bc(1)%loc": -1,
-        "patch_bc(1)%geometry": 3,
+        "patch_bc(1)%geometry": 2,
         "patch_bc(1)%type": -17,
         "patch_bc(1)%centroid(2)": 4*leng,
         "patch_bc(1)%centroid(3)": 4*leng,
-        "patch_bc(1)%length(2)": 1.5*leng,
-        "patch_bc(1)%length(3)": 100*leng,
+        "patch_bc(1)%radius": 1.5*leng/2,
 
         "patch_icpp(2)%x_centroid": 0.0,
         "patch_icpp(2)%y_centroid": 4*leng,
-        "patch_icpp(2)%z_centroid": 0.0,
-        "patch_icpp(2)%length_z": 100*leng,
+        "patch_icpp(2)%z_centroid": 4*leng,
         "patch_icpp(2)%radius": leng/2,
         "patch_icpp(2)%vel(1)": velS,
         "patch_icpp(2)%vel(2)": 0.0e00,
@@ -164,17 +161,15 @@ elif args.dim == 2:
         {
         "patch_bc(1)%dir": 2,
         "patch_bc(1)%loc": -1,
-        "patch_bc(1)%geometry": 3,
+        "patch_bc(1)%geometry": 2,
         "patch_bc(1)%type": -17,
         "patch_bc(1)%centroid(1)": 4*leng,
         "patch_bc(1)%centroid(3)": 4*leng,
-        "patch_bc(1)%length(1)": 100*leng,
-        "patch_bc(1)%length(3)": 1.5*leng,
+        "patch_bc(1)%radius": 1.5*leng/2,
 
         "patch_icpp(2)%x_centroid": 4*leng,
         "patch_icpp(2)%y_centroid": 0,
         "patch_icpp(2)%z_centroid": 4*leng,
-        "patch_icpp(2)%length_x": 100*leng,
         "patch_icpp(2)%radius": leng/2,
         "patch_icpp(2)%vel(1)": 0.0e00,
         "patch_icpp(2)%vel(2)": velS,
@@ -184,25 +179,32 @@ elif args.dim == 2:
 elif args.dim == 3:
     case.update(
         {
-        "patch_bc(1)%dir": 3,
+        "patch_bc(1)%dir": 2,
         "patch_bc(1)%loc": -1,
-        "patch_bc(1)%geometry": 3,
+        "patch_bc(1)%geometry": 2,
         "patch_bc(1)%type": -17,
         "patch_bc(1)%centroid(1)": 4*leng,
         "patch_bc(1)%centroid(2)": 4*leng,
-        "patch_bc(1)%length(1)": 1.5*leng,
-        "patch_bc(1)%length(2)": 100*leng,
+        "patch_bc(1)%radius": 1.5*leng/2,
 
         "patch_icpp(2)%x_centroid": 4*leng,
         "patch_icpp(2)%y_centroid": 4*leng,
         "patch_icpp(2)%z_centroid": 0.0,
-        "patch_icpp(2)%length_y": 100*leng,
         "patch_icpp(2)%radius": leng/2,
         "patch_icpp(2)%vel(1)": 0.0e00,
         "patch_icpp(2)%vel(2)": 0.0e00,
         "patch_icpp(2)%vel(3)": velS,
         }
     )
+
+if 'single' in args.mfc:
+    if args.mfc['single']:
+        case.update({"precision": 1})
+    else:
+        case.update({"precision": 2})
+else:
+    case.update({"precision": 2})
+
 
 if __name__ == "__main__":
     print(json.dumps(case,indent=4))
