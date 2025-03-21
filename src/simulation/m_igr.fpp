@@ -22,8 +22,8 @@ module m_igr
         s_igr_flux_add
 
     real(wp), allocatable, dimension(:, :, :) :: fd_coeff
-    real(wp), allocatable, dimension(:, :, :) :: jac,jac_rhs,rho_igr
-    !$acc declare create(fd_coeff,jac, jac_rhs,rho_igr)
+    real(wp), allocatable, dimension(:, :, :) :: jac,jac_rhs
+    !$acc declare create(fd_coeff,jac, jac_rhs)
 
     real(wp) :: alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze
     !$acc declare create(alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze)
@@ -55,11 +55,6 @@ contains
         end if
 
         if(igr) then 
-            if(num_fluids > 1) then 
-                 @:ALLOCATE(rho_igr(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end))
-            end if
             #:for VAR in [ 'jac','jac_rhs','fd_coeff']
                 @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
                              idwbuff(2)%beg:idwbuff(2)%end, &
@@ -89,116 +84,77 @@ contains
 
         num_iters = num_igr_iters
 
-        if(num_fluids > 1) then 
-            !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        rho_lx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j-1,k,l))
-                        rho_rx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j+1,k,l))
-                        rho_ly = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k-1,l))
-                        rho_ry = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k+1,l))
+        !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rho_lx = 0._wp 
+                    rho_rx = 0._wp 
+                    rho_ly = 0._wp 
+                    rho_ry = 0._wp
+                    rho_lz = 0._wp 
+                    rho_rz = 0._wp 
+                    fd_coeff(j,k,l) = 0._wp 
 
-                        if(p > 0) then
-                            rho_lz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l-1))
-                            rho_rz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l+1))
-                        end if
-
-                        fd_coeff(j,k,l) = (1._wp / rho_igr(j,k,l))
-
-                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (rho_lx + rho_rx) +  (1._wp / dy(k)**2._wp) *(rho_ly + rho_ry) )
-
+                    !$acc loop seq
+                    do i = 1, num_fluids
+                        rho_lx = rho_lx + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j-1,k,l)) / 2._wp
+                        rho_rx = rho_rx + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j+1,k,l)) / 2._wp
+                        rho_ly = rho_ly + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k-1,l)) / 2._wp
+                        rho_ry = rho_ry + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k+1,l)) / 2._wp
                         if(p > 0) then 
-                            fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr* (1._wp / dz(l)**2._wp) * (rho_lz + rho_rz)
+                            rho_lz = rho_lz + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k,l-1)) / 2._wp
+                            rho_rz = rho_rz + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k,l+1)) / 2._wp
                         end if
+                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + q_prim_vf(i)%sf(j,k,l)
                     end do 
+
+                    fd_coeff(j,k,l) = 1._wp / fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (1._wp/rho_lx + 1._wp/rho_rx) + (1._wp / dy(k)**2._wp) *(1._wp/rho_ly + 1._wp/rho_ry) )
+
+                    if(p > 0) then 
+                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr* (1._wp / dz(l)**2._wp) * (1._wp/rho_lz + 1._wp /rho_rz)
+                    end if
                 end do 
-            end do
-        else 
-            !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        rho_lx = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j-1,k,l))
-                        rho_rx = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j+1,k,l))
-                        rho_ly = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k-1,l))
-                        rho_ry = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k+1,l))
-
-                        if(p > 0) then
-                            rho_lz = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k,l-1))
-                            rho_rz = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k,l+1))
-                        end if
-
-                        fd_coeff(j,k,l) = (1._wp / q_prim_vf(1)%sf(j,k,l))
-
-                        fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr * ( (1._wp / dx(j)**2._wp) * (rho_lx + rho_rx) +  (1._wp / dy(k)**2._wp) *(rho_ly + rho_ry) )
-
-                        if(p > 0) then 
-                            fd_coeff(j,k,l) = fd_coeff(j,k,l) + alf_igr* (1._wp / dz(l)**2._wp) * (rho_lz + rho_rz)
-                        end if
-                    end do 
-                end do 
-            end do
-        end if
+            end do 
+        end do
 
         do q = 1, num_iters
-            if(num_fluids > 1) then 
-                !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rho_lx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j-1,k,l))
-                            rho_rx = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j+1,k,l))
-                            rho_ly = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k-1,l))
-                            rho_ry = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k+1,l))
+            !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rho_lx = 0._wp 
+                        rho_rx = 0._wp 
+                        rho_ly = 0._wp 
+                        rho_ry = 0._wp
+                        rho_lz = 0._wp 
+                        rho_rz = 0._wp 
 
-                            if(p > 0) then
-                                rho_lz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l-1))
-                                rho_rz = 0.5_wp *(1._wp / rho_igr(j,k,l) + 1._wp / rho_igr(j,k,l+1))
+                        !$acc loop seq
+                        do i = 1, num_fluids
+                            rho_lx = rho_lx + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j-1,k,l)) / 2._wp
+                            rho_rx = rho_rx + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j+1,k,l)) / 2._wp
+                            rho_ly = rho_ly + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k-1,l)) / 2._wp
+                            rho_ry = rho_ry + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k+1,l)) / 2._wp
+                            if(p > 0) then 
+                                rho_lz = rho_lz + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k,l-1)) / 2._wp
+                                rho_rz = rho_rz + (q_prim_vf(i)%sf(j,k,l) + q_prim_vf(i)%sf(j,k,l+1)) / 2._wp
                             end if
-
-                            if(p > 0) then
-                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
-                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) + &
-                                                        (1._wp / dz(l)**2._wp) * (rho_lz* jac(j,k,l-1) + rho_rz*jac(j,k,l+1)) ) + &
-                                                        jac_rhs(j,k,l) / fd_coeff(j, k, l)
-                           else 
-                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
-                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) ) + &
-                                                        jac_rhs(j,k,l) / fd_coeff(j, k, l)                              
-                           end if
                         end do
+
+                        if(p > 0) then
+                            jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * ( jac(j-1,k,l)/rho_lx + jac(j+1,k,l)/rho_rx) + &
+                                                    (1._wp / dy(k)**2._wp) * (jac(j,k-1,l)/rho_ly + jac(j,k+1,l)/rho_ry) + &
+                                                    (1._wp / dz(l)**2._wp) * (jac(j,k,l-1)/rho_lz + jac(j,k,l+1)/rho_rz) ) + &
+                                                    jac_rhs(j,k,l) / fd_coeff(j, k, l)
+                       else 
+                            jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * ( jac(j-1,k,l)/rho_lx + jac(j+1,k,l)/rho_rx) + &
+                                                    (1._wp / dy(k)**2._wp) * (jac(j,k-1,l)/rho_ly + jac(j,k+1,l)/rho_ry)) + &
+                                                    jac_rhs(j,k,l) / fd_coeff(j, k, l)                             
+                       end if
                     end do
                 end do
-            else 
-                !$acc parallel loop collapse(3) gang vector default(present) private(rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rho_lx = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j-1,k,l))
-                            rho_rx = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j+1,k,l))
-                            rho_ly = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k-1,l))
-                            rho_ry = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k+1,l))
-
-                            if(p > 0) then
-                                rho_lz = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k,l-1))
-                                rho_rz = 0.5_wp *(1._wp / q_prim_vf(1)%sf(j,k,l) + 1._wp / q_prim_vf(1)%sf(j,k,l+1))
-                            end if
-
-                            if(p > 0) then
-                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
-                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) + &
-                                                        (1._wp / dz(l)**2._wp) * (rho_lz* jac(j,k,l-1) + rho_rz*jac(j,k,l+1)) ) + &
-                                                        jac_rhs(j,k,l) / fd_coeff(j, k, l) 
-                           else 
-                                jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * (rho_lx* jac(j-1,k,l) + rho_rx*jac(j+1,k,l)) + &
-                                                        (1._wp / dy(k)**2._wp) * (rho_ly* jac(j,k-1,l) + rho_ry*jac(j,k+1,l)) ) + &
-                                                        jac_rhs(j,k,l) / fd_coeff(j, k, l)                               
-                           end if
-                        end do
-                    end do
-                end do
-            end if
+            end do
 
             if(bcxb >= -12) then
                 if(bcxb >= 0) then
@@ -402,7 +358,7 @@ contains
 
                     end if
                 end if
-            end if        
+            end if      
         end do
     end subroutine s_igr_jacobi_iteration
 
@@ -4015,20 +3971,6 @@ contains
                 end do
             end do
         end do
-
-        if(num_fluids > 1) then 
-            !$acc parallel loop collapse(3) gang vector default(present)
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        rho_igr(j,k,l) = 0._wp
-                        do i = 1, num_fluids 
-                            rho_igr(j,k,l) = rho_igr(j,k,l) + q_prim_vf(contxb + i - 1)%sf(j,k,l)
-                        end do
-                    end do
-                end do
-            end do
-        end if
 
     end subroutine s_initialize_igr
 
