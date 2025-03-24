@@ -2808,7 +2808,7 @@ contains
 
                                 !$acc loop seq 
                                 do q = -2, 2
-                                    !$acc atoz(l
+                                    !$acc atomic
                                     rhs_vf(momxb)%sf(j,k,l+q) = rhs_vf(momxb)%sf(j,k,l+q) + 0.5_wp*mu_L(q)*(coeff(-q)*(dvel1+dvel2))*(1._wp/dz(l+q))
                                     !$acc atomic
                                     rhs_vf(E_idx)%sf(j,k,l+q) = rhs_vf(E_idx)%sf(j,k,l+q) + 0.5_wp*mu_L(q)*(coeff(-q)*(dvel1+dvel2))*vel_R(1,q)*(1._wp/dz(l+q))
@@ -2857,7 +2857,7 @@ contains
 
                                 !$acc loop seq 
                                 do q = -2, 2
-                                    !$acc atoz(l
+                                    !$acc atomic
                                     rhs_vf(momxb+1)%sf(j,k,l+q) = rhs_vf(momxb+1)%sf(j,k,l+q) + 0.5_wp*mu_L(q)*(coeff(-q)*(dvel1+dvel2))*(1._wp/dz(l+q))
                                     !$acc atomic
                                     rhs_vf(E_idx)%sf(j,k,l+q) = rhs_vf(E_idx)%sf(j,k,l+q) + 0.5_wp*mu_L(q)*(coeff(-q)*(dvel1+dvel2))*vel_R(2,q)*(1._wp/dz(l+q))
@@ -2906,7 +2906,7 @@ contains
 
                                 !$acc loop seq 
                                 do q = -2, 2
-                                    !$acc atoz(l
+                                    !$acc atomic
                                     rhs_vf(momxb+2)%sf(j,k,l+q) = rhs_vf(momxb+2)%sf(j,k,l+q) + 0.5_wp*mu_L(q)*(coeff(-q)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*(1._wp/dz(l+q))
                                     !$acc atomic
                                     rhs_vf(E_idx)%sf(j,k,l+q) = rhs_vf(E_idx)%sf(j,k,l+q) + 0.5_wp*mu_L(q)*(coeff(-q)*(4_wp*dvel1-2_wp*dvel2)/3_wp)*vel_R(3,q)*(1._wp/dz(l+q))
@@ -2950,7 +2950,7 @@ contains
 
                                 !$acc loop seq 
                                 do q = -2, 2
-                                    !$acc atoz(l
+                                    !$acc atomic
                                     rhs_vf(momxb+2)%sf(j,k,l+q) = rhs_vf(momxb+2)%sf(j,k,l+q) + 0.5_wp*mu_L(q)*(coeff(-q)*(-2_wp*dvel2)/3_wp)*(1._wp/dz(l+q))
                                     !$acc atomic
                                     rhs_vf(E_idx)%sf(j,k,l+q) = rhs_vf(E_idx)%sf(j,k,l+q) + 0.5_wp*mu_L(q)*(coeff(-q)*(-2_wp*dvel2)/3_wp)*vel_R(3,q)*(1._wp/dz(l+q))
