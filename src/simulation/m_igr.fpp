@@ -21,9 +21,8 @@ module m_igr
         s_initialize_igr, &
         s_igr_flux_add
 
-    real(wp), allocatable, dimension(:, :, :) :: fd_coeff
     real(wp), allocatable, dimension(:, :, :) :: jac,jac_rhs
-    !$acc declare create(fd_coeff,jac, jac_rhs)
+    !$acc declare create(jac, jac_rhs)
 
     real(wp) :: alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze
     !$acc declare create(alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze)
@@ -58,7 +57,7 @@ contains
         end if
 
         if(igr) then 
-            #:for VAR in [ 'jac','jac_rhs','fd_coeff']
+            #:for VAR in [ 'jac','jac_rhs']
                 @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
                              idwbuff(2)%beg:idwbuff(2)%end, &
                              idwbuff(3)%beg:idwbuff(3)%end))
@@ -90,7 +89,7 @@ contains
             dimension(sys_size), &
             intent(inout) :: q_prim_vf
         real(wp) :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
-        real(wp) :: resid, f_coeff
+        real(wp) :: resid, fd_coeff
         integer :: num_iters, t_step
 
         num_iters = num_igr_iters
