@@ -573,7 +573,7 @@ contains
             do j = 0, n
                 do i = 1, sys_size
                     bc_buffers(1,-1)%sf(i,j,k) = q_prim_vf(i)%sf(0,j,k)
-                    bc_buffers(1,1)%sf(i,j,k) = q_prim_vf(i)%sf(m+1,j,k)
+                    bc_buffers(1,1)%sf(i,j,k) = q_prim_vf(i)%sf(m,j,k)
                 end do
             end do
         end do
