@@ -1401,21 +1401,6 @@ contains
             end do
         end do
 
-        if(igr) then 
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(sys_size)%sf(j,k,l) = 1._wp
-                        if(num_fluids > 1) then 
-                            do i = 1, num_fluids - 1
-                                q_cons_ts(1)%vf(sys_size)%sf(j,k,l) = q_cons_ts(1)%vf(sys_size)%sf(j,k,l)  - q_cons_ts(1)%vf(E_idx+i)%sf(j,k,l)
-                            end do
-                        end if
-                    end do
-                end do
-            end do
-        end if
-
         if (qbmm .and. .not. polytropic) then
             !$acc update host(pb_ts(1)%sf)
             !$acc update host(mv_ts(1)%sf)
