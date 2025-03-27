@@ -127,14 +127,14 @@ contains
                         end if
 
                         if(p > 0) then
-                            jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * ( jac(j-1,k,l)/rho_lx + jac(j+1,k,l)/rho_rx) + &
+                            jac(j, k, l) = (alf_igr / fd_coeff) * ( (1._wp / dx(j)**2._wp) * ( jac(j-1,k,l)/rho_lx + jac(j+1,k,l)/rho_rx) + &
                                                     (1._wp / dy(k)**2._wp) * (jac(j,k-1,l)/rho_ly + jac(j,k+1,l)/rho_ry) + &
                                                     (1._wp / dz(l)**2._wp) * (jac(j,k,l-1)/rho_lz + jac(j,k,l+1)/rho_rz) ) + &
-                                                    jac_rhs(j,k,l) / fd_coeff(j, k, l)
+                                                    jac_rhs(j,k,l) / fd_coeff
                        else 
-                            jac(j, k, l) = (alf_igr / fd_coeff(j,k,l)) * ( (1._wp / dx(j)**2._wp) * ( jac(j-1,k,l)/rho_lx + jac(j+1,k,l)/rho_rx) + &
+                            jac(j, k, l) = (alf_igr / fd_coeff) * ( (1._wp / dx(j)**2._wp) * ( jac(j-1,k,l)/rho_lx + jac(j+1,k,l)/rho_rx) + &
                                                     (1._wp / dy(k)**2._wp) * (jac(j,k-1,l)/rho_ly + jac(j,k+1,l)/rho_ry)) + &
-                                                    jac_rhs(j,k,l) / fd_coeff(j, k, l)                             
+                                                    jac_rhs(j,k,l) / fd_coeff                             
                        end if
                     end do
                 end do
