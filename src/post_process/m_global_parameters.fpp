@@ -302,6 +302,7 @@ module m_global_parameters
     !> @name Lagrangian bubbles
     !> @{
     logical :: bubbles_lagrange, rkck_adap_dt
+    logical :: igr
     !> @}
 
 contains
@@ -427,6 +428,8 @@ contains
         ! Lagrangian bubbles modeling
         bubbles_lagrange = .false.
         rkck_adap_dt = .false.
+
+        igr = .false.
 
         ! IBM
         num_ibs = dflt_int

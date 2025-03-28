@@ -94,7 +94,7 @@ contains
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, &
+            cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, igr, &
             sim_data, hyperelasticity
 
         ! Inquiring the status of the post_process.inp file

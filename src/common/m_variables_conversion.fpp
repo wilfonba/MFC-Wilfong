@@ -404,6 +404,14 @@ contains
             alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
         end do
 
+        if(igr) then 
+            if(num_fluids == 1) then 
+                alpha_K(num_fluids) = 1._wp
+            else 
+                alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids-1)) 
+            end if
+        end if
+
         if (mpp_lim) then
 
             do i = 1, num_fluids
