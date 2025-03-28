@@ -161,7 +161,7 @@ for p_id in range(1, 10+1):
     for real_attr in ["radius",  "radii", "epsilon", "beta", "normal", "alpha_rho",
                       'non_axis_sym', "normal", "smooth_coeff", "rho", "vel",
                       "alpha", "gamma", "pi_inf", "r0", "v0", "p0", "m0", "cv",
-                      "qv", "qvp"]:
+                      "qv", "qvp", "sigma"]:
         PRE_PROCESS[f"patch_icpp({p_id})%{real_attr}"] = ParamType.REAL
 
     for real_attr in range(2, 9+1):

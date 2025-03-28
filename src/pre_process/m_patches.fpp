@@ -30,7 +30,7 @@ module m_patches
 
     implicit none
 
-    private; 
+    private;
     public :: s_apply_domain_patches
 
     real(wp) :: x_centroid, y_centroid, z_centroid
@@ -112,6 +112,8 @@ contains
                 ! 3D STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_model(i, patch_id_fp, q_prim_vf)
+                elseif (patch_icpp(i)%geometry == 22) then
+                    call s_2D_gaussian_pulse(i, patch_id_fp, q_prim_vf)
                 end if
             end do
             !> @}
@@ -342,7 +344,7 @@ contains
             spiral_y_max = maxval((/f_r(th, 0.0_wp, mya)*sin(th), &
                                     f_r(th, thickness, mya)*sin(th)/))
 
-            do j = 0, n; do i = 0, m; 
+            do j = 0, n; do i = 0, m;
                     if ((x_cc(i) > spiral_x_min) .and. (x_cc(i) < spiral_x_max) .and. &
                         (y_cc(j) > spiral_y_min) .and. (y_cc(j) < spiral_y_max)) then
                         logic_grid(i, j, 0) = 1
@@ -2392,8 +2394,78 @@ contains
 
     end subroutine s_model
 
+    subroutine s_2D_gaussian_pulse(patch_id, patch_id_fp, q_prim_vf)
+
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        real(wp) :: sigma, radius, normalX, normalY, normalZ, pG
+        logical :: in_patch
+
+        integer :: i, j, k !< Generic loop iterators
+
+        ! Transferring the centroid information of the plane to be swept
+        x_centroid = patch_icpp(patch_id)%x_centroid
+        y_centroid = patch_icpp(patch_id)%y_centroid
+        z_centroid = patch_icpp(patch_id)%z_centroid
+        radius = patch_icpp(patch_id)%radius
+        normalX = patch_icpp(patch_id)%normal(1)
+        normalY = patch_icpp(patch_id)%normal(2)
+        normalZ = patch_icpp(patch_id)%normal(3)
+        smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+        sigma = patch_icpp(patch_id)%sigma
+
+        ! Initializing the pseudo volume fraction value to 1. The value will
+        ! be modified as the patch is laid out on the grid, but only in the
+        ! case that smearing of the sweep plane patch's boundary is enabled.
+        eta = 1._wp
+
+        ! Checking whether the region swept by the plane covers a particular
+        ! cell in the domain and verifying whether the current patch has the
+        ! permission to write to that cell. If both queries check out, the
+        ! primitive variables of the current patch are written to this cell.
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+
+                    if (grid_geometry == 3) then
+                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                    else
+                        cart_y = y_cc(j)
+                        cart_z = z_cc(k)
+                    end if
+
+                    in_patch = .false.
+
+                    if (.not. f_is_default(normalX) .and. &
+                        ((cart_y - y_centroid)**2._wp + (cart_z - z_centroid)**2._wp <= radius**2._wp)) then
+                        pG = x_centroid + normalX*exp(-((cart_y - y_centroid)**2._wp + (cart_z - z_centroid)**2._wp)/(sigma**2._wp))
+                        if (normalX > 0) then
+                            if (x_cc(i) < pG) in_patch = .true.
+                        else if (normalX < 0) then
+                            if (x_cc(i) > pG) in_patch = .true.
+                        end if
+                    end if
+
+                    if (in_patch) then
+
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, &
+                                                                eta, q_prim_vf, patch_id_fp)
+
+                        @:analytical()
+
+                        ! Updating the patch identities bookkeeping variable
+                        if (1._wp - eta < 1e-16_wp) patch_id_fp(i, j, k) = patch_id
+                    end if
+
+                end do
+            end do
+        end do
+
+    end subroutine s_2D_gaussian_pulse
+
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
-        !$acc routine seq
 
         real(wp), intent(in) :: cyl_y, cyl_z
 
@@ -2403,8 +2475,6 @@ contains
     end subroutine s_convert_cylindrical_to_cartesian_coord
 
     function f_convert_cyl_to_cart(cyl) result(cart)
-
-        !$acc routine seq
 
         t_vec3, intent(in) :: cyl
         t_vec3 :: cart
@@ -2416,7 +2486,6 @@ contains
     end function f_convert_cyl_to_cart
 
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
-        !$acc routine seq
 
         real(wp), intent(IN) :: cyl_x, cyl_y
 
@@ -2429,7 +2498,7 @@ contains
     !! @param offset Thickness
     !! @param a Starting position
     function f_r(myth, offset, a)
-        !$acc routine seq
+
         real(wp), intent(in) :: myth, offset, a
         real(wp) :: b
         real(wp) :: f_r

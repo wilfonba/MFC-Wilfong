@@ -91,6 +91,8 @@ contains
                     call s_check_2D_TaylorGreen_vortex_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_check_model_geometry(i)
+                elseif (patch_icpp(i)%geometry == 22) then
+                    print*, "2D gaussian pulse"
                 elseif (patch_icpp(i)%geometry == dflt_int) then
                     call s_prohibit_abort("Active patch undefined", "patch_icpp("//trim(iStr)//")%geometry must be set")
                 else

@@ -97,7 +97,7 @@ contains
             end if
             #:endfor
         end if
-        
+
         ! Patch is a vertical line at y_beg or y_end
         if (patch_bc(patch_id)%dir == 2) then
             x_centroid = patch_bc(patch_id)%centroid(1)
@@ -134,7 +134,7 @@ contains
             end if
             #:endfor
         end if
-        
+
 
     end subroutine s_line_segment_bc
 
@@ -180,7 +180,7 @@ contains
                 end do
             end if
             #:endfor
-        end if  
+        end if
         if (patch_bc(patch_id)%dir == 2) then
             x_centroid = patch_bc(patch_id)%centroid(1)
             z_centroid = patch_bc(patch_id)%centroid(3)
@@ -223,7 +223,7 @@ contains
             #:for BOUND, Z, LOC in [('beg', '-i', -1), ('end', 'p+i', 1)]
             if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_z%${BOUND}$ < 0) then
                 do k = 0, n
-                    do j = 0, m 
+                    do j = 0, m
                         if ((y_cc(k) - y_centroid)**2._wp +  &
                             (x_cc(j) - x_centroid)**2._wp <= radius**2._wp) then
                             bc_type(3,-1)%sf(j,k,0) = patch_bc(patch_id)%type
@@ -257,6 +257,7 @@ contains
 
         type(scalar_field), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
+        real(wp) :: S
 
         integer, intent(in) :: patch_id
         integer :: i, j, k, l
@@ -271,6 +272,7 @@ contains
 
             z_boundary%beg = z_centroid - 0.5_wp*length_z
             z_boundary%end = z_centroid + 0.5_wp*length_z
+
             ! Patch is a circle at x_beg and x_beg is a domain boundary
             #:for BOUND, X, LOC in [('beg', '-i', -1), ('end', 'm+i', 1)]
             if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
@@ -281,29 +283,28 @@ contains
                             z_boundary%beg <= z_cc(k) .and. &
                             z_boundary%end >= z_cc(k)) then
                             bc_type(1,-1)%sf(0,j,k) = patch_bc(patch_id)%type
-                            if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
-                                do i = 1, buff_size
-                                    ! Velocities
-                                    do l = 1, num_dims
-                                        q_prim_vf(momxb+l-1)%sf(${X}$,j,k) = patch_bc(patch_id)%vel(l)
-                                    end do
+                            s = exp(-(y_cc(j)**2._wp + z_cc(k)**2._wp)/(0.5**2._wp))
+                            !if (patch_bc(patch_id)%type == -17) then ! Dirichlet BC
+                                !do i = 1, buff_size
+                                    !q_prim_vf(momxb)%sf(${X}$,j,k) = (patch_bc(patch_id)%vel(1) - 0.0118)*S + 0.0118
+                                    !q_prim_vf(momxb+1)%sf(${X}$,j,k) = 0._wp
+                                    !q_prim_vf(momxe)%sf(${X}$,j,k) = 0._wp
 
-                                    ! Density and volume fraction
-                                    do l = 1, num_fluids
-                                        q_prim_vf(l)%sf(${X}$,j,k) = patch_bc(patch_id)%alpha_rho(l)
-                                        q_prim_vf(advxb+l-1)%sf(${X}$,j,k) = patch_bc(patch_id)%alpha(l)
-                                    end do
+                                    !q_prim_vf(advxb)%sf(${X}$,j,k) = patch_bc(patch_id)%alpha(1)*S
+                                    !q_prim_vf(contxb)%sf(${X}$,j,k) = q_prim_vf(advxb)%sf(${X}$,j,k)*((patch_bc(patch_id)%alpha_rho(1) - 1)*S + 1._wp)
 
-                                    ! Pressure
-                                    q_prim_vf(E_idx)%sf(${X}$,j,k) = patch_bc(patch_id)%pres
-                                end do
-                            end if
+                                    !q_prim_vf(advxb+1)%sf(${X}$,j,k) = 1 - q_prim_vf(advxb)%sf(${X}$,j,k)
+                                    !q_prim_vf(contxb+1)%sf(${X}$,j,k) = 1 - q_prim_vf(advxb)%sf(${X}$,j,k)
+
+                                    !q_prim_vf(E_idx)%sf(${X}$,j,k) = (patch_bc(patch_id)%pres - 1.5)*S + 1.5_wp
+                                !end do
+                            !end if
                         end if
                     end do
                 end do
             end if
             #:endfor
-        end if  
+        end if
         if (patch_bc(patch_id)%dir == 2) then
             x_centroid = patch_bc(patch_id)%centroid(1)
             z_centroid = patch_bc(patch_id)%centroid(3)
@@ -362,7 +363,7 @@ contains
             #:for BOUND, Z, LOC in [('beg', '-i', -1), ('end', 'p+i', 1)]
             if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_z%${BOUND}$ < 0) then
                 do k = 0, n
-                    do j = 0, m 
+                    do j = 0, m
                         if (x_boundary%beg <= x_cc(j) .and. &
                             x_boundary%end >= x_cc(j) .and. &
                             y_boundary%beg <= y_cc(k) .and. &

@@ -180,6 +180,8 @@ module m_derived_types
         real(wp) :: length_x, length_y, length_z !< Dimensions of the patch. x,y,z Lengths.
         real(wp) :: radius !< Dimensions of the patch. radius.
 
+        real(wp) :: sigma
+
         real(wp), dimension(3) :: radii !<
         !! Vector indicating the various radii for the elliptical and ellipsoidal
         !! patch geometries. It is specified through its x-, y-, and z-components
