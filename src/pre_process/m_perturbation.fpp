@@ -830,8 +830,6 @@ contains
 
         end do
 
-
-
     end subroutine s_elliptic_smoothing
 
 end module m_perturbation

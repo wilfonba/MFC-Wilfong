@@ -5,7 +5,57 @@
 
     real(wp) :: eps
 
-    eps = 1e-9_wp
+    ! Case 302 - Single M10 Jet
+    real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
+
+    ! Case 303 - 7 Jet
+    real(wp), dimension(0:6) :: r_arr, y_th_arr, z_th_arr
+
+    ! Case 303 - Additionfor three jet
+    real(wp) :: z_th2, r2, z_th3, r3, rcut, xcut
+    real(wp), dimension(0:n, 0:p) :: rcut_arr
+    integer :: l, q, s
+
+    eps = 1e-6_wp
+
+    y_th_arr(0) = 0._wp
+    y_th_arr(1) = 1.5_wp
+    y_th_arr(2) = -1.5_wp
+    y_th_arr(3) = 0.75_wp
+    y_th_arr(4) = 0.75_wp
+    y_th_arr(5) = -0.75_wp
+    y_th_arr(6) = -0.75_wp
+
+    z_th_arr(0) = 0._wp
+    z_th_arr(1) = 0._wp
+    z_th_arr(2) = 0._wp
+    z_th_arr(3) = 1.3_wp
+    z_th_arr(4) = -1.3_wp
+    z_th_arr(5) = 1.3_wp
+    z_th_arr(6) = -1.3_wp
+
+    ux_th = 10 !11.0*sqrt(1.4)
+    ux_am = 0.01*sqrt(1.4)
+    p_th = 2.8_wp
+    p_am = 0.4_wp
+    rho_th = 2._wp
+    rho_am = 1._wp
+    y_th = 0.05_wp
+    z_th = -0.05_wp
+    r_th = 0.25_wp
+    eps_smooth = 0.5_wp
+
+    do q = 0, p
+        do l = 0, n
+            rcut = 0._wp
+            do s = 0, 6
+                r = sqrt((y_cc(l) - y_th_arr(s))**2._wp + (z_cc(q) - z_th_arr(s))**2._wp)
+                rcut = rcut + f_cut_on(r - r_th,eps_smooth)
+            end do
+            rcut_arr(l,q) = rcut
+        end do
+    end do
+
 #:enddef
 
 #:def Hardcoded3D()
@@ -55,6 +105,120 @@
             q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
+
+    case (302) ! single Mach 10 jet
+
+        ux_th = 10 !10*sqrt(1.4)
+        ux_am = 0.0*sqrt(1.4)
+        p_th = 1._wp
+        p_am = 1._wp
+        rho_th = 2._wp
+        rho_am = 1._wp
+        y_th = 0._wp
+        z_th = 0._wp
+        r_th = 1._wp
+        eps_smooth = 0.72_wp
+
+        r = sqrt((y_cc(j) - y_th)**2._wp + (z_cc(k) - z_th)**2._wp)
+
+        q_prim_vf(momxb)%sf(i,j,k) = (ux_th - ux_am) * f_cut_on(r - r_th,eps_smooth/2._wp) * f_cut_on(x_cc(i),eps_smooth) + ux_am
+        q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
+        q_prim_vf(momxe)%sf(i,j,k) = 0._wp
+
+        q_prim_vf(advxb)%sf(i,j,k) = (1._wp - eps) * f_cut_on(r - r_th, eps_smooth/2._wp) * f_cut_on(x_cc(i),eps_smooth) + eps
+        q_prim_vf(advxe)%sf(i,j,k) = 1._wp - q_prim_vf(advxb)%sf(i,j,k)
+
+        q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*rho_th
+        q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k)*rho_am
+
+        q_prim_vf(E_idx)%sf(i,j,k) = (p_th - p_am) * f_cut_on(r - r_th, eps_smooth/2._wp) * f_cut_on(x_cc(i),eps_smooth) + p_am !+ &
+                                     !(1_wp*p_am) * f_cut_off(r - r_th, eps_smooth) * f_cut_on(2._wp*x_cc(i),eps_smooth)
+
+    case (303) ! Seven jet
+
+        if (x_cc(i) < 1._wp) then
+
+            rcut = rcut_arr(j,k) 
+            xcut = f_cut_on(x_cc(i),eps_smooth)
+
+            q_prim_vf(momxb)%sf(i,j,k) = (ux_th - ux_am) * rcut * xcut + ux_am
+            q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
+            q_prim_vf(momxe)%sf(i,j,k) = 0._wp
+
+            q_prim_vf(advxb)%sf(i,j,k) = (1._wp - eps) * rcut * xcut + eps
+            q_prim_vf(advxe)%sf(i,j,k) = 1._wp - q_prim_vf(advxb)%sf(i,j,k)
+
+            q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*rho_th
+            q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k)*rho_am
+
+            q_prim_vf(E_idx)%sf(i,j,k) = (p_th - p_am) * rcut * xcut + p_am
+
+        else
+            q_prim_vf(momxb)%sf(i,j,k) = ux_am
+            q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
+            q_prim_vf(momxe)%sf(i,j,k) = 0._wp
+
+            q_prim_vf(advxb)%sf(i,j,k) = eps
+            q_prim_vf(advxe)%sf(i,j,k) = 1-eps
+
+            q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*rho_th
+            q_prim_vf(contxe)%sf(i,j,k) = q_prim_Vf(advxe)%sf(i,j,k)*rho_am
+
+            q_prim_vf(E_idx)%sf(i,j,k) = p_am
+        end if
+
+    case (304) ! Florian clone
+
+        ux_th = 10 !10*sqrt(1.4)
+        ux_am = 0.0*sqrt(1.4)
+        p_th = 0.8_wp
+        p_am = 0.4_wp
+        rho_th = 2._wp
+        rho_am = 1._wp
+        y_th = 0.05_wp
+        z_th = -0.05_wp
+        r_th = 0.1_wp
+        eps_smooth = 0.175_wp
+
+        r = sqrt((y_cc(j) - y_th)**2._wp + (z_cc(k) - z_th)**2._wp)
+
+        q_prim_vf(momxb)%sf(i,j,k) = ux_th * f_cut_on(r - r_th,eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + ux_am
+        q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
+        q_prim_vf(momxe)%sf(i,j,k) = 0._wp
+
+        q_prim_vf(advxb)%sf(i,j,k) = (1._wp - 2._wp*eps) * f_cut_on(r - r_th, eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + eps
+        q_prim_vf(advxe)%sf(i,j,k) = 1._wp - q_prim_vf(advxb)%sf(i,j,k)
+
+        q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*(rho_th * f_cut_on(r - r_th, eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + rho_am)
+        q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k)*(rho_th * f_cut_on(r - r_th, eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + rho_am)
+
+        q_prim_vf(E_idx)%sf(i,j,k) = p_th * f_cut_on(r - r_th, eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + p_am + &
+                                     p_am * f_cut_off(r - r_th, eps_smooth) * f_cut_on(x_cc(i), eps_smooth)
+
+    case (305) ! Florian clone one fluid
+
+        ux_th = 10 !10*sqrt(1.4)
+        ux_am = 0.0*sqrt(1.4)
+        p_th = 0.8_wp
+        p_am = 0.4_wp
+        rho_th = 2._wp
+        rho_am = 1._wp
+        y_th = 0.05_wp
+        z_th = -0.05_wp
+        r_th = 0.1_wp
+        eps_smooth = 0.2_wp
+
+        r = sqrt((y_cc(j) - y_th)**2._wp + (z_cc(k) - z_th)**2._wp)
+
+        q_prim_vf(momxb)%sf(i,j,k) = ux_th * f_cut_on(r - r_th,eps_smooth/1._wp) * f_cut_on(x_cc(i),eps_smooth/2._wp) + ux_am
+        q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
+        q_prim_vf(momxe)%sf(i,j,k) = 0._wp
+
+        q_prim_vf(advxb)%sf(i,j,k) = 1._wp
+        q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*(rho_th * f_cut_on(r - r_th, eps_smooth/1._wp) * f_cut_on(x_cc(i),eps_smooth/2._wp) + rho_am)
+
+        q_prim_vf(E_idx)%sf(i,j,k) = p_th * f_cut_on(r - r_th, eps_smooth/1._wp) * f_cut_on(x_cc(i),eps_smooth/2._wp) + p_am
+
 
         ! Put your variable assignments here
     case default

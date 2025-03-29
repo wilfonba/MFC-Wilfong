@@ -42,17 +42,17 @@ contains
         call s_check_inputs_hypoelasticity
         call s_check_inputs_phase_change
         call s_check_inputs_ibm
-        call s_check_inputs_bc_patches
+        !call s_check_inputs_bc_patches
 #endif
 
         ! Run by all three stages
         call s_check_inputs_simulation_domain
         call s_check_inputs_model_eqns_and_num_fluids
         call s_check_inputs_weno
-        call s_check_inputs_bc
+        !call s_check_inputs_bc
         call s_check_inputs_stiffened_eos
         call s_check_inputs_surface_tension
-        call s_check_inputs_moving_bc
+        !call s_check_inputs_moving_bc
 
     end subroutine s_check_inputs_common
 

@@ -20,6 +20,8 @@ module m_patches
 
     use m_helper
 
+    use m_patch_helper
+
     use m_compute_levelset      ! Subroutines to calculate levelsets for IBs
 
     use m_mpi_common
