@@ -21,8 +21,8 @@ module m_igr
         s_initialize_igr, &
         s_igr_flux_add
 
-    real(wp), allocatable, dimension(:, :, :) :: jac,jac_rhs, jac_old
-    !$acc declare create(jac, jac_rhs, jac_old)
+    real(wp), allocatable, dimension(:, :, :) :: jac,jac_rhs
+    !$acc declare create(jac, jac_rhs)
 
     real(wp) :: alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze
     !$acc declare create(alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze)
@@ -57,7 +57,7 @@ contains
         end if
 
         if(igr) then 
-            #:for VAR in [ 'jac','jac_rhs','jac_old']
+            #:for VAR in [ 'jac','jac_rhs']
                 @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
                              idwbuff(2)%beg:idwbuff(2)%end, &
                              idwbuff(3)%beg:idwbuff(3)%end))
@@ -68,7 +68,6 @@ contains
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         jac(j, k, l) = 0._wp
-                        jac_old(j, k, l) = 0._wp
                    end do
                 end do
             end do
@@ -142,13 +141,13 @@ contains
                         end if
 
                         if(p > 0) then
-                            jac(j, k, l) = (alf_igr / fd_coeff) * ( (1._wp / dx(j)**2._wp) * ( jac_old(j-1,k,l)/rho_lx + jac_old(j+1,k,l)/rho_rx) + &
-                                                    (1._wp / dy(k)**2._wp) * (jac_old(j,k-1,l)/rho_ly + jac_old(j,k+1,l)/rho_ry) + &
-                                                    (1._wp / dz(l)**2._wp) * (jac_old(j,k,l-1)/rho_lz + jac_old(j,k,l+1)/rho_rz) ) + &
+                            jac(j, k, l) = (alf_igr / fd_coeff) * ( (1._wp / dx(j)**2._wp) * ( jac(j-1,k,l)/rho_lx + jac(j+1,k,l)/rho_rx) + &
+                                                    (1._wp / dy(k)**2._wp) * (jac(j,k-1,l)/rho_ly + jac(j,k+1,l)/rho_ry) + &
+                                                    (1._wp / dz(l)**2._wp) * (jac(j,k,l-1)/rho_lz + jac(j,k,l+1)/rho_rz) ) + &
                                                     jac_rhs(j,k,l) / fd_coeff
                        else 
-                            jac(j, k, l) = (alf_igr / fd_coeff) * ( (1._wp / dx(j)**2._wp) * ( jac_old(j-1,k,l)/rho_lx + jac_old(j+1,k,l)/rho_rx) + &
-                                                    (1._wp / dy(k)**2._wp) * (jac_old(j,k-1,l)/rho_ly + jac_old(j,k+1,l)/rho_ry)) + &
+                            jac(j, k, l) = (alf_igr / fd_coeff) * ( (1._wp / dx(j)**2._wp) * ( jac(j-1,k,l)/rho_lx + jac(j+1,k,l)/rho_rx) + &
+                                                    (1._wp / dy(k)**2._wp) * (jac(j,k-1,l)/rho_ly + jac(j,k+1,l)/rho_ry)) + &
                                                     jac_rhs(j,k,l) / fd_coeff                             
                        end if
                     end do
@@ -357,15 +356,7 @@ contains
 
                     end if
                 end if
-            end if 
-            !$acc parallel loop gang vector collapse(3) default(present)
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        jac_old(j,k,l) = jac(j,k,l)
-                    end do
-                end do
-            end do     
+            end if    
         end do
     end subroutine s_igr_jacobi_iteration
 
