@@ -375,6 +375,7 @@ module m_global_parameters
     logical :: polydisperse !< Polydisperse bubbles
     logical :: adv_n        !< Solve the number density equation and compute alpha from number density
     logical :: adap_dt      !< Adaptive step size control
+    logical :: handle_signals !< handle slurm signals for quitting jobs
 
     integer :: bubble_model !< Gilmore or Keller--Miksis bubble model
     integer :: thermal      !< Thermal behavior. 1 = adiabatic, 2 = isotherm, 3 = transfer
@@ -627,6 +628,7 @@ contains
 
         adv_n = .false.
         adap_dt = .false.
+        handle_signals = .false.
 
         pi_fac = 1._wp
 

@@ -293,6 +293,7 @@ SIMULATION.update({
     'igr': ParamType.LOG,
     'num_igr_iters': ParamType.INT,
     'alf_factor': ParamType.REAL,
+    'handle_signals': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',

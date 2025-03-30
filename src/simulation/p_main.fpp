@@ -22,6 +22,8 @@ program p_main
 
     use m_nvtx
 
+    use m_signal_handler
+
     implicit none
 
     integer :: t_step !< Iterator for the time-stepping loop
@@ -46,6 +48,9 @@ program p_main
     call nvtxStartRange("INIT-MODULES")
     call s_initialize_modules()
     call nvtxEndRange
+
+    ! Setup handlers for end of job signals to perform checkpointing
+    if (handle_signals) call s_setup_signal_handlers()
 
     allocate (proc_time(0:num_procs - 1))
     allocate (io_proc_time(0:num_procs - 1))
@@ -92,12 +97,14 @@ program p_main
                                  proc_time, io_proc_time, file_exists, start, finish, nt)
 
         if (cfl_dt) then
-            if (abs(mod(mytime, t_save)) < dt .or. mytime >= t_stop) then
+            if (abs(mod(mytime, t_save)) < dt .or. mytime >= t_stop .or. checkpoint_now) then
                 call s_save_data(t_step, start, finish, io_time_avg, nt)
+                if (checkpoint_now) call exit(1)
             end if
         else
-            if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then
+            if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop .or. checkpoint_now) then
                 call s_save_data(t_step, start, finish, io_time_avg, nt)
+                if (checkpoint_now) call exit(1)
             end if
         end if
 
