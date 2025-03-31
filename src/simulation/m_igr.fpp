@@ -68,6 +68,8 @@ contains
                 end do
             end do
             !$acc update device(Res, Re_idx, Re_size)
+            @:PREFER_GPU(Res)
+            @:PREFER_GPU(Re_idx)
         end if
 
         if(igr) then 
@@ -76,6 +78,8 @@ contains
                              idwbuff(2)%beg:idwbuff(2)%end, &
                              idwbuff(3)%beg:idwbuff(3)%end))
             #:endfor
+            @:PREFER_GPU(jac)
+            @:PREFER_GPU(jac_rhs)
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
