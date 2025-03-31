@@ -88,6 +88,33 @@ contains
 
         integer :: i, j !< Generic loop iterators
 
+        integer :: vars_on_gpu = 0
+        character(len=10) :: vars_on_gpu_str
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        call get_environment_variable("NVIDIA_VARS_ON_GPU", vars_on_gpu_str)
+
+        if (trim(vars_on_gpu_str) == "0") then
+            vars_on_gpu = 0
+        elseif (trim(vars_on_gpu_str) == "1") then
+            vars_on_gpu = 1
+        elseif (trim(vars_on_gpu_str) == "2") then
+            vars_on_gpu = 2
+        elseif (trim(vars_on_gpu_str) == "3") then
+            vars_on_gpu = 3
+        elseif (trim(vars_on_gpu_str) == "4") then
+            vars_on_gpu = 4
+        elseif (trim(vars_on_gpu_str) == "5") then
+            vars_on_gpu = 5
+        elseif (trim(vars_on_gpu_str) == "6") then
+            vars_on_gpu = 6
+        elseif (trim(vars_on_gpu_str) == "7") then
+            vars_on_gpu = 7
+        else ! default
+            vars_on_gpu = 0
+        endif
+#endif
+
         ! Setting number of time-stages for selected time-stepping scheme
         if (time_stepper == 1) then
             num_ts = 1
@@ -111,7 +138,9 @@ contains
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
                         if ( i == 1 ) then
-                            @:PREFER_GPU(q_cons_ts(1)%vf(j)%sf)
+                            if ( j <= vars_on_gpu ) then
+                                @:PREFER_GPU(q_cons_ts(1)%vf(j)%sf)
+                            end if
                         end if
                 end do
                 @:ACC_SETUP_VFs_IGR(q_cons_ts(i))

@@ -56,6 +56,23 @@ contains
 
     subroutine s_initialize_igr_module()
 
+        integer :: igr_temps_on_gpu = 2
+        character(len=10) :: igr_temps_on_gpu_str
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        call get_environment_variable("NVIDIA_IGR_TEMPS_ON_GPU", igr_temps_on_gpu_str)
+
+        if (trim(igr_temps_on_gpu_str) == "0") then
+            igr_temps_on_gpu = 0 ! jac and jac_rhs on CPU
+        elseif (trim(igr_temps_on_gpu_str) == "1") then
+            igr_temps_on_gpu = 1 ! jac on GPU, jac_rhs on CPU
+        elseif (trim(igr_temps_on_gpu_str) == "2") then
+            igr_temps_on_gpu = 2 ! jac and jac_rhs on GPU
+        else ! default on GPU
+            igr_temps_on_gpu = 2
+        endif
+#endif
+
         bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
         !bcxb = -1; bcxe = -1; bcyb = -1; bcye = -1; bczb = -1; bcze = -1
         !$acc update device(bcxb, bcxe, bcyb, bcye, bczb, bcze)
@@ -78,8 +95,12 @@ contains
                              idwbuff(2)%beg:idwbuff(2)%end, &
                              idwbuff(3)%beg:idwbuff(3)%end))
             #:endfor
-            @:PREFER_GPU(jac)
-            @:PREFER_GPU(jac_rhs)
+            if ( igr_temps_on_gpu >= 1 ) then
+                @:PREFER_GPU(jac)
+            end if
+            if ( igr_temps_on_gpu >= 2 ) then
+                @:PREFER_GPU(jac_rhs)
+            end if
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
