@@ -32,12 +32,12 @@ module m_mpi_proxy
 
     implicit none
 
-    real(wp), private, allocatable, dimension(:), target :: q_cons_buff_send !<
+    real(wp), private, allocatable, dimension(:) :: q_cons_buff_send !<
     !! This variable is utilized to pack and send the buffer of the cell-average
     !! conservative variables, for a single computational domain boundary at the
     !! time, to the relevant neighboring processor.
 
-    real(wp), private, allocatable, dimension(:), target :: q_cons_buff_recv !<
+    real(wp), private, allocatable, dimension(:) :: q_cons_buff_recv !<
     !! q_cons_buff_recv is utilized to receive and unpack the buffer of the cell-
     !! average conservative variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
@@ -62,7 +62,9 @@ module m_mpi_proxy
     !! immersed boundary markers, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     !$acc declare create(q_cons_buff_send, q_cons_buff_recv)
+#endif
     !$acc declare create( ib_buff_send, ib_buff_recv)
     !$acc declare create(c_divs_buff_send, c_divs_buff_recv)
 
@@ -132,9 +134,17 @@ contains
 
         !$acc update device(halo_size)
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         @:ALLOCATE(q_cons_buff_send(0:halo_size))
 
         @:ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
+#else
+        ALLOCATE(q_cons_buff_send(0:halo_size))
+        !$acc enter data create(capture:q_cons_buff_send)
+
+        ALLOCATE(q_cons_buff_recv(0:ubound(q_cons_buff_send, 1)))
+        !$acc enter data create(capture:q_cons_buff_recv)
+#endif
 
         if (surface_tension) then
             nVars = num_dims + 1
