@@ -33,8 +33,22 @@ module m_igr
     real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
 
-    real(wp), allocatable, dimension(:) :: coeff_L, coeff_R
-    !$acc declare create(coeff_L, coeff_R)
+
+    real(wp), parameter :: coeff_L(-1:3) = [ &
+        -3._wp/60._wp,   &  ! Index -1
+        27._wp/60._wp,   &  ! Index 0
+        47._wp/60._wp,   &  ! Index 1
+        -13._wp/60._wp,  &  ! Index 2
+        2._wp/60._wp     &  ! Index 3
+        ]
+
+    real(wp), parameter :: coeff_R(-2:2) = [ &
+        2._wp/60._wp,    &  ! Index -2
+        -13._wp/60._wp,  &  ! Index -1
+        47._wp/60._wp,   &  ! Index 0
+        27._wp/60._wp,   &  ! Index 1
+        -3._wp/60._wp    &  ! Index 2
+        ]
 
     integer :: i, j, k, l, q, r
 
@@ -72,22 +86,6 @@ contains
                 end do
             end do
 
-
-            @:ALLOCATE(coeff_L(-1:3))
-            coeff_L(-1) = (-3._wp/60._wp)
-            coeff_L(0) = (27._wp/60._wp)
-            coeff_L(1) = (47._wp/60._wp)
-            coeff_L(2) = (-13._wp/60._wp)
-            coeff_L(3) = (2._wp/60._wp)
-            !$acc update device(coeff_L)
-
-            @:ALLOCATE(coeff_R(-2:2))
-            coeff_R(2) = (-3._wp/60._wp)
-            coeff_R(1) = (27._wp/60._wp)
-            coeff_R(0) = (47._wp/60._wp)
-            coeff_R(-1) = (-13._wp/60._wp)
-            coeff_R(-2) = (2._wp/60._wp)
-            !$acc update device(coeff_R)
         end if
 
     end subroutine s_initialize_igr_module
