@@ -67,7 +67,7 @@ case = {
         "igr": "T",
         "alf_factor": 15,
         "num_igr_iters": 4,
-        "fdma_mpi": "T",
+        "rdma_mpi": "T",
 
         "bc_x%beg": -3,
         "bc_x%end": -3,
@@ -81,7 +81,7 @@ case = {
         # Formatted Database Files Structure Parameters
         "format": 1,
         "prim_vars_wrt": "T",
-        "pyarallel_io": "T",
+        "parallel_io": "T",
         "file_per_process": "T",
 
         # Patch 1: Background
