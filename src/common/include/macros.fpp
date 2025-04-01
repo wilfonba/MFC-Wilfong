@@ -88,7 +88,7 @@ ${s if s.rfind(')') == -1 else next((s[:i] for i in range(s.rfind(')'), -1, -1) 
     if ((alloc_mode .eq. 1) .or. (alloc_mode .eq. 3)) then
     #:for arg in args
         istat = cudaMemPrefetchAsync( c_devloc(@{PARSE(${arg}$)}@), SIZEOF(@{PARSE(${arg}$)}@), cudaCpuDeviceId, stream_id )
-        print*, "! @{PARSE(${arg}$)}@ with shape",  SHAPE(@{PARSE(${arg}$)}@), "=> prefetch to CPU"
+        !print*, "! @{PARSE(${arg}$)}@ with shape",  SHAPE(@{PARSE(${arg}$)}@), "=> prefetch to CPU"
         if (istat /= cudaSuccess) then
             write(*,"('Error code: ',I0, ': ')") istat
             write(*,*) cudaGetErrorString(istat)
@@ -100,7 +100,7 @@ ${s if s.rfind(')') == -1 else next((s[:i] for i in range(s.rfind(')'), -1, -1) 
     if ((alloc_mode .eq. 2) .or. (alloc_mode .eq. 3)) then
     #:for arg in args
         istat = cudaMemAdvise( c_devloc(@{PARSE(${arg}$)}@), SIZEOF(@{PARSE(${arg}$)}@), cudaMemAdviseSetPreferredLocation, cudaCpuDeviceId )
-        print*, "! @{PARSE(${arg}$)}@ with shape",  SHAPE(@{PARSE(${arg}$)}@), "=> preferred location CPU"
+        !print*, "! @{PARSE(${arg}$)}@ with shape",  SHAPE(@{PARSE(${arg}$)}@), "=> preferred location CPU"
         if (istat /= cudaSuccess) then
             write(*,"('Error code: ',I0, ': ')") istat
             write(*,*) cudaGetErrorString(istat)
