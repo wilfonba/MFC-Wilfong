@@ -26,8 +26,27 @@ export MFC_CUDA_CC=90
 # cd to case dir
 cd examples/3D_IGR_perf_test/
 
-# run with env vars set, with binding script, and with nsys script
+# Run with env vars set, with binding script, and with nsys script
 bash run.sh
 ```
 The example `bind.sh`, `nsys.sh`, and `run.sh` I used can be found here under `misc/nvidia_uvm`.
 These should be incorporated to the python based mfc workflow.
+
+## The Main Idea behind the Implemented Out-of-Core Strategy
+
+To run MFC out-of-core on Grace Hopper using Unified Memory we implement a zero-copy strategy.
+
+We start by setting preferred location CPU for all buffers by hooking into the allocate macro and setting `NVIDIA_ALLOC_MODE=2`.
+This way we disable access counter based migrations and keep everything on the CPU memory, freeing up as much GPU memory as possible.
+
+Then, for the "important" buffers that are frequently accessed from the GPU, we reset preferred location to GPU in order to place them to GPU memory.
+This is done by the `PREFER_GPU` macro that has been manually placed in the code right after the allocations of the "important" buffers.
+To activate these we export `NVIDIA_MANUAL_GPU_HINTS=1`.
+
+To allow fine grained control and be able to simulate larger sizes, we also use the following environment variables:
+- With `NVIDIA_IGR_TEMPS_ON_GPU` we control how many temporaries from the IGR module are to be placed in GPU memory.
+- With `NVIDIA_VARS_ON_GPU` we control how many of the `q_cons_ts(1)%vf(j)%sf` arrays we place in GPU memory.
+
+It is important to note that we have rearranged the timestep updates in the runge kutta scheme, in a way that allows us to pass only `q_cons_ts(1)` to the `compute_rhs` routines and keep `q_cons_ts(2)` on the CPU for the full lifetime of the simulation, without sacrificing performance.
+
+Note: This rearrangement may be "breaking" the timestepper for different configurations, but we can easily fix it in a later step.

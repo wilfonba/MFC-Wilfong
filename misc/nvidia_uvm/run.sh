@@ -21,7 +21,7 @@ export NVIDIA_VARS_ON_GPU=7                   # q_cons_ts(1)%vf%sf for j=1-7 on 
 
 # NSYS
 export NSYS=1                                 # enable nsys profiling
-export NSYS_FILE=report_uvm_single_N-499-nGPUs-4_params-${NVIDIA_VARS_ON_GPU}-${NVIDIA_IGR_TEMPS_ON_GPU}.qdrep
+export NSYS_FILE=report_uvm_single_N-499_nGPUs-4_params-${NVIDIA_VARS_ON_GPU}-${NVIDIA_IGR_TEMPS_ON_GPU}.qdrep
 
 # Run using --cpu-bind=none because we use our own binding script
 srun --ntasks 4 --cpu-bind=none ./nsys.sh ./bind.sh ${PATH_TO_BINARY}/simulation
