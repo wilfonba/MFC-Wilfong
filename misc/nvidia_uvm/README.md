@@ -37,20 +37,9 @@ cd MFC-Wilfong
 
 # Build
 export MFC_CUDA_CC=90
-./mfc.sh build --gpu -j $(nproc) --single --unified --verbose
+./mfc.sh build --gpu -j 71 --single --unified --verbose
 
-# Dry mfc run to compile pre_process and simulation binaries with case optimization
-./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process simulation --dry-run --gpu -N 1 -n 4 -j 71 -c santis
-
-# Run pre_process
-./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process --gpu -N 1 -n 4 -j 71 -c santis
-
-# cd to case dir
-cd examples/3D_IGR_perf_test/
-
-# Run simulation with env vars set, with binding script, and with nsys script
-bash run.sh
+# Run pre_process and simulation binaries with case optimization
+./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process simulation --gpu -N 1 -n 4 -j 71 -c santis
 ```
-The example `bind.sh`, `nsys.sh`, and `run.sh` I used can be found here under `misc/nvidia_uvm`.
-These should be incorporated to the python based mfc workflow.
-
+The environment variables `NVIDIA_ALLOC_MODE`, `NVIDIA_MANUAL_GPU_HINTS`, and `NVIDIA_VARS_ON_GPU`, can be set appropriately in `toolchain/templates/santis.mako`.

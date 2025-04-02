@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+#set -x
 set -euo pipefail
 
 rank="${OMPI_COMM_WORLD_RANK:-$SLURM_PROCID}"
