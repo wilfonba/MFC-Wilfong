@@ -39,16 +39,16 @@ cd MFC-Wilfong
 export MFC_CUDA_CC=90
 ./mfc.sh build --gpu -j $(nproc) --single --unified --verbose
 
-# Dry mfc run to compile preprocess and simulation binaries with case optimization
-./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process simulation --dry-run --gpu -N 1 -n 4 -j 71
+# Dry mfc run to compile pre_process and simulation binaries with case optimization
+./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process simulation --dry-run --gpu -N 1 -n 4 -j 71 -c santis
 
-# Run preprocess
-./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process --gpu -N 1 -n 4 -j 71
+# Run pre_process
+./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process --gpu -N 1 -n 4 -j 71 -c santis
 
 # cd to case dir
 cd examples/3D_IGR_perf_test/
 
-# Run with env vars set, with binding script, and with nsys script
+# Run simulation with env vars set, with binding script, and with nsys script
 bash run.sh
 ```
 The example `bind.sh`, `nsys.sh`, and `run.sh` I used can be found here under `misc/nvidia_uvm`.
