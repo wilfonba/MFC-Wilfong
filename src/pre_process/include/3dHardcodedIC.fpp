@@ -6,7 +6,7 @@
     real(wp) :: eps
 
     ! Case 302 - Single M10 Jet
-    real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
+    real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth, x0, SS, VV
 
     ! Case 303 - 7 Jet
     real(wp), dimension(0:6) :: r_arr, y_th_arr, z_th_arr
