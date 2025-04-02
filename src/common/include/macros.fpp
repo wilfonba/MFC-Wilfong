@@ -31,7 +31,7 @@
 
     if (prefer_gpu_mode .eq. 1) then
     #:for arg in args
-        print*, "Moving ${arg}$ to GPU => ", SHAPE(${arg}$)
+        !print*, "Moving ${arg}$ to GPU => ", SHAPE(${arg}$)
         ! unset
         istat = cudaMemAdvise( c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseUnSetPreferredLocation, cudaCpuDeviceId )
         if (istat /= cudaSuccess) then
