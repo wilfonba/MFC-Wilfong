@@ -48,6 +48,8 @@ module m_data_input
     type(scalar_field), allocatable, dimension(:), public :: q_cons_vf !<
     !! Conservative variables
 
+    type(scalar_field), allocatable, dimension(:), public :: q_cons_temp
+
     type(scalar_field), allocatable, dimension(:), public :: q_prim_vf !<
     !! Primitive variables
 
@@ -284,6 +286,7 @@ contains
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
         integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
         integer(KIND=MPI_OFFSET_KIND) :: MOK
+        real(wp) :: delx, dely, delz
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
@@ -304,17 +307,25 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
-        ! Read in cell boundary locations in x-direction
-        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if(down_sample) then 
+            delx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
+            do i = 0, m_glb
+                x_cb_glb(i - 1) = x_domain%beg + delx*real(i, wp)
+            end do
+            x_cb_glb(m_glb) = x_domain%end
+        else          
+            ! Read in cell boundary locations in x-direction
+            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
 
-        if (file_exist) then
-            data_size = m_glb + 2
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
-            call MPI_FILE_CLOSE(ifile, ierr)
-        else
-            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+            if (file_exist) then
+                data_size = m_glb + 2
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
+                call MPI_FILE_CLOSE(ifile, ierr)
+            else
+                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+            end if
         end if
 
         ! Assigning local cell boundary locations
@@ -325,17 +336,25 @@ contains
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (n > 0) then
-            ! Read in cell boundary locations in y-direction
-            file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'y_cb.dat'
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-
-            if (file_exist) then
-                data_size = n_glb + 2
-                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
-                call MPI_FILE_CLOSE(ifile, ierr)
+            if(down_sample) then 
+                dely = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
+                do i = 0, n_glb
+                    y_cb_glb(i - 1) = y_domain%beg + dely*real(i, wp)
+                end do
+                y_cb_glb(n_glb) = y_domain%end
             else
-                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                ! Read in cell boundary locations in y-direction
+                file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'y_cb.dat'
+                inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                if (file_exist) then
+                    data_size = n_glb + 2
+                    call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                    call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
+                    call MPI_FILE_CLOSE(ifile, ierr)
+                else
+                    call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                end if
             end if
 
             ! Assigning local cell boundary locations
@@ -346,17 +365,25 @@ contains
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
-                ! Read in cell boundary locations in z-direction
-                file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'z_cb.dat'
-                inquire (FILE=trim(file_loc), EXIST=file_exist)
-
-                if (file_exist) then
-                    data_size = p_glb + 2
-                    call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                    call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
-                    call MPI_FILE_CLOSE(ifile, ierr)
+                if(down_sample) then 
+                    delz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
+                    do i = 0, p_glb
+                        z_cb_glb(i - 1) = z_domain%beg + delz*real(i, wp)
+                    end do
+                    z_cb_glb(p_glb) = z_domain%end
                 else
-                    call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                    ! Read in cell boundary locations in z-direction
+                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'z_cb.dat'
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+                    if (file_exist) then
+                        data_size = p_glb + 2
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                        call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
+                        call MPI_FILE_CLOSE(ifile, ierr)
+                    else
+                        call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+                    end if
                 end if
 
                 ! Assigning local cell boundary locations
@@ -378,24 +405,43 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                ! Initialize MPI data I/O
-                if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                if(down_sample) then 
+                    call s_initialize_mpi_data_ds(q_cons_temp)
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    ! Initialize MPI data I/O
+                    if (ib) then
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    else
+                        call s_initialize_mpi_data(q_cons_vf)
+                    end if
                 end if
 
-                ! Size of local arrays
-                data_size = (m + 1)*(n + 1)*(p + 1)
+                if(down_sample) then 
+                    ! Size of local arrays
+                    data_size = (m + 3)*(n + 3)*(p + 3)
 
-                ! Resize some integers so MPI can read even the biggest file
-                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                    ! Resize some integers so MPI can read even the biggest file
+                    m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                    n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                    p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                    WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                    MOK = int(1._wp, MPI_OFFSET_KIND)
+                    str_MOK = int(name_len, MPI_OFFSET_KIND)
+                    NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                else
+                    ! Size of local arrays
+                    data_size = (m + 1)*(n + 1)*(p + 1)
+
+                    ! Resize some integers so MPI can read even the biggest file
+                    m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                    n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                    p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                    WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                    MOK = int(1._wp, MPI_OFFSET_KIND)
+                    str_MOK = int(name_len, MPI_OFFSET_KIND)
+                    NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                end if
+
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
@@ -417,6 +463,12 @@ contains
                 call s_mpi_barrier()
 
                 call MPI_FILE_CLOSE(ifile, ierr)
+
+                if(down_sample) then 
+                    do i = 1, sys_size
+                        q_cons_vf(i)%sf(0:m,0:n,0:p) = q_cons_temp(i)%sf(0:m,0:n,0:p)
+                    end do
+                end if
 
                 if (ib) then
 
@@ -1313,6 +1365,7 @@ contains
         ! the simulation
         allocate (q_cons_vf(1:sys_size))
         allocate (q_prim_vf(1:sys_size))
+        allocate (q_cons_temp(1:sys_size))
         if (bubbles_lagrange) allocate (q_particle(1))
 
         ! Allocating the parts of the conservative and primitive variables
@@ -1332,6 +1385,9 @@ contains
                     allocate (q_prim_vf(i)%sf(-buff_size:m + buff_size, &
                                               -buff_size:n + buff_size, &
                                               -buff_size:p + buff_size))
+                    if(down_sample) then 
+                        allocate(q_cons_temp(i)%sf(-1:m+1,-1:n+1,-1:p+1))
+                    end if
                 end do
 
                 if (ib) then

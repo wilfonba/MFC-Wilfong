@@ -478,6 +478,9 @@ module m_global_parameters
 
     integer :: vec_size 
     !$acc declare create(vec_size)
+
+    logical :: down_sample
+    !$acc declare create(down_sample)
 contains
 
     !> Assigns default values to the user inputs before reading
@@ -549,6 +552,7 @@ contains
         shear_stress = .false.
         bulk_stress = .false.
         igr = .false.
+        down_sample = .false.
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.

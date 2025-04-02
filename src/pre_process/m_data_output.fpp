@@ -34,13 +34,15 @@ module m_data_output
     use m_boundary_conditions
 
     implicit none
-
+ 
     private; 
     public :: s_write_serial_data_files, &
               s_write_parallel_data_files, &
               s_write_data_files, &
               s_initialize_data_output_module, &
               s_finalize_data_output_module
+
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp
 
     abstract interface
 
@@ -57,7 +59,7 @@ module m_data_output
             ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
-                intent(in) :: q_cons_vf, q_prim_vf
+                intent(inout) :: q_cons_vf, q_prim_vf
 
             type(integer_field), &
                 dimension(1:num_dims, -1:1), &
@@ -86,6 +88,8 @@ module m_data_output
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
+
+
 contains
 
     !>  Writes grid and initial condition data files to the "0"
@@ -98,7 +102,7 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(in) :: q_cons_vf, q_prim_vf
+            intent(inout) :: q_cons_vf, q_prim_vf
 
         type(integer_field), &
             dimension(1:num_dims, -1:1), &
@@ -541,7 +545,7 @@ contains
         ! Conservative variables
         type(scalar_field), &
             dimension(sys_size), &
-            intent(in) :: q_cons_vf, q_prim_vf
+            intent(inout) :: q_cons_vf, q_prim_vf
 
         type(integer_field), &
             dimension(1:num_dims, -1:1), &
@@ -573,7 +577,216 @@ contains
         logical :: file_exist, dir_check
 
         ! Generic loop iterator
-        integer :: i
+        integer :: i, j, k, l, ix, iy, iz,x_id, y_id, z_id
+        integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
+
+        if(down_sample) then
+
+            if((mod(m+1,3) > 0) .or. (mod(n+1,3) > 0) .or. (mod(p+1,3) > 0)) then
+                print *, "WARNING: ATTEMPTING TO RUN DOWN SAMPLING WITH local problem size not divisible by 3"
+            end if
+
+            m_ds = INT((m+1)/3) - 1
+            n_ds = INT((n+1)/3) - 1
+            p_ds = INT((p+1)/3) - 1
+
+            m_glb_ds = INT((m_glb+1)/3) - 1
+            n_glb_ds = INT((n_glb+1)/3) - 1
+            p_glb_ds = INT((p_glb+1)/3) - 1
+
+
+            if(bc_x%beg >= 0) then
+                call s_mpi_sendrecv_variables_buffers(q_cons_vf, 1, -1)
+            else
+                do l = 0, p
+                    do k = 0, n
+                        if (bc_type(1,-1)%sf(0,k,l) == -1) then
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(-j, k, l) = q_cons_vf(i)%sf(m-j+1,k,l)
+                                end do
+                            end do
+                        else if (bc_type(1,-1)%sf(0,k,l) == -2) then
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(-j, k, l) = q_cons_vf(i)%sf(j - 1,k,l)
+                                end do
+                            end do
+                        elseif (bc_type(1,-1)%sf(0,k,l) >= -17) then
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(-j, k, l) = q_cons_vf(i)%sf(0,k,l)
+                                end do
+                            end do
+                        end if
+                    end do
+                end do
+            end if
+
+            if(bc_x%end >= 0) then
+                call s_mpi_sendrecv_variables_buffers(q_cons_vf, 1, 1)
+            else
+                do l = 0, p
+                    do k = 0, n
+                        if (bc_type(1,1)%sf(0,k,l) == -1) then
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(m+j, k, l) = q_cons_vf(i)%sf(j-1,k,l)
+                                end do
+                            end do
+                        elseif (bc_type(1,1)%sf(0,k,l) == -2) then
+                            do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(m+j, k, l) = q_cons_vf(i)%sf(m - (j - 1),k,l)
+                                end do
+                            end do
+                        elseif (bc_type(1,1)%sf(0,k,l) >= -17) then
+                             do j = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(m+j, k, l) = q_cons_vf(i)%sf(m,k,l)
+                                end do
+                            end do
+                        end if
+                    end do
+                end do
+            end if
+
+            if(bc_y%beg >= 0) then
+                call s_mpi_sendrecv_variables_buffers(q_cons_vf, 2, -1)
+            else
+                do l = 0, p
+                    do j = -buff_size,m+buff_size
+                        if (bc_type(2,-1)%sf(j,0,l) == -1) then
+                            do k = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(j,-k,l) = q_cons_vf(i)%sf(j,n-k+1,l)
+                                end do
+                            end do
+                        elseif (bc_type(2,-1)%sf(j,0,l) == -2) then
+                            do k = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(j,-k,l) = q_cons_vf(i)%sf(j,k-1,l)
+                                end do
+                            end do
+                        elseif (bc_type(2,-1)%sf(j,0,l) >= -17) then
+                            do k = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(j,-k,l) = q_cons_vf(i)%sf(j,0,l)
+                                end do
+                            end do
+                        end if
+                    end do
+                end do
+            end if
+
+            if(bc_y%end >= 0) then
+                call s_mpi_sendrecv_variables_buffers(q_cons_vf, 2, 1)
+            else
+                do l = 0, p
+                    do j = -buff_size,m+buff_size
+                        if (bc_type(2,1)%sf(j,0,l) == -1) then
+                            do k = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(j,n+k,l) = q_cons_vf(i)%sf(j,k-1,l)
+                                end do
+                            end do
+                        elseif (bc_type(2,1)%sf(j,0,l) == -2) then
+                            do k = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(j,n+k,l) = q_cons_vf(i)%sf(j,n - (k-1),l)
+                                end do
+                            end do
+                        elseif (bc_type(2,1)%sf(j,0,l) >= -17) then
+                            do k = 1, buff_size
+                                do i = 1, sys_size
+                                    q_cons_vf(i)%sf(j,n+k,l) = q_cons_vf(i)%sf(j,n,l)
+                                end do
+                            end do
+                        end if
+                    end do
+                end do
+            end if
+
+            if(p > 0) then
+                if(bc_z%beg >= 0) then
+                    call s_mpi_sendrecv_variables_buffers(q_cons_vf, 3, -1)
+                else
+                    do k = -buff_size,n+buff_size
+                        do j = -buff_size,m+buff_size
+                            if (bc_type(3,-1)%sf(j,k,0) == -1) then
+                                do l = 1, buff_size
+                                    do i = 1, sys_size
+                                        q_cons_vf(i)%sf(j,k,-l) = q_cons_vf(i)%sf(j,k,p-l+1)
+                                    end do
+                                end do
+                            elseif (bc_type(3,-1)%sf(j,k,0) == -2) then
+                                do l = 1, buff_size
+                                        do i = 1, sys_size
+                                        q_cons_vf(i)%sf(j,k,-l) = q_cons_vf(i)%sf(j,k,l-1)
+                                    end do
+                                end do
+                            elseif (bc_type(3,-1)%sf(j,k,0) >= -17) then
+                                do l = 1, buff_size
+                                    do i = 1, sys_size
+                                        q_cons_vf(i)%sf(j,k,-l) = q_cons_vf(i)%sf(j,k,0)
+                                    end do
+                                end do
+                            end if
+                        end do
+                    end do
+                end if
+
+                if(bc_z%end >= 0) then
+                    call s_mpi_sendrecv_variables_buffers(q_cons_vf, 3, 1)
+                else
+                    do k = -buff_size,n+buff_size
+                        do j = -buff_size,m+buff_size
+                            if (bc_type(3,1)%sf(j,k,0) == -1) then
+                                do l = 1, buff_size
+                                    do i = 1, sys_size
+                                    q_cons_vf(i)%sf(j,k,p+l) = q_cons_vf(i)%sf(j,k,l-1)
+                                    end do
+                                end do
+                            elseif (bc_type(3,1)%sf(j,k,0) == -2) then
+                                do l = 1, buff_size
+                                        do i = 1, sys_size
+                                        q_cons_vf(i)%sf(j,k,p+l) = q_cons_vf(i)%sf(j,k,p - (l-1))
+                                    end do
+                                end do
+                            elseif (bc_type(3,1)%sf(j,k,0) >= -17) then
+                                do l = 1, buff_size
+                                    do i = 1, sys_size
+                                        q_cons_vf(i)%sf(j,k,p+l) = q_cons_vf(i)%sf(j,k,p)
+                                    end do
+                                end do
+                            end if
+                        end do
+                    end do
+                end if
+            end if
+
+            do l = -1, p_ds+1 
+                do k = -1, n_ds+1
+                    do j = -1, m_ds+1
+                        x_id = 3*j + 1
+                        y_id = 3*k + 1 
+                        z_id = 3*l + 1
+                        do i = 1, sys_size
+                            q_cons_temp(i)%sf(j,k,l) = 0
+
+                            do iz = -1, 1
+                                do iy = -1, 1
+                                    do ix = -1, 1
+                                        q_cons_temp(i)%sf(j,k,l) = q_cons_temp(i)%sf(j,k,l) &
+                                        + (1._wp / 27._wp)*q_cons_vf(i)%sf(x_id+ix,y_id+iy,z_id+iz)
+                                    end do 
+                                end do 
+                            end do
+                        end do
+                    end do 
+                end do 
+            end do 
+        end if
 
         if (file_per_process) then
             if (proc_rank == 0) then
@@ -588,11 +801,15 @@ contains
             call DelayFileAccess(proc_rank)
 
             ! Initialize MPI data I/O
-            if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, &
-                                           levelset, levelset_norm)
+            if(down_sample) then 
+                call s_initialize_mpi_data_ds(q_cons_temp)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                                               levelset, levelset_norm)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
             end if
 
             ! Open the file to write all flow variables
@@ -610,17 +827,31 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            ! Size of local arrays
-            data_size = (m + 1)*(n + 1)*(p + 1)
+            if(down_sample) then 
+                 ! Size of local arrays
+                data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
 
-            ! Resize some integers so MPI can write even the biggest files
-            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-            MOK = int(1._wp, MPI_OFFSET_KIND)
-            str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                ! Resize some integers so MPI can write even the biggest files
+                m_MOK = int(m_glb_ds + 3, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb_ds + 3, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb_ds + 3, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            else
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
+
+                ! Resize some integers so MPI can write even the biggest files
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            end if
 
             ! Write the data for each variable
             if (bubbles_euler) then
@@ -862,6 +1093,7 @@ contains
         ! Generic logical used to check the existence of directories
         logical :: dir_check
         integer :: i
+        integer :: m_ds, n_ds, p_ds
 
         if (parallel_io .neqv. .true.) then
             ! Setting the address of the time-step directory
@@ -943,6 +1175,17 @@ contains
         if (chemxb /= 0) write (1, '("[",I2,",",I2,"]",A)') chemxb, chemxe, " Chemistry"
 
         close (1)
+
+        if(down_sample) then 
+            m_ds = INT((m+1)/3) - 1
+            n_ds = INT((n+1)/3) - 1
+            p_ds = INT((p+1)/3) - 1
+
+            allocate(q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+            end do
+        end if
 
     end subroutine s_initialize_data_output_module
 

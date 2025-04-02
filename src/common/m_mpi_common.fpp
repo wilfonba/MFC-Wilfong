@@ -232,6 +232,52 @@ contains
 
     end subroutine s_initialize_mpi_data
 
+    subroutine s_initialize_mpi_data_ds(q_cons_vf)
+
+        type(scalar_field), &
+            dimension(sys_size), &
+            intent(in) :: q_cons_vf
+
+        integer, dimension(num_dims) :: sizes_glb, sizes_loc
+
+#ifdef MFC_MPI
+
+        ! Generic loop iterator
+        integer :: i, j, q, k, l, m_ds, n_ds, p_ds
+
+#ifndef MFC_POST_PROCESS
+        m_ds = INT((m+1)/3) - 1
+        n_ds = INT((n+1)/3) - 1
+        p_ds = INT((p+1)/3) - 1
+#else
+        m_ds = m 
+        n_ds = n 
+        p_ds = p
+#endif
+
+        do i = 1, sys_size
+            MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds+1, -1:n_ds+1, -1:p_ds+1)
+        end do
+
+        ! Define global(g) and local(l) sizes for flow variables
+        sizes_loc(1) = m_ds + 3
+        if (n > 0) then
+            sizes_loc(2) = n_ds + 3
+            if (p > 0) then
+                sizes_loc(3) = p_ds + 3
+            end if
+        end if
+
+        ! Define the view for each variable
+        do i = 1, sys_size
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_loc, sizes_loc, start_idx, &
+                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
+            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+        end do
+#endif
+
+    end subroutine s_initialize_mpi_data_ds
+
     subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
         integer, intent(in) :: counts          ! Array of vector lengths for each process

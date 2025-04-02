@@ -70,6 +70,9 @@ module m_data_output
     real(wp) :: Rc_min !< Rc criterion maximum
     !> @}
 
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp 
+    !$acc declare create(q_cons_temp)
+
 contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
@@ -872,6 +875,66 @@ contains
 
         integer :: alt_sys !< Altered system size for the lagrangian subgrid bubble model
 
+        integer ::  j, k, l, ix, iy, iz, x_id, y_id, z_id
+        integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
+
+        if(down_sample) then
+            
+            m_ds = INT((m+1)/3) - 1
+            n_ds = INT((n+1)/3) - 1
+            p_ds = INT((p+1)/3) - 1
+
+            m_glb_ds = INT((m_glb+1)/3) - 1
+            n_glb_ds = INT((n_glb+1)/3) - 1
+            p_glb_ds = INT((p_glb+1)/3) - 1
+
+            !$acc parallel loop collapse(4) gang vector default(present) private(x_id, y_id, z_id, ix, iy, iz)
+            do l = -1, p_ds+1 
+                do k = -1, n_ds+1
+                    do j = -1, m_ds+1
+                        do i = 1, vec_size
+                            x_id = 3*j + 1
+                            y_id = 3*k + 1 
+                            z_id = 3*l + 1
+                            
+                            q_cons_temp(i)%sf(j,k,l) = 0._wp
+                            !$acc loop seq
+                            do iz = -1, 1
+                                !$acc loop seq
+                                do iy = -1, 1
+                                    !$acc loop seq
+                                    do ix = -1, 1
+                                        q_cons_temp(i)%sf(j,k,l) = q_cons_temp(i)%sf(j,k,l) &
+                                        + (1._wp / 27._wp)*q_cons_vf(i)%sf(x_id+ix,y_id+iy,z_id+iz)
+                                    end do 
+                                end do 
+                            end do
+                        end do
+                    end do 
+                end do 
+            end do 
+
+            !$acc parallel loop collapse(3) gang vector default(present)
+            do l = -1, p_ds+1 
+                do k = -1, n_ds+1
+                    do j = -1, m_ds+1
+                        q_cons_temp(sys_size)%sf(j,k,l) = 1._wp 
+                        if(num_fluids > 1) then 
+                            !$acc loop seq
+                            do i = 1, num_fluids - 1
+                                q_cons_temp(sys_size)%sf(j,k,l) = q_cons_temp(sys_size)%sf(j,k,l) - q_cons_temp(E_idx+i)%sf(j,k,l)
+                            end do 
+                        end if
+                    end do 
+                end do 
+            end do
+
+            do i = 1, sys_size
+                !$acc update host(q_cons_temp(i)%sf)
+            end do
+
+        end if
+
         if (present(beta)) then
             alt_sys = sys_size + 1
         else
@@ -883,11 +946,14 @@ contains
             call s_int_to_str(t_step, t_step_string)
 
             ! Initialize MPI data I/O
-
-            if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+            if(down_sample) then 
+                call s_initialize_mpi_data_ds(q_cons_temp)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
             end if
 
             if (proc_rank == 0) then
@@ -901,9 +967,6 @@ contains
             call s_mpi_barrier()
             call DelayFileAccess(proc_rank)
 
-            ! Initialize MPI data I/O
-            call s_initialize_mpi_data(q_cons_vf)
-
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_string)//trim(mpiiofs)//trim(file_loc)
@@ -914,17 +977,31 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            ! Size of local arrays
-            data_size = (m + 1)*(n + 1)*(p + 1)
+            if(down_sample) then
+                ! Size of local arrays
+                data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
 
-            ! Resize some integers so MPI can write even the biggest files
-            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-            MOK = int(1._wp, MPI_OFFSET_KIND)
-            str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                ! Resize some integers so MPI can write even the biggest files
+                m_MOK = int(m_glb_ds + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb_ds + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb_ds + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            else
+                ! Size of local arrays
+                data_size = (m + 1)*(n + 1)*(p + 1)
+
+                ! Resize some integers so MPI can write even the biggest files
+                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+            end if
 
             if (bubbles_euler) then
                 ! Write the data for each variable
@@ -955,7 +1032,6 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         else
             ! Initialize MPI data I/O
-
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             elseif (present(beta)) then
@@ -971,8 +1047,7 @@ contains
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                               mpi_info_int, ifile, ierr)
-
+                               mpi_info_int, ifile, ierr)            
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
 
@@ -1794,6 +1869,8 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_data_output_module
 
+        integer :: m_ds, n_ds, p_ds, i
+
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         if(run_time_info)then 
             @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
@@ -1812,6 +1889,18 @@ contains
                 vcfl_max = 0._wp
                 Rc_min = 1e3_wp
             end if
+        end if
+
+        if(down_sample) then 
+            m_ds = INT((m+1)/3) - 1
+            n_ds = INT((n+1)/3) - 1
+            p_ds = INT((p+1)/3) - 1
+
+            @:ALLOCATE(q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                @:ALLOCATE(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+                @:ACC_SETUP_SFs(q_cons_temp(i))
+            end do
         end if
 
     end subroutine s_initialize_data_output_module

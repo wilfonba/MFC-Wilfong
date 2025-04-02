@@ -79,7 +79,7 @@ contains
             num_fluids, mpp_lim, &
             weno_order, bc_x, &
             bc_y, bc_z, fluid_pp, format, precision, &
-            output_partial_domain, x_output, y_output, z_output, &
+            output_partial_domain, x_output, y_output, z_output, x_domain, y_domain, z_domain, &
             hypoelasticity, G, &
             chem_wrt_Y, chem_wrt_T, avg_state, &
             alpha_rho_wrt, rho_wrt, mom_wrt, vel_wrt, &
@@ -94,7 +94,7 @@ contains
             polydisperse, poly_sigma, file_per_process, relax, &
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
-            cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, igr, &
+            cfl_target, surface_tension, bubbles_lagrange, rkck_adap_dt, igr, down_sample, &
             sim_data, hyperelasticity
 
         ! Inquiring the status of the post_process.inp file
@@ -117,6 +117,13 @@ contains
             end if
 
             close (1)
+
+            if(down_sample) then 
+                m = INT((m+1)/3) - 1
+                n = INT((n+1)/3) - 1
+                p = INT((p+1)/3) - 1
+            end if
+
             ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n
@@ -210,7 +217,7 @@ contains
         logical :: file_exists
         integer :: i, j, k, l, kx, ky, kz, kf
         integer :: x_beg, x_end, y_beg, y_end, z_beg, z_end
-
+        
         if (output_partial_domain) then
             call s_define_output_region
             x_beg = -offset_x%beg + x_output_idx%beg

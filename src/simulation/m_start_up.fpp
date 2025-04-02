@@ -3,6 +3,7 @@
 !! @brief Contains module m_start_up
 
 #:include 'case.fpp'
+#:include 'macros.fpp'
 
 !> @brief The purpose of the module is primarily to read in the files that
 !!              contain the inputs, the initial condition data and the grid data
@@ -101,6 +102,8 @@ module m_start_up
 
 
     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp
+    !$acc declare create(q_cons_temp)
 
     real(wp) :: dt_init
 
@@ -178,7 +181,7 @@ contains
             viscous, surface_tension, &
             bubbles_lagrange, lag_params, &
             rkck_adap_dt, rkck_tolerance, &
-            hyperelasticity, R0ref, igr, alf_factor, &
+            hyperelasticity, R0ref, igr, down_sample, alf_factor, &
             num_igr_iters, handle_signals
 
         ! Checking that an input file has been provided by the user. If it
@@ -522,6 +525,7 @@ contains
         character(len=10) :: t_step_start_string
 
         integer :: i, j
+        integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -530,6 +534,17 @@ contains
         ! Read in cell boundary locations in x-direction
         file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+        if(down_sample) then 
+            m_ds = INT((m+1)/3) - 1
+            n_ds = INT((n+1)/3) - 1
+            p_ds = INT((p+1)/3) - 1
+
+            m_glb_ds = INT((m_glb+1)/3) - 1
+            n_glb_ds = INT((n_glb+1)/3) - 1
+            p_glb_ds = INT((p_glb+1)/3) - 1
+        end if
+
 
         if (file_exist) then
             data_size = m_glb + 2
@@ -617,25 +632,42 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 ! Initialize MPI data I/O
-
-                if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
-                        levelset, levelset_norm)
+                if(down_sample) then 
+                    call s_initialize_mpi_data_ds(q_cons_vf)
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    if (ib) then
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                            levelset, levelset_norm)
+                    else
+                        call s_initialize_mpi_data(q_cons_vf)
+                    end if
                 end if
 
-                ! Size of local arrays
-                data_size = (m + 1)*(n + 1)*(p + 1)
+                if(down_sample) then 
+                    ! Size of local arrays
+                    data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
 
-                ! Resize some integers so MPI can read even the biggest file
-                m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
-                n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
-                p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
-                MOK = int(1._wp, MPI_OFFSET_KIND)
-                str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                    ! Resize some integers so MPI can read even the biggest file
+                    m_MOK = int(m_glb_ds + 1, MPI_OFFSET_KIND)
+                    n_MOK = int(n_glb_ds + 1, MPI_OFFSET_KIND)
+                    p_MOK = int(p_glb_ds + 1, MPI_OFFSET_KIND)
+                    WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                    MOK = int(1._wp, MPI_OFFSET_KIND)
+                    str_MOK = int(name_len, MPI_OFFSET_KIND)
+                    NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                else 
+                    ! Size of local arrays
+                    data_size = (m + 1)*(n + 1)*(p + 1)
+
+                    ! Resize some integers so MPI can read even the biggest file
+                    m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+                    n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+                    p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+                    WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                    MOK = int(1._wp, MPI_OFFSET_KIND)
+                    str_MOK = int(name_len, MPI_OFFSET_KIND)
+                    NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                end if
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
@@ -760,7 +792,6 @@ contains
 
                 end if
 
-
                 ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
 
@@ -771,7 +802,7 @@ contains
                 WP_MOK = int(8._wp, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
-                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND) 
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
@@ -1440,6 +1471,10 @@ contains
 
     subroutine s_initialize_modules
 
+        integer :: m_ds, n_ds, p_ds
+        integer :: i, j, k, l, x_id, y_id, z_id, ix, iy, iz
+        real(wp) :: temp1, temp2, temp3, temp4
+
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles_euler .and. nb > 1 .and. R0_type == 1) then
@@ -1499,9 +1534,59 @@ contains
 #if defined(MFC_OpenACC) && defined(MFC_MEMORY_DUMP)
         call acc_present_dump()
 #endif
+        if(down_sample) then 
+            m_ds = INT((m+1)/3) - 1
+            n_ds = INT((n+1)/3) - 1
+            p_ds = INT((p+1)/3) - 1
+
+            @:ALLOCATE(q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                @:ALLOCATE(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+                @:ACC_SETUP_SFs(q_cons_temp(i))
+            end do
+        end if
 
         ! Reading in the user provided initial condition and grid data
-        call s_read_data_files(q_cons_ts(1)%vf, bc_type)
+        if(down_sample) then 
+            call s_read_data_files(q_cons_temp, bc_type)
+        else
+            call s_read_data_files(q_cons_ts(1)%vf, bc_type)
+        end if
+
+        if(down_sample) then 
+            do i = 1, sys_size
+                !$acc update device(q_cons_temp(i)%sf)
+            end do
+            !$acc update device(vec_size)
+            !$acc parallel loop collapse(4) gang vector default(present) private(x_id, y_id, z_id, temp1, temp2, temp3, temp4, ix, iy, iz)
+            do l = 0, p 
+                do k = 0, n
+                    do j = 0, m 
+                        do i = 1, vec_size
+
+                            ix = INT(j/3._wp)
+                            iy = INT(k/3._wp)
+                            iz = INT(l/3._wp)
+
+                            x_id = j - INT(3*ix) - 1
+                            y_id = k - INT(3*iy) - 1
+                            z_id = l - INT(3*iz) - 1
+
+                            temp1 = (2._wp/3._wp)*q_cons_temp(i)%sf(ix,iy,iz) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix+x_id,iy,iz)
+                            temp2 = (2._wp/3._wp)*q_cons_temp(i)%sf(ix,iy+y_id,iz) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix+x_id,iy+y_id,iz)
+                            temp3 = (2._wp/3._wp)*temp1 + (1._wp/3._wp)*temp2
+
+                            temp1 = (2._wp/3._wp)*q_cons_temp(i)%sf(ix,iy,iz+z_id) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix+x_id,iy,iz+z_id)
+                            temp2 = (2._wp/3._wp)*q_cons_temp(i)%sf(ix,iy+y_id,iz+z_id) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix+x_id,iy+y_id,iz+z_id)
+                            temp4 = (2._wp/3._wp)*temp1 + (1._wp/3._wp)*temp2
+
+                            q_cons_ts(1)%vf(i)%sf(j,k,l) = (2._wp/3._wp)*temp3 + (1._wp/3._wp)*temp4
+
+                        end do
+                    end do 
+                end do 
+            end do
+        end if
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
@@ -1610,9 +1695,11 @@ contains
     subroutine s_initialize_gpu_vars
         integer :: i
         !Update GPU DATA
-        do i = 1, vec_size
-            !$acc update device(q_cons_ts(1)%vf(i)%sf)
-        end do
+        if(.not. down_sample) then 
+            do i = 1, vec_size
+                !$acc update device(q_cons_ts(1)%vf(i)%sf)
+            end do
+        end if
 
         if (qbmm .and. .not. polytropic) then
             !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)

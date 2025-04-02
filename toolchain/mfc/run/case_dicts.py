@@ -57,6 +57,7 @@ COMMON = {
     'chemistry': ParamType.LOG,
     'cantera_file': ParamType.STR,
     'rkck_adap_dt': ParamType.LOG, 
+    'down_sample': ParamType.LOG, 
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -448,6 +449,9 @@ for cmp_id in range(1,3+1):
 
     POST_PROCESS[f'{cmp}_output%beg'] = ParamType.REAL
     POST_PROCESS[f'{cmp}_output%end'] = ParamType.REAL
+
+    for prepend in ["domain%beg", "domain%end"]:
+        POST_PROCESS[f"{cmp}_{prepend}"] = ParamType.REAL
 
     for real_attr in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
         POST_PROCESS[f'{real_attr}({cmp_id})'] = ParamType.LOG

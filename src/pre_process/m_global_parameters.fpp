@@ -151,6 +151,7 @@ module m_global_parameters
     logical :: igr           !< Use information geometric regularization
     logical :: elliptic_smoothing !< Enables Ellipitcal Smoothing in Patches
     integer :: elliptic_smoothing_iters !< Iterations of Elliptic Smoothing done
+    logical :: down_sample
 
 
 #ifdef MFC_MPI
@@ -526,6 +527,7 @@ contains
         igr = .false.
         elliptic_smoothing = .false.
         elliptic_smoothing_iters = 1
+        down_sample = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 

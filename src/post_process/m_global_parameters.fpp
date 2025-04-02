@@ -141,6 +141,9 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
+    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
+    type(bounds_info) :: x_domain, y_domain, z_domain 
+
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -302,7 +305,7 @@ module m_global_parameters
     !> @name Lagrangian bubbles
     !> @{
     logical :: bubbles_lagrange, rkck_adap_dt
-    logical :: igr
+    logical :: igr, down_sample
     !> @}
 
 contains
@@ -430,6 +433,7 @@ contains
         rkck_adap_dt = .false.
 
         igr = .false.
+        down_sample = .false.
 
         ! IBM
         num_ibs = dflt_int
@@ -442,6 +446,13 @@ contains
         y_output%end = dflt_real
         z_output%beg = dflt_real
         z_output%end = dflt_real
+
+        x_domain%beg = dflt_real
+        x_domain%end = dflt_real
+        y_domain%beg = dflt_real
+        y_domain%end = dflt_real
+        z_domain%beg = dflt_real
+        z_domain%end = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 

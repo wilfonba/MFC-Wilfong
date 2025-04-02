@@ -458,6 +458,10 @@ contains
             end if
         end if
 
+        if(down_sample) then 
+            call s_populate_variables_buffers(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf, bc_type)
+        end if
+
         call nvtxEndRange
 
     end subroutine s_1st_order_tvd_rk
@@ -644,6 +648,10 @@ contains
             else
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
             end if
+        end if
+
+        if(down_sample) then 
+            call s_populate_variables_buffers(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf, bc_type)
         end if
 
         call nvtxEndRange
@@ -915,6 +923,10 @@ contains
             else
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
             end if
+        end if
+
+        if(down_sample) then 
+            call s_populate_variables_buffers(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf, bc_type)
         end if
 
         if (.not. adap_dt) then
