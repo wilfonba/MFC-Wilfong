@@ -42,4 +42,4 @@ export MFC_CUDA_CC=90
 # Run pre_process and simulation binaries with case optimization
 ./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process simulation --gpu -N 1 -n 4 -j 71 -c santis
 ```
-The environment variables `NVIDIA_ALLOC_MODE`, `NVIDIA_MANUAL_GPU_HINTS`, and `NVIDIA_VARS_ON_GPU`, can be set appropriately in `toolchain/templates/santis.mako`.
+The environment variables `NVIDIA_ALLOC_MODE`, `NVIDIA_MANUAL_GPU_HINTS`, `NVIDIA_VARS_ON_GPU`, and `NVIDIA_IGR_TEMPS_ON_GPU`, can be set appropriately in `toolchain/templates/santis.mako`, to configure a run with ALL buffers either in GPU or in CPU memory, or a run with SOME buffers in GPU memory and the rest in CPU memory.
