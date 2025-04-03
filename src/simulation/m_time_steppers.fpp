@@ -88,6 +88,33 @@ contains
 
         integer :: i, j !< Generic loop iterators
 
+        integer :: vars_on_gpu = 0
+        character(len=10) :: vars_on_gpu_str
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        call get_environment_variable("NVIDIA_VARS_ON_GPU", vars_on_gpu_str)
+
+        if (trim(vars_on_gpu_str) == "0") then
+            vars_on_gpu = 0
+        elseif (trim(vars_on_gpu_str) == "1") then
+            vars_on_gpu = 1
+        elseif (trim(vars_on_gpu_str) == "2") then
+            vars_on_gpu = 2
+        elseif (trim(vars_on_gpu_str) == "3") then
+            vars_on_gpu = 3
+        elseif (trim(vars_on_gpu_str) == "4") then
+            vars_on_gpu = 4
+        elseif (trim(vars_on_gpu_str) == "5") then
+            vars_on_gpu = 5
+        elseif (trim(vars_on_gpu_str) == "6") then
+            vars_on_gpu = 6
+        elseif (trim(vars_on_gpu_str) == "7") then
+            vars_on_gpu = 7
+        else ! default
+            vars_on_gpu = 0
+        endif
+#endif
+
         ! Setting number of time-stages for selected time-stepping scheme
         if (time_stepper == 1) then
             num_ts = 1
@@ -97,9 +124,11 @@ contains
 
         ! Allocating the cell-average conservative variables
         @:ALLOCATE(q_cons_ts(1:num_ts))
+        @:PREFER_GPU(q_cons_ts)
 
         do i = 1, num_ts
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
+            @:PREFER_GPU(q_cons_ts(i)%vf)
         end do
 
         if(igr) then 
@@ -108,6 +137,11 @@ contains
                     @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
+                        if ( i == 1 ) then
+                            if ( j <= vars_on_gpu ) then
+                                @:PREFER_GPU(q_cons_ts(1)%vf(j)%sf)
+                            end if
+                        end if
                 end do
                 @:ACC_SETUP_VFs_IGR(q_cons_ts(i))
                 allocate(q_cons_ts(i)%vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -301,6 +335,7 @@ contains
         else
             ! Allocating the cell-average RHS variables
             @:ALLOCATE(rhs_vf(1:sys_size))
+            @:PREFER_GPU(rhs_vf)
 
             if(.not. igr) then 
                 do i = 1, sys_size 
@@ -312,6 +347,7 @@ contains
                     @:ALLOCATE(rhs_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end &
                     , idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(rhs_vf(i))
+                    @:PREFER_GPU(rhs_vf(i)%sf)
                 end do
                 allocate(rhs_vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end &
                     , idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -702,6 +738,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
@@ -714,6 +751,22 @@ contains
                 end do
             end do
         end do
+#else
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, vec_size
+                        q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l)
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                            + dt*rhs_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+#endif
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
@@ -770,13 +823,18 @@ contains
 
         ! Stage 2 of 3
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+#else
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+#endif
 
         if (bubbles_lagrange) then
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
             call s_update_lagrange_tdv_rk(stage=2)
         end if
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
@@ -790,6 +848,21 @@ contains
                 end do
             end do
         end do
+#else
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, vec_size
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                    end do
+                end do
+            end do
+        end do
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)
@@ -846,13 +919,18 @@ contains
         end if
 
         ! Stage 3 of 3
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+#else
+        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
+#endif
 
         if (bubbles_lagrange) then
             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
             call s_update_lagrange_tdv_rk(stage=3)
         end if
         
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
@@ -866,6 +944,21 @@ contains
                 end do
             end do
         end do
+#else
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    do i = 1, vec_size
+                        q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                            (q_cons_ts(2)%vf(i)%sf(j, k, l) &
+                             + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                    end do
+                end do
+            end do
+        end do
+#endif
 
         if (qbmm .and. (.not. polytropic)) then
             !$acc parallel loop collapse(5) gang vector default(present)

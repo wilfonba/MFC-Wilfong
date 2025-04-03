@@ -33,14 +33,45 @@ module m_igr
     real(wp), allocatable, dimension(:, :) :: Res
     !$acc declare create(Res)
 
-    real(wp), allocatable, dimension(:) :: coeff_L, coeff_R
-    !$acc declare create(coeff_L, coeff_R)
+
+    real(wp), parameter :: coeff_L(-1:3) = [ &
+        -3._wp/60._wp,   &  ! Index -1
+        27._wp/60._wp,   &  ! Index 0
+        47._wp/60._wp,   &  ! Index 1
+        -13._wp/60._wp,  &  ! Index 2
+        2._wp/60._wp     &  ! Index 3
+        ]
+
+    real(wp), parameter :: coeff_R(-2:2) = [ &
+        2._wp/60._wp,    &  ! Index -2
+        -13._wp/60._wp,  &  ! Index -1
+        47._wp/60._wp,   &  ! Index 0
+        27._wp/60._wp,   &  ! Index 1
+        -3._wp/60._wp    &  ! Index 2
+        ]
 
     integer :: i, j, k, l, q, r
 
 contains
 
     subroutine s_initialize_igr_module()
+
+        integer :: igr_temps_on_gpu = 2
+        character(len=10) :: igr_temps_on_gpu_str
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        call get_environment_variable("NVIDIA_IGR_TEMPS_ON_GPU", igr_temps_on_gpu_str)
+
+        if (trim(igr_temps_on_gpu_str) == "0") then
+            igr_temps_on_gpu = 0 ! jac and jac_rhs on CPU
+        elseif (trim(igr_temps_on_gpu_str) == "1") then
+            igr_temps_on_gpu = 1 ! jac on GPU, jac_rhs on CPU
+        elseif (trim(igr_temps_on_gpu_str) == "2") then
+            igr_temps_on_gpu = 2 ! jac and jac_rhs on GPU
+        else ! default on GPU
+            igr_temps_on_gpu = 2
+        endif
+#endif
 
         bcxb = bc_x%beg; bcxe = bc_x%end; bcyb = bc_y%beg; bcye = bc_y%end; bczb = bc_z%beg; bcze = bc_z%end
         !bcxb = -1; bcxe = -1; bcyb = -1; bcye = -1; bczb = -1; bcze = -1
@@ -54,6 +85,8 @@ contains
                 end do
             end do
             !$acc update device(Res, Re_idx, Re_size)
+            @:PREFER_GPU(Res)
+            @:PREFER_GPU(Re_idx)
         end if
 
         if(igr) then 
@@ -62,6 +95,12 @@ contains
                              idwbuff(2)%beg:idwbuff(2)%end, &
                              idwbuff(3)%beg:idwbuff(3)%end))
             #:endfor
+            if ( igr_temps_on_gpu >= 1 ) then
+                @:PREFER_GPU(jac)
+            end if
+            if ( igr_temps_on_gpu >= 2 ) then
+                @:PREFER_GPU(jac_rhs)
+            end if
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -73,22 +112,6 @@ contains
                 end do
             end do
 
-
-            @:ALLOCATE(coeff_L(-1:3))
-            coeff_L(-1) = (-3._wp/60._wp)
-            coeff_L(0) = (27._wp/60._wp)
-            coeff_L(1) = (47._wp/60._wp)
-            coeff_L(2) = (-13._wp/60._wp)
-            coeff_L(3) = (2._wp/60._wp)
-            !$acc update device(coeff_L)
-
-            @:ALLOCATE(coeff_R(-2:2))
-            coeff_R(2) = (-3._wp/60._wp)
-            coeff_R(1) = (27._wp/60._wp)
-            coeff_R(0) = (47._wp/60._wp)
-            coeff_R(-1) = (-13._wp/60._wp)
-            coeff_R(-2) = (2._wp/60._wp)
-            !$acc update device(coeff_R)
         end if
 
     end subroutine s_initialize_igr_module

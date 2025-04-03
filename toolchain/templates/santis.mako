@@ -3,16 +3,13 @@
 <%namespace name="helpers" file="helpers.mako"/>
 
 % if engine == 'batch':
-#SBATCH --uenv=prgenv-nvfortran/24.11:v1@daint
+#SBATCH --uenv=icon/25.2:v1
 #SBATCH --nodes=${nodes}
-#SBATCH --ntasks=${nodes*tasks_per_node}
+#SBATCH --ntasks-per-node=${tasks_per_node}
 #SBATCH --job-name="${name}"
 #SBATCH --output="${name}.out"
+#SBATCH --error="${name}.err"
 #SBATCH --time=${walltime}
-% if gpu:
-#SBATCH --gpus-per-task=1
-#SBATCH --gpu-bind=closest
-% endif
 % if account:
 #SBATCH --account=${account}
 % endif
@@ -28,11 +25,25 @@
 % endif
 % endif
 
-export MPICH_GPU_SUPPORT_ENABLED=1
-export FI_CXI_RX_MATCH_MODE=software
-export FI_MR_CACHE_MONITOR=disabled
-export MPICH_NO_BUFFER_ALIAS_CHECK=1
+# NVHPC and CUDA env vars
+export NV_ACC_USE_MALLOC=1                    # use malloc instead of cudaMallocManaged ( compiled using -gpu=mem:unified )
+export NVCOMPILER_ACC_NO_MEMHINTS=1           # disable implicit compiler hints
+export CUDA_BUFFER_PAGE_IN_THRESHOLD_MS=0.001 # workaround for copying to/from unpopulated buffers on GH
 
+# Cray MPICH
+export MPICH_GPU_SUPPORT_ENABLED=1            # MPICH with GPU support
+export FI_CXI_RX_MATCH_MODE=software
+#export FI_MR_CACHE_MONITOR=disabled
+
+# CUSTOM env vars to MFC
+export NVIDIA_ALLOC_MODE=2                    # default alloc to prefloc CPU
+export NVIDIA_MANUAL_GPU_HINTS=1              # prefloc GPU on some
+export NVIDIA_IGR_TEMPS_ON_GPU=1              # jac on GPU and jac_rhs on CPU       ( NOTE: good default, tune based on size )
+export NVIDIA_VARS_ON_GPU=7                   # q_cons_ts(1)%vf%sf for j=1-7 on GPU ( NOTE: good default, tune based on size )
+
+# NSYS
+export NSYS=0                                 # enable nsys profiling
+export NSYS_FILE=myreport.qdrep
 
 ${helpers.template_prologue()}
 
@@ -46,19 +57,22 @@ echo
 
 % for target in targets:
     ${helpers.run_prologue(target)}
-
+    ${target.get_home_dirpath(case)}
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
         (set -x; srun \
-        % if engine == 'interactive':
-                --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
-                --cpus-per-task 7                                    \
+                --ntasks=${nodes*tasks_per_node}                     \
+                --cpus-per-task 1                                    \
+                --cpu-bind=none                                      \
             % if gpu:
-                --gpus-per-task 1 --gpu-bind closest                 \
+                --gpus-per-task 1                                    \
             % endif
-        % endif
-                --wait 200 --bcast=/tmp/${target.name} ${profiler} "${target.get_install_binpath(case)}")
+                --wait 200 --bcast=/tmp/${target.name}               \
+            % if target.name == 'simulation':
+                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/nsys.sh"                        \
+            % endif
+                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/bind.sh" "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}
