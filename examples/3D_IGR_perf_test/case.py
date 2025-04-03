@@ -43,6 +43,7 @@ eps = 1e-5
 
 # Configuring case dictionary
 case = {
+        "rdma_mpi": "T",
         # Logistics
         # "run_time_info": "T",
         # Computational Domain Parameters
