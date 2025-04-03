@@ -15,6 +15,7 @@ export MPICH_OFI_NIC_POLICY=USER
 export MPICH_OFI_NIC_MAPPING="0:0; 1:1; 2:2; 3:3"
 
 # Bind to cores ( second core per socket )
+# see https://eth-cscs.github.io/cscs-docs/guides/gb2025/#low-noise-mode
 physcores=(1 73 145 217)
 
 #echo rank: $local_rank, cores: ${physcores[$local_rank]}, GPU: $CUDA_VISIBLE_DEVICES, NIC mapping: $MPICH_OFI_NIC_POLICY

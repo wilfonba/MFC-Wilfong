@@ -63,7 +63,7 @@ echo
     % else:
         (set -x; srun \
                 --ntasks=${nodes*tasks_per_node}                     \
-                --cpus-per-task 9                                    \
+                --cpus-per-task 1                                    \
                 --cpu-bind=none                                      \
             % if gpu:
                 --gpus-per-task 1                                    \
