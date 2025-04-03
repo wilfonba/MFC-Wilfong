@@ -57,7 +57,7 @@ echo
 
 % for target in targets:
     ${helpers.run_prologue(target)}
-
+    ${target.get_home_dirpath(case)}
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
@@ -70,9 +70,9 @@ echo
             % endif
                 --wait 200 --bcast=/tmp/${target.name}               \
             % if target.name == 'simulation':
-                ../../misc/nvidia_uvm/nsys.sh                        \
+                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/nsys.sh"                        \
             % endif
-                ../../misc/nvidia_uvm/bind.sh "${target.get_install_binpath(case)}")
+                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/bind.sh" "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}
