@@ -39,7 +39,10 @@ cd MFC-Wilfong
 export MFC_CUDA_CC=90
 ./mfc.sh build --gpu -j 71 --single --unified --verbose
 
-# Run pre_process and simulation binaries with case optimization
+# Run pre_process and simulation binaries with case optimization (in an interactive job)
 ./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process simulation --gpu -N 1 -n 4 -j 71 -c santis
+
+# Run pre_process and simulation binaries with case optimization (in an batch job)
+./mfc.sh run examples/3D_IGR_perf_test/case.py --case-optimization -t pre_process simulation --gpu -N 1 -n 4 -j 71 -c santis -e batch -p normal -a g183 -w 00:15:00
 ```
 The environment variables `NVIDIA_ALLOC_MODE`, `NVIDIA_MANUAL_GPU_HINTS`, `NVIDIA_VARS_ON_GPU`, and `NVIDIA_IGR_TEMPS_ON_GPU`, can be set appropriately in `toolchain/templates/santis.mako`, to configure a run with ALL buffers either in GPU or in CPU memory, or a run with SOME buffers in GPU memory and the rest in CPU memory.
