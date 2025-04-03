@@ -42,6 +42,9 @@ echo
 
 export MPICH_GPU_SUPPORT_ENABLED=1
 
+# when compiled with --unified, keeps q_cons_ts(2) on the host and `q_cons_ts(1)` on the device
+export CRAY_ACC_USE_UNIFIED_MEM=1
+
 % for target in targets:
     ${helpers.run_prologue(target)}
 
