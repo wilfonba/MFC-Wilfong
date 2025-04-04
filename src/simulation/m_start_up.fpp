@@ -98,7 +98,7 @@ module m_start_up
  s_initialize_modules, s_initialize_gpu_vars, &
  s_initialize_mpi_domain, s_finalize_modules, &
  s_perform_time_step, s_save_data, &
- s_save_performance_metrics
+ s_save_performance_metrics, s_read_cpu_memory_usage
 
 
     type(scalar_field), allocatable, dimension(:) :: grad_x_vf, grad_y_vf, grad_z_vf, norm_vf
@@ -1345,8 +1345,53 @@ contains
 
     end subroutine s_perform_time_step
 
-    subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+      
+    ! For reading memory usage. Shamelessly adapted from
+    ! stack overflow 
+    subroutine s_read_cpu_memory_usage(current, peak)
+        character(len=255), intent(out)  :: current, peak
+        character(len=*), parameter :: current_str = "VmPeak:"
+        character(len=*), parameter :: peak_str = "VmSize:"
+        logical :: peak_found, current_found
+        character (len=1000) :: text
+        character (len=10) :: word, units
+        integer :: ierr
+        peak_found = .false.
+        current_found = .false.
+       ! picking 20 cause.. I dunno. Fortran I/O is dumb.
 
+        open (unit=20,file="/proc/self/status",action="read")
+        do
+           read (20,"(a)",iostat=ierr) text
+           if (ierr /= 0) exit
+           read (text,*) word
+           if (.not. peak_found) then
+            if (word == peak_str ) then
+               read (text,*) word, peak, units
+               peak = trim(peak) // trim(units)
+               peak_found = .true.
+            end if
+         end if
+         if (.not. current_found) then
+            if (word == current_str ) then
+               read (text,*) word, current, units
+               current = trim(current) // trim(units)
+               current_found = .true.
+            end if
+         endif
+         if (current_found .and. peak_found) exit
+      end do
+      if (.not. current_found) current = "NotFound"
+      if (.not. peak_found) peak = "NotFound"
+      close(20)
+    end subroutine s_read_cpu_memory_usage
+
+    subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
+        use iso_c_binding, only : c_size_t
+#ifdef _CRAYFTN
+        use hipfort
+	use hipfort_check
+#endif
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: time_avg, time_final
         real(wp), intent(inout) :: io_time_avg, io_time_final
@@ -1357,7 +1402,10 @@ contains
         integer, intent(inout) :: nt
 
         real(wp) :: grind_time
-
+        character(len=255) :: cpu_current, cpu_peak, gpu_current_str, gpu_free_str
+        integer(c_size_t) :: gpu_free, gpu_total
+        real(4) :: gpu_current_kb, gpu_free_kb
+        
         call s_mpi_barrier()
 
         if (num_procs > 1) then
@@ -1403,10 +1451,32 @@ contains
             write (1, '(I10, F15.8)') num_procs, io_time_final
             close (1)
 
+            inquire (FILE='memory_usage_data.dat', EXIST=file_exists)
+            if (file_exists) then
+                open (1, file='memory_usage_data.dat', position='append', status='old')
+            else
+                open (1, file='memory_usage_data.dat', status='new')
+                write (1, '(A15, A15, A15, A15, A15)') "Ranks", "CPU Current", "CPU Peak", "GPU Current", "GPU Free"
+            end if
+            call s_read_cpu_memory_usage(cpu_current, cpu_peak)
+            gpu_current_kb = 0.0
+            gpu_free_kb = 0.0
+#ifdef _CRAYFTN
+            call hipCheck(hipMemGetInfo(gpu_free, gpu_total))
+            gpu_current_kb = (real(gpu_total) - real(gpu_free)) / 1024.
+            gpu_free_kb = real(gpu_free) / 1024.
+#endif
+            write (gpu_current_str, '(F13.2)') gpu_current_kb
+	    gpu_current_str = trim(gpu_current_str) // "kB"
+            write (gpu_free_str, '(F13.2)') gpu_free_kb
+            gpu_free_str = trim(gpu_free_str) // "kB"
+            write (1, '(I15, A15, A15, A15, A15)') num_procs, trim(cpu_current), trim(cpu_peak), gpu_current_str, gpu_free_str
+            close (1)
+            
         end if
 
     end subroutine s_save_performance_metrics
-
+      
     subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: start, finish, io_time_avg
