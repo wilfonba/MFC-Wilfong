@@ -163,6 +163,7 @@ contains
 
 	   ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
 	   ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
+	   ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
 	   call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims=pool_dims, lbounds=pool_starts, flags=hipMemAttachGlobal))
 
            do j = 1, sys_size
@@ -1465,7 +1466,9 @@ contains
         @:DEALLOCATE(q_cons_ts)
 #ifdef FRONTIER_UNIFIED
         call hipCheck(hipHostFree(q_cons_ts_pool_host))
-	call acc_unmap_data(q_cons_ts_pool_device)
+	! I thought we would want to unmap to be clean, but
+	! this gives a present table error so don't bother.
+	!call acc_unmap_data(q_cons_ts_pool_device)
 	call hipCheck(hipFree(q_cons_ts_pool_device))
 #endif
         ! Deallocating the cell-average primitive ts variables
