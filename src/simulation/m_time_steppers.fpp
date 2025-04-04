@@ -79,13 +79,23 @@ module m_time_steppers
 
     !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, rhs_ts_rkck, q_prim_ts, rhs_mv, rhs_pb, max_dt)
 
+#ifdef FRONTIER_UNIFIED
+   real(wp), pointer, contiguous, dimension(:,:,:,:) :: q_cons_ts_pool_host, q_cons_ts_pool_device
+   integer :: pool_dims(4), pool_starts(4)
+#endif
+      
 contains
 
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_time_steppers_module
-
+#ifdef FRONTIER_UNIFIED
+        use hipfort
+        use hipfort_hipmalloc
+        use hipfort_check
+	use openacc
+#endif
         integer :: i, j !< Generic loop iterators
 
         integer :: vars_on_gpu = 0
@@ -132,7 +142,49 @@ contains
         end do
 
         if(igr) then 
-            do i = 1, num_ts
+#ifdef FRONTIER_UNIFIED
+           if (num_ts /= 2) stop "FRONTIER_UNIFIED assumes num_ts = 2"
+          !Allocate to memory regions using hip calls
+          ! that we will attach pointers to
+           do i=1,3
+              pool_dims(i) = idwbuff(i)%end - idwbuff(i)%beg + 1
+              pool_starts(i) = idwbuff(i)%beg
+           end do
+           pool_dims(4) = sys_size
+           pool_starts(4) = 1
+
+	   ! Doing hipMalloc then mapping should be most performant
+           call hipCheck(hipMalloc(q_cons_ts_pool_device, dims=pool_dims, lbounds=pool_starts))
+	   ! Without this map CCE will still create a device copy, because it's silly like that
+	   call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
+
+	   ! If the hipMalloc route isn't working we could use this and them prefetch, if we need to
+           !!call hipCheck(hipMallocManaged(q_cons_ts_pool_device, dims=pool_dims, lbounds=pool_starts, flags=hipMemAttachGlobal))
+
+	   ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
+	   ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
+	   ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
+	   call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims=pool_dims, lbounds=pool_starts, flags=hipMemAttachGlobal))
+
+           do j = 1, sys_size
+              ! q_cons_ts(1) lives on the device
+              q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                        idwbuff(2)%beg:idwbuff(2)%end, &
+                                        idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:,:,:,j)
+              ! q_cons_ts(2) lives on the host
+              q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                        idwbuff(2)%beg:idwbuff(2)%end, &
+                                        idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
+          end do
+          do i = 1, num_ts
+             @:ACC_SETUP_VFs_IGR(q_cons_ts(i))             
+            do j = 1, vec_size
+                !$acc update device(q_cons_ts(i)%vf(j))
+            enddo
+         end do
+
+#else
+           do i = 1, num_ts
                 do j = 1, vec_size
                     @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
@@ -148,6 +200,7 @@ contains
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
             end do
+#endif
         else 
             do i = 1, num_ts
                 do j = 1, sys_size 
@@ -738,7 +791,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=1)
         end if
 
-#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
@@ -823,7 +876,7 @@ contains
 
         ! Stage 2 of 3
 
-#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 #else
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
@@ -834,7 +887,8 @@ contains
             call s_update_lagrange_tdv_rk(stage=2)
         end if
 
-#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+
+#if  !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
@@ -919,7 +973,7 @@ contains
         end if
 
         ! Stage 3 of 3
-#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 #else
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
@@ -930,7 +984,7 @@ contains
             call s_update_lagrange_tdv_rk(stage=3)
         end if
         
-#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+#if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
             do k = 0, n
@@ -1386,22 +1440,37 @@ contains
 
     !> Module deallocation and/or disassociation procedures
     subroutine s_finalize_time_steppers_module
+#ifdef FRONTIER_UNIFIED
+        use hipfort
+        use hipfort_hipmalloc
+        use hipfort_check
+#endif
 
         integer :: i, j !< Generic loop iterators
 
         ! Deallocating the cell-average conservative variables
         do i = 1, num_ts
-
+#ifdef FRONTIER_UNIFIED
+            do j = 1, vec_size
+                nullify(q_cons_ts(i)%vf(j)%sf)
+            end do
+#else
             do j = 1, vec_size
                 @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
             end do
-
+#endif
             @:DEALLOCATE(q_cons_ts(i)%vf)
 
         end do
 
         @:DEALLOCATE(q_cons_ts)
-
+#ifdef FRONTIER_UNIFIED
+        call hipCheck(hipHostFree(q_cons_ts_pool_host))
+	! I thought we would want to unmap to be clean, but
+	! this gives a present table error so don't bother.
+	!call acc_unmap_data(q_cons_ts_pool_device)
+	call hipCheck(hipFree(q_cons_ts_pool_device))
+#endif
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
             do i = 0, 3
