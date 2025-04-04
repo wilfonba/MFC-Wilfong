@@ -1456,7 +1456,7 @@ contains
                 open (1, file='memory_usage_data.dat', position='append', status='old')
             else
                 open (1, file='memory_usage_data.dat', status='new')
-                write (1, '(A15, A15, A15, A15, A15)') "Ranks", "CPU Current", "CPU Peak", "GPU Current", "GPU Free"
+                write (1, '(A15, A15, A15, A17, A17)') "Ranks", "CPU Current", "CPU Peak", "GPU Current", "GPU Free"
             end if
             call s_read_cpu_memory_usage(cpu_current, cpu_peak)
             gpu_current_kb = 0.0
@@ -1466,11 +1466,11 @@ contains
             gpu_current_kb = (real(gpu_total) - real(gpu_free)) / 1024.
             gpu_free_kb = real(gpu_free) / 1024.
 #endif
-            write (gpu_current_str, '(F13.2)') gpu_current_kb
+            write (gpu_current_str, '(F15.2)') gpu_current_kb
 	    gpu_current_str = trim(gpu_current_str) // "kB"
-            write (gpu_free_str, '(F13.2)') gpu_free_kb
+            write (gpu_free_str, '(F15.2)') gpu_free_kb
             gpu_free_str = trim(gpu_free_str) // "kB"
-            write (1, '(I15, A15, A15, A15, A15)') num_procs, trim(cpu_current), trim(cpu_peak), gpu_current_str, gpu_free_str
+            write (1, '(I15, A15, A15, A17, A17)') num_procs, trim(cpu_current), trim(cpu_peak), gpu_current_str, gpu_free_str
             close (1)
             
         end if
