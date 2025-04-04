@@ -1350,8 +1350,8 @@ contains
     ! stack overflow 
     subroutine s_read_cpu_memory_usage(current, peak)
         character(len=255), intent(out)  :: current, peak
-        character(len=*), parameter :: current_str = "VmPeak:"
-        character(len=*), parameter :: peak_str = "VmSize:"
+        character(len=*), parameter :: peak_str = "VmHWM:"
+        character(len=*), parameter :: current_str = "Pss:"
         logical :: peak_found, current_found
         character (len=1000) :: text
         character (len=10) :: word, units
@@ -1360,37 +1360,50 @@ contains
         current_found = .false.
        ! picking 20 cause.. I dunno. Fortran I/O is dumb.
 
+        ! get high water mark from proc status
         open (unit=20,file="/proc/self/status",action="read")
         do
-           read (20,"(a)",iostat=ierr) text
-           if (ierr /= 0) exit
-           read (text,*) word
-           if (.not. peak_found) then
-            if (word == peak_str ) then
-               read (text,*) word, peak, units
-               peak = trim(peak) // trim(units)
-               peak_found = .true.
+            read (20,"(a)",iostat=ierr) text
+            if (ierr /= 0) exit
+            read (text,*) word
+            if (.not. peak_found) then
+                if (word == peak_str ) then
+                    read (text,*) word, peak, units
+                    peak = trim(peak) // trim(units)
+                    peak_found = .true.
+                end if
             end if
-         end if
-         if (.not. current_found) then
-            if (word == current_str ) then
-               read (text,*) word, current, units
-               current = trim(current) // trim(units)
-               current_found = .true.
-            end if
-         endif
-         if (current_found .and. peak_found) exit
-      end do
-      if (.not. current_found) current = "NotFound"
-      if (.not. peak_found) peak = "NotFound"
-      close(20)
+
+            if (peak_found) exit
+        end do
+        close(20)
+
+        ! but get currrent from smaps_rollup
+        open (unit=30,file="/proc/self/smaps_rollup",action="read")
+        do
+            read (30,"(a)",iostat=ierr) text
+            if (ierr /= 0) exit
+            read (text,*) word
+            if (.not. current_found) then
+                if (word == current_str ) then
+                    read (text,*) word, current, units
+                    current = trim(current) // trim(units)
+                    current_found = .true.
+                end if  
+            endif
+            if (current_found) exit
+        end do
+        close(30)
+        if (.not. current_found) current = "NotFound"      
+        if (.not. peak_found) peak = "NotFound"
+
     end subroutine s_read_cpu_memory_usage
 
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
         use iso_c_binding, only : c_size_t
 #ifdef _CRAYFTN
         use hipfort
-	use hipfort_check
+	    use hipfort_check
 #endif
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: time_avg, time_final
@@ -1467,7 +1480,7 @@ contains
             gpu_free_kb = real(gpu_free) / 1024.
 #endif
             write (gpu_current_str, '(F15.2)') gpu_current_kb
-	    gpu_current_str = trim(gpu_current_str) // "kB"
+	        gpu_current_str = trim(gpu_current_str) // "kB"
             write (gpu_free_str, '(F15.2)') gpu_free_kb
             gpu_free_str = trim(gpu_free_str) // "kB"
             write (1, '(I15, A15, A15, A17, A17)') num_procs, trim(cpu_current), trim(cpu_peak), gpu_current_str, gpu_free_str
