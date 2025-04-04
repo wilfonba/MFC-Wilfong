@@ -56,20 +56,22 @@ contains
 
     subroutine s_initialize_igr_module()
 
-        integer :: igr_temps_on_gpu = 2
+        integer :: igr_temps_on_gpu = 3
         character(len=10) :: igr_temps_on_gpu_str
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
         call get_environment_variable("NVIDIA_IGR_TEMPS_ON_GPU", igr_temps_on_gpu_str)
 
         if (trim(igr_temps_on_gpu_str) == "0") then
-            igr_temps_on_gpu = 0 ! jac and jac_rhs on CPU
+            igr_temps_on_gpu = 0 ! jac, jac_rhs and jac_old on CPU
         elseif (trim(igr_temps_on_gpu_str) == "1") then
-            igr_temps_on_gpu = 1 ! jac on GPU, jac_rhs on CPU
+            igr_temps_on_gpu = 1 ! jac on GPU, jac_rhs on CPU, jac_old on CPU
         elseif (trim(igr_temps_on_gpu_str) == "2") then
-            igr_temps_on_gpu = 2 ! jac and jac_rhs on GPU
+            igr_temps_on_gpu = 2 ! jac and jac_rhs on GPU, jac_old on CPU
+        elseif (trim(igr_temps_on_gpu_str) == "3") then
+            igr_temps_on_gpu = 3 ! jac, jac_rhs and jac_old on GPU
         else ! default on GPU
-            igr_temps_on_gpu = 2
+            igr_temps_on_gpu = 3
         endif
 #endif
 
@@ -101,6 +103,9 @@ contains
             if ( igr_temps_on_gpu >= 2 ) then
                 @:PREFER_GPU(jac_rhs)
             end if
+            if ( igr_temps_on_gpu >= 3) then 
+                @:PREFER_GPU(jac_old)
+            end if 
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
