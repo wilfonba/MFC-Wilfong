@@ -69,10 +69,11 @@ echo
                 --gpus-per-task 1                                    \
             % endif
                 --wait 200 --bcast=/tmp/${target.name}               \
+                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/bind.sh" \
             % if target.name == 'simulation':
-                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/nsys.sh"                        \
+                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/nsys.sh" \
             % endif
-                "${target.get_home_dirpath(case)}/misc/nvidia_uvm/bind.sh" "${target.get_install_binpath(case)}")
+                "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}
