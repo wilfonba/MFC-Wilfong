@@ -239,11 +239,14 @@ contains
             intent(in) :: q_cons_vf
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
+        integer, dimension(3) :: sf_start_idx
 
 #ifdef MFC_MPI
 
         ! Generic loop iterator
         integer :: i, j, q, k, l, m_ds, n_ds, p_ds
+
+        sf_start_idx = (/0, 0, 0/)
 
 #ifndef MFC_POST_PROCESS
         m_ds = INT((m+1)/3) - 1
@@ -270,7 +273,7 @@ contains
 
         ! Define the view for each variable
         do i = 1, sys_size
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_loc, sizes_loc, start_idx, &
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_loc, sizes_loc, sf_start_idx, &
                                           MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
