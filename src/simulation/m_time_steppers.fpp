@@ -83,6 +83,10 @@ module m_time_steppers
    real(wp), pointer, contiguous, dimension(:,:,:,:) :: q_cons_ts_pool_host, q_cons_ts_pool_device
    integer :: pool_dims(4), pool_starts(4)
 #endif
+
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
+#endif
       
 contains
 
@@ -183,6 +187,29 @@ contains
             enddo
          end do
 
+#elif defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+           allocate(q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                        idwbuff(2)%beg:idwbuff(2)%end, &
+                                        idwbuff(3)%beg:idwbuff(3)%end, &
+                                        1:vec_size))
+           do i = 1, num_ts
+                do j = 1, vec_size
+                    if ( i == 1 ) then
+                        @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                            idwbuff(2)%beg:idwbuff(2)%end, &
+                            idwbuff(3)%beg:idwbuff(3)%end))
+                        @:PREFER_GPU(q_cons_ts(i)%vf(j)%sf)
+                    else
+                        q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                            idwbuff(2)%beg:idwbuff(2)%end, &
+                            idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
+                    end if
+                end do
+                @:ACC_SETUP_VFs_IGR(q_cons_ts(i))
+                allocate(q_cons_ts(i)%vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+            end do
 #else
            do i = 1, num_ts
                 do j = 1, vec_size
@@ -1454,6 +1481,15 @@ contains
             do j = 1, vec_size
                 nullify(q_cons_ts(i)%vf(j)%sf)
             end do
+#elif defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+            do j = 1, vec_size
+                if ( i == 1 ) then
+                    @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
+                else
+                    nullify(q_cons_ts(i)%vf(j)%sf)
+                end if
+            end do
+
 #else
             do j = 1, vec_size
                 @:DEALLOCATE(q_cons_ts(i)%vf(j)%sf)
@@ -1470,6 +1506,9 @@ contains
 	! this gives a present table error so don't bother.
 	!call acc_unmap_data(q_cons_ts_pool_device)
 	call hipCheck(hipFree(q_cons_ts_pool_device))
+#endif
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+        deallocate(q_cons_ts_pool_host)
 #endif
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
