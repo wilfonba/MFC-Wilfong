@@ -26,9 +26,9 @@
 % endif
 
 # NVHPC and CUDA env vars
-export NV_ACC_USE_MALLOC=1                    # use malloc instead of cudaMallocManaged ( compiled using -gpu=mem:unified )
+export NV_ACC_USE_MALLOC=0                    # use cudaMallocManaged instead of malloc ( compiled using -gpu=mem:unified )
 export NVCOMPILER_ACC_NO_MEMHINTS=1           # disable implicit compiler hints
-export CUDA_BUFFER_PAGE_IN_THRESHOLD_MS=0.001 # workaround for copying to/from unpopulated buffers on GH
+#export CUDA_BUFFER_PAGE_IN_THRESHOLD_MS=0.001 # workaround for copying to/from unpopulated buffers on GH
 
 # Cray MPICH
 export MPICH_GPU_SUPPORT_ENABLED=1            # MPICH with GPU support
@@ -36,10 +36,10 @@ export FI_CXI_RX_MATCH_MODE=software
 #export FI_MR_CACHE_MONITOR=disabled
 
 # CUSTOM env vars to MFC
-export NVIDIA_ALLOC_MODE=2                    # default alloc to prefloc CPU
+export NVIDIA_ALLOC_MODE=0                    # do nothing
 export NVIDIA_MANUAL_GPU_HINTS=1              # prefloc GPU on some
-export NVIDIA_IGR_TEMPS_ON_GPU=1              # jac on GPU and jac_rhs on CPU       ( NOTE: good default, tune based on size )
-export NVIDIA_VARS_ON_GPU=7                   # q_cons_ts(1)%vf%sf for j=1-7 on GPU ( NOTE: good default, tune based on size )
+export NVIDIA_IGR_TEMPS_ON_GPU=3              # jac, jac_rhs, and jac_old on GPU
+export NVIDIA_VARS_ON_GPU=7                   # q_cons_ts(1)%vf%sf for j=1-7 on GPU
 
 # NSYS
 export NSYS=0                                 # enable nsys profiling

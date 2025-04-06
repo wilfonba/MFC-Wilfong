@@ -21,8 +21,12 @@ module m_igr
         s_initialize_igr, &
         s_igr_flux_add
 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    real(wp), pointer, contiguous, dimension(:, :, :) :: jac,jac_rhs,jac_old
+#else
     real(wp), allocatable, dimension(:, :, :) :: jac,jac_rhs,jac_old
     !$acc declare create(jac, jac_rhs, jac_old)
+#endif
 
     real(wp) :: alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze
     !$acc declare create(alf_igr, omega, mu, bcxb, bcxe, bcyb, bcye, bczb, bcze)
@@ -56,11 +60,17 @@ module m_igr
 
     integer :: i, j, k, l, q, r
 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+    real(wp), allocatable, dimension(:, :, :, :), pinned, target :: m_igr_pool_host
+#endif
+
 contains
 
     subroutine s_initialize_igr_module()
 
         integer :: igr_temps_on_gpu = 3
+        integer :: igr_temps_on_cpu = 0
+        integer :: pool_idx = 1
         character(len=10) :: igr_temps_on_gpu_str
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
@@ -96,6 +106,58 @@ contains
         end if
 
         if(igr) then 
+#ifdef __NVCOMPILER_GPU_UNIFIED_MEM
+           igr_temps_on_cpu = 3 - igr_temps_on_gpu
+           if ( igr_temps_on_cpu >= 1 ) then
+               allocate(m_igr_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
+                                        idwbuff(2)%beg:idwbuff(2)%end, &
+                                        idwbuff(3)%beg:idwbuff(3)%end, &
+                                        1:igr_temps_on_cpu))
+               pool_idx = 1
+               if ( igr_temps_on_cpu >= 1 ) then
+                   !print*, 'jac_old on CPU'
+                   jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
+                       idwbuff(2)%beg:idwbuff(2)%end, &
+                       idwbuff(3)%beg:idwbuff(3)%end) => m_igr_pool_host(:,:,:,pool_idx)
+                   pool_idx = pool_idx + 1
+               end if
+               if ( igr_temps_on_cpu >= 2 ) then
+                   !print*, 'jac_rhs on CPU'
+                   jac_rhs(idwbuff(1)%beg:idwbuff(1)%end, &
+                       idwbuff(2)%beg:idwbuff(2)%end, &
+                       idwbuff(3)%beg:idwbuff(3)%end) => m_igr_pool_host(:,:,:,pool_idx)
+                   pool_idx = pool_idx + 1
+               end if
+               if ( igr_temps_on_cpu >= 3 ) then
+                   !print*, 'jac on CPU'
+                   jac(idwbuff(1)%beg:idwbuff(1)%end, &
+                       idwbuff(2)%beg:idwbuff(2)%end, &
+                       idwbuff(3)%beg:idwbuff(3)%end) => m_igr_pool_host(:,:,:,pool_idx)
+                   pool_idx = pool_idx + 1
+               end if
+           end if
+           if ( igr_temps_on_gpu >= 1 ) then
+                !print*, 'jac on GPU'
+                @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, &
+                             idwbuff(2)%beg:idwbuff(2)%end, &
+                             idwbuff(3)%beg:idwbuff(3)%end))
+                @:PREFER_GPU(jac)
+           endif
+           if ( igr_temps_on_gpu >= 2 ) then
+                !print*, 'jac_rhs on GPU'
+                @:ALLOCATE(jac_rhs(idwbuff(1)%beg:idwbuff(1)%end, &
+                             idwbuff(2)%beg:idwbuff(2)%end, &
+                             idwbuff(3)%beg:idwbuff(3)%end))
+                @:PREFER_GPU(jac_rhs)
+           endif
+           if ( igr_temps_on_gpu >= 3 ) then
+                !print*, 'jac_old on GPU'
+                @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, &
+                             idwbuff(2)%beg:idwbuff(2)%end, &
+                             idwbuff(3)%beg:idwbuff(3)%end))
+                @:PREFER_GPU(jac_old)
+           endif
+#else
             #:for VAR in [ 'jac','jac_rhs','jac_old']
                 @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
                              idwbuff(2)%beg:idwbuff(2)%end, &
@@ -110,6 +172,7 @@ contains
             if ( igr_temps_on_gpu >= 3) then 
                 @:PREFER_GPU(jac_old)
             end if 
+#endif
 
             !$acc parallel loop collapse(3) gang vector default(present)
             do l = idwbuff(3)%beg, idwbuff(3)%end
