@@ -1463,7 +1463,8 @@ contains
 
             write (1, '(I10, F15.8)') num_procs, io_time_final
             close (1)
-
+            
+#ifdef __linux
             inquire (FILE='memory_usage_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='memory_usage_data.dat', position='append', status='old')
@@ -1485,6 +1486,7 @@ contains
             gpu_free_str = trim(gpu_free_str) // "kB"
             write (1, '(I15, A15, A15, A17, A17)') num_procs, trim(cpu_current), trim(cpu_peak), gpu_current_str, gpu_free_str
             close (1)
+#endif
             
         end if
 
