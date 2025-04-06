@@ -38,7 +38,7 @@ export FI_CXI_RX_MATCH_MODE=software
 # CUSTOM env vars to MFC
 export NVIDIA_ALLOC_MODE=0                    # do nothing
 export NVIDIA_MANUAL_GPU_HINTS=1              # prefloc GPU on some
-export NVIDIA_IGR_TEMPS_ON_GPU=3              # jac and jac_rhs on GPU and jac_old on CPU
+export NVIDIA_IGR_TEMPS_ON_GPU=3              # jac, jac_rhs, and jac_old on GPU
 export NVIDIA_VARS_ON_GPU=7                   # q_cons_ts(1)%vf%sf for j=1-7 on GPU
 
 # NSYS
