@@ -697,7 +697,7 @@ contains
         real(wp) :: rho_L, gamma_L, pi_inf_L, a_L, cfl, pres_L, F_L, E_L, pres_R, a_R, rho_R, gamma_R, pi_inf_R, E_R, mu_L, mu_R
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_L, alpha_R, alpha_rho_R
         real(wp), dimension(num_dims) :: vel_L, vel_R
-        real(wp), dimension(-2:3) :: rho_sf_small
+        real(wp), dimension(-1:1) :: rho_sf_small
         real(wp), dimension(num_dims,num_dims) :: dvel
         real(wp), dimension(3) :: vflux_L_arr, vflux_R_arr
         real(wp), dimension(num_dims) :: dvel_small
@@ -720,7 +720,7 @@ contains
                                 dvel_small = 0._wp
                                 !x-direction contributions
                                 !$acc loop seq 
-                                do i = -2, 2
+                                do i = -1, 1
                                     rho_L = 0._wp
                                     !$acc loop seq 
                                     do r = 1, num_fluids
@@ -729,16 +729,12 @@ contains
                                     rho_sf_small(i) = rho_L
                                 end do
 
-                                dvel_small(1) = (1/(12._wp*dx(j))) * ( &
-                                8._wp*q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb)%sf(j-2+q,k,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb)%sf(j+2+q,k,l)/rho_sf_small(2) )
-                                dvel_small(2) = (1/(12._wp*dx(j))) * ( &
-                                8._wp*q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb+1)%sf(j-2+q,k,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb+1)%sf(j+2+q,k,l)/rho_sf_small(2) )
+                                dvel_small(1) = (1/(2._wp*dx(j))) * ( &
+                                    q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                dvel_small(2) = (1/(2._wp*dx(j))) * ( &
+                                    q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
 
                                 if (q == 0) dvel(:,1) = dvel_small
                                 if (q > -2 .and. viscous) then
@@ -752,7 +748,7 @@ contains
 
                                 !y-direction contributions
                                 !$acc loop seq 
-                                do i = -2, 2
+                                do i = -1, 1
                                     rho_L = 0._wp
                                     !$acc loop seq 
                                     do r = 1, num_fluids
@@ -761,17 +757,12 @@ contains
                                     rho_sf_small(i) = rho_L
                                 end do
 
-                                dvel_small(1) = (1/(12._wp*dy(k))) * ( &
-                                8._wp*q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb)%sf(j+q,k-2,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb)%sf(j+q,k+2,l)/rho_sf_small(2) )
-                                dvel_small(2) = (1/(12._wp*dy(k))) * ( &
-                                8._wp*q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb+1)%sf(j+q,k-2,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb+1)%sf(j+q,k+2,l)/rho_sf_small(2) )
-
+                                dvel_small(1) = (1/(2._wp*dy(k))) * ( &
+                                    q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                dvel_small(2) = (1/(2._wp*dy(k))) * ( &
+                                    q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
 
                                 if (q == 0) dvel(:,2) = dvel_small
 
@@ -1169,7 +1160,7 @@ contains
                                 dvel_small = 0._wp
                                 !x-direction contributions
                                 !$acc loop seq 
-                                do i = -2, 2
+                                do i = -1, 1
                                     rho_L = 0._wp
                                     !$acc loop seq 
                                     do r = 1, num_fluids
@@ -1178,21 +1169,15 @@ contains
                                     rho_sf_small(i) = rho_L
                                 end do
 
-                                dvel_small(1) = (1/(12._wp*dx(j))) * ( &
-                                8._wp*q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb)%sf(j-2+q,k,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb)%sf(j+2+q,k,l)/rho_sf_small(2) )
-                                dvel_small(2) = (1/(12._wp*dx(j))) * ( &
-                                8._wp*q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb+1)%sf(j-2+q,k,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb+1)%sf(j+2+q,k,l)/rho_sf_small(2) )
-                                dvel_small(3) = (1/(12._wp*dx(j))) * ( &
-                                8._wp*q_prim_vf(momxb+2)%sf(j+1+q,k,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb+2)%sf(j-1+q,k,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb+2)%sf(j-2+q,k,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb+2)%sf(j+2+q,k,l)/rho_sf_small(2) )
+                                dvel_small(1) = (1/(2._wp*dx(j))) * ( &
+                                    q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                dvel_small(2) = (1/(2._wp*dx(j))) * ( &
+                                    q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                dvel_small(3) = (1/(2._wp*dx(j))) * ( &
+                                    q_prim_vf(momxb+2)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb+2)%sf(j-1+q,k,l)/rho_sf_small(-1))
 
                                 if (q == 0) dvel(:,1) = dvel_small
                                 if (q > -2 .and. viscous) then
@@ -1208,7 +1193,7 @@ contains
 
                                 !y-direction contributions
                                 !$acc loop seq 
-                                do i = -2, 2
+                                do i = -1, 1
                                     rho_L = 0._wp
                                     !$acc loop seq 
                                     do r = 1, num_fluids
@@ -1217,21 +1202,15 @@ contains
                                     rho_sf_small(i) = rho_L
                                 end do
 
-                                dvel_small(1) = (1/(12._wp*dy(k))) * ( &
-                                8._wp*q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb)%sf(j+q,k-2,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb)%sf(j+q,k+2,l)/rho_sf_small(2) )
-                                dvel_small(2) = (1/(12._wp*dy(k))) * ( &
-                                8._wp*q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb+1)%sf(j+q,k-2,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb+1)%sf(j+q,k+2,l)/rho_sf_small(2) )
-                                if (q == 0) dvel_small(3) = (1/(12._wp*dy(k))) * ( &
-                                8._wp*q_prim_vf(momxb+2)%sf(j+q,k+1,l)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb+2)%sf(j+q,k-1,l)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb+2)%sf(j+q,k-2,l)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb+2)%sf(j+q,k+2,l)/rho_sf_small(2))
+                                dvel_small(1) = (1/(2._wp*dy(k))) * ( &
+                                    q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                dvel_small(2) = (1/(2._wp*dy(k))) * ( &
+                                    q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                if (q == 0) dvel_small(3) = (1/(2._wp*dy(k))) * ( &
+                                    q_prim_vf(momxb+2)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb+2)%sf(j+q,k-1,l)/rho_sf_small(-1))
                                 if (q == 0) dvel(:,2) = dvel_small
 
                                 if (q > -2 .and. viscous) then
@@ -1245,7 +1224,7 @@ contains
 
                                 !z-direction contributions
                                 !$acc loop seq 
-                                do i = -2, 2
+                                do i = -1, 1
                                     rho_L = 0._wp
                                     !$acc loop seq 
                                     do r = 1, num_fluids
@@ -1254,21 +1233,15 @@ contains
                                     rho_sf_small(i) = rho_L
                                 end do
 
-                                dvel_small(1) = (1/(12._wp*dz(l))) * ( &
-                                8._wp*q_prim_vf(momxb)%sf(j+q,k,l+1)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb)%sf(j+q,k,l-1)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb)%sf(j+q,k,l-2)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb)%sf(j+q,k,l+2)/rho_sf_small(2) )
-                                if (q == 0) dvel_small(2) = (1/(12._wp*dz(l))) * ( &
-                                8._wp*q_prim_vf(momxb+1)%sf(j+q,k,l+1)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb+1)%sf(j+q,k,l-1)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb+1)%sf(j+q,k,l-2)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb+1)%sf(j+q,k,l+2)/rho_sf_small(2) )
-                                dvel_small(3) = (1/(12._wp*dz(l))) * ( &
-                                8._wp*q_prim_vf(momxb+2)%sf(j+q,k,l+1)/rho_sf_small(1) - &
-                                8._wp*q_prim_vf(momxb+2)%sf(j+q,k,l-1)/rho_sf_small(-1) + &
-                                q_prim_vf(momxb+2)%sf(j+q,k,l-2)/rho_sf_small(-2) - &
-                                q_prim_vf(momxb+2)%sf(j+q,k,l+2)/rho_sf_small(2) )
+                                dvel_small(1) = (1/(2._wp*dz(l))) * ( &
+                                    q_prim_vf(momxb)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                if (q == 0) dvel_small(2) = (1/(2._wp*dz(l))) * ( &
+                                    q_prim_vf(momxb+1)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb+1)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                dvel_small(3) = (1/(2._wp*dz(l))) * ( &
+                                    q_prim_vf(momxb+2)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                    q_prim_vf(momxb+2)%sf(j+q,k,l-1)/rho_sf_small(-1))
                                 if (q == 0) dvel(:,3) = dvel_small
                                 if (q > -2 .and. viscous) then
                                     vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(1))
@@ -1723,7 +1696,7 @@ contains
                                     dvel_small = 0._wp
                                     !x-direction contributions
                                     !$acc loop seq 
-                                    do i = -2, 2
+                                    do i = -1, 1
                                         rho_L = 0._wp
                                         !$acc loop seq 
                                         do r = 1, num_fluids
@@ -1732,16 +1705,12 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(12._wp*dx(j))) * ( &
-                                    8._wp*q_prim_vf(momxb)%sf(j+1,k+q,l)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb)%sf(j-1,k+q,l)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb)%sf(j-2,k+q,l)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb)%sf(j+2,k+q,l)/rho_sf_small(2) )
-                                    dvel_small(2) = (1/(12._wp*dx(j))) * ( &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j+1,k+q,l)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j-1,k+q,l)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+1)%sf(j-2,k+q,l)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+1)%sf(j+2,k+q,l)/rho_sf_small(2) )
+                                    dvel_small(1) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb)%sf(j+1,k+q,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j-1,k+q,l)/rho_sf_small(-1))
+                                    dvel_small(2) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j+1,k+q,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j-1,k+q,l)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
@@ -1754,7 +1723,7 @@ contains
 
                                     !y-direction contributions
                                     !$acc loop seq 
-                                    do i = -2, 2
+                                    do i = -1, 1
                                         rho_L = 0._wp
                                         !$acc loop seq 
                                         do r = 1, num_fluids
@@ -1763,16 +1732,12 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(12._wp*dy(k))) * ( &
-                                    8._wp*q_prim_vf(momxb)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb)%sf(j,k-1+q,l)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb)%sf(j,k-2+q,l)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb)%sf(j,k+2+q,l)/rho_sf_small(2) )
-                                    dvel_small(2) = (1/(12._wp*dy(k))) * ( &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k-1+q,l)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+1)%sf(j,k-2+q,l)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+1)%sf(j,k+2+q,l)/rho_sf_small(2) )
+                                    dvel_small(1) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j,k-1+q,l)/rho_sf_small(-1))
+                                    dvel_small(2) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j,k-1+q,l)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
@@ -2170,7 +2135,7 @@ contains
                                     dvel_small = 0._wp
                                     !x-direction contributions
                                     !$acc loop seq 
-                                    do i = -2, 2
+                                    do i = -1, 1
                                         rho_L = 0._wp
                                         !$acc loop seq 
                                         do r = 1, num_fluids
@@ -2179,16 +2144,12 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(12._wp*dx(j))) * ( &
-                                    8._wp*q_prim_vf(momxb)%sf(j+1,k+q,l)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb)%sf(j-1,k+q,l)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb)%sf(j-2,k+q,l)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb)%sf(j+2,k+q,l)/rho_sf_small(2) )
-                                    dvel_small(2) = (1/(12._wp*dx(j))) * ( &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j+1,k+q,l)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j-1,k+q,l)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+1)%sf(j-2,k+q,l)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+1)%sf(j+2,k+q,l)/rho_sf_small(2) )
+                                    dvel_small(1) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb)%sf(j+1,k+q,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j-1,k+q,l)/rho_sf_small(-1))
+                                    dvel_small(2) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j+1,k+q,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j-1,k+q,l)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
@@ -2201,7 +2162,7 @@ contains
 
                                     !y-direction contributions
                                     !$acc loop seq 
-                                    do i = -2, 2
+                                    do i = -1, 1
                                         rho_L = 0._wp
                                         !$acc loop seq 
                                         do r = 1, num_fluids
@@ -2210,21 +2171,15 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(12._wp*dy(k))) * ( &
-                                    8._wp*q_prim_vf(momxb)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb)%sf(j,k-1+q,l)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb)%sf(j,k-2+q,l)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb)%sf(j,k+2+q,l)/rho_sf_small(2) )
-                                    dvel_small(2) = (1/(12._wp*dy(k))) * ( &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k-1+q,l)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+1)%sf(j,k-2+q,l)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+1)%sf(j,k+2+q,l)/rho_sf_small(2) )
-                                    dvel_small(3) = (1/(12._wp*dy(k))) * ( &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j,k+1+q,l)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j,k-1+q,l)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+2)%sf(j,k-2+q,l)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+2)%sf(j,k+2+q,l)/rho_sf_small(2))
+                                    dvel_small(1) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j,k-1+q,l)/rho_sf_small(-1))
+                                    dvel_small(2) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j,k-1+q,l)/rho_sf_small(-1))
+                                    dvel_small(3) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb+2)%sf(j,k+1+q,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+2)%sf(j,k-1+q,l)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
@@ -2239,7 +2194,7 @@ contains
 
                                     !z-direction contributions
                                     !$acc loop seq 
-                                    do i = -2, 2
+                                    do i = -1, 1
                                         rho_L = 0._wp
                                         !$acc loop seq 
                                         do r = 1, num_fluids
@@ -2248,16 +2203,12 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(2) = (1/(12._wp*dz(l))) * ( &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k+q,l+1)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k+q,l-1)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+1)%sf(j,k+q,l-2)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+1)%sf(j,k+q,l+2)/rho_sf_small(2) )
-                                    dvel_small(3) = (1/(12._wp*dz(l))) * ( &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j,k+q,l+1)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j,k+q,l-1)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+2)%sf(j,k+q,l-2)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+2)%sf(j,k+q,l+2)/rho_sf_small(2) )
+                                    dvel_small(2) = (1/(2._wp*dz(l))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j,k+q,l+1)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j,k+q,l-1)/rho_sf_small(-1))
+                                    dvel_small(3) = (1/(2._wp*dz(l))) * ( &
+                                        q_prim_vf(momxb+2)%sf(j,k+q,l+1)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+2)%sf(j,k+q,l-1)/rho_sf_small(-1))
                                     if (q > -2) then
                                         vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(2))
                                         vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(-2._wp*dvel_small(3))/3._wp
@@ -2715,7 +2666,7 @@ contains
                                     dvel_small = 0._wp
                                     !x-direction contributions
                                     !$acc loop seq 
-                                    do i = -2, 2
+                                    do i = -1, 1
                                         rho_L = 0._wp
                                         !$acc loop seq 
                                         do r = 1, num_fluids
@@ -2724,16 +2675,12 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(1) = (1/(12._wp*dx(j))) * ( &
-                                    8._wp*q_prim_vf(momxb)%sf(j+1,k,l+q)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb)%sf(j-1,k,l+q)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb)%sf(j-2,k,l+q)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb)%sf(j+2,k,l+q)/rho_sf_small(2) )
-                                    dvel_small(3) = (1/(12._wp*dx(j))) * ( &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j+1,k,l+q)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j-1,k,l+q)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+2)%sf(j-2,k,l+q)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+2)%sf(j+2,k,l+q)/rho_sf_small(2) )
+                                    dvel_small(1) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb)%sf(j+1,k,l+q)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j-1,k,l+q)/rho_sf_small(-1))
+                                    dvel_small(3) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb+2)%sf(j+1,k,l+q)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+2)%sf(j-1,k,l+q)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(3))
@@ -2746,7 +2693,7 @@ contains
 
                                     !y-direction contributions
                                     !$acc loop seq 
-                                    do i = -2, 2
+                                    do i = -1, 1
                                         rho_L = 0._wp
                                         !$acc loop seq 
                                         do r = 1, num_fluids
@@ -2755,16 +2702,12 @@ contains
                                         rho_sf_small(i) = rho_L
                                     end do
 
-                                    dvel_small(2) = (1/(12._wp*dy(k))) * ( &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k+1,l+q)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k-1,l+q)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+1)%sf(j,k-2,l+q)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+1)%sf(j,k+2,l+q)/rho_sf_small(2) )
-                                    dvel_small(3) = (1/(12._wp*dy(k))) * ( &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j,k+1,l+q)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j,k-1,l+q)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+2)%sf(j,k-2,l+q)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+2)%sf(j,k+2,l+q)/rho_sf_small(2))
+                                    dvel_small(2) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j,k+1,l+q)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j,k-1,l+q)/rho_sf_small(-1))
+                                    dvel_small(3) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb+2)%sf(j,k+1,l+q)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+2)%sf(j,k-1,l+q)/rho_sf_small(-1))
 
                                     if (q > -2) then
                                         vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(3))
@@ -2777,7 +2720,7 @@ contains
 
                                     !z-direction contributions
                                     !$acc loop seq 
-                                    do i = -2, 2
+                                    do i = -1, 1
                                         rho_L = 0._wp
                                         !$acc loop seq 
                                         do r = 1, num_fluids
@@ -2785,21 +2728,15 @@ contains
                                         end do
                                         rho_sf_small(i) = rho_L
                                     end do
-                                    dvel_small(1) = (1/(12._wp*dz(l))) * ( &
-                                    8._wp*q_prim_vf(momxb)%sf(j,k,l+1+q)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb)%sf(j,k,l-1+q)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb)%sf(j,k,l-2+q)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb)%sf(j,k,l+2+q)/rho_sf_small(2) )
-                                    dvel_small(2) = (1/(12._wp*dz(l))) * ( &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k,l+1+q)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+1)%sf(j,k,l-1+q)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+1)%sf(j,k,l-2+q)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+1)%sf(j,k,l+2+q)/rho_sf_small(2) )
-                                    dvel_small(3) = (1/(12._wp*dz(l))) * ( &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j,k,l+1+q)/rho_sf_small(1) - &
-                                    8._wp*q_prim_vf(momxb+2)%sf(j,k,l-1+q)/rho_sf_small(-1) + &
-                                    q_prim_vf(momxb+2)%sf(j,k,l-2+q)/rho_sf_small(-2) - &
-                                    q_prim_vf(momxb+2)%sf(j,k,l+2+q)/rho_sf_small(2) )
+                                    dvel_small(1) = (1/(2._wp*dz(l))) * ( &
+                                        q_prim_vf(momxb)%sf(j,k,l+1+q)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j,k,l-1+q)/rho_sf_small(-1))
+                                    dvel_small(2) = (1/(2._wp*dz(l))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j,k,l+1+q)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j,k,l-1+q)/rho_sf_small(-1))
+                                    dvel_small(3) = (1/(2._wp*dz(l))) * ( &
+                                        q_prim_vf(momxb+2)%sf(j,k,l+1+q)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+2)%sf(j,k,l-1+q)/rho_sf_small(-1))
                                     if (q > -2) then
                                         vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
                                         vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(2))
@@ -2812,8 +2749,6 @@ contains
                                     end if
                                 end do
                             end if
-
-
 
                             !$acc loop seq 
                             do i = 1, num_fluids
