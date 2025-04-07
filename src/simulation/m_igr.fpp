@@ -960,9 +960,9 @@ contains
                                                 13._wp * q_prim_vf(E_idx)%sf(j-1,k,l) + &
                                                 2._wp * q_prim_vf(E_idx)%sf(j-2,k,l))       
 
-                            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp))/gamma_L                    
+                            pres_L = max(0._wp,(E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp))/gamma_L)
 
-                            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp))/gamma_R 
+                            pres_R = max(0._wp,(E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp))/gamma_R)
 
                             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
@@ -1469,9 +1469,9 @@ contains
                                                 13._wp * q_prim_vf(E_idx)%sf(j-1,k,l) + &
                                                 2._wp * q_prim_vf(E_idx)%sf(j-2,k,l))       
 
-                            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L                    
+                            pres_L = max(0._wp,(E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L)
 
-                            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))/gamma_R 
+                            pres_R = max(0._wp,(E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))/gamma_R)
 
                             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
@@ -1934,9 +1934,9 @@ contains
                                                 13._wp * q_prim_vf(E_idx)%sf(j,k-1,l) + &
                                                 2._wp * q_prim_vf(E_idx)%sf(j,k-2,l))       
 
-                            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp ))/gamma_L                    
+                            pres_L = max(0._wp,(E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp ))/gamma_L)
 
-                            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp ))/gamma_R 
+                            pres_R = max(0._wp,(E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp ))/gamma_R)
 
                             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
@@ -2434,9 +2434,9 @@ contains
                                                 13._wp * q_prim_vf(E_idx)%sf(j,k-1,l) + &
                                                 2._wp * q_prim_vf(E_idx)%sf(j,k-2,l))       
 
-                            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ))/gamma_L                    
+                            pres_L = max(0._wp,(E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L)
 
-                            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp ))/gamma_R 
+                            pres_R = max(0._wp,(E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp ))/gamma_R)
 
                             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)
@@ -2959,9 +2959,9 @@ contains
                                                 13._wp * q_prim_vf(E_idx)%sf(j,k,l-1) + &
                                                 2._wp * q_prim_vf(E_idx)%sf(j,k,l-2))       
 
-                            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp ))/gamma_L                    
+                            pres_L = max(0._wp,(E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L)
 
-                            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp ))/gamma_R 
+                            pres_R = max(0._wp,(E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp ))/gamma_R)
 
                             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L / gamma_L) / rho_L)
                             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R / gamma_R) / rho_R)

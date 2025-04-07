@@ -63,7 +63,7 @@ echo
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-        (set -x; srun \
+        (set -x; srun --unbuffered \
                 --ntasks=${nodes*tasks_per_node}                     \
                 --cpus-per-task 1                                    \
                 --cpu-bind=none                                      \
