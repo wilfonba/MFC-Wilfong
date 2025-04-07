@@ -5,6 +5,7 @@
 % if engine == 'batch':
 #SBATCH --uenv=icon/25.2:v1
 #SBATCH --nodes=${nodes}
+#SBATCH --reservation=g183
 #SBATCH --ntasks-per-node=${tasks_per_node}
 #SBATCH --job-name="${name}"
 #SBATCH --output="${name}.out"
@@ -31,9 +32,10 @@ export NVCOMPILER_ACC_NO_MEMHINTS=1           # disable implicit compiler hints
 #export CUDA_BUFFER_PAGE_IN_THRESHOLD_MS=0.001 # workaround for copying to/from unpopulated buffers on GH
 
 # Cray MPICH
-export MPICH_GPU_SUPPORT_ENABLED=1            # MPICH with GPU support
+export MPICH_GPU_SUPPORT_ENABLED=1
 export FI_CXI_RX_MATCH_MODE=software
-#export FI_MR_CACHE_MONITOR=disabled
+export FI_MR_CACHE_MONITOR=disabled
+export MPICH_NO_BUFFER_ALIAS_CHECK=1
 
 # CUSTOM env vars to MFC
 export NVIDIA_ALLOC_MODE=0                    # do nothing
