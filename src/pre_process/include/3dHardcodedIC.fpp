@@ -1,58 +1,92 @@
 #:def Hardcoded3DVariables()
     ! Place any declaration of intermediate variables here
 
-    real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph
-
     real(wp) :: eps
 
     ! Case 302 - Single M10 Jet
     real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth, x0, SS, VV
 
     ! Case 303 - 7 Jet
-    real(wp), dimension(0:6) :: r_arr, y_th_arr, z_th_arr
+    real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr
 
     ! Case 303 - Additionfor three jet
-    real(wp) :: z_th2, r2, z_th3, r3, rcut, xcut
-    real(wp), dimension(0:n, 0:p) :: rcut_arr
+    real(wp) :: z_th2, r2, z_th3, r3, rcut, xcut, rn
+    real(wp), dimension(0:n, 0:p) :: rcut_arr, x0_arr
     integer :: l, q, s
 
-    eps = 1e-6_wp
+    integer :: pos, start, end
 
-    y_th_arr(0) = 0._wp
-    y_th_arr(1) = 1.5_wp
-    y_th_arr(2) = -1.5_wp
-    y_th_arr(3) = 0.75_wp
-    y_th_arr(4) = 0.75_wp
-    y_th_arr(5) = -0.75_wp
-    y_th_arr(6) = -0.75_wp
+    character(len=1000) :: line
+    character(len=25) :: value
 
-    z_th_arr(0) = 0._wp
-    z_th_arr(1) = 0._wp
-    z_th_arr(2) = 0._wp
-    z_th_arr(3) = 1.3_wp
-    z_th_arr(4) = -1.3_wp
-    z_th_arr(5) = 1.3_wp
-    z_th_arr(6) = -1.3_wp
+    integer :: nn, NJet
+    integer,allocatable :: seed(:)
 
-    ux_th = 10 !11.0*sqrt(1.4)
-    ux_am = 0.01*sqrt(1.4)
-    p_th = 2.8_wp
+    call random_seed(size=nn)
+    allocate(seed(nn))
+    seed = proc_rank + 1   ! putting arbitrary seed to all elements
+    call random_seed(put=seed)
+    deallocate(seed)
+
+    ! Basic Parameters
+    NJet = 19
+
+    eps = 1e-4_wp
+
+    SS = 6._wp/10._wp
+    VV = dsin(60._wp*pi/180._wp)*SS
+
+    ux_th = 9 ! 10, !11.0*sqrt(1.4)
+    ux_am = 0.0*7.5
+    p_th = 7.2_wp
     p_am = 0.4_wp
     rho_th = 2._wp
     rho_am = 1._wp
-    y_th = 0.05_wp
-    z_th = -0.05_wp
-    r_th = 0.25_wp
-    eps_smooth = 0.5_wp
+    x0 = 0.0_wp
+    r_th = 0.0_wp
+    eps_smooth = 0.3_wp
+
+    open(unit=10, file="njet.txt", status="old", action="read")
+    read(10,*) NJet
+    close(10)
+
+    allocate(y_th_arr(0:NJet - 1))
+    allocate(z_th_arr(0:NJet - 1))
+
+    open(unit=10, file="jets.csv", status="old", action="read")
+    do q = 0, NJet - 1
+        read(10, '(A)') line  ! Read a full line as a string
+        start = 1
+
+        do l = 0, 1
+            end = index(line(start:), ',')  ! Find the next comma
+            if (end == 0) then
+                value = trim(adjustl(line(start:)))  ! Last value in the line
+            else
+                value = trim(adjustl(line(start:start+end-2)))  ! Extract substring
+                start = start + end  ! Move to next value
+            end if
+            if (l == 0) then
+                read(value, *) y_th_arr(q)  ! Convert string to numeric value
+            else
+                read(value, *) z_th_arr(q)
+            end if
+        end do
+        y_th_arr(q) = SS*y_th_arr(q)
+        z_th_arr(q) = SS*z_th_arr(q)
+    end do
+    close(10)
 
     do q = 0, p
         do l = 0, n
             rcut = 0._wp
-            do s = 0, 6
+            do s = 0, NJet - 1
                 r = sqrt((y_cc(l) - y_th_arr(s))**2._wp + (z_cc(q) - z_th_arr(s))**2._wp)
                 rcut = rcut + f_cut_on(r - r_th,eps_smooth)
             end do
             rcut_arr(l,q) = rcut
+            call random_number(rn)
+            x0_arr(l,q) = x0 !+ 0.05*(r_th + eps_smooth)*(rn - 0.5)
         end do
     end do
 
@@ -61,169 +95,43 @@
 #:def Hardcoded3D()
 
     select case (patch_icpp(patch_id)%hcid)
-    case (300) ! Rayleigh-Taylor instability
-        rhoH = 3._wp
-        rhoL = 1._wp
-        pRef = 1.e5_wp
-        pInt = pRef
-        h = 0.7_wp
-        lam = 0.2_wp
-        wl = 2._wp*pi/lam
-        amp = 0.025_wp/wl
 
-        intH = amp*(sin(2._wp*pi*x_cc(i)/lam - pi/2._wp) + sin(2._wp*pi*z_cc(k)/lam - pi/2._wp)) + h
+    case (303) ! Multi Jet 2 Fluid
 
-        alph = 5e-1_wp*(1._wp + tanh((y_cc(j) - intH)/2.5e-3_wp))
+        rcut = rcut_arr(j,k)
+        xcut = f_cut_on(x_cc(i) - x0_arr(j,k),eps_smooth)
 
-        if (alph < eps) alph = eps
-        if (alph > 1._wp - eps) alph = 1._wp - eps
-
-        if (y_cc(j) > intH) then
-            q_prim_vf(advxb)%sf(i, j, k) = alph
-            q_prim_vf(advxe)%sf(i, j, k) = 1._wp - alph
-            q_prim_vf(contxb)%sf(i, j, k) = alph*rhoH
-            q_prim_vf(contxe)%sf(i, j, k) = (1._wp - alph)*rhoL
-            q_prim_vf(E_idx)%sf(i, j, k) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
-        else
-            q_prim_vf(advxb)%sf(i, j, k) = alph
-            q_prim_vf(advxe)%sf(i, j, k) = 1._wp - alph
-            q_prim_vf(contxb)%sf(i, j, k) = alph*rhoH
-            q_prim_vf(contxe)%sf(i, j, k) = (1._wp - alph)*rhoL
-            pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
-            q_prim_vf(E_idx)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
-        end if
-
-    case (301) ! (3D lung geometry in X direction, |sin(*)+sin(*)|)
-        h = 0.0_wp
-        lam = 1.0_wp
-        amp = patch_icpp(patch_id)%a(2)
-        intH = amp*abs((sin(2*pi*y_cc(j)/lam - pi/2) + sin(2*pi*z_cc(k)/lam - pi/2)) + h)
-        if (x_cc(i) > intH) then
-            q_prim_vf(contxb)%sf(i, j, k) = patch_icpp(1)%alpha_rho(1)
-            q_prim_vf(contxe)%sf(i, j, k) = patch_icpp(1)%alpha_rho(2)
-            q_prim_vf(E_idx)%sf(i, j, k) = patch_icpp(1)%pres
-            q_prim_vf(advxb)%sf(i, j, k) = patch_icpp(1)%alpha(1)
-            q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
-        end if
-
-    case (302) ! single Mach 10 jet
-
-        ux_th = 10 !10*sqrt(1.4)
-        ux_am = 0.0*sqrt(1.4)
-        p_th = 1._wp
-        p_am = 1._wp
-        rho_th = 2._wp
-        rho_am = 1._wp
-        y_th = 0._wp
-        z_th = 0._wp
-        r_th = 1._wp
-        eps_smooth = 0.72_wp
-
-        r = sqrt((y_cc(j) - y_th)**2._wp + (z_cc(k) - z_th)**2._wp)
-
-        q_prim_vf(momxb)%sf(i,j,k) = (ux_th - ux_am) * f_cut_on(r - r_th,eps_smooth/2._wp) * f_cut_on(x_cc(i),eps_smooth) + ux_am
+        q_prim_vf(momxb)%sf(i,j,k) = (ux_th - ux_am) * rcut * xcut + ux_am
         q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
         q_prim_vf(momxe)%sf(i,j,k) = 0._wp
 
-        q_prim_vf(advxb)%sf(i,j,k) = (1._wp - eps) * f_cut_on(r - r_th, eps_smooth/2._wp) * f_cut_on(x_cc(i),eps_smooth) + eps
+        q_prim_vf(advxb)%sf(i,j,k) = (1._wp - 2._wp*eps) * rcut * xcut + eps
         q_prim_vf(advxe)%sf(i,j,k) = 1._wp - q_prim_vf(advxb)%sf(i,j,k)
 
         q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*rho_th
         q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k)*rho_am
 
-        q_prim_vf(E_idx)%sf(i,j,k) = (p_th - p_am) * f_cut_on(r - r_th, eps_smooth/2._wp) * f_cut_on(x_cc(i),eps_smooth) + p_am !+ &
-                                     !(1_wp*p_am) * f_cut_off(r - r_th, eps_smooth) * f_cut_on(2._wp*x_cc(i),eps_smooth)
+        q_prim_vf(E_idx)%sf(i,j,k) = (p_th - p_am) * rcut * xcut + p_am
 
-    case (303) ! Seven jet
+    case (306) ! Multi Jet 1 Fluid
 
-        if (x_cc(i) < 1._wp) then
+        rcut = rcut_arr(j,k)
+        xcut = f_cut_on(x_cc(i) - x0_arr(j,k),eps_smooth)
 
-            rcut = rcut_arr(j,k) 
-            xcut = f_cut_on(x_cc(i),eps_smooth)
-
-            q_prim_vf(momxb)%sf(i,j,k) = (ux_th - ux_am) * rcut * xcut + ux_am
-            q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
-            q_prim_vf(momxe)%sf(i,j,k) = 0._wp
-
-            q_prim_vf(advxb)%sf(i,j,k) = (1._wp - eps) * rcut * xcut + eps
-            q_prim_vf(advxe)%sf(i,j,k) = 1._wp - q_prim_vf(advxb)%sf(i,j,k)
-
-            q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*rho_th
-            q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k)*rho_am
-
-            q_prim_vf(E_idx)%sf(i,j,k) = (p_th - p_am) * rcut * xcut + p_am
-
-        else
-            q_prim_vf(momxb)%sf(i,j,k) = ux_am
-            q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
-            q_prim_vf(momxe)%sf(i,j,k) = 0._wp
-
-            q_prim_vf(advxb)%sf(i,j,k) = eps
-            q_prim_vf(advxe)%sf(i,j,k) = 1-eps
-
-            q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*rho_th
-            q_prim_vf(contxe)%sf(i,j,k) = q_prim_Vf(advxe)%sf(i,j,k)*rho_am
-
-            q_prim_vf(E_idx)%sf(i,j,k) = p_am
-        end if
-
-    case (304) ! Florian clone
-
-        ux_th = 10 !10*sqrt(1.4)
-        ux_am = 0.0*sqrt(1.4)
-        p_th = 0.8_wp
-        p_am = 0.4_wp
-        rho_th = 2._wp
-        rho_am = 1._wp
-        y_th = 0.05_wp
-        z_th = -0.05_wp
-        r_th = 0.1_wp
-        eps_smooth = 0.175_wp
-
-        r = sqrt((y_cc(j) - y_th)**2._wp + (z_cc(k) - z_th)**2._wp)
-
-        q_prim_vf(momxb)%sf(i,j,k) = ux_th * f_cut_on(r - r_th,eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + ux_am
-        q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
-        q_prim_vf(momxe)%sf(i,j,k) = 0._wp
-
-        q_prim_vf(advxb)%sf(i,j,k) = (1._wp - 2._wp*eps) * f_cut_on(r - r_th, eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + eps
-        q_prim_vf(advxe)%sf(i,j,k) = 1._wp - q_prim_vf(advxb)%sf(i,j,k)
-
-        q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*(rho_th * f_cut_on(r - r_th, eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + rho_am)
-        q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k)*(rho_th * f_cut_on(r - r_th, eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + rho_am)
-
-        q_prim_vf(E_idx)%sf(i,j,k) = p_th * f_cut_on(r - r_th, eps_smooth) * f_cut_on(x_cc(i),eps_smooth) + p_am + &
-                                     p_am * f_cut_off(r - r_th, eps_smooth) * f_cut_on(x_cc(i), eps_smooth)
-
-    case (305) ! Florian clone one fluid
-
-        ux_th = 10 !10*sqrt(1.4)
-        ux_am = 0.0*sqrt(1.4)
-        p_th = 0.8_wp
-        p_am = 0.4_wp
-        rho_th = 2._wp
-        rho_am = 1._wp
-        y_th = 0.05_wp
-        z_th = -0.05_wp
-        r_th = 0.1_wp
-        eps_smooth = 0.2_wp
-
-        r = sqrt((y_cc(j) - y_th)**2._wp + (z_cc(k) - z_th)**2._wp)
-
-        q_prim_vf(momxb)%sf(i,j,k) = ux_th * f_cut_on(r - r_th,eps_smooth/1._wp) * f_cut_on(x_cc(i),eps_smooth/2._wp) + ux_am
+        q_prim_vf(momxb)%sf(i,j,k) = (ux_th - ux_am) * rcut * xcut + ux_am
         q_prim_vf(momxb+1)%sf(i,j,k) = 0._wp
         q_prim_vf(momxe)%sf(i,j,k) = 0._wp
 
         q_prim_vf(advxb)%sf(i,j,k) = 1._wp
-        q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k)*(rho_th * f_cut_on(r - r_th, eps_smooth/1._wp) * f_cut_on(x_cc(i),eps_smooth/2._wp) + rho_am)
 
-        q_prim_vf(E_idx)%sf(i,j,k) = p_th * f_cut_on(r - r_th, eps_smooth/1._wp) * f_cut_on(x_cc(i),eps_smooth/2._wp) + p_am
+        q_prim_vf(contxb)%sf(i,j,k) = (rho_th - rho_am) * rcut * xcut + rho_am
 
+        q_prim_vf(E_idx)%sf(i,j,k) = (p_th - p_am) * rcut * xcut + p_am
 
-        ! Put your variable assignments here
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
     end select
 
 #:enddef
+
