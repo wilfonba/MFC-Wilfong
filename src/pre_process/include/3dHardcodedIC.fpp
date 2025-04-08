@@ -34,7 +34,7 @@
     eps = 1e-4_wp
 
     SS = 6._wp/10._wp
-    VV = dsin(60._wp*pi/180._wp)*SS
+    VV = sin(60._wp*pi/180._wp)*SS
 
     ux_th = 9 ! 10, !11.0*sqrt(1.4)
     ux_am = 0.0*7.5
@@ -42,9 +42,9 @@
     p_am = 0.4_wp
     rho_th = 2._wp
     rho_am = 1._wp
-    x0 = 0.0_wp
-    r_th = 0.0_wp
-    eps_smooth = 0.3_wp
+    x0 = 0.075_wp
+    r_th = 0.075_wp
+    eps_smooth = 0.2_wp
 
     open(unit=10, file="njet.txt", status="old", action="read")
     read(10,*) NJet
@@ -81,12 +81,13 @@
         do l = 0, n
             rcut = 0._wp
             do s = 0, NJet - 1
+                call random_number(rn)
                 r = sqrt((y_cc(l) - y_th_arr(s))**2._wp + (z_cc(q) - z_th_arr(s))**2._wp)
-                rcut = rcut + f_cut_on(r - r_th,eps_smooth)
+                rcut = rcut + f_cut_on(r - (r_th + 0.05*(r_th+eps_smooth)*(rn - 0.5)),eps_smooth)
             end do
             rcut_arr(l,q) = rcut
             call random_number(rn)
-            x0_arr(l,q) = x0 !+ 0.05*(r_th + eps_smooth)*(rn - 0.5)
+            x0_arr(l,q) = x0 + 0.05*(r_th + eps_smooth)*(rn - 0.5)
         end do
     end do
 
