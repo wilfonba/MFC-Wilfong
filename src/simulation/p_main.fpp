@@ -108,7 +108,7 @@ program p_main
             end if
         end if
 
-        if (proc_rank == 0 .and. mod(t_step, 50) == 0) print*, time_avg
+        if (proc_rank == 0 .and. mod(t_step, 50) == 0) print*, "Rank 0 time_avg: ", time_avg
 
         call system_clock(cpu_end)
     end do
