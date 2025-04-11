@@ -44,6 +44,9 @@ module m_mpi_proxy
     integer, private :: err_code, ierr
     !> @}
 
+
+    integer :: halo_size
+
 contains
 
     !>  Computation of parameters, allocation procedures, and/or
@@ -59,48 +62,24 @@ contains
         ! largest buffer region in the sub-domain.
         if (buff_size > 0) then
 
-            ! Simulation is at least 2D
             if (n > 0) then
-
-                ! Simulation is 3D
                 if (p > 0) then
 
-                    allocate (q_cons_buffer_in(0:buff_size* &
-                                               sys_size* &
-                                               (m + 2*buff_size + 1)* &
-                                               (n + 2*buff_size + 1)* &
-                                               (p + 2*buff_size + 1)/ &
-                                               (min(m, n, p) &
-                                                + 2*buff_size + 1) - 1))
-                    allocate (q_cons_buffer_out(0:buff_size* &
-                                                sys_size* &
-                                                (m + 2*buff_size + 1)* &
-                                                (n + 2*buff_size + 1)* &
-                                                (p + 2*buff_size + 1)/ &
-                                                (min(m, n, p) &
-                                                 + 2*buff_size + 1) - 1))
-
-                    ! Simulation is 2D
+                    halo_size = NINT(-1._wp + 1._wp * buff_size*sys_size* &
+                                             & (m + 2*buff_size + 1)* &
+                                             & (n + 2*buff_size + 1)* &
+                                             & (p + 2*buff_size + 1)/ & 
+                                             & (min(m, n, p) + 2*buff_size + 1))
                 else
-
-                    allocate (q_cons_buffer_in(0:buff_size* &
-                                               sys_size* &
-                                               (max(m, n) &
-                                                + 2*buff_size + 1) - 1))
-                    allocate (q_cons_buffer_out(0:buff_size* &
-                                                sys_size* &
-                                                (max(m, n) &
-                                                 + 2*buff_size + 1) - 1))
-
+                    halo_size = -1 + buff_size*sys_size* &
+                                             & (max(m, n) + 2*buff_size + 1)
                 end if
-
-                ! Simulation is 1D
             else
-
-                allocate (q_cons_buffer_in(0:buff_size*sys_size - 1))
-                allocate (q_cons_buffer_out(0:buff_size*sys_size - 1))
-
+                halo_size = -1 + buff_size*sys_size
             end if
+
+            allocate (q_cons_buffer_in(0:halo_size))
+            allocate (q_cons_buffer_out(0:halo_size))
 
             ! Initially zeroing out the vectorized buffer region variables
             ! to avoid possible underflow from any unused allocated memory
