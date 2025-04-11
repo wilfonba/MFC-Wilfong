@@ -1624,10 +1624,9 @@ contains
             n_ds = INT((n+1)/3) - 1
             p_ds = INT((p+1)/3) - 1
 
-            @:ALLOCATE(q_cons_temp(1:sys_size))
+            allocate(q_cons_temp(1:sys_size))
             do i = 1, sys_size
-                @:ALLOCATE(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
-                @:ACC_SETUP_SFs(q_cons_temp(i))
+                allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
             end do
         end if
 
@@ -1639,11 +1638,6 @@ contains
         end if
 
         if(down_sample) then 
-            do i = 1, sys_size
-                !$acc update device(q_cons_temp(i)%sf)
-            end do
-            !$acc update device(vec_size)
-            !$acc parallel loop collapse(4) gang vector default(present) private(x_id, y_id, z_id, temp1, temp2, temp3, temp4, ix, iy, iz)
             do l = 0, p 
                 do k = 0, n
                     do j = 0, m 
@@ -1671,6 +1665,10 @@ contains
                     end do 
                 end do 
             end do
+            do i = 1, vec_size
+                !$acc update device(q_cons_ts(1)%vf(i)%sf)
+            end do
+            !$acc update device(vec_size)
         end if
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)

@@ -655,7 +655,7 @@ contains
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
 
-        real(wp), dimension(0:m, 0:n, 0:p) :: nbub
+        !real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
         integer :: i, j, k, l, id !< Generic loop iterators
         

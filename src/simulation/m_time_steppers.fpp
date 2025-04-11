@@ -81,7 +81,7 @@ module m_time_steppers
 
 #ifdef FRONTIER_UNIFIED
    real(wp), pointer, contiguous, dimension(:,:,:,:) :: q_cons_ts_pool_host, q_cons_ts_pool_device
-   integer :: pool_dims(4), pool_starts(4)
+   integer(kind=8) :: pool_dims(4), pool_starts(4)
 #endif
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
@@ -158,7 +158,7 @@ contains
            pool_starts(4) = 1
 
 	   ! Doing hipMalloc then mapping should be most performant
-           call hipCheck(hipMalloc(q_cons_ts_pool_device, dims=pool_dims, lbounds=pool_starts))
+           call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
 	   ! Without this map CCE will still create a device copy, because it's silly like that
 	   call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
 
@@ -168,7 +168,7 @@ contains
 	   ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
 	   ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
 	   ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
-	   call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims=pool_dims, lbounds=pool_starts, flags=hipMemAttachGlobal))
+	   call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
 
            do j = 1, sys_size
               ! q_cons_ts(1) lives on the device

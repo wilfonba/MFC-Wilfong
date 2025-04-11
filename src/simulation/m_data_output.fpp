@@ -888,7 +888,10 @@ contains
             n_glb_ds = INT((n_glb+1)/3) - 1
             p_glb_ds = INT((p_glb+1)/3) - 1
 
-            !$acc parallel loop collapse(4) gang vector default(present) private(x_id, y_id, z_id, ix, iy, iz)
+            do i = 1, vec_size
+                !$acc update host(q_cons_vf(i)%sf)
+            end do
+
             do l = -1, p_ds+1 
                 do k = -1, n_ds+1
                     do j = -1, m_ds+1
@@ -898,11 +901,8 @@ contains
                             z_id = 3*l + 1
                             
                             q_cons_temp(i)%sf(j,k,l) = 0._wp
-                            !$acc loop seq
                             do iz = -1, 1
-                                !$acc loop seq
                                 do iy = -1, 1
-                                    !$acc loop seq
                                     do ix = -1, 1
                                         q_cons_temp(i)%sf(j,k,l) = q_cons_temp(i)%sf(j,k,l) &
                                         + (1._wp / 27._wp)*q_cons_vf(i)%sf(x_id+ix,y_id+iy,z_id+iz)
@@ -914,13 +914,11 @@ contains
                 end do 
             end do 
 
-            !$acc parallel loop collapse(3) gang vector default(present)
             do l = -1, p_ds+1 
                 do k = -1, n_ds+1
                     do j = -1, m_ds+1
                         q_cons_temp(sys_size)%sf(j,k,l) = 1._wp 
                         if(num_fluids > 1) then 
-                            !$acc loop seq
                             do i = 1, num_fluids - 1
                                 q_cons_temp(sys_size)%sf(j,k,l) = q_cons_temp(sys_size)%sf(j,k,l) - q_cons_temp(E_idx+i)%sf(j,k,l)
                             end do 
@@ -929,10 +927,7 @@ contains
                 end do 
             end do
 
-            do i = 1, sys_size
-                !$acc update host(q_cons_temp(i)%sf)
-            end do
-
+            
         end if
 
         if (present(beta)) then
@@ -1896,10 +1891,9 @@ contains
             n_ds = INT((n+1)/3) - 1
             p_ds = INT((p+1)/3) - 1
 
-            @:ALLOCATE(q_cons_temp(1:sys_size))
+            allocate(q_cons_temp(1:sys_size))
             do i = 1, sys_size
-                @:ALLOCATE(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
-                @:ACC_SETUP_SFs(q_cons_temp(i))
+                allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
             end do
         end if
 
