@@ -154,7 +154,7 @@ contains
               pool_dims(i) = idwbuff(i)%end - idwbuff(i)%beg + 1
               pool_starts(i) = idwbuff(i)%beg
            end do
-           pool_dims(4) = sys_size
+           pool_dims(4) = vec_size
            pool_starts(4) = 1
 
 	   ! Doing hipMalloc then mapping should be most performant
@@ -170,7 +170,7 @@ contains
 	   ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
 	   call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
 
-           do j = 1, sys_size
+           do j = 1, vec_size
               ! q_cons_ts(1) lives on the device
               q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                         idwbuff(2)%beg:idwbuff(2)%end, &
@@ -185,6 +185,9 @@ contains
             do j = 1, vec_size
                 !$acc update device(q_cons_ts(i)%vf(j))
             enddo
+            allocate(q_cons_ts(i)%vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                        idwbuff(2)%beg:idwbuff(2)%end, &
+                                        idwbuff(3)%beg:idwbuff(3)%end))
          end do
 
 #elif defined(__NVCOMPILER_GPU_UNIFIED_MEM)
