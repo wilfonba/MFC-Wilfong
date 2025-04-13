@@ -85,7 +85,7 @@ module m_time_steppers
 #endif
 
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
-    real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
+    real(2), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
 #endif
       
 contains

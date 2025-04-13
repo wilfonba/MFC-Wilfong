@@ -677,7 +677,7 @@ contains
             end if
 
             ! Size of local arrays
-            data_size = (m + 1)*(n + 1)*(p + 1)
+            data_size = NINT(1._wp*(m + 1)*(n + 1)*(p + 1))
 
             ! Resize some integers so MPI can read even the biggest files
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)

@@ -1010,7 +1010,7 @@ contains
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
             else
                 ! Size of local arrays
-                data_size = (m + 1)*(n + 1)*(p + 1)
+                data_size = NINT(1._wp*(m + 1)*(n + 1)*(p + 1))
 
                 ! Resize some integers so MPI can write even the biggest files
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
@@ -1068,7 +1068,7 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)            
             ! Size of local arrays
-            data_size = (m + 1)*(n + 1)*(p + 1)
+            data_size = NINT(1._wp*(m + 1)*(n + 1)*(p + 1))
 
             ! Resize some integers so MPI can write even the biggest files
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
