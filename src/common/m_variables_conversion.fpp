@@ -1102,9 +1102,9 @@ contains
 
 #ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
+        do l = 0, p
+            do k = 0, n
+                    do j = 0, m
 
                     ! Obtaining the density, specific heat ratio function
                     ! and the liquid stiffness function, respectively
