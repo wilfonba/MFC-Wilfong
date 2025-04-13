@@ -1148,24 +1148,24 @@ contains
 
     !> Bubble source part in Strang operator splitting scheme
         !! @param t_step Current time-step
-    ! subroutine s_adaptive_dt_bubble(t_step)
+    subroutine s_adaptive_dt_bubble(t_step)
 
-    !     integer, intent(in) :: t_step
+        integer, intent(in) :: t_step
 
-    !     type(vector_field) :: gm_alpha_qp
+        type(vector_field) :: gm_alpha_qp
 
-    !     call s_convert_conservative_to_primitive_variables( &
-    !         q_cons_ts(1)%vf, &
-    !         q_T_sf, &
-    !         q_prim_vf, &
-    !         idwint, &
-    !         gm_alpha_qp%vf)
+        !call s_convert_conservative_to_primitive_variables( &
+            q_cons_ts(1)%vf, &
+            q_T_sf, &
+            q_prim_vf, &
+            idwint, &
+            gm_alpha_qp%vf)
 
-    !     call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+        !call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
-    !     call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        !call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-    ! end subroutine s_adaptive_dt_bubble
+    end subroutine s_adaptive_dt_bubble
 
     subroutine s_compute_dt(q_prim_vf)
 
