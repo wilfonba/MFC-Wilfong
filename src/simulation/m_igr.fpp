@@ -219,7 +219,7 @@ contains
 
 
         if (t_step  == t_step_start) then
-            num_iters = 10
+            num_iters = 100
         else
             num_iters = num_igr_iters
         end if
