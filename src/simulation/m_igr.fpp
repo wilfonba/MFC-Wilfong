@@ -3763,9 +3763,9 @@ contains
         !$acc update device(omega)
 
         !$acc parallel loop collapse(3) gang vector default(present)
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-           do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
+        do l = -1, p+1
+           do k = -1, n+1
+                do j = -1, m+1
                     do i = 1, vec_size
                         rhs_vf(i)%sf(j,k,l) = 0._2 
                     end do
