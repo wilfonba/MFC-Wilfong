@@ -878,6 +878,17 @@ contains
         integer ::  j, k, l, ix, iy, iz, x_id, y_id, z_id
         integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
 
+        if(down_sample) then 
+             m_ds = INT((m+1)/3) - 1
+             n_ds = INT((n+1)/3) - 1
+             p_ds = INT((p+1)/3) - 1
+ 
+             allocate(q_cons_temp(1:sys_size))
+             do i = 1, sys_size
+                 allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+             end do
+         end if
+
         if(down_sample) then
             
             m_ds = INT((m+1)/3) - 1
@@ -926,7 +937,6 @@ contains
                     end do 
                 end do 
             end do
-            
         end if
 
         if (present(beta)) then
@@ -1110,6 +1120,11 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
+
+        do i = 1, sys_size
+            deallocate(q_cons_temp(i)%sf)
+        end do 
+        deallocate(q_cons_temp)
 
 #endif
 
@@ -1883,17 +1898,6 @@ contains
                 vcfl_max = 0._wp
                 Rc_min = 1e3_wp
             end if
-        end if
-
-        if(down_sample) then 
-            m_ds = INT((m+1)/3) - 1
-            n_ds = INT((n+1)/3) - 1
-            p_ds = INT((p+1)/3) - 1
-
-            allocate(q_cons_temp(1:sys_size))
-            do i = 1, sys_size
-                allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
-            end do
         end if
 
     end subroutine s_initialize_data_output_module

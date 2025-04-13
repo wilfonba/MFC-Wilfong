@@ -1123,11 +1123,15 @@ contains
         ! sufficient boundary conditions data as to iterate the solution in
         ! the physical computational domain from one time-step iteration to
         ! the next one
-        if (viscous) then
-            buff_size = 2*weno_polyn + 2
-        else
-            buff_size = weno_polyn + 2
-        end if
+        if(viscous) then
+             if(igr) then 
+                 buff_size = weno_polyn + 2
+             else
+                 buff_size = 2*weno_polyn + 2
+             end if
+         else
+             buff_size = weno_polyn + 1
+         end if
 
         if (elasticity) then
             fd_number = max(1, fd_order/2)
