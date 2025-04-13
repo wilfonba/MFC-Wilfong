@@ -517,7 +517,7 @@ function(MFC_SETUP_TARGET)
 
                 target_compile_options(${a_target}
                     # PRIVATE -gpu=keep,ptxinfo,lineinfo
-                    PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-gpu=keep,ptxinfo,lineinfo>    
+                    PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-gpu=keep,ptxinfo,lineinfo,fastmath>    
                 )
 
                 # GH-200 Unified Memory Support
