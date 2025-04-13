@@ -1154,12 +1154,12 @@ contains
 
         type(vector_field) :: gm_alpha_qp
 
-        !call s_convert_conservative_to_primitive_variables( &
-            q_cons_ts(1)%vf, &
-            q_T_sf, &
-            q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+        ! call s_convert_conservative_to_primitive_variables( &
+        !     q_cons_ts(1)%vf, &
+        !     q_T_sf, &
+        !     q_prim_vf, &
+        !     idwint, &
+        !     gm_alpha_qp%vf)
 
         !call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
