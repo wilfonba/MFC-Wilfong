@@ -185,9 +185,6 @@ contains
             do j = 1, vec_size
                 !$acc update device(q_cons_ts(i)%vf(j))
             enddo
-            allocate(q_cons_ts(i)%vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                                        idwbuff(2)%beg:idwbuff(2)%end, &
-                                        idwbuff(3)%beg:idwbuff(3)%end))
          end do
 
 #elif defined(__NVCOMPILER_GPU_UNIFIED_MEM)
@@ -209,9 +206,6 @@ contains
                     end if
                 end do
                 @:ACC_SETUP_VFs_IGR(q_cons_ts(i))
-                allocate(q_cons_ts(i)%vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, &
-                        idwbuff(3)%beg:idwbuff(3)%end))
             end do
 #else
            do i = 1, num_ts
@@ -226,9 +220,6 @@ contains
                         end if
                 end do
                 @:ACC_SETUP_VFs_IGR(q_cons_ts(i))
-                allocate(q_cons_ts(i)%vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                        idwbuff(2)%beg:idwbuff(2)%end, &
-                        idwbuff(3)%beg:idwbuff(3)%end))
             end do
 #endif
         else 
@@ -430,7 +421,6 @@ contains
                     @:ALLOCATE(rhs_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
                     @:PREFER_GPU(rhs_vf(i)%sf)
                 end do
-                allocate(rhs_vf(sys_size)%sf(-1:m+1,-1:n+1,-1:p+1))
             end if
         end if
 

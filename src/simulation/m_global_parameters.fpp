@@ -977,6 +977,8 @@ contains
                     sys_size = c_idx
                 end if
 
+                sys_size = sys_size - 1
+
             else if (model_eqns == 4) then
                 cont_idx%beg = 1 ! one continuity equation
                 cont_idx%end = 1 !num_fluids
@@ -1211,7 +1213,7 @@ contains
         sys_size = sys_size
 
         if(igr) then 
-            vec_size = sys_size - 1
+            vec_size = sys_size 
         else 
             vec_size = sys_size
         end if

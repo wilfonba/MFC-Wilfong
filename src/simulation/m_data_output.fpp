@@ -924,19 +924,6 @@ contains
                     end do 
                 end do 
             end do 
-
-            do l = -1, p_ds+1 
-                do k = -1, n_ds+1
-                    do j = -1, m_ds+1
-                        q_cons_temp(sys_size)%sf(j,k,l) = 1._wp 
-                        if(num_fluids > 1) then 
-                            do i = 1, num_fluids - 1
-                                q_cons_temp(sys_size)%sf(j,k,l) = q_cons_temp(sys_size)%sf(j,k,l) - q_cons_temp(E_idx+i)%sf(j,k,l)
-                            end do 
-                        end if
-                    end do 
-                end do 
-            end do
         end if
 
         if (present(beta)) then
