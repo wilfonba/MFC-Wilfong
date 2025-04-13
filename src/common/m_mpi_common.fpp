@@ -108,7 +108,7 @@ contains
         if (present(beta)) then
             MPI_IO_DATA%var(alt_sys)%sf => beta%sf(0:m, 0:n, 0:p)
         end if
-
+        
         !Additional variables pb and mv for non-polytropic qbmm
 #ifdef MFC_PRE_PROCESS
         if (qbmm .and. .not. polytropic) then
@@ -258,10 +258,11 @@ contains
         p_ds = p
 #endif
 
+#ifdef MFC_POST_PROCESS
         do i = 1, sys_size
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds+1, -1:n_ds+1, -1:p_ds+1)
         end do
-
+#endif
         ! Define global(g) and local(l) sizes for flow variables
         sizes_loc(1) = m_ds + 3
         if (n > 0) then

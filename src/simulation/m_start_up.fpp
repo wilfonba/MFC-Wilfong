@@ -688,12 +688,21 @@ contains
                         end do
                     end if
                 else
-                    do i = 1, adv_idx%end
-                        var_MOK = int(i, MPI_OFFSET_KIND)
+                    if(down_sample) then
+                        do i = 1, sys_size
+                            var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           mpi_p, status, ierr)
-                    end do
+                            call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
+                                               mpi_p, status, ierr)
+                        end do                        
+                    else
+                        do i = 1, sys_size
+                            var_MOK = int(i, MPI_OFFSET_KIND)
+
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                               mpi_p, status, ierr)
+                        end do
+                    end if
                 end if
 
 
