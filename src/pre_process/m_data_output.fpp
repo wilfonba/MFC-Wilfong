@@ -887,6 +887,7 @@ contains
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
                                                 mpi_p, status, ierr)
                     end do
+                end if
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
