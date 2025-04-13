@@ -1052,11 +1052,11 @@ contains
         else
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                call s_initialize_mpi_data(q_cons_temp, ib_markers, levelset, levelset_norm)
             elseif (present(beta)) then
-                call s_initialize_mpi_data(q_cons_vf, beta=beta)
+                call s_initialize_mpi_data(q_cons_temp, beta=beta)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                call s_initialize_mpi_data(q_cons_temp)
             end if
 
             write (file_loc, '(I0,A)') t_step, '.dat'
