@@ -53,7 +53,7 @@ contains
     end subroutine s_initialize_perturbation_module
 
     subroutine s_perturb_sphere(q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !< generic loop operators
 
         real(wp) :: perturb_alpha
@@ -85,7 +85,7 @@ contains
     end subroutine s_perturb_sphere
 
     subroutine s_perturb_surrounding_flow(q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !<  generic loop iterators
 
         real(wp) :: perturb_alpha
@@ -117,7 +117,7 @@ contains
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave(q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(mixlayer_nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(wp) :: uratio, Ldomain
         integer :: i, j, k, q
@@ -169,7 +169,7 @@ contains
 
                     if (bubbles_euler .and. (.not. qbmm)) then
                         do q = 1, nb
-                            call s_compute_equilibrium_state(q_prim_vf(E_idx)%sf(i, j, k), R0(q), q_prim_vf(bub_idx%rs(q))%sf(i, j, k))
+                            call s_compute_equilibrium_state(1._wp*q_prim_vf(E_idx)%sf(i, j, k), R0(q),1._wp*q_prim_vf(bub_idx%rs(q))%sf(i, j, k))
                         end do
                     end if
                 end do
@@ -613,7 +613,7 @@ contains
 
     subroutine  s_elliptic_smoothing(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
         real(wp), dimension(0:m, 0:n, 0:p, 1:sys_size) :: q_prim_temp
         integer :: i, j, k, l, q

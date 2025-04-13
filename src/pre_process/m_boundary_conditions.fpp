@@ -55,7 +55,7 @@ contains
 
     subroutine s_line_segment_bc(patch_id, q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
         integer, intent(in) :: patch_id
 
@@ -140,7 +140,7 @@ contains
 
     subroutine s_circle_bc(patch_id, q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
 
         integer, intent(in) :: patch_id
@@ -255,7 +255,7 @@ contains
 
     subroutine s_rectangle_bc(patch_id, q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
         real(wp) :: S
 
@@ -397,7 +397,7 @@ contains
 
     subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
         integer :: i
 
@@ -431,7 +431,7 @@ contains
 
     subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
 
         character(LEN=*), intent(in) :: step_dirpath
@@ -471,7 +471,7 @@ contains
 
     subroutine s_write_parallel_boundary_condition_files(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
 
         integer :: dir, loc
@@ -567,7 +567,7 @@ contains
 
     subroutine s_pack_boundary_condition_buffers(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size) :: q_prim_vf
         integer :: i, j, k
 
         do k = 0, p

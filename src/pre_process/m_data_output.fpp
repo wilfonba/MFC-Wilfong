@@ -53,11 +53,11 @@ module m_data_output
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
         subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
-            import :: scalar_field, integer_field, sys_size, m, n, p, &
+            import :: scalar_field_half, integer_field, sys_size, m, n, p, &
                 pres_field, levelset_field, levelset_norm_field, num_dims
 
             ! Conservative variables
-            type(scalar_field), &
+            type(scalar_field_half), &
                 dimension(sys_size), &
                 intent(inout) :: q_cons_vf, q_prim_vf
 
@@ -100,7 +100,7 @@ contains
         !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
-        type(scalar_field), &
+        type(scalar_field_half), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf, q_prim_vf
 
@@ -158,6 +158,20 @@ contains
         else
             status = 'new'
         end if
+
+        do l = 0, p 
+            do k = 0, n 
+                do j = 0, m 
+                    do i = 1, sys_size
+                        if(igr) then 
+                            q_cons_temp(i)%sf(j,k,l) = real(q_cons_vf(i)%sf(j,k,l),kind=4)
+                        else
+                            q_cons_temp(i)%sf(j,k,l) = real(q_prim_vf(i)%sf(j,k,l),kind=4)
+                        end if
+                    end do 
+                end do 
+            end do 
+        end do
 
         if (igr) then
             call s_write_serial_boundary_condition_files(q_cons_vf, bc_type, t_step_dir)
@@ -236,7 +250,7 @@ contains
                        //'.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
                   STATUS=status)
-            write (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
+            write (1) q_cons_temp(i)%sf(0:m, 0:n, 0:p)
             close (1)
         end do
 
@@ -298,7 +312,7 @@ contains
 
                         if (chemistry) then
                             do c = 1, num_species
-                                rhoYks(c) = q_cons_vf(chemxb + c - 1)%sf(j, 0, 0)
+                                rhoYks(c) = q_cons_temp(chemxb + c - 1)%sf(j, 0, 0)
                             end do
                         end if
 
@@ -307,43 +321,43 @@ contains
                         lit_gamma = 1._wp/gamma + 1._wp
 
                         if ((i >= chemxb) .and. (i <= chemxe)) then
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
+                            write (2, FMT) x_cb(j), q_cons_temp(i)%sf(j, 0, 0)/rho
                         else if (((i >= cont_idx%beg) .and. (i <= cont_idx%end)) &
                                  .or. &
                                  ((i >= adv_idx%beg) .and. (i <= adv_idx%end)) &
                                  .or. &
                                  ((i >= chemxb) .and. (i <= chemxe)) &
                                  ) then
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                            write (2, FMT) x_cb(j), q_cons_temp(i)%sf(j, 0, 0)
                         else if (i == mom_idx%beg) then !u
-                            write (2, FMT) x_cb(j), q_cons_vf(mom_idx%beg)%sf(j, 0, 0)/rho
+                            write (2, FMT) x_cb(j), q_cons_temp(mom_idx%beg)%sf(j, 0, 0)/rho
                         else if (i == stress_idx%beg) then !tau_e
-                            write (2, FMT) x_cb(j), q_cons_vf(stress_idx%beg)%sf(j, 0, 0)/rho
+                            write (2, FMT) x_cb(j), q_cons_temp(stress_idx%beg)%sf(j, 0, 0)/rho
                         else if (i == E_idx) then !p
                             call s_compute_pressure( &
-                                q_cons_vf(E_idx)%sf(j, 0, 0), &
-                                q_cons_vf(alf_idx)%sf(j, 0, 0), &
-                                0.5_wp*(q_cons_vf(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, &
+                                q_cons_temp(E_idx)%sf(j, 0, 0), &
+                                q_cons_temp(alf_idx)%sf(j, 0, 0), &
+                                0.5_wp*(q_cons_temp(mom_idx%beg)%sf(j, 0, 0)**2._wp)/rho, &
                                 pi_inf, gamma, rho, qv, rhoYks, pres, T)
                             write (2, FMT) x_cb(j), pres
                         else if ((i >= bub_idx%beg) .and. (i <= bub_idx%end) .and. bubbles_euler) then
 
                             if (qbmm) then
-                                nbub = q_cons_vf(bubxb)%sf(j, 0, 0)
+                                nbub = q_cons_temp(bubxb)%sf(j, 0, 0)
                             else
                                 if (adv_n) then
-                                    nbub = q_cons_vf(n_idx)%sf(j, 0, 0)
+                                    nbub = q_cons_temp(n_idx)%sf(j, 0, 0)
                                 else
                                     do k = 1, nb
-                                        nRtmp(k) = q_cons_vf(bub_idx%rs(k))%sf(j, 0, 0)
+                                        nRtmp(k) = q_cons_temp(bub_idx%rs(k))%sf(j, 0, 0)
                                     end do
 
-                                    call s_comp_n_from_cons(q_cons_vf(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
+                                    call s_comp_n_from_cons(q_cons_temp(alf_idx)%sf(j, 0, 0), nRtmp, nbub, weight)
                                 end if
                             end if
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/nbub
+                            write (2, FMT) x_cb(j), q_cons_temp(i)%sf(j, 0, 0)/nbub
                         else if (i == n_idx .and. adv_n .and. bubbles_euler) then
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                            write (2, FMT) x_cb(j), q_cons_temp(i)%sf(j, 0, 0)
                         end if
                     end do
                     close (2)
@@ -355,7 +369,7 @@ contains
 
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
-                    write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                    write (2, FMT) x_cb(j), q_cons_temp(i)%sf(j, 0, 0)
                 end do
                 close (2)
             end do
@@ -399,7 +413,7 @@ contains
                 open (2, FILE=trim(file_loc))
                 do j = 0, m
                     do k = 0, n
-                        write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
+                        write (2, FMT) x_cb(j), y_cb(k), q_cons_temp(i)%sf(j, k, 0)
                     end do
                     write (2, *)
                 end do
@@ -449,7 +463,7 @@ contains
                 do j = 0, m
                     do k = 0, n
                         do l = 0, p
-                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
+                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_temp(i)%sf(j, k, l)
                         end do
                         write (2, *)
                     end do
@@ -543,7 +557,7 @@ contains
     subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)
 
         ! Conservative variables
-        type(scalar_field), &
+        type(scalar_field_half), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf, q_prim_vf
 
@@ -786,6 +800,16 @@ contains
                     end do 
                 end do 
             end do 
+        else
+            do l = 0, p 
+                do k = 0, n 
+                    do j = 0, m 
+                        do i = 1, sys_size
+                            q_cons_temp(i)%sf(j,k,l) = real(q_cons_vf(i)%sf(j,k,l),kind=4)
+                        end do 
+                    end do 
+                end do 
+            end do
         end if
 
         if (file_per_process) then
@@ -805,10 +829,10 @@ contains
                 call s_initialize_mpi_data_ds(q_cons_temp)
             else
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                    call s_initialize_mpi_data(q_cons_temp, ib_markers, &
                                                levelset, levelset_norm)
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    call s_initialize_mpi_data(q_cons_temp)
                 end if
             end if
 
@@ -885,10 +909,10 @@ contains
         else
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, &
+                call s_initialize_mpi_data(q_cons_temp, ib_markers, &
                                            levelset, levelset_norm)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                call s_initialize_mpi_data(q_cons_temp)
             end if
 
             ! Open the file to write all flow variables
@@ -1184,6 +1208,11 @@ contains
             allocate(q_cons_temp(1:sys_size))
             do i = 1, sys_size
                 allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+            end do
+        else
+            allocate(q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                allocate(q_cons_temp(i)%sf(0:m,0:n,0:p))
             end do
         end if
 

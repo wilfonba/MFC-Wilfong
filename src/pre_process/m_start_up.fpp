@@ -80,9 +80,9 @@ module m_start_up
         !! @param ib_markers track if a cell is within the immersed boundary
         subroutine s_read_abstract_ic_data_files(q_cons_vf, ib_markers)
 
-            import :: scalar_field, integer_field, sys_size, pres_field
+            import :: scalar_field_half, integer_field, sys_size, pres_field
 
-            type(scalar_field), &
+            type(scalar_field_half), &
                 dimension(sys_size), &
                 intent(inout) :: q_cons_vf
 
@@ -399,7 +399,7 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
     subroutine s_read_serial_ic_data_files(q_cons_vf, ib_markers)
 
-        type(scalar_field), &
+        type(scalar_field_half), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf
 
@@ -635,7 +635,7 @@ contains
         !! @param ib_markers track if a cell is within the immersed boundary
     subroutine s_read_parallel_ic_data_files(q_cons_vf, ib_markers)
 
-        type(scalar_field), &
+        type(scalar_field_half), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf
 
@@ -671,9 +671,9 @@ contains
 
             ! Initialize MPI data I/O
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                !call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                !call s_initialize_mpi_data(q_cons_vf)
             end if
 
             ! Size of local arrays
@@ -846,7 +846,7 @@ contains
 &                pTg-equilirium (relax = "T" activated)'
             end if
 
-            call s_infinite_relaxation_k(q_cons_vf)
+            !call s_infinite_relaxation_k(q_cons_vf)
         end if
 
         call s_write_data_files(q_cons_vf, q_prim_vf, ib_markers, levelset, levelset_norm, bc_type)

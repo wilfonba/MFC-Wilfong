@@ -81,7 +81,11 @@ contains
     subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+#ifdef MFC_PRE_PROCESS
+        type(scalar_field_half), dimension(sys_size), intent(in) :: q_vf
+#else
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf       
+#endif
         integer, intent(in) :: i, j, k
         real(wp), intent(out), target :: rho, gamma, pi_inf, qv
         real(wp), optional, dimension(2), intent(out) :: Re_K
@@ -121,8 +125,8 @@ contains
 #else
         !$acc routine seq
 #endif
-
         real(wp), intent(in) :: energy, alf
+
         real(wp), intent(in) :: dyn_p
         real(wp), intent(in) :: pi_inf, gamma, rho, qv
         real(wp), intent(out) :: pres
@@ -207,7 +211,11 @@ contains
     subroutine s_convert_mixture_to_mixture_variables(q_vf, i, j, k, &
                                                       rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+#ifdef MFC_PRE_PROCESS
+        type(scalar_field_half), dimension(sys_size), intent(in) :: q_vf
+#else
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf      
+#endif
         integer, intent(in) :: i, j, k
 
         real(wp), intent(out), target :: rho
@@ -254,7 +262,11 @@ contains
     subroutine s_convert_species_to_mixture_variables_bubbles(q_vf, j, k, l, &
                                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+#ifdef MFC_PRE_PROCESS
+        type(scalar_field_half), dimension(sys_size), intent(in) :: q_vf
+#else
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf      
+#endif
 
         integer, intent(in) :: j, k, l
 
@@ -377,9 +389,11 @@ contains
         !! @param qv fluid reference energy
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
                                                       gamma, pi_inf, qv, Re_K, G_K, G)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
-
+#ifdef MFC_PRE_PROCESS
+        type(scalar_field_half), dimension(sys_size), intent(in) :: q_vf
+#else
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf      
+#endif
         integer, intent(in) :: k, l, r
 
         real(wp), intent(out), target :: rho
@@ -752,7 +766,11 @@ contains
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
     subroutine s_initialize_mv(qK_cons_vf, mv)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+#ifdef MFC_PRE_PROCESS
+        type(scalar_field_half), dimension(sys_size), intent(in) :: qK_cons_vf
+#else
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf      
+#endif
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: mv
 
@@ -784,7 +802,11 @@ contains
 
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
-        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+#ifdef MFC_PRE_PROCESS
+        type(scalar_field_half), dimension(sys_size), intent(in) :: qK_cons_vf
+#else
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf      
+#endif
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(inout) :: pb
@@ -829,9 +851,14 @@ contains
                                                              ibounds, &
                                                              gm_alphaK_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
+#ifdef MFC_PRE_PROCESS
+        type(scalar_field_half), dimension(sys_size), intent(inout) :: qK_prim_vf
+        type(scalar_field_half), dimension(sys_size), intent(in) :: qK_cons_vf
+#else
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf       
+#endif
         type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
         type(scalar_field), &
             allocatable, optional, dimension(:), &
@@ -967,8 +994,8 @@ contains
                         T = q_T_sf%sf(j, k, l)
                     end if
 
-                    call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
-                                            qK_cons_vf(alf_idx)%sf(j, k, l), &
+                    call s_compute_pressure(1._wp*qK_cons_vf(E_idx)%sf(j, k, l), &
+                                            1._wp*qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, &
                                             qv_K, rhoYks, pres, T)
 
@@ -1075,10 +1102,13 @@ contains
         !!  @param iz Index bounds in the third coordinate direction
     subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                              q_cons_vf)
-
+#ifdef MFC_PRE_PROCESS
+        type(scalar_field_half), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size), intent(inout) :: q_cons_vf
+#else
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf       
+#endif
         ! Density, specific heat ratio function, liquid stiffness function
         ! and dynamic pressure, as defined in the incompressible flow sense,
         ! respectively
@@ -1185,7 +1215,7 @@ contains
                                 q_cons_vf(n_idx)%sf(j, k, l) = q_prim_vf(n_idx)%sf(j, k, l)
                                 nbub = q_prim_vf(n_idx)%sf(j, k, l)
                             else
-                                call s_comp_n_from_prim(q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
+                                call s_comp_n_from_prim(1._wp*q_prim_vf(alf_idx)%sf(j, k, l), Rtmp, nbub, weight)
                             end if
                         else
                             !Initialize R3 averaging over R0 and R directions

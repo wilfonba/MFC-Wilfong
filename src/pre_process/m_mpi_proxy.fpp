@@ -661,7 +661,7 @@ contains
                                                 mpi_dir, &
                                                 pbc_loc)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: mpi_dir, pbc_loc
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
@@ -726,7 +726,7 @@ contains
                             do j = 0, buff_size - 1
                                 do i = 1, sys_size
                                     r = (i - 1) + v_size*(j + buff_size*(k + (n + 1)*l))
-                                    q_prims_buff_send(r) = q_prim_vf(i)%sf(j + pack_offset, k, l)
+                                    q_prims_buff_send(r) = real(q_prim_vf(i)%sf(j + pack_offset, k, l),kind=4)
                                 end do
                             end do
                         end do
@@ -740,7 +740,7 @@ contains
                                     r = (i - 1) + v_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          (k + buff_size*l))
-                                    q_prims_buff_send(r) = q_prim_vf(i)%sf(j, k + pack_offset, l)
+                                    q_prims_buff_send(r) = real(q_prim_vf(i)%sf(j, k + pack_offset, l),kind=4)
                                 end do
                             end do
                         end do
@@ -754,7 +754,7 @@ contains
                                     r = (i - 1) + v_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                    q_prims_buff_send(r) = q_prim_vf(i)%sf(j, k, l + pack_offset)
+                                    q_prims_buff_send(r) = real(q_prim_vf(i)%sf(j, k, l + pack_offset),kind=4)
                                 end do
                             end do
                         end do
@@ -782,7 +782,7 @@ contains
                                 do i = 1, sys_size
                                     r = (i - 1) + v_size* &
                                         (j + buff_size*((k + 1) + (n + 1)*l))
-                                        q_prim_vf(i)%sf(j + unpack_offset, k, l) = q_prims_buff_recv(r)
+                                        q_prim_vf(i)%sf(j + unpack_offset, k, l) = real(q_prims_buff_recv(r),kind=2)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
@@ -803,7 +803,7 @@ contains
                                     r = (i - 1) + v_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + buff_size*l))
-                                         q_prim_vf(i)%sf(j, k + unpack_offset, l) = q_prims_buff_recv(r)
+                                         q_prim_vf(i)%sf(j, k + unpack_offset, l) = real(q_prims_buff_recv(r),kind=2)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
@@ -825,7 +825,7 @@ contains
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)* &
                                           (l + buff_size)))
-                                          q_prim_vf(i)%sf(j, k, l + unpack_offset) = q_prims_buff_recv(r)
+                                          q_prim_vf(i)%sf(j, k, l + unpack_offset) = real(q_prims_buff_recv(r),kind=2)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_prim_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i

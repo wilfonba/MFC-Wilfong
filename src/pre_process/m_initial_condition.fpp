@@ -45,9 +45,9 @@ module m_initial_condition
     ! a procedure such that the choice of the model equations does not have to
     ! be queried every time the patch primitive variables are to be assigned in
     ! a cell in the computational domain.
-    type(scalar_field), allocatable, dimension(:) :: q_prim_vf !< primitive variables
+    type(scalar_field_half), allocatable, dimension(:) :: q_prim_vf !< primitive variables
 
-    type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
+    type(scalar_field_half), allocatable, dimension(:) :: q_cons_vf !< conservative variables
 
     type(scalar_field) :: q_T_sf !< Temperature field
 
@@ -73,7 +73,6 @@ contains
     subroutine s_initialize_initial_condition_module
 
         integer :: i, j, k, l !< generic loop iterator
-
         ! Allocating the primitive and conservative variables
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
@@ -94,10 +93,12 @@ contains
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
-        allocate (ib_markers%sf(0:m, 0:n, 0:p))
+        if(ib) then 
+            allocate (ib_markers%sf(0:m, 0:n, 0:p))
 
-        allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
-        allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
+            allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+        end if
 
         if (qbmm .and. .not. polytropic) then
             !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
@@ -116,8 +117,8 @@ contains
         ! up. The conservative variables do not need to be similarly treated
         ! since they are computed directly from the primitive variables.
         do i = 1, sys_size
-            q_cons_vf(i)%sf = dflt_real
-            q_prim_vf(i)%sf = dflt_real
+            q_cons_vf(i)%sf = -100._2
+            q_prim_vf(i)%sf = -100._2
         end do
 
         ! Allocating arrays to store the bc types
@@ -162,7 +163,9 @@ contains
         ! extent of application that the overwrite permissions give a patch
         ! when it is being applied in the domain.
         patch_id_fp = 0
-        ib_markers%sf = 0
+        if(ib) then 
+            ib_markers%sf = 0
+        end if
 
     end subroutine s_initialize_initial_condition_module
 
@@ -179,16 +182,16 @@ contains
         character(len=10) :: iStr
 
         ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        !if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
-        if (old_ic) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, &
-                                                               q_T_sf, &
-                                                               q_prim_vf, &
-                                                               idwbuff)
-        end if
+        ! if (old_ic) then
+        !     call s_convert_conservative_to_primitive_variables(q_cons_vf, &
+        !                                                        q_T_sf, &
+        !                                                        q_prim_vf, &
+        !                                                        idwbuff)
+        ! end if
 
         call s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers%sf, levelset, levelset_norm)
         call s_apply_boundary_patches(q_prim_vf, bc_type)
@@ -202,7 +205,7 @@ contains
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        !if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
@@ -232,7 +235,9 @@ contains
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
-        deallocate (ib_markers%sf)
+        if(ib) then 
+            deallocate (ib_markers%sf)
+        end if
 
     end subroutine s_finalize_initial_condition_module
 

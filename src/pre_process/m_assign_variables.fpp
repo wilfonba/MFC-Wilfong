@@ -45,12 +45,12 @@ module m_assign_variables
         subroutine s_assign_patch_xxxxx_primitive_variables(patch_id, j, k, l, &
                                                             eta, q_prim_vf, patch_id_fp)
 
-            import :: scalar_field, sys_size, n, m, p, wp
+            import :: scalar_field_half, sys_size, n, m, p, wp
 
             integer, intent(in) :: patch_id
             integer, intent(in) :: j, k, l
             real(wp), intent(in) :: eta
-            type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+            type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
             integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
@@ -68,7 +68,9 @@ contains
 
     subroutine s_initialize_assign_variables_module
 
-        allocate (alf_sum%sf(0:m, 0:n, 0:p))
+        if(mpp_lim .and. bubbles_euler) then 
+            allocate (alf_sum%sf(0:m, 0:n, 0:p))
+        end if
 
         ! Depending on multicomponent flow model, the appropriate procedure
         ! for assignment of the patch mixture or species primitive variables
@@ -108,7 +110,7 @@ contains
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
         real(wp), intent(in) :: eta
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 
         real(wp) :: rho    !< density
@@ -200,7 +202,7 @@ contains
     subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
         integer, intent(in) :: j, k, l
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i
         real(wp) :: pres_mag, loc, n_tait, B_tait, p0
@@ -289,7 +291,7 @@ contains
         integer, intent(in) :: j, k, l
         real(wp), intent(in) :: eta
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Density, the specific heat ratio function and the liquid stiffness
         ! function, respectively, obtained from the combination of primitive
@@ -663,11 +665,11 @@ contains
 
         if (bubbles_euler .and. (.not. polytropic) .and. (.not. qbmm)) then
             do i = 1, nb
-                if (f_is_default(q_prim_vf(bub_idx%ps(i))%sf(j, k, l))) then
+                if (f_is_default(1._wp*q_prim_vf(bub_idx%ps(i))%sf(j, k, l))) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
                     ! print *, 'setting to pb0'
                 end if
-                if (f_is_default(q_prim_vf(bub_idx%ms(i))%sf(j, k, l))) then
+                if (f_is_default(1._wp*q_prim_vf(bub_idx%ms(i))%sf(j, k, l))) then
                     q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = mass_v0(i)
                 end if
             end do

@@ -69,7 +69,7 @@ contains
 
     subroutine s_apply_domain_patches(patch_id_fp, q_prim_vf, ib_markers_sf, levelset, levelset_norm)
 
-        type(scalar_field), dimension(1:sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size) :: q_prim_vf
         integer, dimension(0:m,0:m,0:m) :: patch_id_fp, ib_markers_sf
         type(levelset_field), intent(inout) :: levelset !< Levelset determined by models
         type(levelset_norm_field), intent(inout) :: levelset_norm !< Levelset_norm determined by models
@@ -259,7 +259,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(wp) :: pi_inf, gamma, lit_gamma
 
@@ -317,7 +317,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: th, thickness, nturns, mya
@@ -383,7 +383,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib
 
         real(wp) :: radius
@@ -460,7 +460,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib
 
         real(wp) :: x0, y0, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
@@ -622,7 +622,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib
 
         real(wp) :: x0, y0, z0, lz, z_max, z_min, f, x_act, y_act, ca, pa, ma, ta, theta, xa, ya, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
@@ -795,7 +795,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -853,7 +853,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -920,7 +920,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop operators
         real(wp) :: a, b
@@ -987,7 +987,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -1072,7 +1072,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< generic loop iterators
@@ -1162,7 +1162,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop operators
         real(wp) :: a, b, c
@@ -1227,7 +1227,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
@@ -1302,7 +1302,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -1362,7 +1362,7 @@ contains
         ! Patch identifier
         integer, intent(in) :: patch_id
         integer, intent(inout), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -1416,7 +1416,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: a, b, c, d !< placeholderrs for the cell boundary values
@@ -1485,7 +1485,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< equation of state parameters
@@ -1569,7 +1569,7 @@ contains
 
         integer, intent(IN) :: patch_id
         integer, intent(INOUT), dimension(0:m, 0:n, 0:p) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(wp) :: r, x_p, eps, phi
         real(wp), dimension(2:9) :: as, Ps
@@ -1721,7 +1721,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib   !< True if this patch is an immersed boundary
 
         ! Generic loop iterators
@@ -1818,7 +1818,7 @@ contains
         integer, intent(in) :: patch_id
         logical, optional, intent(in) :: ib
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -1915,7 +1915,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
         logical, optional, intent(in) :: ib   !< True if this patch is an immersed boundary
 
         integer :: i, j, k !< Generic loop iterators
@@ -2065,7 +2065,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: a, b, c, d
@@ -2144,7 +2144,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Variables for IBM+STL
         type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models
@@ -2400,7 +2400,7 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp) :: sigma, radius, normalX, normalY, normalZ, pG
         logical :: in_patch
 
