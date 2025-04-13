@@ -76,7 +76,6 @@ contains
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
 
         integer :: i, j, k, l, q
-
         !< x-direction
         if (bcxb >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, pb, mv, 1, -1)

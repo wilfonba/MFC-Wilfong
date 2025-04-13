@@ -1723,7 +1723,6 @@ contains
                             !     pres_L) )*(1._wp/dx(j)) - &
                             !     0.5_wp*cfl * (E_L)*(1._wp/dx(j)))
 
-
                             !$acc loop seq
                             do i = 1, num_fluids
                                 @:ATOMIC_ADD(rhs_vf(i)%sf(j+1,k,l),(0.5_wp * (alpha_rho_R(i) * &
@@ -2218,14 +2217,6 @@ contains
                             !     (0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dy(k+1)) - &
                             !     0.5_wp*cfl * (rho_L*vel_L(1))*(1._wp/dy(k+1)))
 
-                            @:ATOMIC_ADD(rhs_vf(momxb+2)%sf(j, k+1, l),(0.5_wp * rho_L * vel_L(3)*vel_L(2)*(1._wp/dy(k+1)) - &
-                                0.5_wp*cfl * (rho_L*vel_L(3))*(1._wp/dy(k+1))))
-                            ! !$omp atomic update
-                            ! !$acc atomic
-                            ! rhs_vf(momxb+2)%sf(j, k+1, l) =  rhs_vf(momxb+2)%sf(j, k+1, l) + &
-                            !     (0.5_wp * rho_L * vel_L(3)*vel_L(2)*(1._wp/dy(k+1)) - &
-                            !     0.5_wp*cfl * (rho_L*vel_L(3))*(1._wp/dy(k+1)))
-
                             @:ATOMIC_ADD(rhs_vf(E_idx)%sf(j, k+1, l),(0.5_wp * (vel_L(2) * (E_L + &
                                 pres_L+F_L) )*(1._wp/dy(k+1)) - &
                                 0.5_wp*cfl * (E_L)*(1._wp/dy(k+1))))
@@ -2254,13 +2245,6 @@ contains
                             !     (0.5_wp * rho_L * vel_L(1)*vel_L(2)*(1._wp/dy(k)) - &
                             !     0.5_wp*cfl * (rho_L*vel_L(1))*(1._wp/dy(k)))
 
-                            @:ATOMIC_ADD(rhs_vf(momxb+2)%sf(j, k, l),(-0.5_wp * rho_L * vel_L(3)*vel_L(2)*(1._wp/dy(k)) + &
-                                0.5_wp*cfl * (rho_L*vel_L(3))*(1._wp/dy(k))))
-                            ! !$omp atomic update
-                            ! !$acc atomic
-                            ! rhs_vf(momxb+2)%sf(j, k, l) =  rhs_vf(momxb+2)%sf(j, k, l) - &
-                            !     (0.5_wp * rho_L * vel_L(3)*vel_L(2)*(1._wp/dy(k)) - &
-                            !     0.5_wp*cfl * (rho_L*vel_L(3))*(1._wp/dy(k)))
 
                             @:ATOMIC_ADD(rhs_vf(E_idx)%sf(j, k, l),(-0.5_wp * (vel_L(2) * (E_L + &
                                 pres_L+F_L) )*(1._wp/dy(k)) + &
@@ -2357,13 +2341,6 @@ contains
                             !     (0.5_wp * rho_R * vel_R(2)*vel_R(1)*(1._wp/dy(k+1)) + &
                             !     0.5_wp*cfl * (rho_R*vel_R(1))*(1._wp/dy(k+1)))
 
-                            @:ATOMIC_ADD(rhs_vf(momxb+2)%sf(j, k+1, l),(0.5_wp * rho_R * vel_R(2)*vel_R(3)*(1._wp/dy(k+1)) + &
-                                0.5_wp*cfl * (rho_R*vel_R(3))*(1._wp/dy(k+1))))
-                            ! !$omp atomic update
-                            ! !$acc atomic
-                            ! rhs_vf(momxb+2)%sf(j, k+1, l) =  rhs_vf(momxb+2)%sf(j, k+1, l) + &
-                            !     (0.5_wp * rho_R * vel_R(2)*vel_R(3)*(1._wp/dy(k+1)) + &
-                            !     0.5_wp*cfl * (rho_R*vel_R(3))*(1._wp/dy(k+1)))
 
                             @:ATOMIC_ADD(rhs_vf(E_idx)%sf(j, k+1, l),(0.5_wp * (vel_R(2) * (E_R+ &
                                 pres_R+F_L ) )*(1._wp/dy(k+1)) + &
@@ -2393,13 +2370,6 @@ contains
                             !     (0.5_wp * rho_R * vel_R(2)*vel_R(1)*(1._wp/dy(k)) + &
                             !     0.5_wp*cfl * (rho_R*vel_R(1))*(1._wp/dy(k)))
 
-                            @:ATOMIC_ADD(rhs_vf(momxb+2)%sf(j, k, l),(-0.5_wp * rho_R * vel_R(2)*vel_R(3)*(1._wp/dy(k)) - &
-                                0.5_wp*cfl * (rho_R*vel_R(3))*(1._wp/dy(k))))
-                            ! !$omp atomic update
-                            ! !$acc atomic
-                            ! rhs_vf(momxb+2)%sf(j, k, l) =  rhs_vf(momxb+2)%sf(j, k, l) - &
-                            !     (0.5_wp * rho_R * vel_R(2)*vel_R(3)*(1._wp/dy(k)) + &
-                            !     0.5_wp*cfl * (rho_R*vel_R(3))*(1._wp/dy(k)))
 
                             @:ATOMIC_ADD(rhs_vf(E_idx)%sf(j, k, l),(-0.5_wp * (vel_R(2) * (E_R + &
                                 pres_R+F_L) )*(1._wp/dy(k)) - &
@@ -3676,7 +3646,7 @@ contains
            do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     do i = 1, vec_size
-                        rhs_vf(i)%sf(j,k,l) = 0._wp 
+                        rhs_vf(i)%sf(j,k,l) = 0._2 
                     end do
                 end do
             end do

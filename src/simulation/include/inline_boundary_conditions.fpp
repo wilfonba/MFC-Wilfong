@@ -240,7 +240,7 @@
 #:def PRIM_DIRICHLET_BC(DIR, LOC, DEST, SRC)
     do i = 1, vec_size
         do j = 1, buff_size
-            q_prim_vf(i)%sf(${DEST}$) = bc_buffers(${DIR}$,${LOC}$)%sf(${SRC}$)
+            q_prim_vf(i)%sf(${DEST}$) = real(bc_buffers(${DIR}$,${LOC}$)%sf(${SRC}$),kind=2)
         end do
     end do
 #:enddef

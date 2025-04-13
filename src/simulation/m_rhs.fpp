@@ -749,11 +749,11 @@ contains
         !     call s_get_capilary(q_prim_qp%vf)
         !     call nvtxEndRange
         ! end if
-
         ! Dimensional Splitting Loop
         do id = 1, num_dims
 
             if (igr) then
+
 
                 if (id == 1) then
                     call nvtxStartRange("IGR_SETUP")
