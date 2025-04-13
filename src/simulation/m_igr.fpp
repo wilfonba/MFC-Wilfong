@@ -11,6 +11,8 @@ module m_igr
     use m_mpi_proxy
 
     use m_helper
+
+    use atomic_mod
     
     implicit none
 
