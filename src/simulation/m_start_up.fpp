@@ -675,7 +675,7 @@ contains
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                        call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
                                            mpi_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
@@ -683,7 +683,7 @@ contains
                         do i = sys_size + 1, sys_size + 2*nb*nnode
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                            call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
                                                mpi_p, status, ierr)
                         end do
                     end if
@@ -691,7 +691,7 @@ contains
                     do i = 1, adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                        call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
                                            mpi_p, status, ierr)
                     end do
                 end if
@@ -813,7 +813,7 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                        call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
                                            mpi_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
@@ -825,7 +825,7 @@ contains
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                    'native', mpi_info_int, ierr)
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                            call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
                                                mpi_p, status, ierr)
                         end do
                     end if
@@ -838,7 +838,7 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                        call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
                                            mpi_p, status, ierr)
 
                     end do

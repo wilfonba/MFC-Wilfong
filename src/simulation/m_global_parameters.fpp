@@ -753,7 +753,7 @@ contains
         !!      other procedures that are necessary to setup the module.
     subroutine s_initialize_global_parameters_module
 
-        integer :: i, j, k
+        integer :: i, j, k, m_ds, n_ds, p_ds
         integer :: fac
 
         #:if not MFC_CASE_OPTIMIZATION
@@ -1087,8 +1087,16 @@ contains
         end if
 
         do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            MPI_IO_DATA%var(i)%sf => null()
+            if(down_sample) then 
+                m_ds = INT((m+1)/3) - 1
+                n_ds = INT((n+1)/3) - 1
+                p_ds = INT((p+1)/3) - 1
+                !allocate (MPI_IO_DATA%var(i)%sf(-1:m_ds+1, -1:n_ds+1, -1:p_ds+1))
+                !MPI_IO_DATA%var(i)%sf => null()
+            else
+                !allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                !MPI_IO_DATA%var(i)%sf => null()
+            end if
         end do
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
