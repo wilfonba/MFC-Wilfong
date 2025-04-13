@@ -427,13 +427,10 @@ contains
                 end do
             else 
                 do i = 1, vec_size
-                    @:ALLOCATE(rhs_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end &
-                    , idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(rhs_vf(i))
+                    @:ALLOCATE(rhs_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
                     @:PREFER_GPU(rhs_vf(i)%sf)
                 end do
-                allocate(rhs_vf(sys_size)%sf(idwbuff(1)%beg:idwbuff(1)%end &
-                    , idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                allocate(rhs_vf(sys_size)%sf(-1:m+1,-1:n+1,-1:p+1))
             end if
         end if
 
