@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.20)
 # We include C as a language because - for some reason -
 # FIND_LIBRARY_USE_LIB64_PATHS is otherwise ignored.
 
-project(MFC LANGUAGES C CXX Fortran)
+project(MFC LANGUAGES C CUDA CXX Fortran)
 
 # Build options exposed to users and their default values.
 
@@ -27,6 +27,8 @@ option(MFC_SYSCHECK      "Build syscheck"                                    OFF
 option(MFC_DOCUMENTATION "Build documentation"                               OFF)
 option(MFC_ALL           "Build everything"                                  OFF)
 option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
+
+
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -63,6 +65,7 @@ compiler (or a different version thereof), please:\n\
  - Set/Export the C, CXX, and FC environment variables. (e.g. 'export CC=gcc', \
  'export CXX=g++', and 'export FC=gfortran'.\n\
  - If using mfc.sh, delete the build/<code name> directory and try again. (e.g. 'rm -rf build/pre_process')")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 5)
@@ -193,6 +196,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
 	    $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Minform=warn>
         $<$<COMPILE_LANGUAGE:Fortran>:-cuda>
     )
 
@@ -210,6 +214,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if (DEFINED ENV{MFC_CUDA_CC})
         string(REGEX MATCHALL "[0-9]+" MFC_CUDA_CC $ENV{MFC_CUDA_CC})
         message(STATUS "Found $MFC_CUDA_CC specified. GPU code will be generated for compute capability(ies) ${MFC_CUDA_CC}.")
+        set(CMAKE_CUDA_ARCHITECTURES ${MFC_CUDA_CC})
     endif()
 endif()
 
@@ -418,7 +423,8 @@ function(MFC_SETUP_TARGET)
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
     	)
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
-        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
+        # target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib)
+        target_compile_options(${ARGS_TARGET} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-Minline=lib:${ARGS_TARGET}_lib>)
         list(PREPEND IPO_TARGETS ${ARGS_TARGET}_lib)
     endif()
 
@@ -504,12 +510,14 @@ function(MFC_SETUP_TARGET)
 
                 foreach (cc ${MFC_CUDA_CC})
                     target_compile_options(${a_target}
-                        PRIVATE -gpu=cc${cc}
+                        # PRIVATE -gpu=cc${cc}
+                        PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-gpu=cc${cc}>
                     )
                 endforeach()
 
                 target_compile_options(${a_target}
-                    PRIVATE -gpu=keep,ptxinfo,lineinfo
+                    # PRIVATE -gpu=keep,ptxinfo,lineinfo
+                    PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-gpu=keep,ptxinfo,lineinfo>    
                 )
 
                 # GH-200 Unified Memory Support
@@ -528,19 +536,17 @@ function(MFC_SETUP_TARGET)
                         PRIVATE -gpu=autocompare,debug
                     )
                 endif()
-                
+
                 target_compile_options(
                     ${a_target} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-cuda>
                 )
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-	    # Frontier Unified Memory Support
-                if (MFC_Unified)
+		if (MFC_Unified)
                     target_compile_options(${ARGS_TARGET}
                         PRIVATE -DFRONTIER_UNIFIED
                     )
                 endif()
-
-                find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
+    		find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
@@ -552,6 +558,13 @@ function(MFC_SETUP_TARGET)
             target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
         endif()
     endforeach()
+
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+        if (MFC_OpenACC)
+            set_target_properties(${ARGS_TARGET} PROPERTIES CUDA_ARCHITECTURES "${MFC_CUDA_CC}")
+            target_link_options(${ARGS_TARGET} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-cuda>)
+        endif()
+    endif()
 
     install(TARGETS ${ARGS_TARGET} RUNTIME DESTINATION bin)
 endfunction()
