@@ -520,7 +520,7 @@ contains
                     do j = 0, m
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -633,7 +633,7 @@ contains
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -709,7 +709,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/2._wp
+                             + rhs_vf(i)%sf(j, k, l))/2._wp
                     end do
                 end do
             end do
@@ -829,7 +829,7 @@ contains
                     do i = 1, vec_size
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -844,7 +844,7 @@ contains
                             q_cons_ts(1)%vf(i)%sf(j, k, l)
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt*rhs_vf(i)%sf(j, k, l)
+                            + rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -927,7 +927,7 @@ contains
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             (3._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                             + rhs_vf(i)%sf(j, k, l))/4._wp
                     end do
                 end do
             end do
@@ -941,7 +941,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (3._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + dt*rhs_vf(i)%sf(j, k, l))/4._wp
+                             + rhs_vf(i)%sf(j, k, l))/4._wp
                     end do
                 end do
             end do
@@ -1023,7 +1023,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2._wp*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                             + 2._wp*rhs_vf(i)%sf(j, k, l))/3._wp
                     end do
                 end do
             end do
@@ -1037,7 +1037,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + 2._wp*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                             + 2._wp*dt*rhs_vf(i)%sf(j, k, l))/3._wp
+                             + 2._wp*rhs_vf(i)%sf(j, k, l))/3._wp
                     end do
                 end do
             end do
