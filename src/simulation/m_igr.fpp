@@ -160,10 +160,13 @@ contains
                 !@:PREFER_GPU(jac_old)
            endif
 #else
-            #:for VAR in [ 'jac','jac_rhs']
+            #:for VAR in [ 'jac']
                 @:ALLOCATE(${VAR}$(idwbuff(1)%beg:idwbuff(1)%end, &
                              idwbuff(2)%beg:idwbuff(2)%end, &
                              idwbuff(3)%beg:idwbuff(3)%end))
+            #:endfor
+            #:for VAR in [ 'jac_rhs']
+                @:ALLOCATE(${VAR}$(-1:m,-1:n,-1:p))
             #:endfor
             if ( igr_temps_on_gpu >= 1 ) then
                 @:PREFER_GPU(jac)

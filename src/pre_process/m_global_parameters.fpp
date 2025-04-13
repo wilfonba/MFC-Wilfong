@@ -821,11 +821,14 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-
         if (viscous) then
-            buff_size = 2*weno_polyn + 2
+            if(igr) then 
+                buff_size = weno_polyn + 2
+            else
+                buff_size = 2*weno_polyn + 2
+            end if
         else
-            buff_size = weno_polyn + 2
+            buff_size = weno_polyn + 1
         end if
 
         ! Correction for smearing function in the lagrangian subgrid bubble model
