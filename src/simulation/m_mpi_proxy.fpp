@@ -892,7 +892,7 @@ contains
                                                 mpi_dir, &
                                                 pbc_loc)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field_half), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
         integer, intent(in) :: mpi_dir, pbc_loc
 
@@ -967,7 +967,7 @@ contains
                             do j = 0, buff_size - 1
                                 do i = 1, vec_size
                                     r = (i - 1) + v_size*(j + buff_size*(k + (n + 1)*l))
-                                    q_cons_buff_send(r) = q_cons_vf(i)%sf(j + pack_offset, k, l)
+                                    q_cons_buff_send(r) = real(q_cons_vf(i)%sf(j + pack_offset, k, l),kind=4)
                                 end do
                             end do
                         end do
@@ -1013,7 +1013,7 @@ contains
                                     r = (i - 1) + v_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          (k + buff_size*l))
-                                    q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k + pack_offset, l)
+                                    q_cons_buff_send(r) = real(q_cons_vf(i)%sf(j, k + pack_offset, l),kind=4)
                                 end do
                             end do
                         end do
@@ -1061,7 +1061,7 @@ contains
                                     r = (i - 1) + v_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                    q_cons_buff_send(r) = q_cons_vf(i)%sf(j, k, l + pack_offset)
+                                    q_cons_buff_send(r) = real(q_cons_vf(i)%sf(j, k, l + pack_offset),kind=4)
                                 end do
                             end do
                         end do
@@ -1147,7 +1147,7 @@ contains
                                 do i = 1, vec_size
                                     r = (i - 1) + v_size* &
                                         (j + buff_size*((k + 1) + (n + 1)*l))
-                                    q_cons_vf(i)%sf(j + unpack_offset, k, l) = q_cons_buff_recv(r)
+                                    q_cons_vf(i)%sf(j + unpack_offset, k, l) = real(q_cons_buff_recv(r),kind=2)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
@@ -1199,7 +1199,7 @@ contains
                                     r = (i - 1) + v_size* &
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + buff_size*l))
-                                    q_cons_vf(i)%sf(j, k + unpack_offset, l) = q_cons_buff_recv(r)
+                                    q_cons_vf(i)%sf(j, k + unpack_offset, l) = real(q_cons_buff_recv(r),kind=2)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
@@ -1255,7 +1255,7 @@ contains
                                         ((j + buff_size) + (m + 2*buff_size + 1)* &
                                          ((k + buff_size) + (n + 2*buff_size + 1)* &
                                           (l + buff_size)))
-                                    q_cons_vf(i)%sf(j, k, l + unpack_offset) = q_cons_buff_recv(r)
+                                    q_cons_vf(i)%sf(j, k, l + unpack_offset) = real(q_cons_buff_recv(r),kind=2)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_cons_vf(i)%sf(j, k, l))) then
                                         print *, "Error", j, k, l, i
@@ -2162,7 +2162,7 @@ contains
 
     subroutine s_mpi_sendrecv_F_igr(F_igr, mpi_dir, pbc_loc)
 
-        real(wp), dimension(startx:, starty:, startz:), intent (INOUT) :: F_igr
+        real(2), dimension(startx:, starty:, startz:), intent (INOUT) :: F_igr
 
         integer, intent(IN) :: mpi_dir
         integer, intent(IN) :: pbc_loc
@@ -2179,7 +2179,7 @@ contains
                         do k = 0, n
                             do j = m - (buff_size - 1), m
                                 r = j - m - 1 + buff_size + k*buff_size + l*buff_size*(n+1)
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2214,7 +2214,7 @@ contains
                         do k = 0, n
                             do j = 0, buff_size - 1
                                 r = j + k*buff_size + l*buff_size*(n+1)
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2254,7 +2254,7 @@ contains
                     do k = 0, n
                         do j = -buff_size, -1
                             r = j + buff_size + k*buff_size + l*buff_size*(n+1)
-                            F_igr(j, k, l) = q_cons_buff_recv(r)
+                            F_igr(j, k, l) = real(q_cons_buff_recv(r),kind=2)
                         end do
                     end do
                 end do
@@ -2266,7 +2266,7 @@ contains
                         do k = 0, n
                             do j = 0, buff_size - 1
                                 r = j + k*buff_size + l*buff_size*(n+1)
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2301,7 +2301,7 @@ contains
                         do k = 0, n
                             do j = m - (buff_size - 1), m
                                 r = j - m - 1 + buff_size + k*buff_size + l*buff_size*(n+1)
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2342,7 +2342,7 @@ contains
                     do k = 0, n
                         do j = m + 1, m + buff_size
                             r = j - m - 1 + k*buff_size + l*buff_size*(n+1)
-                            F_igr(j, k, l) = q_cons_buff_recv(r)
+                            F_igr(j, k, l) = real(q_cons_buff_recv(r),kind=2)
                         end do
                     end do
                 end do
@@ -2357,7 +2357,7 @@ contains
                         do k = n - (buff_size - 1), n
                             do j = -buff_size, m + buff_size
                                 r = j + buff_size + (k - n + buff_size - 1)*(m + 2*buff_size + 1) + l*(m+2*buff_size+1)*buff_size
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2391,7 +2391,7 @@ contains
                         do k = 0, buff_size - 1
                             do j = -buff_size, m + buff_size
                                 r = j + buff_size + k*(m + 2*buff_size + 1) + l*(m+2*buff_size+1)*buff_size
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2431,7 +2431,7 @@ contains
                     do k = -buff_size, - 1
                         do j = -buff_size, m + buff_size
                             r = j + buff_size + (k + buff_size)*(m + 2*buff_size + 1) + l*(m+2*buff_size+1)*buff_size
-                            F_igr(j, k, l) = q_cons_buff_recv(r)
+                            F_igr(j, k, l) = real(q_cons_buff_recv(r),kind=2)
                         end do
                     end do
                 end do
@@ -2443,7 +2443,7 @@ contains
                         do k = 0, buff_size - 1
                             do j = -buff_size, m + buff_size
                                 r = j + buff_size + k*(m + 2*buff_size + 1) + l*(m+2*buff_size+1)*buff_size
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2478,7 +2478,7 @@ contains
                         do k = n - (buff_size - 1), n
                             do j = -buff_size, m + buff_size
                                 r = j + buff_size + (k - n + buff_size - 1)*(m + 2*buff_size + 1) + l*(m+2*buff_size+1)*buff_size
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2518,7 +2518,7 @@ contains
                     do k = n+1, n+buff_size
                         do j = -buff_size, m + buff_size
                             r = j + buff_size + (k - n - 1)*(m + 2*buff_size + 1) + l*(m+2*buff_size+1)*buff_size
-                            F_igr(j, k, l) = q_cons_buff_recv(r)
+                            F_igr(j, k, l) = real(q_cons_buff_recv(r),kind=2)
                         end do
                     end do
                 end do
@@ -2533,7 +2533,7 @@ contains
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
                                 r = j + buff_size + (k + buff_size)*(m + 2*buff_size + 1) + (l - p - 1 + buff_size)*(m + 2*buff_size+ 1)*(n + 2*buff_size + 1)
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2568,7 +2568,7 @@ contains
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
                                 r = j + buff_size + (k + buff_size)*(m + 2*buff_size + 1) + l*(m + 2*buff_size+ 1)*(n + 2*buff_size + 1)
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2608,7 +2608,7 @@ contains
                     do k = -buff_size, n + buff_size
                         do j = -buff_size, m + buff_size
                             r = j + buff_size + (k + buff_size)*(m + 2*buff_size + 1) + (l + buff_size)*(m + 2*buff_size+ 1)*(n + 2*buff_size + 1)
-                            F_igr(j, k, l) = q_cons_buff_recv(r)
+                            F_igr(j, k, l) = real(q_cons_buff_recv(r),kind=2)
                         end do
                     end do
                 end do
@@ -2620,7 +2620,7 @@ contains
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
                                 r = j + buff_size + (k + buff_size)*(m + 2*buff_size + 1) + l*(m + 2*buff_size+ 1)*(n + 2*buff_size + 1)
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2654,7 +2654,7 @@ contains
                         do k = -buff_size, n + buff_size
                             do j = -buff_size, m + buff_size
                                 r = j + buff_size + (k + buff_size)*(m + 2*buff_size + 1) + (l - p - 1 + buff_size)*(m + 2*buff_size+ 1)*(n + 2*buff_size + 1)
-                                q_cons_buff_send(r) = F_igr(j, k, l)
+                                q_cons_buff_send(r) = real(F_igr(j, k, l),kind=4)
                             end do
                         end do
                     end do
@@ -2694,7 +2694,7 @@ contains
                     do k = -buff_size, n + buff_size
                         do j = -buff_size, m + buff_size
                             r = j + buff_size + (k + buff_size)*(m + 2*buff_size + 1) + (l - p - 1)*(m + 2*buff_size+ 1)*(n + 2*buff_size + 1)
-                            F_igr(j, k, l) = q_cons_buff_recv(r)
+                            F_igr(j, k, l) = real(q_cons_buff_recv(r),kind=2)
                         end do
                     end do
                 end do

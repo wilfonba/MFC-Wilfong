@@ -193,6 +193,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
 	    $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
+        $<$<COMPILE_LANGUAGE:Fortran>:-cuda>
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -366,6 +367,19 @@ macro(HANDLE_SOURCES target useCommon)
 
         list(APPEND ${target}_SRCs ${f90})
     endforeach()
+    if (MFC_OpenACC)
+        # Gather:
+        # *          src/[<target>,(common)]/*.cu
+        # * (if any) <build>/modules/<target>/*.cu
+        file(GLOB ${target}_CUs CONFIGURE_DEPENDS "${${target}_DIR}/*.cu"
+                                                "${CMAKE_BINARY_DIR}/modules/${target}/*.cu")
+        list(APPEND ${target}_SRCs ${${target}_CUs})
+        if (${useCommon})
+            file(GLOB common_CUs CONFIGURE_DEPENDS "${common_DIR}/*.cu")
+            list(APPEND ${target}_SRCs ${common_CUs})
+        endif()
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -rdc=true")
+    endif()
 endmacro()
 
 
@@ -514,6 +528,10 @@ function(MFC_SETUP_TARGET)
                         PRIVATE -gpu=autocompare,debug
                     )
                 endif()
+                
+                target_compile_options(
+                    ${a_target} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:-cuda>
+                )
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
 	    # Frontier Unified Memory Support
                 if (MFC_Unified)

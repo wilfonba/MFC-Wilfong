@@ -1508,7 +1508,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
+                        if (q_cons_ts(1)%vf(i)%sf(j, k, l) /= q_cons_ts(1)%vf(i)%sf(j, k, l)) then
                             print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
                             error stop "NaN(s) in timestep output."
                         end if
@@ -1558,7 +1558,7 @@ contains
 
         integer :: m_ds, n_ds, p_ds
         integer :: i, j, k, l, x_id, y_id, z_id, ix, iy, iz
-        real(wp) :: temp1, temp2, temp3, temp4
+        real(wp) :: temp1, temp2, temp3, temp4, temp
 
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
@@ -1628,20 +1628,25 @@ contains
             do i = 1, sys_size
                 allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
             end do
+        else
+            allocate(q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                allocate(q_cons_temp(i)%sf(0:m,0:n,0:p))
+            end do
         end if
 
         ! Reading in the user provided initial condition and grid data
         if(down_sample) then 
             call s_read_data_files(q_cons_temp, bc_type)
         else
-            call s_read_data_files(q_cons_ts(1)%vf, bc_type)
+            call s_read_data_files(q_cons_temp, bc_type)
         end if
 
         if(down_sample) then 
             do l = 0, p 
                 do k = 0, n
                     do j = 0, m 
-                        do i = 1, vec_size
+                        do i = 1, sys_size
 
                             ix = INT(j/3._wp)
                             iy = INT(k/3._wp)
@@ -1659,17 +1664,34 @@ contains
                             temp2 = (2._wp/3._wp)*q_cons_temp(i)%sf(ix,iy+y_id,iz+z_id) + (1._wp/3._wp)*q_cons_temp(i)%sf(ix+x_id,iy+y_id,iz+z_id)
                             temp4 = (2._wp/3._wp)*temp1 + (1._wp/3._wp)*temp2
 
-                            q_cons_ts(1)%vf(i)%sf(j,k,l) = (2._wp/3._wp)*temp3 + (1._wp/3._wp)*temp4
+                            temp = (2._wp/3._wp)*temp3 + (1._wp/3._wp)*temp4
+                            q_cons_ts(1)%vf(i)%sf(j,k,l) = real(temp,kind=2)
 
                         end do
                     end do 
                 end do 
             end do
-            do i = 1, vec_size
-                !$acc update device(q_cons_ts(1)%vf(i)%sf)
+        else
+            do l = 0, p 
+                do k = 0, n
+                    do j = 0, m 
+                        do i = 1, sys_size
+                            q_cons_ts(1)%vf(i)%sf(j,k,l) = real(q_cons_temp(i)%sf(j,k,l),kind=2)
+                        end do
+                    end do 
+                end do 
             end do
-            !$acc update device(vec_size)
         end if
+
+        do i = 1, vec_size
+            !$acc update device(q_cons_ts(1)%vf(i)%sf)
+        end do
+        !$acc update device(vec_size)
+
+        do i = 1, sys_size
+            deallocate(q_cons_temp(i)%sf)
+        end do 
+        deallocate(q_cons_temp)
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()

@@ -46,13 +46,13 @@ module m_time_steppers
 
     implicit none
 
-    type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
+    type(vector_field_half), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
 
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf !<
     !! Cell-average primitive variables at the current time-stage
 
-    type(scalar_field), allocatable, dimension(:) :: rhs_vf !<
+    type(scalar_field_half), allocatable, dimension(:) :: rhs_vf !<
     !! Cell-average RHS variables at the current time-stage
 
     type(integer_field), allocatable, dimension(:,:) :: bc_type
@@ -486,13 +486,13 @@ contains
         print *, 'got rhs'
 #endif
 
-        if (run_time_info) then
-            if(igr) then
-                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else
-                call s_write_run_time_information(q_prim_vf, t_step)
-            end if
-        end if
+        ! if (run_time_info) then
+        !     if(igr) then
+        !         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+        !     else
+        !         call s_write_run_time_information(q_prim_vf, t_step)
+        !     end if
+        ! end if
 
 #ifdef DEBUG
         print *, 'wrote runtime info'
@@ -508,10 +508,10 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lagrange_tdv_rk(stage=1)
-        end if
+        ! if (bubbles_lagrange) then
+        !     call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
+        !     call s_update_lagrange_tdv_rk(stage=1)
+        ! end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, vec_size
@@ -561,21 +561,21 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
+        ! if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, dt)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+        ! if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-        if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        ! if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        if (ib) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-            end if
-        end if
+        ! if (ib) then
+        !     if (qbmm .and. .not. polytropic) then
+        !         call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+        !     else
+        !         call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+        !     end if
+        ! end if
 
         if(down_sample) then 
             call s_populate_variables_buffers(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf, bc_type)
@@ -603,13 +603,13 @@ contains
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
-        if (run_time_info) then
-            if(igr) then
-                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else
-                call s_write_run_time_information(q_prim_vf, t_step)
-            end if
-        end if
+        ! if (run_time_info) then
+        !     if(igr) then
+        !         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+        !     else
+        !         call s_write_run_time_information(q_prim_vf, t_step)
+        !     end if
+        ! end if
 
         if (probe_wrt) then
             call s_time_step_cycling(t_step)
@@ -621,10 +621,10 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lagrange_tdv_rk(stage=1)
-        end if
+        ! if (bubbles_lagrange) then
+        !     call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
+        !     call s_update_lagrange_tdv_rk(stage=1)
+        ! end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, vec_size
@@ -674,32 +674,32 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+        ! if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+        ! if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-        end if
+        ! if (model_eqns == 3 .and. (.not. relax)) then
+        !     call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        ! end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
-        if (ib) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
-            end if
-        end if
+        ! if (ib) then
+        !     if (qbmm .and. .not. polytropic) then
+        !         call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+        !     else
+        !         call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+        !     end if
+        ! end if
 
         ! Stage 2 of 2
 
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
-            call s_update_lagrange_tdv_rk(stage=2)
-        end if
+        ! if (bubbles_lagrange) then
+        !     call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
+        !     call s_update_lagrange_tdv_rk(stage=2)
+        ! end if
 
         !$acc parallel loop collapse(4) gang vector default(present)
         do i = 1, vec_size
@@ -751,23 +751,23 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        ! if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+        ! if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-        end if
+        ! if (model_eqns == 3 .and. (.not. relax)) then
+        !     call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        ! end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        if (ib) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-            end if
-        end if
+        ! if (ib) then
+        !     if (qbmm .and. .not. polytropic) then
+        !         call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+        !     else
+        !         call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+        !     end if
+        ! end if
 
         if(down_sample) then 
             call s_populate_variables_buffers(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf, bc_type)
@@ -798,13 +798,13 @@ contains
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
 
-        if (run_time_info) then
-            if(igr) then
-                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else
-                call s_write_run_time_information(q_prim_vf, t_step)
-            end if
-        end if
+        ! if (run_time_info) then
+        !     if(igr) then
+        !         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+        !     else
+        !         call s_write_run_time_information(q_prim_vf, t_step)
+        !     end if
+        ! end if
 
         if (probe_wrt) then
             call s_time_step_cycling(t_step)
@@ -816,10 +816,10 @@ contains
             if (t_step == t_step_stop) return
         end if
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
-            call s_update_lagrange_tdv_rk(stage=1)
-        end if
+        ! if (bubbles_lagrange) then
+        !     call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, stage=1)
+        !     call s_update_lagrange_tdv_rk(stage=1)
+        ! end if
 
 #if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -886,23 +886,23 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
+        ! if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+        ! if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-        end if
+        ! if (model_eqns == 3 .and. (.not. relax)) then
+        !     call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        ! end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
-        if (ib) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
-            end if
-        end if
+        ! if (ib) then
+        !     if (qbmm .and. .not. polytropic) then
+        !         call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+        !     else
+        !         call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+        !     end if
+        ! end if
 
         ! Stage 2 of 3
 
@@ -912,10 +912,10 @@ contains
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 #endif
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
-            call s_update_lagrange_tdv_rk(stage=2)
-        end if
+        ! if (bubbles_lagrange) then
+        !     call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=2)
+        !     call s_update_lagrange_tdv_rk(stage=2)
+        ! end if
 
 
 #if  !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
@@ -984,23 +984,23 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
+        ! if (bodyForces) call s_apply_bodyforces(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, dt/4._wp)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
+        ! if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(2)%vf)
 
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
-        end if
+        ! if (model_eqns == 3 .and. (.not. relax)) then
+        !     call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
+        ! end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
-        if (ib) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
-            end if
-        end if
+        ! if (ib) then
+        !     if (qbmm .and. .not. polytropic) then
+        !         call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
+        !     else
+        !         call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf)
+        !     end if
+        ! end if
 
         ! Stage 3 of 3
 #if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
@@ -1009,10 +1009,10 @@ contains
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg)
 #endif
 
-        if (bubbles_lagrange) then
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
-            call s_update_lagrange_tdv_rk(stage=3)
-        end if
+        ! if (bubbles_lagrange) then
+        !     call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_vf, stage=3)
+        !     call s_update_lagrange_tdv_rk(stage=3)
+        ! end if
         
 #if !defined(__NVCOMPILER_GPU_UNIFIED_MEM) && !defined(FRONTIER_UNIFIED)
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -1080,27 +1080,27 @@ contains
             end do
         end if
 
-        if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
+        ! if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, 2._wp*dt/3._wp)
 
-        if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+        ! if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
 
-        if (model_eqns == 3 .and. (.not. relax)) then
-            call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-        end if
+        ! if (model_eqns == 3 .and. (.not. relax)) then
+        !     call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+        ! end if
 
-        call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
-        call nvtxEndRange
+        ! call nvtxStartRange("RHS-ELASTIC")
+        ! if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_ts(1)%vf, q_prim_vf)
+        ! call nvtxEndRange
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        if (ib) then
-            if (qbmm .and. .not. polytropic) then
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            else
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-            end if
-        end if
+        ! if (ib) then
+        !     if (qbmm .and. .not. polytropic) then
+        !         call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+        !     else
+        !         call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+        !     end if
+        ! end if
 
         if(down_sample) then 
             call s_populate_variables_buffers(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf, bc_type)
@@ -1148,24 +1148,24 @@ contains
 
     !> Bubble source part in Strang operator splitting scheme
         !! @param t_step Current time-step
-    subroutine s_adaptive_dt_bubble(t_step)
+    ! subroutine s_adaptive_dt_bubble(t_step)
 
-        integer, intent(in) :: t_step
+    !     integer, intent(in) :: t_step
 
-        type(vector_field) :: gm_alpha_qp
+    !     type(vector_field) :: gm_alpha_qp
 
-        call s_convert_conservative_to_primitive_variables( &
-            q_cons_ts(1)%vf, &
-            q_T_sf, &
-            q_prim_vf, &
-            idwint, &
-            gm_alpha_qp%vf)
+    !     call s_convert_conservative_to_primitive_variables( &
+    !         q_cons_ts(1)%vf, &
+    !         q_T_sf, &
+    !         q_prim_vf, &
+    !         idwint, &
+    !         gm_alpha_qp%vf)
 
-        call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+    !     call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
-        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+    !     call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-    end subroutine s_adaptive_dt_bubble
+    ! end subroutine s_adaptive_dt_bubble
 
     subroutine s_compute_dt(q_prim_vf)
 
@@ -1338,133 +1338,133 @@ contains
         real(wp) :: lag_largestep, rkck_errmax, dt_did
         integer :: RKstep
 
-        mytime = mytime - dt
+!         mytime = mytime - dt
 
-        start_rkck_step = .true.
-        restart_rkck_step = .false.
+!         start_rkck_step = .true.
+!         restart_rkck_step = .false.
 
-        do while (start_rkck_step .or. restart_rkck_step)
+!         do while (start_rkck_step .or. restart_rkck_step)
 
-            start_rkck_step = .false.
-            restart_rkck_step = .false.
+!             start_rkck_step = .false.
+!             restart_rkck_step = .false.
 
-            ! FIRST TIME-STAGE
-            RKstep = 1
-            rkck_time_tmp = mytime + rkck_c1*dt
-!$acc update device (rkck_time_tmp)
+!             ! FIRST TIME-STAGE
+!             RKstep = 1
+!             rkck_time_tmp = mytime + rkck_c1*dt
+! !$acc update device (rkck_time_tmp)
 
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 1st time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(1)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_rkck(1)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
+! #ifdef DEBUG
+!             if (proc_rank == 0) print *, 'RKCK 1st time-stage at', rkck_time_tmp
+! #endif
+!             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(1)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+!             call s_compute_EL_coupled_solver(q_cons_ts(1)%vf, q_prim_vf, rhs_ts_rkck(1)%vf, RKstep)
+!             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
+!             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+!             if (restart_rkck_step) cycle
 
-            ! SECOND TIME-STAGE
-            RKstep = 2
-            rkck_time_tmp = mytime + rkck_c2*dt
-!$acc update device (rkck_time_tmp)
+!             ! SECOND TIME-STAGE
+!             RKstep = 2
+!             rkck_time_tmp = mytime + rkck_c2*dt
+! !$acc update device (rkck_time_tmp)
 
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 2nd time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(2)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(2)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
+! #ifdef DEBUG
+!             if (proc_rank == 0) print *, 'RKCK 2nd time-stage at', rkck_time_tmp
+! #endif
+!             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(2)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+!             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(2)%vf, RKstep)
+!             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
+!             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+!             if (restart_rkck_step) cycle
 
-            ! THIRD TIME-STAGE
-            RKstep = 3
-            rkck_time_tmp = mytime + rkck_c3*dt
-!$acc update device (rkck_time_tmp)
+!             ! THIRD TIME-STAGE
+!             RKstep = 3
+!             rkck_time_tmp = mytime + rkck_c3*dt
+! !$acc update device (rkck_time_tmp)
 
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 3rd time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(3)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(3)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
+! #ifdef DEBUG
+!             if (proc_rank == 0) print *, 'RKCK 3rd time-stage at', rkck_time_tmp
+! #endif
+!             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(3)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+!             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(3)%vf, RKstep)
+!             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
+!             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+!             if (restart_rkck_step) cycle
 
-            ! FOURTH TIME-STAGE
-            RKstep = 4
-            rkck_time_tmp = mytime + rkck_c4*dt
-!$acc update device (rkck_time_tmp)
+!             ! FOURTH TIME-STAGE
+!             RKstep = 4
+!             rkck_time_tmp = mytime + rkck_c4*dt
+! !$acc update device (rkck_time_tmp)
 
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 4th time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(4)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(4)%vf, RKstep)
-            call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
+! #ifdef DEBUG
+!             if (proc_rank == 0) print *, 'RKCK 4th time-stage at', rkck_time_tmp
+! #endif
+!             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(4)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+!             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(4)%vf, RKstep)
+!             call s_update_tmp_rkck(RKstep, q_cons_ts, rhs_ts_rkck, lag_largestep)
+!             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+!             if (restart_rkck_step) cycle
 
-            ! FIFTH TIME-STAGE
-            RKstep = 5
-            rkck_time_tmp = mytime + rkck_c5*dt
-!$acc update device (rkck_time_tmp)
+!             ! FIFTH TIME-STAGE
+!             RKstep = 5
+!             rkck_time_tmp = mytime + rkck_c5*dt
+! !$acc update device (rkck_time_tmp)
 
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 5th time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(5)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(5)%vf, 5)
-            call s_update_tmp_rkck(5, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
+! #ifdef DEBUG
+!             if (proc_rank == 0) print *, 'RKCK 5th time-stage at', rkck_time_tmp
+! #endif
+!             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(5)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+!             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(5)%vf, 5)
+!             call s_update_tmp_rkck(5, q_cons_ts, rhs_ts_rkck, lag_largestep)
+!             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+!             if (restart_rkck_step) cycle
 
-            ! SIXTH TIME-STAGE
-            RKstep = 6
-            rkck_time_tmp = mytime + rkck_c6*dt
-!$acc update device (rkck_time_tmp)
+!             ! SIXTH TIME-STAGE
+!             RKstep = 6
+!             rkck_time_tmp = mytime + rkck_c6*dt
+! !$acc update device (rkck_time_tmp)
 
-#ifdef DEBUG
-            if (proc_rank == 0) print *, 'RKCK 6th time-stage at', rkck_time_tmp
-#endif
-            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(6)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(6)%vf, 6)
-            call s_update_tmp_rkck(6, q_cons_ts, rhs_ts_rkck, lag_largestep)
-            if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
-            if (restart_rkck_step) cycle
+! #ifdef DEBUG
+!             if (proc_rank == 0) print *, 'RKCK 6th time-stage at', rkck_time_tmp
+! #endif
+!             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_ts_rkck(6)%vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+!             call s_compute_EL_coupled_solver(q_cons_ts(2)%vf, q_prim_vf, rhs_ts_rkck(6)%vf, 6)
+!             call s_update_tmp_rkck(6, q_cons_ts, rhs_ts_rkck, lag_largestep)
+!             if (lag_largestep > 0._wp) call s_compute_rkck_dt(lag_largestep, restart_rkck_step)
+!             if (restart_rkck_step) cycle
 
-            dt_did = dt
+!             dt_did = dt
 
-            if (rkck_adap_dt) then
-                ! TRUNCATION ERROR
-#ifdef DEBUG
-                if (proc_rank == 0) print *, 'Computing truncation error (4th/5th RKCK)'
-#endif
-                call s_calculate_rkck_truncation_error(rkck_errmax)
-                call s_compute_rkck_dt(lag_largestep, restart_rkck_step, rkck_errmax)
-                if (restart_rkck_step) cycle
-            end if
+!             if (rkck_adap_dt) then
+!                 ! TRUNCATION ERROR
+! #ifdef DEBUG
+!                 if (proc_rank == 0) print *, 'Computing truncation error (4th/5th RKCK)'
+! #endif
+!                 call s_calculate_rkck_truncation_error(rkck_errmax)
+!                 call s_compute_rkck_dt(lag_largestep, restart_rkck_step, rkck_errmax)
+!                 if (restart_rkck_step) cycle
+!             end if
 
-        end do
+!         end do
 
-        !> Update values
-        mytime = mytime + dt_did
-        call s_update_rkck(q_cons_ts)
+!         !> Update values
+!         mytime = mytime + dt_did
+!         call s_update_rkck(q_cons_ts)
 
-        call s_write_void_evol(mytime)
-        if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
+!         call s_write_void_evol(mytime)
+!         if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
 
-        if (lag_params%write_bubbles) then
-            !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
-            call s_write_lag_particles(mytime)
-        end if
+!         if (lag_params%write_bubbles) then
+!             !$acc update host(gas_p, gas_mv, intfc_rad, intfc_vel)
+!             call s_write_lag_particles(mytime)
+!         end if
 
-        if (run_time_info) then
-            if(igr) then
-                call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-            else
-                call s_write_run_time_information(q_prim_vf, t_step)
-            end if
-        end if
+!         if (run_time_info) then
+!             if(igr) then
+!                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+!             else
+!                 call s_write_run_time_information(q_prim_vf, t_step)
+!             end if
+!         end if
 
     end subroutine s_4th_5th_order_rkck
 

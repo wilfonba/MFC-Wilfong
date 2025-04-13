@@ -71,7 +71,7 @@ contains
 
     subroutine s_populate_variables_buffers(q_prim_vf, pb, mv, bc_type)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
         real(wp), dimension(startx:, starty:, startz:, 1:, 1:), intent(inout) :: pb, mv
 

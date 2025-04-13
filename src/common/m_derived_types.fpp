@@ -25,6 +25,10 @@ module m_derived_types
         real(wp), pointer, dimension(:, :, :) :: sf => null()
     end type scalar_field
 
+    type scalar_field_half
+        real(2), pointer, dimension(:, :, :) :: sf => null()
+    end type scalar_field_half
+
     !> Derived type for bubble variables pb and mv at quadrature nodes (qbmm)
     type pres_field
         real(wp), pointer, dimension(:, :, :, :, :) :: sf => null()
@@ -69,6 +73,10 @@ module m_derived_types
     type vector_field
         type(scalar_field), allocatable, dimension(:) :: vf !< Vector field
     end type vector_field
+
+    type vector_field_half
+        type(scalar_field_half), allocatable, dimension(:) :: vf !< Vector field
+    end type vector_field_half
 
     !> Integer bounds for variables
     type int_bounds_info

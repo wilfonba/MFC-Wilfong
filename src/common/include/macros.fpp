@@ -222,3 +222,12 @@ ${s if s.rfind(')') == -1 else next((s[:i] for i in range(s.rfind(')'), -1, -1) 
                          //${message or '"No error description."'}$)
     end if
 #:enddef
+
+#:def ATOMIC_ADD(result, rhs)
+#if 1
+    call atomicAdd_half(${result}$, ${rhs}$)
+#else
+    !$acc atomic
+    ${result}$ = ${result}$ + ${rhs}$
+#endif
+#:enddef

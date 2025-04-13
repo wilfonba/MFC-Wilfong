@@ -81,7 +81,7 @@ contains
         !! @param t_step Current time step
     subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
-        type(scalar_field), &
+        type(scalar_field_half), &
             dimension(sys_size), &
             intent(in) :: q_cons_vf
 
@@ -454,7 +454,7 @@ contains
         !!  @param t_step Current time-step
     subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field_half), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
@@ -518,6 +518,19 @@ contains
 
         end if
 
+        do i = 1, vec_size
+            !$acc update host(q_cons_vf(i)%sf)
+        end do
+        do l = 0, p 
+            do k = 0, n
+                do j = 0, m 
+                    do i = 1, sys_size
+                        q_cons_temp(i)%sf(j,k,l) = real(q_cons_vf(i)%sf(j,k,l),kind=4)
+                    end do
+                end do 
+            end do 
+        end do
+
         ! Writing the conservative variables data files
         do i = 1, sys_size
             write (file_path, '(A,I0,A)') trim(t_step_dir)//'/q_cons_vf', &
@@ -527,7 +540,7 @@ contains
                   FORM='unformatted', &
                   STATUS='new')
 
-            write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
+            write (2) q_cons_temp(i)%sf(0:m, 0:n, 0:p); close (2)
         end do
 
         if (qbmm .and. .not. polytropic) then
@@ -589,7 +602,7 @@ contains
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
         if ((prim_vars_wrt .or. (n == 0 .and. p == 0)) .and. (.not. igr)) then
-            call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
+            call s_convert_conservative_to_primitive_variables(q_cons_temp, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
                 !$acc update host(q_prim_vf(i)%sf(:,:,:))
             end do
@@ -610,7 +623,7 @@ contains
                     do j = 0, m
                         ! todo: revisit change here
                         if (((i >= adv_idx%beg) .and. (i <= adv_idx%end))) then
-                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                            write (2, FMT) x_cb(j), q_cons_temp(i)%sf(j, 0, 0)
                         else
                             write (2, FMT) x_cb(j), q_prim_vf(i)%sf(j, 0, 0)
                         end if
@@ -624,7 +637,7 @@ contains
 
                 open (2, FILE=trim(file_path))
                 do j = 0, m
-                    write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                    write (2, FMT) x_cb(j), q_cons_temp(i)%sf(j, 0, 0)
                 end do
                 close (2)
             end do
@@ -668,7 +681,7 @@ contains
                 open (2, FILE=trim(file_path))
                 do j = 0, m
                     do k = 0, n
-                        write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
+                        write (2, FMT) x_cb(j), y_cb(k), q_cons_temp(i)%sf(j, k, 0)
                     end do
                     write (2, *)
                 end do
@@ -730,7 +743,7 @@ contains
                                 .or. &
                                 ((i >= chemxb) .and. (i <= chemxe)) &
                                 ) then
-                                write (2, FMT) x_cb(j), y_cb(k), q_cons_vf(i)%sf(j, k, 0)
+                                write (2, FMT) x_cb(j), y_cb(k), q_cons_temp(i)%sf(j, k, 0)
                             else
                                 write (2, FMT) x_cb(j), y_cb(k), q_prim_vf(i)%sf(j, k, 0)
                             end if
@@ -756,7 +769,7 @@ contains
                 do j = 0, m
                     do k = 0, n
                         do l = 0, p
-                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
+                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_temp(i)%sf(j, k, l)
                         end do
                         write (2, *)
                     end do
@@ -828,7 +841,7 @@ contains
                                     .or. &
                                     ((i >= chemxb) .and. (i <= chemxe)) &
                                     ) then
-                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_vf(i)%sf(j, k, l)
+                                    write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_cons_temp(i)%sf(j, k, l)
                                 else
                                     write (2, FMT) x_cb(j), y_cb(k), z_cb(l), q_prim_vf(i)%sf(j, k, l)
                                 end if
@@ -852,7 +865,7 @@ contains
         !!  @param beta Eulerian void fraction from lagrangian bubbles
     subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, t_step, beta)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field_half), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
@@ -905,7 +918,7 @@ contains
                                 do iy = -1, 1
                                     do ix = -1, 1
                                         q_cons_temp(i)%sf(j,k,l) = q_cons_temp(i)%sf(j,k,l) &
-                                        + (1._wp / 27._wp)*q_cons_vf(i)%sf(x_id+ix,y_id+iy,z_id+iz)
+                                        + (1._wp / 27._wp)*real(q_cons_vf(i)%sf(x_id+ix,y_id+iy,z_id+iz),kind=4)
                                     end do 
                                 end do 
                             end do
@@ -926,8 +939,19 @@ contains
                     end do 
                 end do 
             end do
-
-            
+        else
+            do i = 1, vec_size
+                !$acc update host(q_cons_vf(i)%sf)
+            end do
+            do l = 0, p 
+                do k = 0, n
+                    do j = 0, m 
+                        do i = 1, sys_size
+                            q_cons_temp(i)%sf(j,k,l) = real(q_cons_vf(i)%sf(j,k,l),kind=4)
+                        end do
+                    end do 
+                end do 
+            end do
         end if
 
         if (present(beta)) then
@@ -945,9 +969,9 @@ contains
                 call s_initialize_mpi_data_ds(q_cons_temp)
             else
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                    call s_initialize_mpi_data(q_cons_temp, ib_markers, levelset, levelset_norm)
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    call s_initialize_mpi_data(q_cons_temp)
                 end if
             end if
 
@@ -1894,6 +1918,11 @@ contains
             allocate(q_cons_temp(1:sys_size))
             do i = 1, sys_size
                 allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
+            end do
+        else
+            allocate(q_cons_temp(1:sys_size))
+            do i = 1, sys_size
+                allocate(q_cons_temp(i)%sf(0:m,0:n,0:p))
             end do
         end if
 
