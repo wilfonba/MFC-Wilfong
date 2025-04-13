@@ -1199,7 +1199,7 @@ contains
     subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
         integer, intent(in) :: t_step
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field_half), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
 
         real(wp), dimension(-1:m) :: distx
