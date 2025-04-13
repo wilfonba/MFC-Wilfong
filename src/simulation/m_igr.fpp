@@ -490,7 +490,7 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present) private(F_L,vel_L,alpha_rho_L)
                 do l = 0, p
                     do k = 0, n
-                        do j = -buff_size+3, m+buff_size-3
+                        do j = -1, m
 
                             F_L = (1._wp/60._wp) * (-3._wp * jac(j-1, k, l) + &
                                                 27._wp * jac(j, k, l) + &
@@ -582,7 +582,7 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present) private(F_L, vel_L,alpha_rho_L)
                 do l = 0, p
                     do k = 0, n
-                        do j = -buff_size+3, m+buff_size-3
+                        do j = -1, m
 
                            F_L = (1._wp/60._wp) * (-3._wp * jac(j-1, k, l) + &
                                                 27._wp * jac(j, k, l) + &
@@ -700,15 +700,83 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L,alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,E_L,mu_R,rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)                
                 do l = 0, p
                     do k = 0, n
-                        do j = -buff_size+5, m+buff_size-5
+                        do j = -1, m
 
                             dvel = 0._wp
                             vflux_L_arr = 0._wp
                             vflux_R_arr = 0._wp
 
-                            !DIR$ unroll 6
-                            !$acc loop seq 
-                            do q = -2, 3
+                            if(viscous) then 
+                                !DIR$ unroll 6
+                                !$acc loop seq 
+                                do q = -2, 3
+                                    dvel_small = 0._wp
+                                    !x-direction contributions
+                                    !$acc loop seq 
+                                    do i = -1, 1
+                                        rho_L = 0._wp
+                                        !$acc loop seq 
+                                        do r = 1, num_fluids
+                                            rho_L = rho_L + q_prim_vf(r)%sf(j+i+q,k,l)
+                                        end do
+                                        rho_sf_small(i) = rho_L
+                                    end do
+
+                                    dvel_small(1) = (1/(2._wp*dx(j))) * ( &
+                                        1._wp*q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        1._wp*q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                    dvel_small(2) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
+
+                                    if (q == 0) dvel(:,1) = dvel_small
+                                    if (q > -2 .and. viscous) then
+                                        vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
+                                        vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(4._wp*dvel_small(1))/3._wp
+                                    end if
+                                    if (q < 3 .and. viscous) then
+                                        vflux_R_arr(1) = vflux_R_arr(1) + coeff_R(q)*(dvel_small(2))
+                                        vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(4._wp*dvel_small(1))/3._wp
+                                    end if
+
+                                    !y-direction contributions
+                                    !$acc loop seq 
+                                    do i = -1, 1
+                                        rho_L = 0._wp
+                                        !$acc loop seq 
+                                        do r = 1, num_fluids
+                                            rho_L = rho_L + q_prim_vf(r)%sf(j+q,k+i,l)
+                                        end do
+                                        rho_sf_small(i) = rho_L
+                                    end do
+
+                                    dvel_small(1) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                    dvel_small(2) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
+
+
+                                    if (q == 0) dvel(:,2) = dvel_small
+
+                                    if (q > -2 .and. viscous) then
+                                        vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
+                                        vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(-2._wp*dvel_small(2))/3._wp
+                                    end if
+                                    if (q < 3 .and. viscous) then
+                                        vflux_R_arr(1) = vflux_R_arr(1) + coeff_R(q)*(dvel_small(1))
+                                        vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(-2._wp*dvel_small(2))/3._wp
+                                    end if
+
+                                    if (q == 0) then
+                                        jac_rhs(j,k,l) = alf_igr * (2._wp*(dvel(1,2)*dvel(2,1)) &
+                                            + dvel(1,1)**2_wp + dvel(2,2)**2_wp &
+                                            + (dvel(1,1) + dvel(2,2))**2_wp)
+                                    end if
+                                end do
+                            else
+                                q = 0
                                 dvel_small = 0._wp
                                 !x-direction contributions
                                 !$acc loop seq 
@@ -728,15 +796,7 @@ contains
                                     q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
                                     q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
 
-                                if (q == 0) dvel(:,1) = dvel_small
-                                if (q > -2 .and. viscous) then
-                                    vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
-                                    vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(4._wp*dvel_small(1))/3._wp
-                                end if
-                                if (q < 3 .and. viscous) then
-                                    vflux_R_arr(1) = vflux_R_arr(1) + coeff_R(q)*(dvel_small(2))
-                                    vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(4._wp*dvel_small(1))/3._wp
-                                end if
+                                dvel(:,1) = dvel_small
 
                                 !y-direction contributions
                                 !$acc loop seq 
@@ -757,23 +817,12 @@ contains
                                     q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
 
 
-                                if (q == 0) dvel(:,2) = dvel_small
-
-                                if (q > -2 .and. viscous) then
-                                    vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
-                                    vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(-2._wp*dvel_small(2))/3._wp
-                                end if
-                                if (q < 3 .and. viscous) then
-                                    vflux_R_arr(1) = vflux_R_arr(1) + coeff_R(q)*(dvel_small(1))
-                                    vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(-2._wp*dvel_small(2))/3._wp
-                                end if
-
-                                if (q == 0) then
-                                    jac_rhs(j,k,l) = alf_igr * (2._wp*(dvel(1,2)*dvel(2,1)) &
-                                        + dvel(1,1)**2_wp + dvel(2,2)**2_wp &
-                                        + (dvel(1,1) + dvel(2,2))**2_wp)
-                                end if
-                            end do
+                                dvel(:,2) = dvel_small
+                                
+                                jac_rhs(j,k,l) = alf_igr * (2._wp*(dvel(1,2)*dvel(2,1)) &
+                                    + dvel(1,1)**2_wp + dvel(2,2)**2_wp &
+                                    + (dvel(1,1) + dvel(2,2))**2_wp)
+                            end if
 
                             !$acc loop seq 
                             do i = 1, num_fluids
@@ -1141,15 +1190,122 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L,alpha_L,alpha_R,alpha_rho_L,cfl,dvel,F_L,E_L,mu_R,rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 do l = 0, p
                     do k = 0, n
-                        do j = -buff_size+5, m+buff_size-5
+                        do j = -1, m
                             
                             dvel = 0._wp
                             vflux_L_arr = 0._wp
                             vflux_R_arr = 0._wp
 
-                            !DIR$ unroll 6
-                            !$acc loop seq 
-                            do q = -2, 3
+                            if(viscous) then 
+                                !DIR$ unroll 6
+                                !$acc loop seq 
+                                do q = -2, 3
+                                    dvel_small = 0._wp
+                                    !x-direction contributions
+                                    !$acc loop seq 
+                                    do i = -1, 1
+                                        rho_L = 0._wp
+                                        !$acc loop seq 
+                                        do r = 1, num_fluids
+                                            rho_L = rho_L + q_prim_vf(r)%sf(j+i+q,k,l)
+                                        end do
+                                        rho_sf_small(i) = rho_L
+                                    end do
+
+                                    dvel_small(1) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                    dvel_small(2) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j-1+q,k,l)/rho_sf_small(-1))
+                                    dvel_small(3) = (1/(2._wp*dx(j))) * ( &
+                                        q_prim_vf(momxb+2)%sf(j+1+q,k,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+2)%sf(j-1+q,k,l)/rho_sf_small(-1))
+
+                                    if (q == 0) dvel(:,1) = dvel_small
+                                    if (q > -2 .and. viscous) then
+                                        vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
+                                        vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(3))
+                                        vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(4._wp*dvel_small(1))/3._wp
+                                    end if
+                                    if (q < 3 .and. viscous) then
+                                        vflux_R_arr(1) = vflux_R_arr(1) + coeff_R(q)*(dvel_small(2))
+                                        vflux_R_arr(2) = vflux_R_arr(2) + coeff_R(q)*(dvel_small(3))
+                                        vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(4._wp*dvel_small(1))/3._wp
+                                    end if
+
+                                    !y-direction contributions
+                                    !$acc loop seq 
+                                    do i = -1, 1
+                                        rho_L = 0._wp
+                                        !$acc loop seq 
+                                        do r = 1, num_fluids
+                                            rho_L = rho_L + q_prim_vf(r)%sf(j+q,k+i,l)
+                                        end do
+                                        rho_sf_small(i) = rho_L
+                                    end do
+
+                                    dvel_small(1) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                    dvel_small(2) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                    if (q == 0) dvel_small(3) = (1/(2._wp*dy(k))) * ( &
+                                        q_prim_vf(momxb+2)%sf(j+q,k+1,l)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+2)%sf(j+q,k-1,l)/rho_sf_small(-1))
+                                    if (q == 0) dvel(:,2) = dvel_small
+
+                                    if (q > -2 .and. viscous) then
+                                        vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
+                                        vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(-2._wp*dvel_small(2))/3._wp
+                                    end if
+                                    if (q < 3 .and. viscous) then
+                                        vflux_R_arr(1) = vflux_R_arr(1) + coeff_R(q)*(dvel_small(1))
+                                        vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(-2._wp*dvel_small(2))/3._wp
+                                    end if
+
+                                    !z-direction contributions
+                                    !$acc loop seq 
+                                    do i = -1, 1
+                                        rho_L = 0._wp
+                                        !$acc loop seq 
+                                        do r = 1, num_fluids
+                                            rho_L = rho_L + q_prim_vf(r)%sf(j+q,k,l+i)
+                                        end do
+                                        rho_sf_small(i) = rho_L
+                                    end do
+
+                                    dvel_small(1) = (1/(2._wp*dz(l))) * ( &
+                                        q_prim_vf(momxb)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                    if (q == 0) dvel_small(2) = (1/(2._wp*dz(l))) * ( &
+                                        q_prim_vf(momxb+1)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+1)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                    dvel_small(3) = (1/(2._wp*dz(l))) * ( &
+                                        q_prim_vf(momxb+2)%sf(j+q,k,l+1)/rho_sf_small(1) - &
+                                        q_prim_vf(momxb+2)%sf(j+q,k,l-1)/rho_sf_small(-1))
+                                    if (q == 0) dvel(:,3) = dvel_small
+                                    if (q > -2 .and. viscous) then
+                                        vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(1))
+                                        vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(-2._wp*dvel_small(3))/3._wp
+                                    end if
+                                    if (q < 3 .and. viscous) then
+                                        vflux_R_arr(2) = vflux_R_arr(2) + coeff_R(q)*(dvel_small(1))
+                                        vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(-2._wp*dvel_small(3))/3._wp
+                                    end if
+
+                                    if (q == 0) then
+                                        jac_rhs(j,k,l) = alf_igr * (2._wp*(dvel(1,2)*dvel(2,1) &
+                                            + dvel(1,3)*dvel(3,1) &
+                                            + dvel(2,3)*dvel(3,2)) &
+                                            + dvel(1,1)**2_wp + dvel(2,2)**2_wp &
+                                            + dvel(3,3)**2_wp &
+                                            + (dvel(1,1) + dvel(2,2)+ dvel(3,3))**2_wp)
+                                    end if
+                                end do
+                            else
+                                q = 0
                                 dvel_small = 0._wp
                                 !x-direction contributions
                                 !$acc loop seq 
@@ -1172,17 +1328,7 @@ contains
                                     q_prim_vf(momxb+2)%sf(j+1+q,k,l)/rho_sf_small(1) - &
                                     q_prim_vf(momxb+2)%sf(j-1+q,k,l)/rho_sf_small(-1))
 
-                                if (q == 0) dvel(:,1) = dvel_small
-                                if (q > -2 .and. viscous) then
-                                    vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(2))
-                                    vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(3))
-                                    vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(4._wp*dvel_small(1))/3._wp
-                                end if
-                                if (q < 3 .and. viscous) then
-                                    vflux_R_arr(1) = vflux_R_arr(1) + coeff_R(q)*(dvel_small(2))
-                                    vflux_R_arr(2) = vflux_R_arr(2) + coeff_R(q)*(dvel_small(3))
-                                    vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(4._wp*dvel_small(1))/3._wp
-                                end if
+                                dvel(:,1) = dvel_small
 
                                 !y-direction contributions
                                 !$acc loop seq 
@@ -1201,19 +1347,11 @@ contains
                                 dvel_small(2) = (1/(2._wp*dy(k))) * ( &
                                     q_prim_vf(momxb+1)%sf(j+q,k+1,l)/rho_sf_small(1) - &
                                     q_prim_vf(momxb+1)%sf(j+q,k-1,l)/rho_sf_small(-1))
-                                if (q == 0) dvel_small(3) = (1/(2._wp*dy(k))) * ( &
+                                dvel_small(3) = (1/(2._wp*dy(k))) * ( &
                                     q_prim_vf(momxb+2)%sf(j+q,k+1,l)/rho_sf_small(1) - &
                                     q_prim_vf(momxb+2)%sf(j+q,k-1,l)/rho_sf_small(-1))
-                                if (q == 0) dvel(:,2) = dvel_small
-
-                                if (q > -2 .and. viscous) then
-                                    vflux_L_arr(1) = vflux_L_arr(1) + coeff_L(q)*(dvel_small(1))
-                                    vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(-2._wp*dvel_small(2))/3._wp
-                                end if
-                                if (q < 3 .and. viscous) then
-                                    vflux_R_arr(1) = vflux_R_arr(1) + coeff_R(q)*(dvel_small(1))
-                                    vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(-2._wp*dvel_small(2))/3._wp
-                                end if
+                                
+                                dvel(:,2) = dvel_small
 
                                 !z-direction contributions
                                 !$acc loop seq 
@@ -1229,31 +1367,23 @@ contains
                                 dvel_small(1) = (1/(2._wp*dz(l))) * ( &
                                     q_prim_vf(momxb)%sf(j+q,k,l+1)/rho_sf_small(1) - &
                                     q_prim_vf(momxb)%sf(j+q,k,l-1)/rho_sf_small(-1))
-                                if (q == 0) dvel_small(2) = (1/(2._wp*dz(l))) * ( &
+                                dvel_small(2) = (1/(2._wp*dz(l))) * ( &
                                     q_prim_vf(momxb+1)%sf(j+q,k,l+1)/rho_sf_small(1) - &
                                     q_prim_vf(momxb+1)%sf(j+q,k,l-1)/rho_sf_small(-1))
                                 dvel_small(3) = (1/(2._wp*dz(l))) * ( &
                                     q_prim_vf(momxb+2)%sf(j+q,k,l+1)/rho_sf_small(1) - &
                                     q_prim_vf(momxb+2)%sf(j+q,k,l-1)/rho_sf_small(-1))
-                                if (q == 0) dvel(:,3) = dvel_small
-                                if (q > -2 .and. viscous) then
-                                    vflux_L_arr(2) = vflux_L_arr(2) + coeff_L(q)*(dvel_small(1))
-                                    vflux_L_arr(3) = vflux_L_arr(3) + coeff_L(q)*(-2._wp*dvel_small(3))/3._wp
-                                end if
-                                if (q < 3 .and. viscous) then
-                                    vflux_R_arr(2) = vflux_R_arr(2) + coeff_R(q)*(dvel_small(1))
-                                    vflux_R_arr(3) = vflux_R_arr(3) + coeff_R(q)*(-2._wp*dvel_small(3))/3._wp
-                                end if
+                                
+                                dvel(:,3) = dvel_small
+                               
+                                jac_rhs(j,k,l) = alf_igr * (2._wp*(dvel(1,2)*dvel(2,1) &
+                                    + dvel(1,3)*dvel(3,1) &
+                                    + dvel(2,3)*dvel(3,2)) &
+                                    + dvel(1,1)**2_wp + dvel(2,2)**2_wp &
+                                    + dvel(3,3)**2_wp &
+                                    + (dvel(1,1) + dvel(2,2)+ dvel(3,3))**2_wp)
 
-                                if (q == 0) then
-                                    jac_rhs(j,k,l) = alf_igr * (2._wp*(dvel(1,2)*dvel(2,1) &
-                                        + dvel(1,3)*dvel(3,1) &
-                                        + dvel(2,3)*dvel(3,2)) &
-                                        + dvel(1,1)**2_wp + dvel(2,2)**2_wp &
-                                        + dvel(3,3)**2_wp &
-                                        + (dvel(1,1) + dvel(2,2)+ dvel(3,3))**2_wp)
-                                end if
-                            end do
+                            end if
 
                             !$acc loop seq 
                             do i = 1, num_fluids
@@ -1671,7 +1801,7 @@ contains
                 !$omp target teams loop collapse(3) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L,alpha_L,alpha_R,alpha_rho_L,cfl,F_L,E_L,mu_R,rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L,alpha_L,alpha_R,alpha_rho_L,cfl,F_L,E_L,mu_R,rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 do l = 0, p
-                    do k = -buff_size+5, n+buff_size-5
+                    do k = -1, n
                         do j = 0, m
 
                             if(viscous) then 
@@ -2107,7 +2237,7 @@ contains
                 !$omp target teams loop collapse(3) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L,alpha_L,alpha_R,alpha_rho_L,cfl,F_L,E_L,mu_R,rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L,alpha_L,alpha_R,alpha_rho_L,cfl,F_L,E_L,mu_R,rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 do l = 0, p
-                    do k = -buff_size+5, n+buff_size-5
+                    do k = -1, n
                         do j = 0, m
 
                             if(viscous) then 
@@ -2632,7 +2762,7 @@ contains
         elseif (idir == 3) then
                 !$omp target teams loop collapse(3) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L,alpha_L,alpha_R,alpha_rho_L,cfl,F_L,E_L,mu_R,rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
                 !$acc parallel loop collapse(3) gang vector default(present) private(rho_L,gamma_L,pi_inf_L,mu_L,a_L,vel_L,vel_R,pres_L,alpha_L,alpha_R,alpha_rho_L,cfl,F_L,E_L,mu_R,rho_sf_small,alpha_rho_R,vflux_L_arr,vflux_R_arr,dvel_small)
-                do l = -buff_size+5, p+buff_size-5
+                do l = -1, p
                     do k = 0, n
                         do j = 0, m
                             if(viscous) then 
