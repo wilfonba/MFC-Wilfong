@@ -828,10 +828,6 @@ contains
             buff_size = weno_polyn + 2
         end if
 
-        if(igr) then
-            buff_size = buff_size + 2
-        end if
-
         ! Correction for smearing function in the lagrangian subgrid bubble model
         if (bubbles_lagrange) then
             buff_size = max(buff_size, 6)
