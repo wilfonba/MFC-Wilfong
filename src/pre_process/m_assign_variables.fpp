@@ -68,7 +68,9 @@ contains
 
     subroutine s_initialize_assign_variables_module
 
-        allocate (alf_sum%sf(0:m, 0:n, 0:p))
+        if (bubbles_euler) then
+            allocate (alf_sum%sf(0:m, 0:n, 0:p))
+        end if
 
         ! Depending on multicomponent flow model, the appropriate procedure
         ! for assignment of the patch mixture or species primitive variables
@@ -354,9 +356,9 @@ contains
         ! Computing Mixture Variables of Current Patch
 
         ! Volume fraction(s)
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
-        end do
+        !do i = adv_idx%beg, adv_idx%end
+            !q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha(i - E_idx)
+        !end do
 
         if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -397,9 +399,9 @@ contains
         end if
 
         ! Volume fraction(s)
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
-        end do
+        !do i = adv_idx%beg, adv_idx%end
+            !q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha(i - E_idx)
+        !end do
 
         if (mpp_lim .and. bubbles_euler) then
             !adjust volume fractions, according to modeled gas void fraction
@@ -471,11 +473,11 @@ contains
              + (1._wp - eta)*orig_prim_vf(E_idx))
 
         ! Volume fractions \alpha
-        do i = adv_idx%beg, adv_idx%end
-            q_prim_vf(i)%sf(j, k, l) = &
-                eta*patch_icpp(patch_id)%alpha(i - E_idx) &
-                + (1._wp - eta)*orig_prim_vf(i)
-        end do
+        !do i = adv_idx%beg, adv_idx%end
+            !q_prim_vf(i)%sf(j, k, l) = &
+                !eta*patch_icpp(patch_id)%alpha(i - E_idx) &
+                !+ (1._wp - eta)*orig_prim_vf(i)
+        !end do
 
         ! Elastic Shear Stress
         if (elasticity) then

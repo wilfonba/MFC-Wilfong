@@ -700,6 +700,8 @@ contains
                 sys_size = c_idx
             end if
 
+            sys_size = sys_size - 1
+
             ! Volume Fraction Model (6-equation model)
         else if (model_eqns == 3) then
 

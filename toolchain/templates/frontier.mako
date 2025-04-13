@@ -65,7 +65,7 @@ export CRAY_ACC_USE_UNIFIED_MEM=1
             % endif
             ${profiler} "${target.get_install_binpath(case)}")
         % else:
-            --unbuffered ${profiler} "/mnt/bb/$USER/${target.name}")
+            ${profiler} "/mnt/bb/$USER/${target.name}")
         % endif
     % endif
 

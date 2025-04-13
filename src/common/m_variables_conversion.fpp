@@ -401,7 +401,7 @@ contains
 
         do i = 1, num_fluids
             alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
-            alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
+            !alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
         end do
 
         if(igr) then 
@@ -1117,9 +1117,9 @@ contains
                     end do
 
                     ! Transferring the advection equation(s) variable(s)
-                    do i = adv_idx%beg, adv_idx%end
-                        q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
-                    end do
+                    !do i = adv_idx%beg, adv_idx%end
+                        !q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                    !end do
 
                     ! Zeroing out the dynamic pressure since it is computed
                     ! iteratively by cycling through the velocity equations

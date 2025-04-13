@@ -1206,6 +1206,8 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
+        sys_size = sys_size
+
         if(igr) then 
             vec_size = sys_size - 1
         else 
