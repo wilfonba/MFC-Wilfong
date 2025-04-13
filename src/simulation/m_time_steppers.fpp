@@ -1169,7 +1169,7 @@ contains
 
     subroutine s_compute_dt(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
+        type(scalar_field_half), dimension(sys_size) :: q_prim_vf
         real(wp) :: rho        !< Cell-avg. density
         real(wp), dimension(num_dims) :: vel        !< Cell-avg. velocity
         real(wp) :: vel_sum    !< Cell-avg. velocity sum

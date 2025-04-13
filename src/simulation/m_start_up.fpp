@@ -1337,7 +1337,7 @@ contains
             call s_4th_5th_order_rkck(t_step, time_avg)
         end if
 
-        if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+        !if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
         ! Time-stepping loop controls
 
@@ -1693,7 +1693,7 @@ contains
         end do 
         deallocate(q_cons_temp)
 
-        if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
+        !if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
         if (bodyForces) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
@@ -1702,7 +1702,7 @@ contains
         call s_populate_grid_variables_buffers()
 
         ! Initialize the Temperature cache.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_ts(1)%vf, idwint)
+        !if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_ts(1)%vf, idwint)
 
         ! Computation of parameters, allocation of memory, association of pointers,
         ! and/or execution of any other tasks that are needed to properly configure
@@ -1718,7 +1718,7 @@ contains
 #endif
         if (.not. igr) call s_initialize_cbc_module()
         call s_initialize_derived_variables()
-        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
+        !if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
