@@ -939,6 +939,7 @@ contains
                     c_idx = sys_size + 1
                     sys_size = c_idx
                 end if
+                sys_size = sys_size - 1
 
             else if (model_eqns == 3) then
                 cont_idx%beg = 1
@@ -977,7 +978,6 @@ contains
                     sys_size = c_idx
                 end if
 
-                sys_size = sys_size - 1
 
             else if (model_eqns == 4) then
                 cont_idx%beg = 1 ! one continuity equation
