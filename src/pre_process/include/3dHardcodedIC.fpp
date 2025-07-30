@@ -63,14 +63,14 @@
 
         ux_th = 10*sqrt(1.4*0.4)
         ux_am = 0.0*sqrt(1.4)
-        p_th = 2.0_wp
-        p_am = 1.0_wp
+        p_th = 0.8_wp
+        p_am = 0.4_wp
         rho_th = 1._wp
         rho_am = 1._wp
         y_th = 0.0_wp
         z_th = 0.0_wp
         r_th = 1._wp
-        eps_smooth = 1._wp
+        eps_smooth = 0.5_wp
         eps = 1e-6
 
         r = sqrt((y_cc(j) - y_th)**2._wp + (z_cc(k) - z_th)**2._wp)

@@ -5,18 +5,18 @@ import json
 # Domain parameters
 
 D = 2  # Jet diameter
-Nd = 100  # Cells per jet diameter
+Nd = 200  # Cells per jet diameter
 x0 = 0  # x_beg coordinate
-x1 = 3 * D  # x_end coordinate
-y0 = -3 * D / 2  # y_beg coordinate
-y1 = 3 * D / 2  # y_end coordinate
-z0 = -3 * D / 2  # y_beg coordinate
-z1 = 3 * D / 2  # y_end coordinate
+x1 = 6.5 * D  # x_end coordinate
+y0 = -4.5 * D / 2  # y_beg coordinate
+y1 = 4.5 * D / 2  # y_end coordinate
+z0 = -4.5 * D / 2  # y_beg coordinate
+z1 = 4.5 * D / 2  # y_end coordinate
 
 alfFactor = 10
 igrIters = 5
 
-tS = 20  # dimensionless time
+tS = 40  # dimensionless time
 
 gam = 1.4  # Fluid gamma
 M = 10  # Mach number0
@@ -41,7 +41,7 @@ Ny = int(Nd * (y1 - y0) / D) - 1
 Nz = int(Nd * (z1 - z0) / D) - 1
 
 # time_end = tS * D / (M*c)
-time_end = 1.0
+time_end = 4.0
 
 dx = D / Nd
 dt = dx / 18
@@ -55,7 +55,7 @@ print(
     json.dumps(
         {
             # Logistics
-            "run_time_info": "F",
+            "run_time_info": "T",
             # Computational Domain Parameters
             "x_domain%beg": x0,
             "x_domain%end": x1,
@@ -69,7 +69,7 @@ print(
             "dt": dt,
             "t_step_start": 0,
             "t_step_stop": Nt,
-            "t_step_save": int(Nt / 20),
+            "t_step_save": int(Nt / 25),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "num_bc_patches": 0,
@@ -79,7 +79,7 @@ print(
             "mpp_lim": "T",
             "time_stepper": 3,
             "igr": "T",
-            "igr_order": 3,
+            "igr_order": 5,
             "igr_pres_lim": "T",
             "igr_iter_solver": 1,
             "num_igr_iters": igrIters,
@@ -93,9 +93,10 @@ print(
             "bc_z%end": -3,
             # Formatted Database Files Structure Parameters
             "format": 1,
-            "precision": 2,
+            "precision": 1,
             "prim_vars_wrt": "T",
-            "c_wrt": "T",
+            # "alpha_wrt(1)": "T",
+            "c_wrt": "F",
             "parallel_io": "T",
             # Background
             "patch_icpp(1)%geometry": 9,
@@ -114,6 +115,25 @@ print(
             "patch_icpp(1)%alpha(1)": eps,
             "patch_icpp(1)%alpha_rho(2)": rhoA,
             "patch_icpp(1)%alpha(2)": 1 - eps,
+            "simplex_perturb": "T",
+            "simplex_params%perturb_vel(1)": "T",
+            "simplex_params%perturb_vel_freq(1)": 3,
+            "simplex_params%perturb_vel_scale(1)": 0.005,
+            "simplex_params%perturb_vel_offset(1,1)": 12.3,
+            "simplex_params%perturb_vel_offset(1,2)": -11.3,
+            "simplex_params%perturb_vel_offset(1,3)": 34.6,
+            "simplex_params%perturb_vel(2)": "T",
+            "simplex_params%perturb_vel_freq(2)": 2,
+            "simplex_params%perturb_vel_scale(2)": 0.0025,
+            "simplex_params%perturb_vel_offset(2,1)": -70.3,
+            "simplex_params%perturb_vel_offset(2,2)": 33.4,
+            "simplex_params%perturb_vel_offset(2,3)": -34.6,
+            "simplex_params%perturb_vel(3)": "T",
+            "simplex_params%perturb_vel_freq(3)": 2,
+            "simplex_params%perturb_vel_scale(3)": 0.0025,
+            "simplex_params%perturb_vel_offset(3,1)": 123.3,
+            "simplex_params%perturb_vel_offset(3,2)": -654.3,
+            "simplex_params%perturb_vel_offset(3,3)": -64.5,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
