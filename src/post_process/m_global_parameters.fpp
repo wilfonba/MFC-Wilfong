@@ -105,7 +105,9 @@ module m_global_parameters
     integer :: relax_model     !< Phase change relaxation model
     logical :: mpp_lim         !< Maximum volume fraction limiter
     integer :: sys_size        !< Number of unknowns in the system of equations
+    integer :: recon_type      !< Which type of reconstruction to use
     integer :: weno_order      !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order     !< Order of accuracy for the MUSCL reconstruction
     logical :: mixture_err     !< Mixture error limiter
     logical :: alt_soundspeed  !< Alternate sound speed
     logical :: mhd             !< Magnetohydrodynamics
@@ -152,9 +154,6 @@ module m_global_parameters
     ! the buffer region. idwbuff and idwint are the same otherwise.
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
-
-    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
-    type(bounds_info) :: x_domain, y_domain, z_domain
 
     integer :: num_bc_patches
     logical :: bc_io
@@ -253,6 +252,7 @@ module m_global_parameters
     logical :: c_wrt
     logical, dimension(3) :: omega_wrt
     logical :: qm_wrt
+    logical :: liutex_wrt
     logical :: schlieren_wrt
     logical :: cf_wrt
     logical :: ib
@@ -286,7 +286,7 @@ module m_global_parameters
     integer :: nb
     real(wp) :: R0ref
     real(wp) :: Ca, Web, Re_inv
-    real(wp), dimension(:), allocatable :: weight, R0, V0
+    real(wp), dimension(:), allocatable :: weight, R0
     logical :: bubbles_euler
     logical :: qbmm
     logical :: polytropic
@@ -363,7 +363,9 @@ contains
         ! Simulation algorithm parameters
         model_eqns = dflt_int
         num_fluids = dflt_int
+        recon_type = WENO_TYPE
         weno_order = dflt_int
+        muscl_order = dflt_int
         mixture_err = .false.
         alt_soundspeed = .false.
         relax = .false.
@@ -431,6 +433,7 @@ contains
         c_wrt = .false.
         omega_wrt = .false.
         qm_wrt = .false.
+        liutex_wrt = .false.
         schlieren_wrt = .false.
         sim_data = .false.
         cf_wrt = .false.
@@ -471,13 +474,6 @@ contains
         y_output%end = dflt_real
         z_output%beg = dflt_real
         z_output%end = dflt_real
-
-        x_domain%beg = dflt_real
-        x_domain%end = dflt_real
-        y_domain%beg = dflt_real
-        y_domain%end = dflt_real
-        z_domain%beg = dflt_real
-        z_domain%end = dflt_real
 
         ! MHD
         Bx0 = dflt_real
@@ -524,13 +520,19 @@ contains
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
-            adv_idx%beg = E_idx + 1
-            adv_idx%end = E_idx + num_fluids
 
             if (igr) then
-                adv_idx%beg = E_idx + 1
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                ! volume fractions since there is no volume fraction to track
+                adv_idx%beg = E_idx + 1 ! Alpha for fluid 1
                 adv_idx%end = E_idx + num_fluids - 1
             else
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
             end if
@@ -568,7 +570,7 @@ contains
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
 
                 if (qbmm) then
                     allocate (bub_idx%moms(nb, nmom))
@@ -600,11 +602,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 0._wp
-                else if (nb > 1) then
-                    !call s_simpson
-                    V0(:) = 0._wp
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -671,7 +669,7 @@ contains
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
 
                 do i = 1, nb
                     if (polytropic .neqv. .true.) then
@@ -692,10 +690,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 0._wp
-                else if (nb > 1) then
-                    V0(:) = 0._wp
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -842,7 +837,7 @@ contains
         buff_size = max(offset_x%beg, offset_x%end, offset_y%beg, &
                         offset_y%end, offset_z%beg, offset_z%end)
 
-        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt) then
+        if (any(omega_wrt) .or. schlieren_wrt .or. qm_wrt .or. liutex_wrt) then
             fd_number = max(1, fd_order/2)
             buff_size = buff_size + fd_number
         end if

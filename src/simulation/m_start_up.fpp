@@ -32,6 +32,9 @@ module m_start_up
     use m_weno                 !< Weighted and essentially non-oscillatory (WENO)
                                !! schemes for spatial reconstruction of variables
 
+    use m_muscl                !< Monotonic Upstream-centered (MUSCL)
+                               !! schemes for convservation laws
+
     use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
 
     use m_cbc                  !< Characteristic boundary conditions (CBC)
@@ -166,6 +169,7 @@ contains
             nb, mapped_weno, wenoz, teno, wenoz_q, weno_order, &
             num_fluids, mhd, relativity, igr_order, viscous, &
             igr_iter_solver, igr, igr_pres_lim, &
+            recon_type, muscl_order, muscl_lim, &
 #:endif
             Ca, Web, Re_inv, &
             acoustic_source, acoustic, num_source, &
@@ -174,8 +178,8 @@ contains
             polydisperse, poly_sigma, qbmm, &
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
-            R0_type, file_per_process, sigma, &
-            pi_fac, adv_n, adap_dt, adap_dt_tol, &
+            file_per_process, sigma, &
+            pi_fac, adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, &
             bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z, n_start, t_save, t_stop, &
@@ -184,7 +188,8 @@ contains
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
             alf_factor, num_igr_iters, down_sample, &
-            num_igr_warm_start_iters
+            num_igr_warm_start_iters, &
+            int_comp, ic_eps, ic_beta
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -533,7 +538,13 @@ contains
         integer :: i, j
 
         ! Downsampled data variables
+<<<<<<< HEAD
         integer :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds
+=======
+        integer :: m_ds, n_ds, p_ds
+        integer :: m_glb_ds, n_glb_ds, p_glb_ds
+        integer :: m_glb_read, n_glb_read, p_glb_read ! data size of read
+>>>>>>> upstream/master
 
         allocate (x_cb_glb(-1:m_glb))
         allocate (y_cb_glb(-1:n_glb))
@@ -653,6 +664,7 @@ contains
                 if(down_sample) then
                     ! Size of local arrays
                     data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
+<<<<<<< HEAD
 
                     ! Resize some integers so MPI can read even the biggest file
                     m_MOK = int(m_glb_ds + 1, MPI_OFFSET_KIND)
@@ -675,6 +687,27 @@ contains
                     str_MOK = int(name_len, MPI_OFFSET_KIND)
                     NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
                 end if
+=======
+                    m_glb_read = m_glb_ds + 1
+                    n_glb_read = n_glb_ds + 1
+                    p_glb_read = p_glb_ds + 1
+                else
+                    ! Size of local arrays
+                    data_size = (m + 1)*(n + 1)*(p + 1)
+                    m_glb_read = m_glb + 1
+                    n_glb_read = n_glb + 1
+                    p_glb_read = p_glb + 1
+                end if
+
+                ! Resize some integers so MPI can read even the biggest file
+                m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
+                n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
+                p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
+                WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+                MOK = int(1._wp, MPI_OFFSET_KIND)
+                str_MOK = int(name_len, MPI_OFFSET_KIND)
+                NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
+>>>>>>> upstream/master
 
                 ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
@@ -1105,19 +1138,23 @@ contains
 
         if (cfl_dt) then
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8, "")', &
+                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, "")', &
                     int(ceiling(100._wp*(mytime/t_stop))), &
                     mytime, &
                     dt, &
-                    t_step
+                    t_step, &
+                    wall_time_avg, &
+                    wall_time
             end if
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
-                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I0, "")', &
+                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, "")', &
                    int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
                     t_step - t_step_start + 1, &
                     t_step_stop - t_step_start + 1, &
-                t_step
+                    t_step, &
+                    wall_time_avg, &
+                    wall_time
             end if
         end if
 
@@ -1293,7 +1330,7 @@ contains
 
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
-        if (bubbles_euler .and. nb > 1 .and. R0_type == 1) then
+        if (bubbles_euler .and. nb > 1) then
             call s_simpson(weight, R0)
         end if
         !Initialize variables for non-polytropic (Preston) model
@@ -1375,7 +1412,11 @@ contains
         if (igr) then
             call s_initialize_igr_module()
         else
-            call s_initialize_weno_module()
+            if (recon_type == WENO_TYPE) then
+                call s_initialize_weno_module()
+            elseif (recon_type == MUSCL_TYPE) then
+                call s_initialize_muscl_module()
+            end if
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
         end if
@@ -1477,10 +1518,10 @@ contains
         if (chemistry) then
             $:GPU_UPDATE(device='[q_T_sf%sf]')
         end if
-        $:GPU_UPDATE(device='[nb,R0ref,Ca,Web,Re_inv,weight,R0,V0, &
-            & bubbles_euler,polytropic,polydisperse,qbmm,R0_type, &
+        $:GPU_UPDATE(device='[nb,R0ref,Ca,Web,Re_inv,weight,R0, &
+            & bubbles_euler,polytropic,polydisperse,qbmm, &
             & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
-            & adap_dt_tol,n_idx,pi_fac,low_Mach]')
+            & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
         $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv,M_n, &
             & M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T,Re_trans_T, &
             & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mul0,ss, &
@@ -1525,7 +1566,11 @@ contains
         else
             call s_finalize_cbc_module()
             call s_finalize_riemann_solvers_module()
-            call s_finalize_weno_module()
+            if (recon_type == WENO_TYPE) then
+                call s_finalize_weno_module()
+            elseif (recon_type == MUSCL_TYPE) then
+                call s_finalize_muscl_module()
+            end if
         end if
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module

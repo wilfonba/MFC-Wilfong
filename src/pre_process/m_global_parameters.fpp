@@ -81,13 +81,16 @@ module m_global_parameters
     integer :: model_eqns            !< Multicomponent flow model
     logical :: relax                 !< activate phase change
     integer :: relax_model           !< Relax Model
-    real(wp) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
-    real(wp) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
+    real(wp) :: palpha_eps           !< trigger parameter for the p relaxation procedure, phase change model
+    real(wp) :: ptgalpha_eps         !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids            !< Number of different fluids present in the flow
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
-    integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
+    integer :: recon_type            !< Reconstruction Type
+    integer :: weno_polyn            !< Degree of the WENO polynomials (polyn)
+    integer :: muscl_polyn           !< Degree of the MUSCL polynomials (polyn)
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order           !< Order of accuracy for the MUSCL reconstruction
     logical :: hypoelasticity        !< activate hypoelasticity
     logical :: hyperelasticity       !< activate hyperelasticity
     logical :: elasticity            !< elasticity modeling, true for hyper or hypo
@@ -219,7 +222,7 @@ module m_global_parameters
     integer :: nb
     real(wp) :: R0ref
     real(wp) :: Ca, Web, Re_inv
-    real(wp), dimension(:), allocatable :: weight, R0, V0
+    real(wp), dimension(:), allocatable :: weight, R0
     logical :: bubbles_euler
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
@@ -255,7 +258,6 @@ module m_global_parameters
     real(wp) :: gamma_m, gamma_n, mu_n
     real(wp) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
-    integer :: R0_type   !1 = simpson
     !> @}
 
     !> @name Surface Tension Modeling
@@ -347,9 +349,11 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         num_fluids = dflt_int
+        recon_type = WENO_TYPE
         weno_order = dflt_int
         igr = .false.
         igr_order = dflt_int
+        muscl_order = dflt_int
 
         hypoelasticity = .false.
         hyperelasticity = .false.
@@ -507,7 +511,6 @@ contains
         sigV = dflt_real
         rhoRV = 0._wp
         dist_type = dflt_int
-        R0_type = dflt_int
 
         R_n = dflt_real
         R_v = dflt_real
@@ -576,7 +579,11 @@ contains
 
         integer :: i, j, fac
 
-        weno_polyn = (weno_order - 1)/2
+        if (recon_type == WENO_TYPE) then
+            weno_polyn = (weno_order - 1)/2
+        elseif (recon_type == MUSCL_TYPE) then
+            muscl_polyn = muscl_order
+        end if
 
         ! Determining the layout of the state vectors and overall size of
         ! the system of equations, given the dimensionality and choice of
@@ -613,13 +620,19 @@ contains
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
-            adv_idx%beg = E_idx + 1
-            adv_idx%end = E_idx + num_fluids
 
             if (igr) then
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                ! volume fractions since there is no volume fraction to track
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids - 1
             else
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
             end if
@@ -653,7 +666,7 @@ contains
                     sys_size = n_idx
                 end if
 
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
 
@@ -694,11 +707,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 1._wp
-                else if (nb > 1) then
-                    V0(:) = 1._wp
-                    !R0 and weight initialized in s_simpson
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -773,7 +782,7 @@ contains
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
 
                 do i = 1, nb
                     if (.not. polytropic) then
@@ -794,10 +803,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 0._wp
-                else if (nb > 1) then
-                    V0(:) = 1._wp
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -886,7 +892,8 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        call s_configure_coordinate_bounds(weno_polyn, igr_order, buff_size, &
+        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
+                                           igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
                                            num_dims, igr)
