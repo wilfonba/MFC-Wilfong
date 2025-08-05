@@ -31,6 +31,8 @@ program p_main
 
     call s_initialize_modules()
 
+    !call s_perform_comp_debug(varname, pres, c, H)
+
     if (cfl_dt) then
         t_step = n_start
         n_save = int(t_stop/t_save) + 1
