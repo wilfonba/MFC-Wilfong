@@ -1235,12 +1235,8 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
-<<<<<<< HEAD
-        call s_configure_coordinate_bounds(weno_polyn, igr_order, buff_size, &
-=======
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                            igr_order, buff_size, &
->>>>>>> upstream/master
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
                                            num_dims, igr)

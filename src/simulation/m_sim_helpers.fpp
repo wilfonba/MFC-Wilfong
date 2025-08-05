@@ -13,7 +13,6 @@ module m_sim_helpers
     private; public :: s_compute_enthalpy, &
  s_compute_stability_from_dt, &
  s_compute_dt_from_cfl, &
- s_upsample_data, &
  s_check_cells, &
  s_check_rhs
 

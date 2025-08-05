@@ -38,12 +38,8 @@ module m_helper
               factorial, &
               f_cut_on, &
               f_cut_off, &
-<<<<<<< HEAD
-              s_downsample_data
-=======
               s_downsample_data, &
               s_upsample_data
->>>>>>> upstream/master
 
 contains
 

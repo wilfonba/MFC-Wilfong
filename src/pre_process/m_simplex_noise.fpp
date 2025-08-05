@@ -7,8 +7,7 @@ module m_simplex_noise
     implicit none
 
     private; public :: f_simplex3d, &
-f_simplex2d, &
-f_simplex1d
+f_simplex2d
 
     integer, parameter :: p(512) = [ &
         151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30, &
@@ -54,7 +53,7 @@ f_simplex1d
          0._wp,  1._wp, -1._wp,   &
          0._wp, -1._wp, -1._wp ], shape=[12,3])
 
-    real(wp), parameter :: grad2(12,2) = reshape([ &
+    real(wp), parameter :: grad2(10,2) = reshape([ &
          1._wp, 1._wp, &
         -1._wp, 1._wp, &
          1._wp,-1._wp, &
@@ -64,7 +63,7 @@ f_simplex1d
          0._wp, 1._wp, &
          0._wp,-1._wp, &
          1._wp, 1._wp, &
-        -1._wp, 1._wp], shape=[12,2])
+        -1._wp, 1._wp], shape=[10,2])
 
 contains
 

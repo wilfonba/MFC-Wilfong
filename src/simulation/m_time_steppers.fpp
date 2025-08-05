@@ -606,10 +606,8 @@ contains
             end do
         end do
 
-        !call s_q_cons_debug(q_cons_ts(2)%vf, t_step, 1)
-#endif
-
         dest = 2 ! Result in q_cons_ts(2)%vf
+        !call s_q_cons_debug(q_cons_ts(2)%vf, t_step, 1)
 #endif
 
         !Evolve pb and mv for non-polytropic qbmm
