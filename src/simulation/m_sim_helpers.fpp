@@ -13,7 +13,9 @@ module m_sim_helpers
     private; public :: s_compute_enthalpy, &
  s_compute_stability_from_dt, &
  s_compute_dt_from_cfl, &
- s_upsample_data
+ s_upsample_data, &
+ s_check_cells, &
+ s_check_rhs
 
 contains
 
@@ -331,5 +333,139 @@ contains
         end do
 
     end subroutine s_upsample_data
+
+    subroutine s_check_cells(q_cons_Vf, t_step, stage, errors_sh)
+
+        type(scalar_field), dimension(sys_size) :: q_cons_vf
+        integer, intent(in) :: t_step, stage
+        integer :: j, k, l, i, q
+        integer :: errors_sh
+        real(wp) :: alpha
+
+        character(LEN=name_len) :: file_name = 'comp_debug.txt'
+        character(LEN=path_len + name_len) :: file_path
+        character(100) :: str_format
+
+        ! Opening the run-time information file
+        file_path = trim(case_dir)//'/'//trim(file_name)
+        str_format = "(I9, A, I3, A, I4, I4, I4, A, I2, A, I5, A, I5, I5, I5)"
+
+        open (12, FILE=trim(file_path), &
+              STATUS='replace')
+
+        errors_sh = 0
+        ! Check all variables for NaNs
+        $:GPU_PARALLEL_LOOP(collapse=4, copy='[errors_sh]', reduction='[[errors_sh]]', reductionOp='[+]')
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (q_cons_vf(i)%sf(j, k, l) /= q_cons_vf(i)%sf(j, k, l)) then
+                            !write (12, str_format) t_step, " NaN(s) in conservative variables after RK stage ", &
+                                !stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
+                                !" (m, n, p)", m, n, p
+                            print*, "NAN"
+                            errors_sh = errors_sh + 1
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
+        ! Check for invalid densities
+        $:GPU_PARALLEL_LOOP(collapse=4, copy='[errors_sh]', reduction='[[errors_sh]]', reductionOp='[+]')
+        do i = 1, num_fluids
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (num_fluids > 1) then
+                            if (i < num_fluids) then
+                                if (q_cons_vf(advxb + i - 1)%sf(j, k, l) < 0d0 .and. q_cons_vf(contxb+i-1)%sf(j, k, l) > 0d0 .or. &
+                                    q_cons_vf(advxb + i - 1)%sf(j, k, l) > 0d0 .and. q_cons_vf(contxb+i-1)%sf(j, k, l) < 0d0) then
+                                    !write (12, str_format) t_step, " Density is negative after RK stage ", &
+                                        !stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
+                                        !" (m, n, p)", m, n, p
+                                    print*, "a", q_cons_vf(advxb+i-1)%sf(j,k,l), q_cons_vf(contxb+i-1)%sf(j,k,l)
+                                    errors_sh = errors_sh + 1
+                                end if
+                            else
+                                alpha = 1._wp
+                                do q = 1, num_fluids - 1
+                                    alpha = alpha - q_cons_vf(advxb + q - 1)%sf(j, k, l)
+                                end do
+                                if (alpha < 0d0 .and. q_cons_vf(contxb+i-1)%sf(j, k, l) > 0d0 .or. &
+                                    alpha > 0d0 .and. q_cons_vf(contxb+i-1)%sf(j, k, l) < 0d0) then
+                                    print*, "b", alpha, q_cons_vf(contxb+i-1)%sf(j,k,l), q_cons_vf(advxb)%sf(j,k,l)
+                                    !write (12, str_format) t_step, " Density is negative after RK stage ", &
+                                        !stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
+                                        !" (m, n, p)", m, n, p
+                                    errors_sh = errors_sh + 1
+                                end if
+                            end if
+                        else
+                            if (q_cons_vf(contxb)%sf(j,k,l) < 0d0) then
+                                print*, "c", q_cons_vf(contxb)%sf(j,k,l)
+                                errors_sh = errors_sh + 1
+                            end if
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
+        $:GPU_PARALLEL_LOOP(collapse=3, copy='[errors_sh]', reduction='[[errors_sh]]', reductionOp='[+]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (q_cons_vf(E_idx)%sf(j, k, l) < 0d0) then
+                        !write (12, str_format) t_step, " Energy is negative after RK stage ", &
+                            !stage, " at (j,k,l) ", j, k, l, " equation", E_idx, " proc", proc_rank, &
+                            !" (m, n, p)", m, n, p
+                        print*, "ENERGY"
+                        errors_sh = errors_sh + 1
+                    end if
+                end do
+            end do
+        end do
+
+    end subroutine s_check_cells
+
+    subroutine s_check_rhs(rhs_vf, t_step, stage, errors_sh)
+
+        type(scalar_field), dimension(sys_size) :: rhs_vf
+        integer, intent(in) :: t_step, stage
+        integer :: j, k, l, i, q
+        integer :: errors_sh
+
+        character(LEN=name_len) :: file_name = 'comp_debug.txt'
+        character(LEN=path_len + name_len) :: file_path
+        character(100) :: str_format
+
+        ! Opening the run-time information file
+        file_path = trim(case_dir)//'/'//trim(file_name)
+        str_format = "(I9, A, I3, A, I4, I4, I4, A, I2, A, I5, A, I5, I5, I5)"
+
+        open (12, FILE=trim(file_path), &
+              STATUS='replace')
+
+        errors_sh = 0
+        ! Check all variables for NaNs
+        $:GPU_PARALLEL_LOOP(collapse=4, copy='[errors_sh]', reduction='[[errors_sh]]', reductionOp='[+]')
+        do i = 1, sys_size
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (rhs_vf(i)%sf(j, k, l) /= rhs_vf(i)%sf(j, k, l)) then
+                            !write (12, str_format) t_step, " NaN(s) in RHS after RK stage ", &
+                                !stage, " at (j,k,l) ", j, k, l, " equation", i, " proc", proc_rank, &
+                                !" (m, n, p)", m, n, p
+                            errors_sh = errors_sh + 1
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_check_rhs
 
 end module m_sim_helpers

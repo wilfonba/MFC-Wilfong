@@ -416,6 +416,8 @@ contains
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
+        call s_rhs_debug(q_cons_ts(1)%vf, rhs_vf, t_step, 1)
+
 #ifdef DEBUG
         print *, 'got rhs'
 #endif
@@ -456,6 +458,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(1)%vf, t_step, 1)
 
         !Evolve pb and mv for non-polytropic qbmm
         if (qbmm .and. (.not. polytropic)) then
@@ -530,6 +534,8 @@ contains
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
+        !call s_rhs_debug(q_cons_ts(1)%vf, rhs_vf, t_step, 1)
+
         if (run_time_info) then
             if (igr) then
                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
@@ -565,6 +571,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(1)%vf, t_step, 1)
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -578,6 +586,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(2)%vf, t_step, 1)
 #endif
 
         !Evolve pb and mv for non-polytropic qbmm
@@ -636,8 +646,12 @@ contains
         ! Stage 2 of 2
 #if defined(FRONTIER_UNIFIED)
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        !call s_rhs_debug(q_cons_ts(1)%vf, rhs_vf, t_step, 2)
 #else
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        !call s_rhs_debug(q_cons_ts(2)%vf, rhs_vf, t_step, 2)
 #endif
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
@@ -656,6 +670,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(1)%vf, t_step, 2)
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -670,6 +686,9 @@ contains
                 end do
             end do
         end do
+
+
+        !call s_q_cons_debug(q_cons_ts(1)%vf, t_step, 2)
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
@@ -752,6 +771,8 @@ contains
 
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
 
+        !call s_rhs_debug(q_cons_ts(1)%vf, rhs_vf, t_step, 1)
+
         if (run_time_info) then
             if (igr) then
                 call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
@@ -787,6 +808,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(1)%vf, t_step, 1)
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -800,6 +823,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(2)%vf, t_step, 1)
 #endif
 
         !Evolve pb and mv for non-polytropic qbmm
@@ -858,8 +883,12 @@ contains
         ! Stage 2 of 3
 #if defined(FRONTIER_UNIFIED)
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        !call s_rhs_debug(q_cons_ts(1)%vf, rhs_vf, t_step, 2)
 #else
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        !call s_rhs_debug(q_cons_ts(2)%vf, rhs_vf, t_step, 2)
 #endif
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
@@ -878,6 +907,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(1)%vf, t_step, 2)
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -892,6 +923,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(2)%vf, t_step, 2)
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
@@ -951,8 +984,12 @@ contains
         ! Stage 3 of 3
 #ifdef FRONTIER_UNIFIED
         call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
+
+        !call s_rhs_debug(q_cons_ts(1)%vf, rhs_vf, t_step, 3)
 #else
         call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
+
+        !call s_rhs_debug(q_cons_ts(2)%vf, rhs_vf, t_step, 3)
 #endif
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
@@ -971,6 +1008,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(1)%vf, t_step, 3)
 #else
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
@@ -985,6 +1024,8 @@ contains
                 end do
             end do
         end do
+
+        !call s_q_cons_debug(q_cons_ts(1)%vf, t_step, 3)
 #endif
 
         if (qbmm .and. (.not. polytropic)) then
@@ -1052,6 +1093,54 @@ contains
             time = time + (finish - start)
         end if
     end subroutine s_3rd_order_tvd_rk
+
+    subroutine s_q_cons_debug(q_cons_vf, t_step, stage)
+
+        type(scalar_field), dimension(sys_size) :: q_cons_vf
+        integer, intent(in) :: t_step, stage
+
+        integer :: errors_ts, i
+
+        !call s_check_cells(q_cons_vf, t_step, stage, errors_ts)
+
+        !if (errors_ts /= 0) then
+            !write (12, "(I3)") t_step
+            !close (12)
+            !do i = 1, sys_size
+                !$:GPU_UPDATE(host='[q_cons_vf(i)%sf]')
+            !end do
+            !call s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type)
+            !print*, "Stage = ", stage
+            !call s_mpi_abort("errors found in conservative variables")
+        !end if
+
+        close (12)
+
+    end subroutine s_q_cons_debug
+
+    subroutine s_rhs_debug(q_cons_vf, rhs_vf, t_step, stage)
+
+        type(scalar_field), dimension(sys_size) :: q_cons_vf, rhs_vf
+        integer, intent(in) :: t_step, stage
+
+        integer :: errors_ts, i
+
+        !call s_check_rhs(rhs_vf, t_step, stage, errors_ts)
+
+        !if (errors_ts /= 0) then
+            !write (12, "(I3)") t_step
+            !close (12)
+            !do i = 1, sys_size
+                !$:GPU_UPDATE(host='[q_cons_vf(i)%sf]')
+            !end do
+            !call s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type)
+            !print*, "Stage = ", stage
+            !call s_mpi_abort("errors found in RHS")
+        !end if
+
+        close (12)
+
+    end subroutine s_rhs_debug
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
         !!      the flux term and adaptive time stepping algorithm for

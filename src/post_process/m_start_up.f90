@@ -777,4 +777,50 @@ contains
         call s_mpi_finalize()
     end subroutine s_finalize_modules
 
+    subroutine s_perform_comp_debug(varname, pres, c, H)
+
+        real(wp) :: pres
+        real(wp) :: c
+        real(wp) :: H
+        integer :: t_fail, ios
+        logical :: exists
+        character(LEN=name_len) :: varname !<
+        character(LEN=name_len) :: file_name = 'comp_debug.txt'
+        character(LEN=path_len + name_len) :: file_path
+
+        ! Opening the run-time information file
+        file_path = trim(case_dir)//'/'//trim(file_name)
+
+        inquire (file=file_path, exist=exists)
+        if (exists) then
+            open (12, file=file_path)
+            ! Read the file line by line
+            do
+                read (12, '(I9)', iostat=ios) t_fail
+                if (ios /= 0) exit  ! Exit loop on error or end-of-file
+            end do
+            if (t_fail == -1) return
+        else
+            return
+        end if
+
+        if (proc_rank == 0) then
+            print("(A, I6)"), " Post Processing suspicious time-step: ", t_fail
+        end if
+
+        ! Populating the grid and conservative variables
+        call s_read_data_files(t_fail)
+
+        ! Populating the buffer regions of the grid variables
+        if (buff_size > 0) then
+            call s_populate_grid_variables_buffers()
+            call s_populate_variables_buffers(bc_type, q_cons_vf)
+        end if
+
+        ! Converting the conservative variables to the primitive ones
+        call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwbuff)
+        call s_save_data(t_fail, varname, pres, c, H)
+
+    end subroutine s_perform_comp_debug
+
 end module m_start_up
