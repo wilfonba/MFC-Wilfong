@@ -21,7 +21,7 @@
     integer,allocatable :: seed(:)
 
     eps = 1e-9_wp
-    eps_smooth = 1.0_wp
+    eps_smooth = 3.0_wp
 #if 1
     open(unit=10, file="njet.txt", status="old", action="read")
     read(10,*) NJet
@@ -51,8 +51,8 @@
             else
                 read(value, *) r_th_arr(q)
             end if
-            y_th_arr(q) = 1.2_wp * y_th_arr(q)  ! Scale y-coordinate
-            z_th_arr(q) = 1.2_wp * z_th_arr(q)  ! Scale z-coordinate
+            y_th_arr(q) = 1.0_wp * y_th_arr(q)  ! Scale y-coordinate
+            z_th_arr(q) = 1.0_wp * z_th_arr(q)  ! Scale z-coordinate
         end do
     end do
     close(10)

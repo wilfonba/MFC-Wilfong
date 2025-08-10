@@ -2512,8 +2512,9 @@ contains
                                          pres_L, pres_R, cfl)
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in) :: E_L, gamma_L, pi_inf_L, rho_L
-        real(wp), intent(in) :: E_R, gamma_R, pi_inf_R, rho_R
+        real(wp), intent(in) :: gamma_L, pi_inf_L, rho_L
+        real(wp), intent(in) :: gamma_R, pi_inf_R, rho_R
+        real(wp), intent(inout) :: E_L, E_R
         real(wp), dimension(num_dims), intent(in) :: vel_L, vel_R
         real(wp), intent(out) :: pres_L, pres_R, cfl
 
@@ -2535,13 +2536,22 @@ contains
                       sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp)) + &
                   max(a_L, a_R)
         elseif (num_dims == 3) then
+
+            if (igr_pres_lim) then
+                E_L = max(E_L, rho_L ** (1._wp / gamma_L + 1._wp) + 0.5_wp * rho_L * (vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))
+                E_R = max(E_R, rho_R ** (1._wp / gamma_R + 1._wp) + 0.5_wp * rho_R * (vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))
+            end if
+
             pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L
             pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))/gamma_R
 
-            if (igr_pres_lim) then
-                pres_L = max(pres_L, 0._wp)
-                pres_R = max(pres_R, 0._wp)
-            end if
+            !pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L
+            !pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))/gamma_R
+
+            !if (igr_pres_lim) then
+                !pres_L = max(pres_L, 0._wp)
+                !pres_R = max(pres_R, 0._wp)
+            !end if
 
             a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L/gamma_L)/rho_L)
             a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R/gamma_R)/rho_R)
