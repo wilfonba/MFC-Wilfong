@@ -102,6 +102,7 @@ module m_global_parameters
     logical :: cont_damage           !< continuum damage modeling
     logical :: igr                   !< Use information geometric regularization
     integer :: igr_order             !< IGR reconstruction order
+    logical :: entropic_pres_restart !< Save entropic pressure
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
@@ -353,6 +354,7 @@ contains
         weno_order = dflt_int
         igr = .false.
         igr_order = dflt_int
+        entropic_pres_restart = .false.
         muscl_order = dflt_int
 
         hypoelasticity = .false.

@@ -18,13 +18,15 @@ module m_igr
     implicit none
 
     private; public :: s_initialize_igr_module, &
+ s_initialize_entropic_pressure, &
  s_igr_iterative_solve, &
  s_igr_riemann_solver, &
  s_igr_sigma_x, &
  s_igr_flux_add, &
  s_finalize_igr_module
 
-    real(wp), allocatable, dimension(:, :, :) :: jac, jac_rhs, jac_old
+    real(wp), allocatable, dimension(:, :, :) :: jac_rhs, jac_old
+    real(wp), allocatable, dimension(:, :, :), public :: jac
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
 
     real(wp), allocatable, dimension(:, :) :: Res
@@ -73,7 +75,6 @@ module m_igr
                                    5._wp/6._wp, & ! Index 0
                                    2._wp/6._wp & ! Index 1
                                    ]
-
         #:endif
     #:endif
 
@@ -103,23 +104,6 @@ contains
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
         end if
-
-        $:GPU_PARALLEL_LOOP(collapse=3)
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
-                    jac(j, k, l) = 0._wp
-                    if (igr_iter_solver == 1) jac_old(j, k, l) = 0._wp
-                end do
-            end do
-        end do
-
-        if (p == 0) then
-            alf_igr = alf_factor*max(dx(1), dy(1))**2._wp
-        else
-            alf_igr = alf_factor*max(dx(1), dy(1), dz(1))**2._wp
-        end if
-        $:GPU_UPDATE(device='[alf_igr]')
 
         #:if not MFC_CASE_OPTIMIZATION
             if (igr_order == 3) then
@@ -161,6 +145,40 @@ contains
         #:endif
 
     end subroutine s_initialize_igr_module
+
+    subroutine s_initialize_entropic_pressure()
+
+        if (p == 0) then
+            alf_igr = alf_factor*max(dx(1), dy(1))**2._wp
+        else
+            alf_igr = alf_factor*max(dx(1), dy(1), dz(1))**2._wp
+        end if
+        $:GPU_UPDATE(device='[alf_igr]')
+
+        if (t_step_start == 0 .or. (.not. entropic_pres_restart)) then
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                        jac(j, k, l) = 0._wp
+                        if (igr_iter_solver == 1) jac_old(j, k, l) = 0._wp
+                    end do
+                end do
+            end do
+        else
+            if (igr_iter_solver == 1) then
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            jac_old(j, k, l) = jac(j, k, l)
+                        end do
+                    end do
+                end do
+            end if
+        end if
+
+        $:GPU_UPDATE(device='[jac, jac_old]')
+
+    end subroutine s_initialize_entropic_pressure
 
     subroutine s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
 #ifdef _CRAYFTN

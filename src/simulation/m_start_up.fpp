@@ -188,7 +188,7 @@ contains
             hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
             alf_factor, num_igr_iters, down_sample, &
-            num_igr_warm_start_iters, &
+            num_igr_warm_start_iters, entropic_pres_restart, &
             int_comp, ic_eps, ic_beta
 
         ! Checking that an input file has been provided by the user. If it
@@ -391,6 +391,20 @@ contains
             end if
         end do
 
+        if (entropic_pres_restart .and. t_step_start /= 0) then
+            write (file_path, '(A)') trim(t_step_dir)//'/entropicPres.dat'
+            inquire (FILE=trim(file_path), EXIST=file_exist)
+            if (file_exist) then
+                open (2, FILE=trim(file_path), &
+                      FORM='unformatted', &
+                      ACTION='read', &
+                      STATUS='old')
+                read (2) jac(0:m, 0:n, 0:p); close (2)
+            else
+                call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
+            end if
+        end if
+
         if (bubbles_euler .or. elasticity) then
             ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
@@ -536,6 +550,7 @@ contains
         character(len=10) :: t_step_start_string
 
         integer :: i, j
+        integer :: alt_size
 
         ! Downsampled data variables
         integer :: m_ds, n_ds, p_ds
@@ -652,6 +667,8 @@ contains
                     if (ib) then
                         call s_initialize_mpi_data(q_cons_vf, ib_markers, &
                             levelset, levelset_norm)
+                    elseif (igr) then
+                        call s_initialize_mpi_data(q_cons_vf, jac_in=jac)
                     else
                         call s_initialize_mpi_data(q_cons_vf)
                     end if
@@ -699,15 +716,20 @@ contains
                         end do
                     end if
                 else
+                    alt_size = sys_size
+                    if (t_step_start /= 0 .and. entropic_pres_restart) then
+                        alt_size = sys_size + 1
+                    end if
+
                     if(down_sample) then
-                        do i = 1, sys_size
+                        do i = 1, alt_size
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
                             call MPI_FILE_READ(ifile, q_cons_temp(i)%sf, data_size, &
                                                mpi_p, status, ierr)
                         end do
                     else
-                        do i = 1, sys_size
+                        do i = 1, alt_size
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
                             call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -805,10 +827,10 @@ contains
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers, &
                         levelset, levelset_norm)
+                elseif (igr) then
+                    call s_initialize_mpi_data(q_cons_vf, jac_in=jac)
                 else
-
                     call s_initialize_mpi_data(q_cons_vf)
-
                 end if
 
 
@@ -850,7 +872,12 @@ contains
                         end do
                     end if
                 else
-                    do i = 1, sys_size
+                    alt_size = sys_size
+                    if (t_step_start /= 0 .and. entropic_pres_restart) then
+                        alt_size = sys_size + 1
+                    end if
+
+                    do i = 1, alt_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         ! Initial displacement to skip at beginning of file
@@ -1269,10 +1296,13 @@ contains
             end do
 
             $:GPU_UPDATE(host='[q_beta%vf(1)%sf]')
-            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta%vf(1))
+            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, beta=q_beta%vf(1))
             $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
+        else if (igr) then
+            $:GPU_UPDATE(host='[jac]')
+            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, jac_in=jac)
         else
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
@@ -1355,16 +1385,20 @@ contains
             end do
         end if
 
+        if (igr) call s_initialize_igr_module()
+
         ! Reading in the user provided initial condition and grid data
         if(down_sample) then
             call s_read_data_files(q_cons_temp)
-            call s_upsample_data(q_cons_ts(1)%vf, q_cons_temp)
+            call s_upsample_data(q_cons_ts(1)%vf, q_cons_temp, jac)
             do i = 1, sys_size
                 $:GPU_UPDATE(device='[q_cons_ts(1)%vf(i)%sf]')
             end do
         else
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
+
+        if (igr) call s_initialize_entropic_pressure()
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()
@@ -1380,9 +1414,7 @@ contains
         ! Computation of parameters, allocation of memory, association of pointers,
         ! and/or execution of any other tasks that are needed to properly configure
         ! the modules. The preparations below DO DEPEND on the grid being complete.
-        if (igr) then
-            call s_initialize_igr_module()
-        else
+        if (.not. igr) then
             if (recon_type == WENO_TYPE) then
                 call s_initialize_weno_module()
             elseif (recon_type == MUSCL_TYPE) then

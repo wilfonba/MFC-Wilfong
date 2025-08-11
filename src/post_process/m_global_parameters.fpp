@@ -132,6 +132,7 @@ module m_global_parameters
     integer :: E_idx                               !< Index of energy equation
     integer :: n_idx                               !< Index of number density
     integer :: beta_idx                            !< Index of lagrange bubbles beta
+    integer :: ent_pres_idx                        !< Entropic pressure index
     type(int_bounds_info) :: adv_idx               !< Indexes of first & last advection eqns.
     type(int_bounds_info) :: internalEnergies_idx  !< Indexes of first & last internal energy eqns.
     type(bub_bounds_info) :: bub_idx               !< Indexes of first & last bubble variable eqns.
@@ -258,6 +259,8 @@ module m_global_parameters
     logical :: ib
     logical :: chem_wrt_Y(1:num_species)
     logical :: chem_wrt_T
+    logical :: entropic_pres_restart
+    logical :: entropic_pres_wrt
     !> @}
 
     real(wp), dimension(num_fluids_max) :: schlieren_alpha    !<
@@ -438,6 +441,8 @@ contains
         sim_data = .false.
         cf_wrt = .false.
         ib = .false.
+        entropic_pres_restart = .false.
+        entropic_pres_wrt = .false.
 
         schlieren_alpha = dflt_real
 
@@ -613,6 +618,11 @@ contains
                     pref = 1._wp
                 end if
 
+            end if
+
+            if (entropic_pres_wrt) then
+                ent_pres_idx = sys_size + 1
+                sys_size = ent_pres_idx
             end if
 
             if (bubbles_lagrange) then

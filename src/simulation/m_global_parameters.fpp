@@ -182,6 +182,7 @@ module m_global_parameters
     logical :: cont_damage   !< Continuum damage modeling
     integer :: num_igr_iters !< number of iterations for elliptic solve
     integer :: num_igr_warm_start_iters !< number of warm start iterations for elliptic solve
+    logical :: entropic_pres_restart !< Save entropic pressure in I/O
     real(wp) :: alf_factor  !< alpha factor for IGR
 
     $:GPU_DECLARE(create='[chemistry]')
@@ -612,6 +613,7 @@ contains
         cont_damage = .false.
         num_igr_iters = dflt_num_igr_iters
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
+        entropic_pres_restart = .false.
         alf_factor = dflt_alf_factor
 
         #:if not MFC_CASE_OPTIMIZATION
@@ -1181,7 +1183,7 @@ contains
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
-        elseif (bubbles_lagrange) then
+        elseif (bubbles_lagrange .or. entropic_pres_restart) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else

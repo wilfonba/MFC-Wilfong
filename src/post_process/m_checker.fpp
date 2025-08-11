@@ -36,6 +36,7 @@ contains
         call s_check_inputs_liutex
         call s_check_inputs_schlieren
         call s_check_inputs_surface_tension
+        call s_check_inputs_igr
         call s_check_inputs_no_flow_variables
 
     end subroutine s_check_inputs
@@ -146,6 +147,17 @@ contains
         @:PROHIBIT(cf_wrt .and. .not. surface_tension, &
             "cf_wrt can only be enabled if the surface coefficient is set")
     end subroutine s_check_inputs_surface_tension
+
+    subroutine s_check_inputs_igr
+
+        @:PROHIBIT((.not. igr) .and.  entropic_pres_restart, &
+            "entropic_pres_restart requires igr = T")
+        @:PROHIBIT((.not. igr) .and. entropic_pres_wrt, &
+            "entropic_pres_wrt requires igr = T")
+        @:PROHIBIT((.not. entropic_pres_restart) .and. entropic_pres_wrt, &
+            "entropic_pres_wrt requires entropic_pres_restart = T")
+
+    end subroutine s_check_inputs_igr
 
     !> Checks constraints on the absence of flow variables
     impure subroutine s_check_inputs_no_flow_variables

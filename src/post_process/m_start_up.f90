@@ -90,7 +90,7 @@ contains
             cfl_target, surface_tension, bubbles_lagrange, &
             sim_data, hyperelasticity, Bx0, relativity, cont_damage, &
             num_bc_patches, igr, igr_order, down_sample, recon_type, &
-            muscl_order
+            muscl_order, entropic_pres_restart, entropic_pres_wrt
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -387,6 +387,14 @@ contains
 
             varname(:) = ' '
 
+        end if
+
+        if (entropic_pres_wrt) then
+            q_sf(:, :, :) = q_cons_vf(ent_pres_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+            write (varname, '(A)') 'entropic_pressure'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+
+            varname(:) = ' '
         end if
 
         ! Adding the magnetic field to the formatted database file

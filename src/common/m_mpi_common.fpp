@@ -125,13 +125,16 @@ contains
     !! @param levelset closest distance from every cell to the IB
     !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     !! @param beta Eulerian void fraction from lagrangian bubbles
-    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
+    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta, jac_in)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(integer_field), optional, intent(in) :: ib_markers
         type(levelset_field), optional, intent(IN) :: levelset
         type(levelset_norm_field), optional, intent(IN) :: levelset_norm
         type(scalar_field), intent(in), optional :: beta
+        real(wp), target, &
+            dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), &
+            intent(in), optional :: jac_in
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
         integer, dimension(1) :: airfoil_glb, airfoil_loc, airfoil_start
@@ -145,7 +148,7 @@ contains
         !Altered system size for the lagrangian subgrid bubble model
         integer :: alt_sys
 
-        if (present(beta)) then
+        if (present(beta) .or. entropic_pres_restart) then
             alt_sys = sys_size + 1
         else
             alt_sys = sys_size
@@ -157,6 +160,8 @@ contains
 
         if (present(beta)) then
             MPI_IO_DATA%var(alt_sys)%sf => beta%sf(0:m, 0:n, 0:p)
+        elseif (entropic_pres_restart) then
+            MPI_IO_DATA%var(alt_sys)%sf => jac_in(0:m, 0:n, 0:p)
         end if
 
         !Additional variables pb and mv for non-polytropic qbmm
@@ -296,6 +301,13 @@ contains
 
         ! Generic loop iterator
         integer :: i, j, q, k, l, m_ds, n_ds, p_ds, ierr
+        integer :: alt_sys
+
+        if (entropic_pres_restart) then
+            alt_sys = sys_size + 1
+        else
+            alt_sys = sys_size
+        end if
 
         sf_start_idx = (/0, 0, 0/)
 
@@ -324,7 +336,7 @@ contains
         end if
 
         ! Define the view for each variable
-        do i = 1, sys_size
+        do i = 1, alt_sys
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_loc, sizes_loc, sf_start_idx, &
                                           MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)

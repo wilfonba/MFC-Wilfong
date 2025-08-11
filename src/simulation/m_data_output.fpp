@@ -36,7 +36,7 @@ module m_data_output
 
     implicit none
 
-    private; 
+    private;
     public :: s_initialize_data_output_module, &
               s_open_run_time_information_file, &
               s_open_com_files, &
@@ -82,7 +82,7 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta, jac_in)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -97,17 +97,20 @@ contains
 
         integer, intent(in) :: t_step
 
-        type(scalar_field), &
-            intent(inout), optional :: beta
-
         type(integer_field), &
             dimension(1:num_dims, -1:1), &
             intent(in) :: bc_type
 
+        type(scalar_field), &
+            intent(inout), optional :: beta
+
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), &
+            intent(in), optional :: jac_in
+
         if (.not. parallel_io) then
-            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta, jac_in)
         else
-            call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
+            call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, jac_in)
         end if
 
     end subroutine s_write_data_files
@@ -394,13 +397,14 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
-    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta, jac_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
+        real(wp), intent(inout), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), optional :: jac_in
         type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
@@ -473,6 +477,16 @@ contains
             write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
         end do
 
+        if (entropic_pres_restart) then
+            write (file_path, '(A,I0,A)') trim(t_step_dir)//'/entropicPres.dat'
+
+            open (2, FILE=trim(file_path), &
+                  FORM='unformatted', &
+                  STATUS='new')
+
+            write (2) jac_in(0:m, 0:n, 0:p); close (2)
+        end if
+
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do r = 1, nnode
@@ -531,7 +545,7 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
-        if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
+        if ((prim_vars_wrt .or. (n == 0 .and. p == 0)) .and. (.not. igr)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:,:,:)]')
@@ -623,7 +637,19 @@ contains
                 open (2, FILE=trim(file_path))
                 do j = 0, m
                     do k = 0, n
-                        write (2, FMT) x_cb(j), y_cb(k), beta%sf(0:m, 0:n, 0)
+                        write (2, FMT) x_cb(j), y_cb(k), beta%sf(j, k, 0)
+                    end do
+                    write (2, *)
+                end do
+                close (2)
+            end if
+
+            if (entropic_pres_restart) then
+                write (file_path, '(A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/entropic_pres.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    do k = 0, n
+                        write (2, FMT) x_cb(j), y_cb(k), jac_in(j, k, 0)
                     end do
                     write (2, *)
                 end do
@@ -721,6 +747,23 @@ contains
                 close (2)
             end if
 
+            if (entropic_pres_restart) then
+                write (file_path, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/entropic_pres.', i, '.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    do k = 0, n
+                        do l = 0, p
+                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), jac_in(j, k, l)
+                        end do
+                        write (2, *)
+                    end do
+                    write (2, *)
+                end do
+                close (2)
+            end if
+
+
+
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -790,11 +833,12 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
         !!  @param beta Eulerian void fraction from lagrangian bubbles
-    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, jac_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(inout), optional :: jac_in
         type(integer_field), &
             dimension(1:num_dims, -1:1), &
             intent(in) :: bc_type
@@ -824,11 +868,12 @@ contains
 
         if (down_sample) then
             call s_populate_variables_buffers(bc_type, q_cons_vf)
+            if (entropic_pres_restart) call s_populate_F_igr_buffers(bc_type, jac_in)
             call s_downsample_data(q_cons_vf, q_cons_temp, &
-                                   m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
+                                   m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds, jac_in)
         end if
 
-        if (present(beta)) then
+        if (present(beta) .or. entropic_pres_restart) then
             alt_sys = sys_size + 1
         else
             alt_sys = sys_size
@@ -837,17 +882,6 @@ contains
         if (file_per_process) then
 
             call s_int_to_str(t_step, t_step_string)
-
-            ! Initialize MPI data I/O
-            if (down_sample) then
-                call s_initialize_mpi_data_ds(q_cons_temp)
-            else
-                if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
-                else
-                    call s_initialize_mpi_data(q_cons_vf)
-                end if
-            end if
 
             if (proc_rank == 0) then
                 file_loc = trim(case_dir)//'/restart_data/lustre_'//trim(t_step_string)
@@ -861,7 +895,17 @@ contains
             call DelayFileAccess(proc_rank)
 
             ! Initialize MPI data I/O
-            call s_initialize_mpi_data(q_cons_vf)
+            if (down_sample) then
+                call s_initialize_mpi_data_ds(q_cons_temp)
+            else
+                if (ib) then
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                else if (igr) then
+                    call s_initialize_mpi_data(q_cons_vf, jac_in=jac_in)
+                else
+                    call s_initialize_mpi_data(q_cons_vf)
+                end if
+            end if
 
             ! Open the file to write all flow variables
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
@@ -915,14 +959,14 @@ contains
                 end if
             else
                 if (down_sample) then
-                    do i = 1, sys_size !TODO: check if correct (sys_size
+                    do i = 1, alt_sys
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size, &
                                                 mpi_p, status, ierr)
                     end do
                 else
-                    do i = 1, sys_size !TODO: check if correct (sys_size
+                    do i = 1, alt_sys
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
@@ -939,6 +983,8 @@ contains
                 call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
             elseif (present(beta)) then
                 call s_initialize_mpi_data(q_cons_vf, beta=beta)
+            elseif (igr) then
+                call s_initialize_mpi_data(q_cons_vf, jac_in=jac_in)
             else
                 call s_initialize_mpi_data(q_cons_vf)
             end if
@@ -992,7 +1038,7 @@ contains
                     end do
                 end if
             else
-                do i = 1, sys_size !TODO: check if correct (sys_size
+                do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
@@ -1005,8 +1051,8 @@ contains
                 end do
             end if
 
-            ! Correction for the lagrangian subgrid bubble model
-            if (present(beta)) then
+            ! Additional variable for the lagrangian subgrid bubble model or entropic pressure
+            if (present(beta) .or. entropic_pres_restart) then
                 var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
 
                 ! Initial displacement to skip at beginning of file
@@ -1794,6 +1840,7 @@ contains
     impure subroutine s_initialize_data_output_module
 
         integer :: i, m_ds, n_ds, p_ds
+        integer :: alt_size
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         if (run_time_info) then
@@ -1818,7 +1865,13 @@ contains
             n_ds = int((n + 1)/3) - 1
             p_ds = int((p + 1)/3) - 1
 
-            allocate (q_cons_temp(1:sys_size))
+            if (entropic_pres_restart) then
+                alt_size = sys_size + 1
+            else
+                alt_size = sys_size
+            end if
+
+            allocate (q_cons_temp(1:alt_size))
             do i = 1, sys_size
                 allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
             end do
