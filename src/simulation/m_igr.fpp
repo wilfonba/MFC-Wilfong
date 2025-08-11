@@ -123,7 +123,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION
             if (igr_order == 3) then
-                vidxb = -1; vidxe = 2; 
+                vidxb = -1; vidxe = 2;
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(0:2))
@@ -139,7 +139,7 @@ contains
                 $:GPU_UPDATE(device='[coeff_R]')
 
             elseif (igr_order == 5) then
-                vidxb = -2; vidxe = 3; 
+                vidxb = -2; vidxe = 3;
                 $:GPU_UPDATE(device='[vidxb, vidxe]')
 
                 @:ALLOCATE(coeff_L(-1:3))
@@ -307,6 +307,17 @@ contains
                         vel_R = vel_R + coeff_R(q)*q_cons_vf(momxb)%sf(j + q, k, l)
                         F_R = F_R + coeff_R(q)*jac(j + q, k, l)
                     end do
+
+                    if (igr_pres_lim) then
+                        if (vel_L < 0._wp) vel_L = q_cons_vf(momxb)%sf(j, k, l)
+                        if (vel_R < 0._wp) vel_R = q_cons_vf(momxb)%sf(j + 1, k, l)
+                        if (F_L < 0._wp) F_L = jac(j, k, l)
+                        if (F_R < 0._wp) F_R = jac(j + 1, k, l)
+                        do i = 1, num_fluids
+                            if (alpha_rho_L(i) < 0._wp) alpha_rho_L(i) = q_cons_vf(i)%sf(j, k, l)
+                            if (alpha_rho_R(i) < 0._wp) alpha_rho_R(i) = q_cons_vf(i)%sf(j + 1, k, l)
+                        end do
+                    end if
 
                     vel_L = vel_L/sum(alpha_rho_L)
                     vel_R = vel_R/sum(alpha_rho_R)
@@ -490,6 +501,27 @@ contains
                                 end do
                             end do
 
+                            if (igr_pres_lim) then
+                                do i = 1, num_fluids
+                                    if (alpha_rho_L(i) < 0._wp) alpha_rho_L(i) = q_cons_vf(i)%sf(j, k, l)
+                                    if (alpha_rho_R(i) < 0._wp) alpha_rho_R(i) = q_cons_vf(i)%sf(j + 1, k, l)
+                                end do
+                                do i = 1, num_dims
+                                    if (vel_L(i) < 0._wp) vel_L = q_cons_vf(momxb + i - 1)%sf(j, k, l)
+                                    if (vel_R(i) < 0._wp) vel_R = q_cons_vf(momxb + i - 1)%sf(j + 1, k, l)
+                                end do
+                                if (num_fluids > 1) then
+                                    do i = 1, num_fluids - 1
+                                        if (max(min(alpha_L(i), 1._wp), 0._wp) /= alpha_L(i)) then
+                                            alpha_L(i) = q_cons_vf(advxb + i - 1)%sf(j, k, l)
+                                        end if
+                                        if (max(min(alpha_R(i), 1._wp), 0._wp) /= alpha_R(i)) then
+                                            alpha_R(i) = q_cons_vf(advxb + i - 1)%sf(j + 1, k, l)
+                                        end if
+                                    end do
+                                end if
+                            end if
+
                             if (num_fluids > 1) then
                                 alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
                                 alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
@@ -582,6 +614,11 @@ contains
                             do q = vidxb, vidxe - 1
                                 E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j + q, k, l)
                             end do
+
+                            if (igr_pres_lim) then
+                                if (E_L < 0._wp) E_L = q_cons_vf(E_idx)%sf(j, k, l)
+                                if (E_R < 0._wp) E_R = q_cons_vf(E_idx)%sf(j + 1, k, l)
+                            end if
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
@@ -914,6 +951,27 @@ contains
                                 end do
                             end do
 
+                            if (igr_pres_lim) then
+                                do i = 1, num_fluids
+                                    if (alpha_rho_L(i) < 0._wp) alpha_rho_L(i) = q_cons_vf(i)%sf(j, k, l)
+                                    if (alpha_rho_R(i) < 0._wp) alpha_rho_R(i) = q_cons_vf(i)%sf(j + 1, k, l)
+                                end do
+                                do i = 1, num_dims
+                                    if (vel_L(i) < 0._wp) vel_L = q_cons_vf(momxb + i - 1)%sf(j, k, l)
+                                    if (vel_R(i) < 0._wp) vel_R = q_cons_vf(momxb + i - 1)%sf(j + 1, k, l)
+                                end do
+                                if (num_fluids > 1) then
+                                    do i = 1, num_fluids - 1
+                                        if (max(min(alpha_L(i), 1._wp), 0._wp) /= alpha_L(i)) then
+                                            alpha_L(i) = q_cons_vf(advxb + i - 1)%sf(j, k, l)
+                                        end if
+                                        if (max(min(alpha_R(i), 1._wp), 0._wp) /= alpha_R(i)) then
+                                            alpha_R(i) = q_cons_vf(advxb + i - 1)%sf(j + 1, k, l)
+                                        end if
+                                    end do
+                                end if
+                            end if
+
                             if (num_fluids > 1) then
                                 alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
                                 alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
@@ -1035,6 +1093,11 @@ contains
                             do q = vidxb, vidxe - 1
                                 E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j + q, k, l)
                             end do
+
+                            if (igr_pres_lim) then
+                                if (E_L < 0._wp) E_R = q_cons_vf(E_idx)%sf(j, k, l)
+                                if (E_R < 0._wp) E_R = q_cons_vf(E_idx)%sf(j + 1, k, l)
+                            end if
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
@@ -1341,6 +1404,27 @@ contains
                                 end do
                             end do
 
+                            if (igr_pres_lim) then
+                                do i = 1, num_fluids
+                                    if (alpha_rho_L(i) < 0._wp) alpha_rho_L(i) = q_cons_vf(i)%sf(j, k, l)
+                                    if (alpha_rho_R(i) < 0._wp) alpha_rho_R(i) = q_cons_vf(i)%sf(j + 1, k, l)
+                                end do
+                                do i = 1, num_dims
+                                    if (vel_L(i) < 0._wp) vel_L = q_cons_vf(momxb + i - 1)%sf(j, k, l)
+                                    if (vel_R(i) < 0._wp) vel_R = q_cons_vf(momxb + i - 1)%sf(j + 1, k, l)
+                                end do
+                                if (num_fluids > 1) then
+                                    do i = 1, num_fluids - 1
+                                        if (max(min(alpha_L(i), 1._wp), 0._wp) /= alpha_L(i)) then
+                                            alpha_L(i) = q_cons_vf(advxb + i - 1)%sf(j, k, l)
+                                        end if
+                                        if (max(min(alpha_R(i), 1._wp), 0._wp) /= alpha_R(i)) then
+                                            alpha_R(i) = q_cons_vf(advxb + i - 1)%sf(j + 1, k, l)
+                                        end if
+                                    end do
+                                end if
+                            end if
+
                             if (num_fluids > 1) then
                                 alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
                                 alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
@@ -1437,6 +1521,14 @@ contains
                                 E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j, k + q, l)
                                 F_R = F_R + coeff_R(q)*jac(j, k + q, l)
                             end do
+
+                            if (igr_pres_lim) then
+                                if (E_L < 0._wp) E_L = q_cons_vf(E_idx)%sf(j, k, l)
+                                if (E_R < 0._wp) E_R = q_cons_vf(E_idx)%sf(j + 1, k, l)
+
+                                if (F_L < 0._wp) F_L = jac(j, k, l)
+                                if (F_R < 0._wp) F_R = jac(j + 1, k, l)
+                            end if
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
@@ -1744,6 +1836,27 @@ contains
                                 end do
                             end do
 
+                            if (igr_pres_lim) then
+                                do i = 1, num_fluids
+                                    if (alpha_rho_L(i) < 0._wp) alpha_rho_L(i) = q_cons_vf(i)%sf(j, k, l)
+                                    if (alpha_rho_R(i) < 0._wp) alpha_rho_R(i) = q_cons_vf(i)%sf(j + 1, k, l)
+                                end do
+                                do i = 1, num_dims
+                                    if (vel_L(i) < 0._wp) vel_L = q_cons_vf(momxb + i - 1)%sf(j, k, l)
+                                    if (vel_R(i) < 0._wp) vel_R = q_cons_vf(momxb + i - 1)%sf(j + 1, k, l)
+                                end do
+                                if (num_fluids > 1) then
+                                    do i = 1, num_fluids - 1
+                                        if (max(min(alpha_L(i), 1._wp), 0._wp) /= alpha_L(i)) then
+                                            alpha_L(i) = q_cons_vf(advxb + i - 1)%sf(j, k, l)
+                                        end if
+                                        if (max(min(alpha_R(i), 1._wp), 0._wp) /= alpha_R(i)) then
+                                            alpha_R(i) = q_cons_vf(advxb + i - 1)%sf(j + 1, k, l)
+                                        end if
+                                    end do
+                                end if
+                            end if
+
                             if (num_fluids > 1) then
                                 alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
                                 alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
@@ -1868,6 +1981,14 @@ contains
                                 E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j, k + q, l)
                                 F_R = F_R + coeff_R(q)*jac(j, k + q, l)
                             end do
+
+                            if (igr_pres_lim) then
+                                if (E_L < 0._wp) E_L = q_cons_vf(E_idx)%sf(j, k, l)
+                                if (E_R < 0._wp) E_R = q_cons_vf(E_idx)%sf(j + 1, k, l)
+
+                                if (F_L < 0._wp) F_L = jac(j, k, l)
+                                if (F_R < 0._wp) F_R = jac(j + 1, k, l)
+                            end if
 
                             call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                       E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
@@ -2203,6 +2324,27 @@ contains
                             end do
                         end do
 
+                        if (igr_pres_lim) then
+                            do i = 1, num_fluids
+                                if (alpha_rho_L(i) < 0._wp) alpha_rho_L(i) = q_cons_vf(i)%sf(j, k, l)
+                                if (alpha_rho_R(i) < 0._wp) alpha_rho_R(i) = q_cons_vf(i)%sf(j + 1, k, l)
+                            end do
+                            do i = 1, num_dims
+                                if (vel_L(i) < 0._wp) vel_L = q_cons_vf(momxb + i - 1)%sf(j, k, l)
+                                if (vel_R(i) < 0._wp) vel_R = q_cons_vf(momxb + i - 1)%sf(j + 1, k, l)
+                            end do
+                            if (num_fluids > 1) then
+                                do i = 1, num_fluids - 1
+                                    if (max(min(alpha_L(i), 1._wp), 0._wp) /= alpha_L(i)) then
+                                        alpha_L(i) = q_cons_vf(advxb + i - 1)%sf(j, k, l)
+                                    end if
+                                    if (max(min(alpha_R(i), 1._wp), 0._wp) /= alpha_R(i)) then
+                                        alpha_R(i) = q_cons_vf(advxb + i - 1)%sf(j + 1, k, l)
+                                    end if
+                                end do
+                            end if
+                        end if
+
                         if (num_fluids > 1) then
                             alpha_L(num_fluids) = 1._wp - sum(alpha_L(1:num_fluids - 1))
                             alpha_R(num_fluids) = 1._wp - sum(alpha_R(1:num_fluids - 1))
@@ -2327,6 +2469,14 @@ contains
                             E_R = E_R + coeff_R(q)*q_cons_vf(E_idx)%sf(j, k, l + q)
                             F_R = F_R + coeff_R(q)*jac(j, k, l + q)
                         end do
+
+                        if (igr_pres_lim) then
+                            if (E_L < 0._wp) E_L = q_cons_vf(E_idx)%sf(j, k, l)
+                            if (E_R < 0._wp) E_R = q_cons_vf(E_idx)%sf(j + 1, k, l)
+
+                            if (F_L < 0._wp) F_L = jac(j, k, l)
+                            if (F_R < 0._wp) F_R = jac(j + 1, k, l)
+                        end if
 
                         call s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                                   E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
