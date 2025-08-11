@@ -629,8 +629,9 @@ contains
 
     subroutine s_downsample_data(q_cons_vf, q_cons_temp, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds, jac_in)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_cons_temp
-        real(wp), optional, intent(inout), dimension(:,:,:) :: jac_in
+        type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_cons_temp
+        real(wp), optional, intent(inout), &
+            dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:) :: jac_in
 
         ! Down sampling variables
         integer :: i, j, k, l
@@ -695,7 +696,8 @@ contains
     subroutine s_upsample_data(q_cons_vf, q_cons_temp, jac_in)
 
         type(scalar_field), intent(inout), dimension(:) :: q_cons_vf, q_cons_temp
-        real(wp), optional, intent(inout), dimension(:,:,:) :: jac_in
+        real(wp), optional, intent(inout), &
+            dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:) :: jac_in
         integer :: i, j, k, l
         integer :: ix, iy, iz
         integer :: x_id, y_id, z_id

@@ -75,6 +75,7 @@ module m_data_output
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
+    integer :: alt_size !< Alt sys_size for entropic pressure
 
 contains
 
@@ -838,7 +839,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(inout), optional :: jac_in
+        real(wp), intent(inout), optional, &
+            dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:) :: jac_in
         type(integer_field), &
             dimension(1:num_dims, -1:1), &
             intent(in) :: bc_type
@@ -1840,7 +1842,6 @@ contains
     impure subroutine s_initialize_data_output_module
 
         integer :: i, m_ds, n_ds, p_ds
-        integer :: alt_size
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         if (run_time_info) then
@@ -1872,7 +1873,7 @@ contains
             end if
 
             allocate (q_cons_temp(1:alt_size))
-            do i = 1, sys_size
+            do i = 1, alt_size
                 allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
             end do
         end if
@@ -1897,7 +1898,7 @@ contains
         end if
 
         if (down_sample) then
-            do i = 1, sys_size
+            do i = 1, alt_size
                 deallocate (q_cons_temp(i)%sf)
             end do
             deallocate (q_cons_temp)

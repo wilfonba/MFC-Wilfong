@@ -22,52 +22,52 @@
 
     eps = 1e-9_wp
     eps_smooth = 3.0_wp
-#if 1
-    open(unit=10, file="njet.txt", status="old", action="read")
-    read(10,*) NJet
-    close(10)
+    if (patch_icpp(patch_id)%hcid == 303) then
+        open(unit=10, file="njet.txt", status="old", action="read")
+        read(10,*) NJet
+        close(10)
 
-    allocate(y_th_arr(0:NJet - 1))
-    allocate(z_th_arr(0:NJet - 1))
-    allocate(r_th_arr(0:NJet - 1))
+        allocate(y_th_arr(0:NJet - 1))
+        allocate(z_th_arr(0:NJet - 1))
+        allocate(r_th_arr(0:NJet - 1))
 
-    open(unit=10, file="jets.csv", status="old", action="read")
-    do q = 0, NJet - 1
-        read(10, '(A)') line  ! Read a full line as a string
-        start = 1
+        open(unit=10, file="jets.csv", status="old", action="read")
+        do q = 0, NJet - 1
+            read(10, '(A)') line  ! Read a full line as a string
+            start = 1
 
-        do l = 0, 2
-            end = index(line(start:), ',')  ! Find the next comma
-            if (end == 0) then
-                value = trim(adjustl(line(start:)))  ! Last value in the line
-            else
-                value = trim(adjustl(line(start:start+end-2)))  ! Extract substring
-                start = start + end  ! Move to next value
-            end if
-            if (l == 0) then
-                read(value, *) y_th_arr(q)  ! Convert string to numeric value
-            elseif (l == 1) then
-                read(value, *) z_th_arr(q)
-            else
-                read(value, *) r_th_arr(q)
-            end if
-            y_th_arr(q) = 1.0_wp * y_th_arr(q)  ! Scale y-coordinate
-            z_th_arr(q) = 1.0_wp * z_th_arr(q)  ! Scale z-coordinate
-        end do
-    end do
-    close(10)
-
-    do q = 0, p
-        do l = 0, n
-            rcut = 0._wp
-            do s = 0, NJet - 1
-                r = sqrt((y_cc(l) - y_th_arr(s))**2._wp + (z_cc(q) - z_th_arr(s))**2._wp)
-                rcut = rcut + f_cut_on(r - r_th_arr(s),eps_smooth)
+            do l = 0, 2
+                end = index(line(start:), ',')  ! Find the next comma
+                if (end == 0) then
+                    value = trim(adjustl(line(start:)))  ! Last value in the line
+                else
+                    value = trim(adjustl(line(start:start+end-2)))  ! Extract substring
+                    start = start + end  ! Move to next value
+                end if
+                if (l == 0) then
+                    read(value, *) y_th_arr(q)  ! Convert string to numeric value
+                elseif (l == 1) then
+                    read(value, *) z_th_arr(q)
+                else
+                    read(value, *) r_th_arr(q)
+                end if
+                y_th_arr(q) = 1.0_wp * y_th_arr(q)  ! Scale y-coordinate
+                z_th_arr(q) = 1.0_wp * z_th_arr(q)  ! Scale z-coordinate
             end do
-            rcut_arr(l,q) = rcut
         end do
-    end do
-#endif
+        close(10)
+
+        do q = 0, p
+            do l = 0, n
+                rcut = 0._wp
+                do s = 0, NJet - 1
+                    r = sqrt((y_cc(l) - y_th_arr(s))**2._wp + (z_cc(q) - z_th_arr(s))**2._wp)
+                    rcut = rcut + f_cut_on(r - r_th_arr(s),eps_smooth)
+                end do
+                rcut_arr(l,q) = rcut
+            end do
+        end do
+    end if
 
 #:enddef
 

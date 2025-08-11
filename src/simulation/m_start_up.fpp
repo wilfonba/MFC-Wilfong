@@ -189,7 +189,7 @@ contains
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
             alf_factor, num_igr_iters, down_sample, &
             num_igr_warm_start_iters, entropic_pres_restart, &
-            int_comp, ic_eps, ic_beta
+            int_comp, ic_eps, ic_beta, entropic_pres_wrt
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1328,6 +1328,7 @@ contains
         integer :: m_ds, n_ds, p_ds
         integer :: i, j, k, l, x_id, y_id, z_id, ix, iy, iz
         real(wp) :: temp1, temp2, temp3, temp4
+        integer :: alt_size
 
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
@@ -1379,8 +1380,11 @@ contains
             n_ds = INT((n+1)/3) - 1
             p_ds = INT((p+1)/3) - 1
 
-            allocate(q_cons_temp(1:sys_size))
-            do i = 1, sys_size
+            alt_size = sys_size
+            if (entropic_pres_restart) alt_size = sys_size + 1
+
+            allocate(q_cons_temp(1:alt_size))
+            do i = 1, alt_size
                 allocate(q_cons_temp(i)%sf(-1:m_ds+1,-1:n_ds+1,-1:p_ds+1))
             end do
         end if

@@ -322,6 +322,7 @@ SIMULATION.update({
     'alf_factor': ParamType.REAL,
     'igr_iter_solver': ParamType.INT,
     'igr_pres_lim': ParamType.LOG,
+    'entropic_pres_restart': ParamType.LOG,
     'recon_type': ParamType.INT,
     'muscl_order': ParamType.INT,
     'muscl_lim': ParamType.INT,
@@ -468,6 +469,8 @@ POST_PROCESS.update({
     'surface_tension': ParamType.LOG,
     'output_partial_domain': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
+    'entropic_pres_restart': ParamType.LOG,
+    'entropic_pres_wrt': ParamType.LOG,
 })
 
 for cmp in ["x", "y", "z"]:

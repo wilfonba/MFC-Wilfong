@@ -83,6 +83,8 @@ contains
         @:PROHIBIT(hyperelasticity, "IGR does not support hyperelasticity")
         @:PROHIBIT(cyl_coord, "IGR does not support cylindrical or axisymmetric coordinates")
         @:PROHIBIT(probe_wrt, "IGR does not support probe writes")
+        @:PROHIBIT(entropic_pres_wrt .and. (.not. entropic_pres_restart), &
+            "entropic_pres_wrt requires entropic_pores_restart = T")
 
         #:for DIR in [('x'), ('y'), ('z')]
             #:for LOC in [('beg'), ('end')]
