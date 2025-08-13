@@ -1983,14 +1983,6 @@ contains
                                     E_R = q_cons_vf(E_idx)%sf(j, k, l)
                                     F_L = jac(j, k + 1, l)
                                     F_R = jac(j, k, l)
-                                    !print*, "F_L, F_R Before", i, F_L, F_R
-                                    !print*, "E_L, E_R", E_L, E_R
-                                    !print*, "alpha_L", alpha_L(1), alpha_L(2)
-                                    !print*, "alpha_R", alpha_R(1), alpha_R(2)
-                                    !print*, "alpha_rho_L", alpha_rho_L(1), alpha_rho_L(2)
-                                    !print*, "alpha_rho_R", alpha_rho_R(1), alpha_rho_R(2)
-                                    !print*, "vel_L", vel_L(1), vel_L(2), vel_L(3)
-                                    !print*, "vel_R", vel_R(1), vel_R(2), vel_R(3)
                                 end if
                             end if
 
