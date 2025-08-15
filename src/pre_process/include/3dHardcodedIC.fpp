@@ -149,7 +149,7 @@
     case (303) ! 3D Multijet
 
         ux_th = 10*sqrt(1.4*0.4)
-        ux_am = 0.0*sqrt(1.4)
+        ux_am = 1.5*sqrt(1.4*0.4)
         p_th = 0.8_wp
         p_am = 0.4_wp
         rho_th = 1._wp

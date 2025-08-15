@@ -329,6 +329,8 @@ SIMULATION.update({
     'int_comp': ParamType.LOG,
     'ic_eps': ParamType.REAL,
     'ic_beta': ParamType.REAL,
+    'igr_lf_restart': ParamType.LOG,
+    'igr_lf_restart_steps': ParamType.INT,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',

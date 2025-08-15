@@ -743,7 +743,7 @@ contains
                 end if
 
                 call nvtxStartRange("IGR_RIEMANN")
-                call s_igr_riemann_solver(q_cons_vf, rhs_vf, id)
+                call s_igr_riemann_solver(q_cons_vf, rhs_vf, id, t_step)
                 call nvtxEndRange
 
                 if (id == 1) then
@@ -752,7 +752,7 @@ contains
                     call nvtxEndRange
 
                     call nvtxStartRange("IGR_SIGMA")
-                    call s_igr_sigma_x(q_cons_vf, rhs_vf)
+                    call s_igr_sigma_x(q_cons_vf, rhs_vf, t_step)
                     call nvtxEndRange
                 end if
 

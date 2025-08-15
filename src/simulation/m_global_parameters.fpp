@@ -182,6 +182,8 @@ module m_global_parameters
     logical :: cont_damage   !< Continuum damage modeling
     integer :: num_igr_iters !< number of iterations for elliptic solve
     integer :: num_igr_warm_start_iters !< number of warm start iterations for elliptic solve
+    logical :: igr_lf_restart !< Drop to LF reconstruction for fest few timesteps after a restart
+    integer :: igr_lf_restart_steps !< Number of LF steps to perform
     logical :: entropic_pres_restart !< Save entropic pressure in I/O
     logical :: entropic_pres_wrt !< save entropic pressure to output files
     real(wp) :: alf_factor  !< alpha factor for IGR
@@ -614,6 +616,8 @@ contains
         cont_damage = .false.
         num_igr_iters = dflt_num_igr_iters
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
+        igr_lf_restart = .false.
+        igr_lf_restart_steps = 0
         entropic_pres_restart = .false.
         entropic_pres_wrt = .false.
         alf_factor = dflt_alf_factor
