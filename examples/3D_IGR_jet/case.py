@@ -5,7 +5,7 @@ import json
 # Domain parameters
 
 D = 2  # Jet diameter
-Nd = 200  # Cells per jet diameter
+Nd = 100  # Cells per jet diameter
 x0 = 0  # x_beg coordinate
 x1 = 6.5 * D  # x_end coordinate
 y0 = -4.5 * D / 2  # y_beg coordinate
@@ -44,7 +44,7 @@ Nz = int(Nd * (z1 - z0) / D) - 1
 time_end = 4.0
 
 dx = D / Nd
-dt = dx / 18
+dt = dx / 36
 
 Nt = int(time_end / dt)
 
