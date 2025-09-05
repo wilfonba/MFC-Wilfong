@@ -45,6 +45,15 @@ module m_constants
     real(wp), parameter :: dflt_ic_beta = 1.6_wp !< Sharpness parameter's default value used in THINC
     integer, parameter :: moncon_cutoff = 1e-8_wp !< Monotonicity constraint's limiter to prevent extremas in THINC
 
+    ! Positivity preserving reconstructions
+    real(wp), parameter :: eps_alpha_rho_HS = 1e-11_wp
+    real(wp), parameter :: eps_alpha_HS = 1e-11_wp
+    real(wp), parameter :: eps_rho_e_HS = 1e-9_wp
+    real(wp), parameter :: eps_rho_cs_HS = 1e-9_wp
+    real(wp), parameter :: eps_alpha_rho = 1e-10_wp
+    real(wp), parameter :: eps_alpha = 1e-10_wp
+    real(wp), parameter :: eps_rho_e = 1e-8_wp
+
     ! Chemistry
     real(wp), parameter :: dflt_T_guess = 1200._wp ! Default guess for temperature (when a previous value is not available)
 

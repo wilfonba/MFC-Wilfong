@@ -118,7 +118,7 @@ contains
         if (n == 0) then
             is2_weno%beg = 0
         else
-            is2_weno%beg = -buff_size; 
+            is2_weno%beg = -buff_size;
         end if
 
         is2_weno%end = n - is2_weno%beg
@@ -903,6 +903,11 @@ contains
                         call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
                                                      vR_rs_vf_${XYZ}$)
                     end if
+
+                    if (.true.) then
+                        call s_preserve_positivity(v_rs_ws_${XYZ}$, VL_rs_vf_${XYZ}$, &
+                                                   v_R_rs_vf_${XYZ}$)
+                    end if
                 end if
             #:endfor
         elseif (weno_order == 7) then
@@ -1180,6 +1185,61 @@ contains
         end if
 
     end subroutine s_initialize_weno
+
+    !>  The goal of this subroutine is to ensure that the WENO
+        !!      reconstruction has positive densities and speed of sound
+        !!      as well as bounded volume fractions.
+        !!  @param i Equation number
+        !!  @param j First-coordinate cell index
+        !!  @param k Secone-coordinate cell index
+        !!  @param l Thire-coordinate cell index
+    pure subroutine s_preserve_positivity(v_rs_ws, vL_rs_vf, vR_rs_vf)
+
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(IN) :: v_rs_ws
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: vL_rs_vf, vR_rs_vf
+        real(wp) :: theta, thetaK
+
+        integer :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=4,private='[theta]')
+        do l = is3_weno%beg, is3_weno%end
+            do k = is2_weno%beg, is2_weno%end
+                do j = is1_weno%beg, is1_weno%end
+                    ! Positive partial densities
+                    do i = contxb, contxe
+                        #:for state in ['L', 'R']
+                            if (q${STATE}$_rs_vf(j, k, l, i) < min(eps_alpha_rho, v_rs_ws(j, k, l, i))) then
+                                theta = (min(eps_alpha_rho, v_rs_ws(j, k, l, i)) - v_rs_ws(j, k, l, i)) / &
+                                         (v${STATE}$_rs_vf(j, k, l, i) - v_rs_ws(j, k, l, i))
+                                v${STATE}$_rs_vf(j, k, l, i) = (1 - theta) * v_rs_ws(j, k, l, i) + &
+                                                        theta * vL_rs_vf(j, k, l, i)
+                            end if
+                        #:endfor
+                    end do
+
+                    ! Bounded volume fractions
+                    #:for STATE in ['L', 'R']
+                        theta = 1._wp
+                        do i = advxb, advxe
+                            if (q${STATE}$_rs_vf(j, k, l, i) < min(eps_alpha, q_rs_vf(j, k, l, i))) then
+                                thetaK = (min(eps_alpha, v_rs_ws(j, k, l, i)) - v_rs_ws(j, k, l, i)) / &
+                                          (v${STATE}$_rs_vf(j, k, l, i) - v_rs_vf(j, k, l, i))
+                            else
+                                thetaK = 1._wp
+                            endif
+                            theta = min(theta, thetaK)
+                        end do
+
+                        do i = advxb, advxe
+                            v${STATE}$_rs_vf(j, k, l, i) = (1._wp - theta) * v_rs_vf(j, k, l, i) + &
+                                                    theta * v${STATE}$_rs_vf(j, k, l, i)
+                        end do
+                    #:endfor
+                end do
+            end do
+        end do
+
+    end subroutine s_preserve_positivity
 
     !>  The goal of this subroutine is to ensure that the WENO
         !!      reconstruction is monotonic. The latter is achieved by
