@@ -1082,7 +1082,7 @@ contains
 
 #endif
 
-        if (allocated(neighbor_ranks)) deallocate(neighbor_ranks)
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

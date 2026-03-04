@@ -1619,9 +1619,11 @@ contains
             if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                 .and. mtn_pos(k, 1, 2) < x_cb(-1) + intfc_rad(k, 2)) then
                 mtn_pos(k, 1, 2) = x_cb(-1) + intfc_rad(k, 2)
+                mtn_vel(k, 1, 2) = abs(mtn_vel(k, 1, 2))
             elseif (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                     .and. mtn_pos(k, 1, 2) > x_cb(m) - intfc_rad(k, 2)) then
                 mtn_pos(k, 1, 2) = x_cb(m) - intfc_rad(k, 2)
+                mtn_vel(k, 1, 2) = -abs(mtn_vel(k, 1, 2))
             elseif (bc_x%beg == BC_PERIODIC .and. mtn_pos(k, 1, 2) < pcomm_coords(1)%beg .and. &
                     mtn_posPrev(k, 1, 2) >= pcomm_coords(1)%beg) then
                 wrap_bubble_dir(k, 1) = 1
@@ -1639,9 +1641,11 @@ contains
             if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                 .and. mtn_pos(k, 2, 2) < y_cb(-1) + intfc_rad(k, 2)) then
                 mtn_pos(k, 2, 2) = y_cb(-1) + intfc_rad(k, 2)
+                mtn_vel(k, 2, 2) = abs(mtn_vel(k, 2, 2))
             else if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                      .and. mtn_pos(k, 2, 2) > y_cb(n) - intfc_rad(k, 2)) then
                 mtn_pos(k, 2, 2) = y_cb(n) - intfc_rad(k, 2)
+                mtn_vel(k, 2, 2) = -abs(mtn_vel(k, 2, 2))
             elseif (bc_y%beg == BC_PERIODIC .and. mtn_pos(k, 2, 2) < pcomm_coords(2)%beg .and. &
                     mtn_posPrev(k, 2, 2) >= pcomm_coords(2)%beg) then
                 wrap_bubble_dir(k, 2) = 1
@@ -1660,9 +1664,11 @@ contains
                 if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                     .and. mtn_pos(k, 3, 2) < z_cb(-1) + intfc_rad(k, 2)) then
                     mtn_pos(k, 3, 2) = z_cb(-1) + intfc_rad(k, 2)
+                    mtn_vel(k, 3, 2) = abs(mtn_vel(k, 3, 2))
                 else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
                          .and. mtn_pos(k, 3, 2) > z_cb(p) - intfc_rad(k, 2)) then
                     mtn_pos(k, 3, 2) = z_cb(p) - intfc_rad(k, 2)
+                    mtn_vel(k, 3, 2) = -abs(mtn_vel(k, 3, 2))
                 elseif (bc_z%beg == BC_PERIODIC .and. mtn_pos(k, 3, 2) < pcomm_coords(3)%beg .and. &
                         mtn_posPrev(k, 3, 2) >= pcomm_coords(3)%beg) then
                     wrap_bubble_dir(k, 3) = 1

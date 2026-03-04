@@ -706,7 +706,7 @@ contains
 
             if (p_send_counts(dir_x, dir_y, dir_z) >= el_mpi_buff_capacity) then
                 call s_resize_mpi_particle_buffers(max(el_mpi_buff_capacity + 1, &
-                    int(real(el_mpi_buff_capacity, wp)*lag_params%capacity_multiplier)))
+                                                       int(real(el_mpi_buff_capacity, wp)*lag_params%capacity_multiplier)))
             end if
             p_send_ids(dir_x, dir_y, dir_z, p_send_counts(dir_x, dir_y, dir_z)) = particle_id
             p_send_counts(dir_x, dir_y, dir_z) = p_send_counts(dir_x, dir_y, dir_z) + 1
