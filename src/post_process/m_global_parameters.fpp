@@ -1057,7 +1057,10 @@ contains
         end if
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
+
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate(neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

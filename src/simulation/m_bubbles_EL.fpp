@@ -152,31 +152,39 @@ contains
         ! Allocating space for lagrangian variables
         nBubs_glb = lag_params%nBubs_glb
 
-        @:ALLOCATE(bub_R0(1:nBubs_glb))
-        @:ALLOCATE(Rmax_stats(1:nBubs_glb))
-        @:ALLOCATE(Rmin_stats(1:nBubs_glb))
-        @:ALLOCATE(gas_mg(1:nBubs_glb))
-        @:ALLOCATE(gas_betaT(1:nBubs_glb))
-        @:ALLOCATE(gas_betaC(1:nBubs_glb))
-        @:ALLOCATE(bub_dphidt(1:nBubs_glb))
-        @:ALLOCATE(lag_id(1:nBubs_glb, 1:2))
-        @:ALLOCATE(gas_p(1:nBubs_glb, 1:2))
-        @:ALLOCATE(gas_mv(1:nBubs_glb, 1:2))
-        @:ALLOCATE(intfc_rad(1:nBubs_glb, 1:2))
-        @:ALLOCATE(intfc_vel(1:nBubs_glb, 1:2))
-        @:ALLOCATE(mtn_pos(1:nBubs_glb, 1:3, 1:2))
-        @:ALLOCATE(mtn_posPrev(1:nBubs_glb, 1:3, 1:2))
-        @:ALLOCATE(mtn_vel(1:nBubs_glb, 1:3, 1:2))
-        @:ALLOCATE(mtn_s(1:nBubs_glb, 1:3, 1:2))
-        @:ALLOCATE(intfc_draddt(1:nBubs_glb, 1:lag_num_ts))
-        @:ALLOCATE(intfc_dveldt(1:nBubs_glb, 1:lag_num_ts))
-        @:ALLOCATE(gas_dpdt(1:nBubs_glb, 1:lag_num_ts))
-        @:ALLOCATE(gas_dmvdt(1:nBubs_glb, 1:lag_num_ts))
-        @:ALLOCATE(mtn_dposdt(1:nBubs_glb, 1:3, 1:lag_num_ts))
-        @:ALLOCATE(mtn_dveldt(1:nBubs_glb, 1:3, 1:lag_num_ts))
+        ! Compute initial local capacity based on uniform distribution with multiplier
+        if (lag_params%capacity_multiplier > 0._wp) then
+            el_bub_capacity = max(1, int(real(nBubs_glb, wp)/real(max(num_procs, 1), wp) &
+                                         *lag_params%capacity_multiplier))
+        else
+            el_bub_capacity = nBubs_glb
+        end if
 
-        @:ALLOCATE(keep_bubble(1:nBubs_glb))
-        @:ALLOCATE(wrap_bubble_loc(1:nBubs_glb, 1:num_dims), wrap_bubble_dir(1:nBubs_glb, 1:num_dims))
+        @:ALLOCATE(bub_R0(1:el_bub_capacity))
+        @:ALLOCATE(Rmax_stats(1:el_bub_capacity))
+        @:ALLOCATE(Rmin_stats(1:el_bub_capacity))
+        @:ALLOCATE(gas_mg(1:el_bub_capacity))
+        @:ALLOCATE(gas_betaT(1:el_bub_capacity))
+        @:ALLOCATE(gas_betaC(1:el_bub_capacity))
+        @:ALLOCATE(bub_dphidt(1:el_bub_capacity))
+        @:ALLOCATE(lag_id(1:el_bub_capacity, 1:2))
+        @:ALLOCATE(gas_p(1:el_bub_capacity, 1:2))
+        @:ALLOCATE(gas_mv(1:el_bub_capacity, 1:2))
+        @:ALLOCATE(intfc_rad(1:el_bub_capacity, 1:2))
+        @:ALLOCATE(intfc_vel(1:el_bub_capacity, 1:2))
+        @:ALLOCATE(mtn_pos(1:el_bub_capacity, 1:3, 1:2))
+        @:ALLOCATE(mtn_posPrev(1:el_bub_capacity, 1:3, 1:2))
+        @:ALLOCATE(mtn_vel(1:el_bub_capacity, 1:3, 1:2))
+        @:ALLOCATE(mtn_s(1:el_bub_capacity, 1:3, 1:2))
+        @:ALLOCATE(intfc_draddt(1:el_bub_capacity, 1:lag_num_ts))
+        @:ALLOCATE(intfc_dveldt(1:el_bub_capacity, 1:lag_num_ts))
+        @:ALLOCATE(gas_dpdt(1:el_bub_capacity, 1:lag_num_ts))
+        @:ALLOCATE(gas_dmvdt(1:el_bub_capacity, 1:lag_num_ts))
+        @:ALLOCATE(mtn_dposdt(1:el_bub_capacity, 1:3, 1:lag_num_ts))
+        @:ALLOCATE(mtn_dveldt(1:el_bub_capacity, 1:3, 1:lag_num_ts))
+
+        @:ALLOCATE(keep_bubble(1:el_bub_capacity))
+        @:ALLOCATE(wrap_bubble_loc(1:el_bub_capacity, 1:num_dims), wrap_bubble_dir(1:el_bub_capacity, 1:num_dims))
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
@@ -223,11 +231,136 @@ contains
         ! Allocate cell list arrays for atomic-free Gaussian smearing
         @:ALLOCATE(cell_list_start(0:m, 0:n, 0:p))
         @:ALLOCATE(cell_list_count(0:m, 0:n, 0:p))
-        @:ALLOCATE(cell_list_idx(1:lag_params%nBubs_glb))
+        @:ALLOCATE(cell_list_idx(1:el_bub_capacity))
 
         call s_read_input_bubbles(q_cons_vf, bc_type)
 
     end subroutine s_initialize_bubbles_EL_module
+
+    !> @brief Resizes all bubble arrays to a new capacity, preserving existing data.
+        !! Handles GPU memory via GPU_EXIT_DATA/GPU_ENTER_DATA around move_alloc.
+        !! @param new_capacity New allocated capacity for bubble arrays
+    impure subroutine s_resize_el_bubble_arrays(new_capacity)
+
+        integer, intent(in) :: new_capacity
+        integer :: n_copy
+
+        ! Temporaries for each shape category
+        real(wp), allocatable :: tmp_r1(:)
+        real(wp), allocatable :: tmp_r2(:, :)
+        real(wp), allocatable :: tmp_r3(:, :, :)
+        integer, allocatable :: tmp_i1(:)
+        integer, allocatable :: tmp_i2(:, :)
+
+        n_copy = min(n_el_bubs_loc, new_capacity)
+
+        ! 1D real arrays
+        #:for ARR in ['bub_R0', 'Rmax_stats', 'Rmin_stats', 'gas_mg', 'gas_betaT', 'gas_betaC', 'bub_dphidt']
+            $:GPU_EXIT_DATA(delete='[${ARR}$]')
+            allocate (tmp_r1(1:new_capacity))
+            tmp_r1 = 0._wp
+            tmp_r1(1:n_copy) = ${ARR}$ (1:n_copy)
+            deallocate (${ARR}$)
+            call move_alloc(from=tmp_r1, to=${ARR}$)
+            $:GPU_ENTER_DATA(create='[${ARR}$]')
+            $:GPU_UPDATE(device='[${ARR}$]')
+        #:endfor
+
+        ! 1D integer arrays
+        #:for ARR in ['keep_bubble']
+            $:GPU_EXIT_DATA(delete='[${ARR}$]')
+            allocate (tmp_i1(1:new_capacity))
+            tmp_i1 = 0
+            tmp_i1(1:n_copy) = ${ARR}$ (1:n_copy)
+            deallocate (${ARR}$)
+            call move_alloc(from=tmp_i1, to=${ARR}$)
+            $:GPU_ENTER_DATA(create='[${ARR}$]')
+            $:GPU_UPDATE(device='[${ARR}$]')
+        #:endfor
+
+        ! cell_list_idx (1D integer, from m_bubbles_EL_kernels)
+        $:GPU_EXIT_DATA(delete='[cell_list_idx]')
+        allocate (tmp_i1(1:new_capacity))
+        tmp_i1 = 0
+        tmp_i1(1:n_copy) = cell_list_idx(1:n_copy)
+        deallocate (cell_list_idx)
+        call move_alloc(from=tmp_i1, to=cell_list_idx)
+        $:GPU_ENTER_DATA(create='[cell_list_idx]')
+        $:GPU_UPDATE(device='[cell_list_idx]')
+
+        ! 2D integer (cap, 2): lag_id
+        $:GPU_EXIT_DATA(delete='[lag_id]')
+        allocate (tmp_i2(1:new_capacity, 1:2))
+        tmp_i2 = 0
+        tmp_i2(1:n_copy, :) = lag_id(1:n_copy, :)
+        deallocate (lag_id)
+        call move_alloc(from=tmp_i2, to=lag_id)
+        $:GPU_ENTER_DATA(create='[lag_id]')
+        $:GPU_UPDATE(device='[lag_id]')
+
+        ! 2D integer (cap, num_dims): wrap arrays
+        #:for ARR in ['wrap_bubble_loc', 'wrap_bubble_dir']
+            $:GPU_EXIT_DATA(delete='[${ARR}$]')
+            allocate (tmp_i2(1:new_capacity, 1:num_dims))
+            tmp_i2 = 0
+            tmp_i2(1:n_copy, :) = ${ARR}$ (1:n_copy, :)
+            deallocate (${ARR}$)
+            call move_alloc(from=tmp_i2, to=${ARR}$)
+            $:GPU_ENTER_DATA(create='[${ARR}$]')
+            $:GPU_UPDATE(device='[${ARR}$]')
+        #:endfor
+
+        ! 2D real (cap, 2)
+        #:for ARR in ['gas_p', 'gas_mv', 'intfc_rad', 'intfc_vel']
+            $:GPU_EXIT_DATA(delete='[${ARR}$]')
+            allocate (tmp_r2(1:new_capacity, 1:2))
+            tmp_r2 = 0._wp
+            tmp_r2(1:n_copy, :) = ${ARR}$ (1:n_copy, :)
+            deallocate (${ARR}$)
+            call move_alloc(from=tmp_r2, to=${ARR}$)
+            $:GPU_ENTER_DATA(create='[${ARR}$]')
+            $:GPU_UPDATE(device='[${ARR}$]')
+        #:endfor
+
+        ! 2D real (cap, lag_num_ts)
+        #:for ARR in ['intfc_draddt', 'intfc_dveldt', 'gas_dpdt', 'gas_dmvdt']
+            $:GPU_EXIT_DATA(delete='[${ARR}$]')
+            allocate (tmp_r2(1:new_capacity, 1:lag_num_ts))
+            tmp_r2 = 0._wp
+            tmp_r2(1:n_copy, :) = ${ARR}$ (1:n_copy, :)
+            deallocate (${ARR}$)
+            call move_alloc(from=tmp_r2, to=${ARR}$)
+            $:GPU_ENTER_DATA(create='[${ARR}$]')
+            $:GPU_UPDATE(device='[${ARR}$]')
+        #:endfor
+
+        ! 3D real (cap, 3, 2)
+        #:for ARR in ['mtn_pos', 'mtn_posPrev', 'mtn_vel', 'mtn_s']
+            $:GPU_EXIT_DATA(delete='[${ARR}$]')
+            allocate (tmp_r3(1:new_capacity, 1:3, 1:2))
+            tmp_r3 = 0._wp
+            tmp_r3(1:n_copy, :, :) = ${ARR}$ (1:n_copy, :, :)
+            deallocate (${ARR}$)
+            call move_alloc(from=tmp_r3, to=${ARR}$)
+            $:GPU_ENTER_DATA(create='[${ARR}$]')
+            $:GPU_UPDATE(device='[${ARR}$]')
+        #:endfor
+
+        ! 3D real (cap, 3, lag_num_ts)
+        #:for ARR in ['mtn_dposdt', 'mtn_dveldt']
+            $:GPU_EXIT_DATA(delete='[${ARR}$]')
+            allocate (tmp_r3(1:new_capacity, 1:3, 1:lag_num_ts))
+            tmp_r3 = 0._wp
+            tmp_r3(1:n_copy, :, :) = ${ARR}$ (1:n_copy, :, :)
+            deallocate (${ARR}$)
+            call move_alloc(from=tmp_r3, to=${ARR}$)
+            $:GPU_ENTER_DATA(create='[${ARR}$]')
+            $:GPU_UPDATE(device='[${ARR}$]')
+        #:endfor
+
+        el_bub_capacity = new_capacity
+
+    end subroutine s_resize_el_bubble_arrays
 
     !> The purpose of this procedure is to obtain the initial bubbles' information
         !! @param q_cons_vf Conservative variables
@@ -273,6 +406,10 @@ contains
                     end if
                     if (indomain) then
                         bub_id = bub_id + 1
+                        if (bub_id > el_bub_capacity) then
+                            call s_resize_el_bubble_arrays(max(bub_id, &
+                                                               int(real(el_bub_capacity, wp)*lag_params%capacity_multiplier)))
+                        end if
                         call s_add_bubbles(inputBubble, q_cons_vf, bub_id)
                         lag_id(bub_id, 1) = id      !global ID
                         lag_id(bub_id, 2) = bub_id  !local ID
@@ -526,6 +663,11 @@ contains
 
         bub_id = proc_bubble_counts(proc_rank + 1)
 
+        if (bub_id > el_bub_capacity) then
+            call s_resize_el_bubble_arrays(max(bub_id, &
+                                               int(real(el_bub_capacity, wp)*lag_params%capacity_multiplier)))
+        end if
+
         start_idx_part(1) = 0
         do i = 1, proc_rank
             start_idx_part(1) = start_idx_part(1) + proc_bubble_counts(i)
@@ -618,9 +760,7 @@ contains
         !! @param q_prim_vf Primitive variables
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
-#ifdef MFC_OpenMP
-        !DIR$ OPTIMIZE (-O1)
-#endif
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         integer, intent(in) :: stage
@@ -1416,41 +1556,57 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer :: k, i, q
-        integer :: patch_id, newBubs, new_idx
+        integer :: patch_id, newBubs, new_idx, total_incoming, new_cap
         real(wp) :: offset
         integer, dimension(3) :: cell
 
-        call nvtxStartRange("LAG-BC")
-        call nvtxStartRange("LAG-BC-DEV2HOST")
-        $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-            & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
-            & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
-            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, n_el_bubs_loc, &
-            & wrap_bubble_dir, wrap_bubble_loc]')
-        call nvtxEndRange
-
         ! Handle MPI transfer of bubbles going to another processor's local domain
         if (num_procs > 1) then
+            call nvtxStartRange("LAG-BC")
+            call nvtxStartRange("LAG-BC-DEV2HOST")
+            $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+                & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
+                & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
+                & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, n_el_bubs_loc, &
+                & wrap_bubble_dir, wrap_bubble_loc]')
+            call nvtxEndRange
+
             call nvtxStartRange("LAG-BC-TRANSFER-LIST")
             call s_add_particles_to_transfer_list(n_el_bubs_loc, mtn_pos(:, :, 2), mtn_posPrev(:, :, 2))
             call nvtxEndRange
 
+            ! Exchange counts first, then resize if needed before data exchange
+            call s_mpi_exchange_particle_counts(total_incoming)
+
+            if (n_el_bubs_loc + total_incoming > el_bub_capacity) then
+                new_cap = max(n_el_bubs_loc + total_incoming, &
+                              int(real(el_bub_capacity, wp)*lag_params%capacity_multiplier))
+                call s_resize_el_bubble_arrays(new_cap)
+            end if
+
+            ! Resize MPI buffers if needed for this exchange
+            if (total_incoming*p_var_size > p_buff_size) then
+                new_cap = max(total_incoming, &
+                              int(real(el_mpi_buff_capacity, wp)*lag_params%capacity_multiplier))
+                call s_resize_mpi_particle_buffers(new_cap)
+            end if
+
             call nvtxStartRange("LAG-BC-SENDRECV")
-            call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                                          gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-                                          intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-                                          mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_bubs_loc, &
-                                          2)
+            call s_mpi_exchange_particle_data(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+                                              gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
+                                              intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
+                                              mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
+                                              gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_bubs_loc, &
+                                              2)
+            call nvtxEndRange
+
+            call nvtxStartRange("LAG-BC-HOST2DEV")
+            $:GPU_UPDATE(device='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+                & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
+                & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
+                & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, n_el_bubs_loc]')
             call nvtxEndRange
         end if
-
-        call nvtxStartRange("LAG-BC-HOST2DEV")
-        $:GPU_UPDATE(device='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-            & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
-            & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
-            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, n_el_bubs_loc]')
-        call nvtxEndRange
 
         $:GPU_PARALLEL_LOOP(private='[k, cell]')
         do k = 1, n_el_bubs_loc
@@ -2290,6 +2446,9 @@ contains
         @:DEALLOCATE(gas_dmvdt)
         @:DEALLOCATE(mtn_dposdt)
         @:DEALLOCATE(mtn_dveldt)
+
+        @:DEALLOCATE(keep_bubble)
+        @:DEALLOCATE(wrap_bubble_loc, wrap_bubble_dir)
 
         ! Deallocate pressure gradient arrays and FD coefficients
         if (lag_params%vel_model > 0 .and. lag_params%pressure_force) then

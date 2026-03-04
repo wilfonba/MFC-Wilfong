@@ -1082,6 +1082,8 @@ contains
 
 #endif
 
+        if (allocated(neighbor_ranks)) deallocate(neighbor_ranks)
+
     end subroutine s_finalize_global_parameters_module
 
 end module m_global_parameters

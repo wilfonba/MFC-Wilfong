@@ -500,6 +500,8 @@ module m_derived_types
         real(wp) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
         integer :: charNz           !< Number of grid cells in characteristic depth
         real(wp) :: valmaxvoid       !< Maximum void fraction permitted
+        real(wp) :: capacity_multiplier  !< Growth/initial capacity multiplier for dynamic bubble arrays
+        real(wp) :: mpi_buff_fraction    !< MPI buffer capacity as fraction of local bubble capacity
 
     end type bubbles_lagrange_parameters
 

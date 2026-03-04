@@ -96,9 +96,10 @@ contains
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
         nReal = 7 + 16*2 + 10*lag_num_ts
         p_var_size = nReal*real_size + int_size
-        p_buff_size = lag_params%nBubs_glb*p_var_size
+        el_mpi_buff_capacity = max(1, int(real(el_bub_capacity, wp)*lag_params%mpi_buff_fraction))
+        p_buff_size = el_mpi_buff_capacity*p_var_size
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
-        @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:lag_params%nBubs_glb))
+        @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:el_mpi_buff_capacity))
         ! First, collect all neighbor information
         n_neighbors = 0
         do k = nidx(3)%beg, nidx(3)%end
@@ -116,6 +117,35 @@ contains
 #endif
 
     end subroutine s_initialize_particles_mpi
+
+    !> @brief Resizes MPI particle communication buffers to a new capacity.
+        !! Preserves p_send_ids data since this may be called mid-population.
+        !! @param new_bub_count New capacity in number of bubbles
+    subroutine s_resize_mpi_particle_buffers(new_bub_count)
+
+        integer, intent(in) :: new_bub_count
+        integer :: old_cap
+        integer, dimension(:, :, :, :), allocatable :: tmp_ids
+
+#ifdef MFC_MPI
+        old_cap = el_mpi_buff_capacity
+        el_mpi_buff_capacity = new_bub_count
+        p_buff_size = el_mpi_buff_capacity*p_var_size
+
+        @:DEALLOCATE(p_send_buff, p_recv_buff)
+        @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
+
+        ! Preserve existing send IDs
+        allocate (tmp_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, &
+                          nidx(3)%beg:nidx(3)%end, 0:el_mpi_buff_capacity))
+        tmp_ids = 0
+        tmp_ids(:, :, :, 0:min(old_cap, el_mpi_buff_capacity)) = &
+            p_send_ids(:, :, :, 0:min(old_cap, el_mpi_buff_capacity))
+        @:DEALLOCATE(p_send_ids)
+        call move_alloc(from=tmp_ids, to=p_send_ids)
+#endif
+
+    end subroutine s_resize_mpi_particle_buffers
 
     !>  Since only the processor with rank 0 reads and verifies
         !!      the consistency of user inputs, these are initially not
@@ -187,7 +217,7 @@ contains
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in ['epsilonb','charwidth','valmaxvoid']
+            #:for VAR in ['epsilonb','charwidth','valmaxvoid','capacity_multiplier','mpi_buff_fraction']
                 call MPI_BCAST(lag_params%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -674,6 +704,10 @@ contains
 
             integer, intent(in) :: particle_id, dir_x, dir_y, dir_z
 
+            if (p_send_counts(dir_x, dir_y, dir_z) >= el_mpi_buff_capacity) then
+                call s_resize_mpi_particle_buffers(max(el_mpi_buff_capacity + 1, &
+                    int(real(el_mpi_buff_capacity, wp)*lag_params%capacity_multiplier)))
+            end if
             p_send_ids(dir_x, dir_y, dir_z, p_send_counts(dir_x, dir_y, dir_z)) = particle_id
             p_send_counts(dir_x, dir_y, dir_z) = p_send_counts(dir_x, dir_y, dir_z) + 1
 
@@ -681,49 +715,18 @@ contains
 
     end subroutine s_add_particles_to_transfer_list
 
-    !> This subroutine performs the MPI communication for lagrangian particles/
-        !! bubbles.
-        !! @param bub_R0 Initial radius of each bubble
-        !! @param Rmax_stats Maximum radius of each bubble
-        !! @param Rmin_stats Minimum radius of each bubble
-        !! @param gas_mg Mass of gas in each bubble
-        !! @param gas_betaT Heat flux model coefficient for each bubble
-        !! @param gas_betaC mass flux model coefficient for each bubble
-        !! @param bub_dphidt Subgrid velocity potential for each bubble
-        !! @param lag_id Global and local ID of each bubble
-        !! @param gas_p Pressure of the gas in each bubble
-        !! @param gas_mv Mass of vapor in each bubble
-        !! @param rad Radius of each bubble
-        !! @param rvel Radial velocity of each bubble
-        !! @param pos Position of each bubble
-        !! @param posPrev Previous position of each bubble
-        !! @param vel Velocity of each bubble
-        !! @param scoord Cell index in real format of each bubble
-        !! @param drad Radial velocity of each bubble
-        !! @param drvel Radial acceleration of each bubble
-        !! @param dgasp Time derivative of gas pressure in each bubble
-        !! @param dgasmv Time derivative of vapor mass in each bubble
-        !! @param dpos Time derivative of position of each bubble
-        !! @param dvel Time derivative of velocity of each bubble
-        !! @param lag_num_ts Number of stages in time-stepping scheme
-        !! @param nBubs Local number of bubbles
-    impure subroutine s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-                                               gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, rad, &
-                                               rvel, pos, posPrev, vel, scoord, drad, drvel, dgasp, &
-                                               dgasmv, dpos, dvel, lag_num_ts, nbubs, dest)
+    !> @brief Exchanges particle counts with all neighbors via non-blocking MPI.
+        !! Must be called before s_mpi_exchange_particle_data.
+        !! @param total_incoming Total number of particles to be received from all neighbors
+    impure subroutine s_mpi_exchange_particle_counts(total_incoming)
 
-        real(wp), dimension(:) :: bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt
-        integer, dimension(:, :) :: lag_id
-        real(wp), dimension(:, :) :: gas_p, gas_mv, rad, rvel, drad, drvel, dgasp, dgasmv
-        real(wp), dimension(:, :, :) :: pos, posPrev, vel, scoord, dpos, dvel
-        integer :: position, bub_id, lag_num_ts, tag, partner, send_tag, recv_tag, nbubs, p_recv_size, dest
-
-        integer :: i, j, k, l, q, r
-        integer :: req_send, req_recv, ierr !< Generic flag used to identify and report MPI errors
-        integer :: send_count, send_offset, recv_count, recv_offset
+        integer, intent(out) :: total_incoming
+        integer :: i, j, k, l
+        integer :: send_count, recv_count
+        integer :: partner, send_tag, recv_tag
+        integer :: ierr
 
 #ifdef MFC_MPI
-        ! Phase 1: Exchange particle counts using non-blocking communication
         send_count = 0
         recv_count = 0
 
@@ -761,7 +764,38 @@ contains
             call MPI_Waitall(send_count, send_requests(1:send_count), MPI_STATUSES_IGNORE, ierr)
         end if
 
-        ! Phase 2: Exchange particle data using non-blocking communication
+        ! Compute total incoming particles
+        total_incoming = 0
+        do l = 1, n_neighbors
+            i = neighbor_list(l, 1)
+            j = neighbor_list(l, 2)
+            k = neighbor_list(l, 3)
+            total_incoming = total_incoming + p_recv_counts(i, j, k)
+        end do
+#else
+        total_incoming = 0
+#endif
+
+    end subroutine s_mpi_exchange_particle_counts
+
+    !> @brief Exchanges particle data with all neighbors via non-blocking MPI.
+        !! Must be called after s_mpi_exchange_particle_counts.
+    impure subroutine s_mpi_exchange_particle_data(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+                                                   gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, rad, &
+                                                   rvel, pos, posPrev, vel, scoord, drad, drvel, dgasp, &
+                                                   dgasmv, dpos, dvel, lag_num_ts, nbubs, dest)
+
+        real(wp), dimension(:) :: bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt
+        integer, dimension(:, :) :: lag_id
+        real(wp), dimension(:, :) :: gas_p, gas_mv, rad, rvel, drad, drvel, dgasp, dgasmv
+        real(wp), dimension(:, :, :) :: pos, posPrev, vel, scoord, dpos, dvel
+        integer :: position, bub_id, lag_num_ts, partner, send_tag, recv_tag, nbubs, p_recv_size, dest
+
+        integer :: i, j, k, l, q, r
+        integer :: ierr
+        integer :: send_count, send_offset, recv_count, recv_offset
+
+#ifdef MFC_MPI
         send_count = 0
         recv_count = 0
 
@@ -897,7 +931,7 @@ contains
             call s_wrap_particle_positions(pos, posPrev, nbubs, dest)
         end if
 
-    end subroutine s_mpi_sendrecv_particles
+    end subroutine s_mpi_exchange_particle_data
 
     !! This function returns a unique tag for each neighbor based on its position
         !! relative to the current process.
@@ -988,6 +1022,10 @@ contains
 #ifdef MFC_MPI
         if (ib) then
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
+        end if
+        if (bubbles_lagrange .and. num_procs > 1) then
+            @:DEALLOCATE(p_send_buff, p_recv_buff)
+            @:DEALLOCATE(p_send_ids)
         end if
 #endif
 

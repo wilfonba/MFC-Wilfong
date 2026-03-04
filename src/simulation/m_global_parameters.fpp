@@ -538,6 +538,7 @@ module m_global_parameters
     logical :: bubbles_lagrange                         !< Lagrangian subgrid bubble model switch
     type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
     integer :: n_el_bubs_loc, n_el_bubs_glb             !< Number of Lagrangian bubbles (local and global)
+    integer :: el_bub_capacity, el_mpi_buff_capacity   !< Allocated capacity for bubble and MPI buffer arrays
     logical :: moving_lag_bubbles
     logical :: lag_pressure_force
     logical :: lag_gravity_force
@@ -1481,6 +1482,8 @@ contains
 
         if (p == 0) return; 
         @:DEALLOCATE(z_cb, z_cc, dz)
+
+        if (allocated(neighbor_ranks)) deallocate(neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

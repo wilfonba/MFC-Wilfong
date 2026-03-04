@@ -1173,7 +1173,8 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model",
               "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
-    for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
+    for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost",
+              "capacity_multiplier", "mpi_buff_fraction"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
     _r(f"lag_params%input_path", STR, {"bubbles"})
 

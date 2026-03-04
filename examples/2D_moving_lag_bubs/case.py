@@ -181,7 +181,7 @@ data = {
     "bubble_model": 2,  # (0) Particle (2) KM (3) RP
     "thermal": 3,
     "polytropic": "F",
-    "lag_params%nBubs_glb": 5000,  # Max number of bubbles
+    "lag_params%nBubs_glb": 2000,  # Max number of bubbles
     "lag_params%vel_model": 2,
     "lag_params%drag_model": 1,
     "lag_params%solver_approach": 2,
@@ -193,6 +193,8 @@ data = {
     "lag_params%write_bubbles": "T",
     "lag_params%write_bubbles_stats": "F",
     "lag_params%charwidth": cw,
+    "lag_params%capacity_multiplier": 1.25,
+    "lag_params%mpi_buff_fraction": 0.05,
 }
 
 mods = {}
