@@ -1019,17 +1019,17 @@ contains
                         end if
 
                         ! The treatment of void fraction source is unclear
-                        !if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                        !$:GPU_LOOP(parallelism='[seq]')
-                        !do i = 1, advxe - E_idx
-                        !dadv_dt(i) = -L(momxe + i) !+ adv_local(i) * vel(dir_idx(1))/y_cc(n)
-                        !end do
-                        !else
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, advxe - E_idx
-                            dadv_dt(i) = -L(momxe + i)
-                        end do
-                        !end if
+                        if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, advxe - E_idx
+                                dadv_dt(i) = -L(momxe + i) !+ adv_local(i) * vel(dir_idx(1))/y_cc(n)
+                            end do
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, advxe - E_idx
+                                dadv_dt(i) = -L(momxe + i)
+                            end do
+                        end if
 
                         drho_dt = 0._wp; dgamma_dt = 0._wp; dpi_inf_dt = 0._wp; dqv_dt = 0._wp
 
