@@ -40,7 +40,7 @@
   <a href="https://github.com/MFlowCode/homebrew-mfc">
     <img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" alt="Homebrew"/>
   </a>
-  <a href="https://www.youtube.com/@MFCode" target="_blank">
+  <a href="https://www.youtube.com/@MFlowCode" target="_blank">
     <img src="https://img.shields.io/badge/YouTube-MFlowCode-red?logo=youtube&style=flat" alt="YouTube"/>
   </a>
 </p>
@@ -78,6 +78,7 @@ Your first simulation:
 Visualize the output in `examples/3D_shockdroplet/silo_hdf5/` with ParaView, VisIt, or your favorite tool.
 For detailed build instructions (Linux, macOS, Windows/WSL, HPC clusters), see the [Getting Started guide](https://mflowcode.github.io/documentation/getting-started.html).
 
+MFC is developed by the [Computational Physics Group at Georgia Tech](https://comp-physics.group) and collaborators.
 Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
 We have an [active Slack channel](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw) and development team.
 MFC has high- and low-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).

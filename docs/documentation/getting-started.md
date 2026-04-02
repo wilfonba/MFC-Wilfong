@@ -144,7 +144,8 @@ MFC can be built with support for various (compile-time) features:
 | :----------------: | :---------: | :------------: | :-----: | --------------------------------------------------------------- |
 | **MPI**            | `--mpi`     | `--no-mpi`     | On      | Allows MFC to run on multiple processors (and nodes). |
 | **GPU**            | `--gpu`     | `--no-gpu`     | Off     | Enables GPU acceleration via OpenACC or OpenMP offload.         |
-| **Debug**          | `--debug`   | `--no-debug`   | Off     | Requests the compiler build MFC in debug mode.                  |
+| **Debug**          | `--debug`   | `--no-debug`   | Off     | Full debug mode: all runtime checks, minimal optimization.      |
+| **RelDebug**       | `--reldebug`| `--no-reldebug`| Off     | Lightweight debug: key runtime checks, `-Og`/`-O1`. Used by CI.|
 | **GCov**           | `--gcov`    | `--no-gcov`    | Off     | Build MFC with coverage flags on.                              |
 | **Unified Memory** | `--unified` | `--no-unified` | Off     | Build MFC with unified CPU/GPU memory (GH200 superchip only)  |
 | **Single**         | `--single`  | `--no-single`  | Off     | Build MFC in single precision                                   |
@@ -204,6 +205,24 @@ MFC is **unit-agnostic**: the solver performs no internal unit conversions. What
 
 The only requirement is **consistency** — all inputs must use the same unit system. Note that some parameters use **transformed stored forms** rather than standard physical values (e.g., `gamma` expects \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself). See @ref sec-stored-forms for details.
 
+## Visualizing Results
+
+After running post_process, visualize the output directly from the command line:
+
+```shell
+# List available variables
+./mfc.sh viz examples/2D_shockbubble/ --list-vars --step 0
+
+# Render a pressure snapshot
+./mfc.sh viz examples/2D_shockbubble/ --var pres --step 1000
+
+# Generate a video
+./mfc.sh viz examples/2D_shockbubble/ --var pres --step all --mp4
+```
+
+Output images and videos are saved to the `viz/` subdirectory of the case.
+For more options, see @ref visualization "Flow Visualization" or run `./mfc.sh viz -h`.
+
 ## Helpful Tools
 
 ### Parameter Lookup
@@ -241,3 +260,6 @@ autoload -Uz compinit && compinit
 ```
 
 After reloading your shell, press Tab to complete commands and options.
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

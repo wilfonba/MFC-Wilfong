@@ -73,6 +73,14 @@ using 4 cores:
 ./mfc.sh run examples/2D_shockbubble/case.py -t simulation post_process -n 4
 ```
 
+- Visualizing post-processed output:
+
+```shell
+./mfc.sh viz examples/2D_shockbubble/ --var pres --step 1000
+```
+
+See @ref visualization "Flow Visualization" for the full set of visualization options.
+
 ---
 
 ## Running on GPUs
@@ -374,3 +382,6 @@ We have provided an example, `case.py` and `restart_case.py` in `/examples/1D_va
 ./mfc.sh run examples/2D_shockbubble/case.py -e batch \
                -N 2 -n 4 -t simulation -a <redacted> -c summit
 ```
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-14</div>

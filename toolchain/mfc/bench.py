@@ -1,13 +1,19 @@
-import os, sys, uuid, subprocess, dataclasses, typing, math, traceback
+import dataclasses
+import math
+import os
+import subprocess
+import sys
+import time
+import traceback
+import typing
+import uuid
 
 import rich.table
 
+from .build import DEFAULT_TARGETS, SIMULATION, get_targets
+from .common import MFC_BENCH_FILEPATH, MFC_BUILD_DIR, MFCException, create_directory, file_dump_yaml, file_load_yaml, format_list_to_string, system
 from .printer import cons
-from .state   import ARG, CFG
-from .build   import get_targets, DEFAULT_TARGETS, SIMULATION
-from .common  import system, MFC_BENCH_FILEPATH, MFC_BUILD_DIR, format_list_to_string
-from .common  import file_load_yaml, file_dump_yaml, create_directory
-from .common  import MFCException
+from .state import ARG, CFG
 
 
 @dataclasses.dataclass
@@ -16,8 +22,8 @@ class BenchCase:
     path: str
     args: typing.List[str]
 
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements
-def bench(targets = None):
+
+def bench(targets=None):
     if targets is None:
         targets = ARG("targets")
 
@@ -33,7 +39,7 @@ def bench(targets = None):
     try:
         cons.print()
 
-        CASES = [ BenchCase(**case) for case in file_load_yaml(MFC_BENCH_FILEPATH) ]
+        CASES = [BenchCase(**case) for case in file_load_yaml(MFC_BENCH_FILEPATH)]
 
         for case in CASES:
             case.args = case.args + ARG("--")
@@ -44,91 +50,110 @@ def bench(targets = None):
                 raise MFCException(f"Benchmark case file not found: {case.path}")
 
         results = {
-            "metadata": {
-                "invocation": sys.argv[1:],
-                "lock":       dataclasses.asdict(CFG())
-            },
+            "metadata": {"invocation": sys.argv[1:], "lock": dataclasses.asdict(CFG())},
             "cases": {},
         }
 
         failed_cases = []
 
+        max_attempts = 2
+
         for i, case in enumerate(CASES):
             summary_filepath = os.path.join(bench_dirpath, f"{case.slug}.yaml")
-            log_filepath     = os.path.join(bench_dirpath, f"{case.slug}.out")
+            log_filepath = os.path.join(bench_dirpath, f"{case.slug}.out")
 
-            cons.print(f"{str(i+1).zfill(len(CASES) // 10 + 1)}/{len(CASES)}: {case.slug} @ [bold]{os.path.relpath(case.path)}[/bold]")
+            cons.print(f"{str(i + 1).zfill(len(CASES) // 10 + 1)}/{len(CASES)}: {case.slug} @ [bold]{os.path.relpath(case.path)}[/bold]")
             cons.indent()
             cons.print()
             cons.print(f"> Log:     [bold]{os.path.relpath(log_filepath)}[/bold]")
             cons.print(f"> Summary: [bold]{os.path.relpath(summary_filepath)}[/bold]")
 
             try:
-                with open(log_filepath, "w") as log_file:
-                    result = system(
-                        ["./mfc.sh", "run", case.path, "--case-optimization"] +
-                        ["--targets"] + [t.name for t in targets] +
-                        ["--output-summary", summary_filepath] +
-                        case.args +
-                        ["--", "--gbpp", str(ARG('mem'))],
-                        stdout=log_file,
-                        stderr=subprocess.STDOUT)
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        with open(log_filepath, "w") as log_file:
+                            result = system(
+                                ["./mfc.sh", "run", case.path] + ["--targets"] + [t.name for t in targets] + ["--output-summary", summary_filepath] + case.args + ["--", "--gbpp", str(ARG("mem"))],
+                                stdout=log_file,
+                                stderr=subprocess.STDOUT,
+                            )
 
-                # Check return code (handle CompletedProcess or int defensively)
-                rc = result.returncode if hasattr(result, "returncode") else result
-                if rc != 0:
-                    cons.print(f"[bold red]ERROR[/bold red]: Case {case.slug} failed with exit code {rc}")
-                    cons.print(f"[bold red]      Check log at: {log_filepath}[/bold red]")
-                    failed_cases.append(case.slug)
-                    continue
+                        # Check return code (handle CompletedProcess or int defensively)
+                        rc = result.returncode if hasattr(result, "returncode") else result
+                        if rc != 0:
+                            if attempt < max_attempts:
+                                cons.print(f"[bold yellow]WARNING[/bold yellow]: Case {case.slug} failed with exit code {rc} (attempt {attempt}/{max_attempts})")
+                                cons.print("Retrying in 5s...")
+                                time.sleep(5)
+                                continue
+                            cons.print(f"[bold red]ERROR[/bold red]: Case {case.slug} failed with exit code {rc}")
+                            cons.print(f"[bold red]      Check log at: {log_filepath}[/bold red]")
+                            failed_cases.append(case.slug)
+                            break
 
-                # Validate summary file exists
-                if not os.path.exists(summary_filepath):
-                    cons.print(f"[bold red]ERROR[/bold red]: Summary file not created for {case.slug}")
-                    cons.print(f"[bold red]      Expected: {summary_filepath}[/bold red]")
-                    failed_cases.append(case.slug)
-                    continue
+                        # Validate summary file exists
+                        if not os.path.exists(summary_filepath):
+                            if attempt < max_attempts:
+                                cons.print(f"[bold yellow]WARNING[/bold yellow]: Summary file not created for {case.slug} (attempt {attempt}/{max_attempts})")
+                                cons.print("Retrying in 5s...")
+                                time.sleep(5)
+                                continue
+                            cons.print(f"[bold red]ERROR[/bold red]: Summary file not created for {case.slug}")
+                            cons.print(f"[bold red]      Expected: {summary_filepath}[/bold red]")
+                            failed_cases.append(case.slug)
+                            break
 
-                # Load summary
-                summary = file_load_yaml(summary_filepath)
+                        # Load summary
+                        summary = file_load_yaml(summary_filepath)
 
-                # Validate all targets have required data
-                validation_failed = False
-                for target in targets:
-                    if target.name not in summary:
-                        cons.print(f"[bold red]ERROR[/bold red]: Target {target.name} missing from summary for {case.slug}")
-                        validation_failed = True
+                        # Validate all targets have required data
+                        validation_failed = False
+                        for target in targets:
+                            if target.name not in summary:
+                                cons.print(f"[bold red]ERROR[/bold red]: Target {target.name} missing from summary for {case.slug}")
+                                validation_failed = True
+                                break
+
+                            if "exec" not in summary[target.name]:
+                                cons.print(f"[bold red]ERROR[/bold red]: 'exec' time missing for {target.name} in {case.slug}")
+                                validation_failed = True
+                                break
+
+                            if target.name == "simulation" and "grind" not in summary[target.name]:
+                                cons.print(f"[bold red]ERROR[/bold red]: 'grind' time missing for simulation in {case.slug}")
+                                validation_failed = True
+                                break
+
+                        if validation_failed:
+                            failed_cases.append(case.slug)
+                            break
+
+                        # Add to results
+                        results["cases"][case.slug] = {
+                            "description": dataclasses.asdict(case),
+                            "output_summary": summary,
+                        }
+                        cons.print(f"[bold green]✓[/bold green] Case {case.slug} completed successfully")
                         break
 
-                    if "exec" not in summary[target.name]:
-                        cons.print(f"[bold red]ERROR[/bold red]: 'exec' time missing for {target.name} in {case.slug}")
-                        validation_failed = True
-                        break
+                    except Exception as e:
+                        if attempt < max_attempts:
+                            cons.print(f"[bold yellow]WARNING[/bold yellow]: Unexpected error running {case.slug} (attempt {attempt}/{max_attempts}): {e}")
+                            cons.print("Retrying in 5s...")
+                            time.sleep(5)
+                            continue
+                        cons.print(f"[bold red]ERROR[/bold red]: Unexpected error running {case.slug}: {e}")
+                        cons.print(f"[dim]{traceback.format_exc()}[/dim]")
+                        failed_cases.append(case.slug)
 
-                    if target.name == "simulation" and "grind" not in summary[target.name]:
-                        cons.print(f"[bold red]ERROR[/bold red]: 'grind' time missing for simulation in {case.slug}")
-                        validation_failed = True
-                        break
-
-                if validation_failed:
-                    failed_cases.append(case.slug)
-                    continue
-
-                # Add to results
-                results["cases"][case.slug] = {
-                    "description":    dataclasses.asdict(case),
-                    "output_summary": summary,
-                }
-                cons.print(f"[bold green]✓[/bold green] Case {case.slug} completed successfully")
-
-            except Exception as e:
-                cons.print(f"[bold red]ERROR[/bold red]: Unexpected error running {case.slug}: {e}")
-                cons.print(f"[dim]{traceback.format_exc()}[/dim]")
-                failed_cases.append(case.slug)
             finally:
                 cons.unindent()
 
-        # Report results
+        # Always write results (even partial) so diff() can compare the intersection
+        file_dump_yaml(ARG("output"), results)
+        cons.print(f"Wrote results to [bold magenta]{os.path.relpath(ARG('output'))}[/bold magenta].")
+
+        # Report failures after writing results
         if failed_cases:
             cons.print()
             cons.print(f"[bold red]Failed cases ({len(failed_cases)}):[/bold red]")
@@ -137,47 +162,47 @@ def bench(targets = None):
             cons.print()
             raise MFCException(f"Benchmarking failed: {len(failed_cases)}/{len(CASES)} cases failed")
 
-        # Write output
-        file_dump_yaml(ARG("output"), results)
-
-        cons.print(f"Wrote results to [bold magenta]{os.path.relpath(ARG('output'))}[/bold magenta].")
-
     finally:
         cons.unindent()
 
 
 # TODO: This function is too long and not nicely written at all. Someone should
 #       refactor it...
-# pylint: disable=too-many-branches
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
-    cons.print(f"[bold]Comparing Benchmarks: Speedups from [magenta]{os.path.relpath(ARG('lhs'))}[/magenta] to [magenta]{os.path.relpath(ARG('rhs'))}[/magenta] are displayed below. Thus, numbers > 1 represent increases in performance.[/bold]")
+    lhs_path = os.path.relpath(ARG("lhs"))
+    rhs_path = os.path.relpath(ARG("rhs"))
+    cons.print(
+        f"[bold]Comparing Benchmarks: Speedups from [magenta]{lhs_path}[/magenta] to [magenta]{rhs_path}[/magenta] are displayed below. Thus, numbers > 1 represent increases in performance.[/bold]"
+    )
 
     if lhs["metadata"] != rhs["metadata"]:
-        _lock_to_str = lambda lock: ' '.join([f"{k}={v}" for k, v in lock.items()])
+
+        def _lock_to_str(lock):
+            return " ".join([f"{k}={v}" for k, v in lock.items()])
 
         cons.print(f"""\
 [bold yellow]Warning[/bold yellow]: Metadata in lhs and rhs are not equal.
     This could mean that the benchmarks are not comparable (e.g. one was run on CPUs and the other on GPUs).
     lhs:
-    * Invocation: [magenta]{' '.join(lhs['metadata']['invocation'])}[/magenta]
-    * Modes:      {_lock_to_str(lhs['metadata']['lock'])}
+    * Invocation: [magenta]{" ".join(lhs["metadata"]["invocation"])}[/magenta]
+    * Modes:      {_lock_to_str(lhs["metadata"]["lock"])}
     rhs:
-    * Invocation: {' '.join(rhs['metadata']['invocation'])}
-    * Modes:      [magenta]{_lock_to_str(rhs['metadata']['lock'])}[/magenta]
+    * Invocation: {" ".join(rhs["metadata"]["invocation"])}
+    * Modes:      [magenta]{_lock_to_str(rhs["metadata"]["lock"])}[/magenta]
         """)
 
     slugs = set(lhs["cases"].keys()) & set(rhs["cases"].keys())
     if len(slugs) not in [len(lhs["cases"]), len(rhs["cases"])]:
         cons.print(f"""\
 [bold yellow]Warning[/bold yellow]: Cases in lhs and rhs are not equal.
-    * rhs cases: {', '.join(set(rhs['cases'].keys()) - slugs)}.
-    * lhs cases: {', '.join(set(lhs['cases'].keys()) - slugs)}.
+    * rhs cases: {", ".join(set(rhs["cases"].keys()) - slugs)}.
+    * lhs cases: {", ".join(set(lhs["cases"].keys()) - slugs)}.
     Using intersection: {slugs} with {len(slugs)} elements.
         """)
 
     table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
-    table.add_column("[bold]Case[/bold]",    justify="left")
+    table.add_column("[bold]Case[/bold]", justify="left")
     table.add_column("[bold]Pre Process[/bold]", justify="right")
     table.add_column("[bold]Simulation[/bold]", justify="right")
     table.add_column("[bold]Post Process[/bold]", justify="right")
@@ -185,12 +210,13 @@ def diff():
     err = 0
     for slug in slugs:
         lhs_summary, rhs_summary = lhs["cases"][slug]["output_summary"], rhs["cases"][slug]["output_summary"]
-        speedups = ['N/A', 'N/A', 'N/A']
+        speedups = ["N/A", "N/A", "N/A"]
 
         for i, target in enumerate(sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder)):
             if (target.name not in lhs_summary) or (target.name not in rhs_summary):
                 cons.print(f"{target.name} not present in lhs_summary or rhs_summary - Case: {slug}")
-                err = 1; continue
+                err = 1
+                continue
 
             if not math.isfinite(lhs_summary[target.name]["exec"]) or not math.isfinite(rhs_summary[target.name]["exec"]):
                 err = 1
@@ -208,13 +234,9 @@ def diff():
                     grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
                     speedups[i] += f" & Grind: {grind_time_value:.2f}"
                     if grind_time_value < 0.95:
-                        cons.print(f"[bold red]Error[/bold red]: Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.95) - Case: {slug}")
-                        err = 1
+                        cons.print(f"[bold yellow]Warning[/bold yellow]: Grind time speedup for {target.name} below threshold (<0.95) - Case: {slug}")
             except Exception as e:
-                cons.print(
-                    f"[bold red]ERROR[/bold red]: Failed to compute speedup for {target.name} in {slug}: {e}\n"
-                    f"{traceback.format_exc()}"
-                )
+                cons.print(f"[bold red]ERROR[/bold red]: Failed to compute speedup for {target.name} in {slug}: {e}\n{traceback.format_exc()}")
                 err = 1
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)

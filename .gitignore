@@ -22,6 +22,9 @@ __pycache__
 # Auto-generated version file
 toolchain/mfc/_version.py
 
+# Raw coverage cache — legacy, not tracked (the .json.gz version IS committed)
+toolchain/mfc/test/test_coverage_cache.json
+
 # Auto-generated toolchain files (regenerate with: ./mfc.sh generate)
 toolchain/completions/mfc.bash
 toolchain/completions/_mfc
@@ -45,6 +48,11 @@ docs/documentation/*-example.png
 docs/documentation/examples.md
 docs/documentation/case_constraints.md
 docs/documentation/physics_constraints.md
+docs/documentation/architecture.md
+docs/pre_process/readme.md
+docs/simulation/readme.md
+docs/post_process/readme.md
+docs/api/readme.md
 
 examples/*batch/*/
 examples/**/D/*
@@ -101,3 +109,8 @@ benchmarks/*.png
 
 **isolation_rules/
 **.supercode/
+# CCE stress-test log directories (local testing artifacts)
+cce_*/
+cce_*.log
+run_cce_*.sh
+.ffmt_cache/

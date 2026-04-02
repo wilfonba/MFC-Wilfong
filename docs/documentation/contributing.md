@@ -536,6 +536,10 @@ contains
 end module m_my_feature
 ```
 
+**Step 3: Register the module in the architecture docs**
+
+Add your module name to the appropriate category in `docs/module_categories.json`. This ensures it appears on the @ref architecture "Code Architecture" page. The precheck linter will fail if a module is missing from this file.
+
 Key conventions:
 - `private` by default, explicitly `public` for the module API
 - Initialize/finalize subroutines for allocation lifecycle
@@ -711,14 +715,15 @@ Every push to a PR triggers CI. Understanding the pipeline helps you fix failure
 
 ### Lint Gate (runs first, blocks all other jobs)
 
-All four checks must pass before any builds start:
+All five checks must pass before any builds start:
 
 1. **Formatting** — `./mfc.sh format` (auto-handled by pre-commit hook)
 2. **Spelling** — `./mfc.sh spelling`
-3. **Toolchain lint** — `./mfc.sh lint` (Python code quality)
+3. **Toolchain lint** — `./mfc.sh lint` (ruff + Python unit tests)
 4. **Source lint** — checks for:
    - Raw `!$acc` or `!$omp` directives (must use Fypp GPU macros)
    - Double-precision intrinsics (`dsqrt`, `dexp`, `dble`, etc.)
+5. **Doc references** — validates documentation cross-references
 
 ### Build and Test Matrix
 
@@ -767,3 +772,6 @@ If your change touches GPU code (`src/simulation/`), see the GPU checklist in th
 - A maintainer will merge your PR once all reviews are approved and CI is green
 
 If your PR is large or architectural, consider opening an issue first to discuss the approach.
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>
