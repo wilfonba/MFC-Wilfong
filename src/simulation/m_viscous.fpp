@@ -15,7 +15,7 @@ module m_viscous
     use m_finite_differences
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
-        & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module, s_compute_viscous_stress_tensor
+        & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module, s_compute_viscous_stress_tensor, Res_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
@@ -520,7 +520,27 @@ contains
                                                            & buff_size)
                 end if
             end do
-        else  ! Compute velocity gradients at cell centers using central finite differences
+        else  ! Compute velocity gradients at cell faces and centers using finite differences
+            ! The following details the meaning of each gradient variable with relevant simulation dimension and equation numbers
+            ! from Jomela Meng's CalTech thesis available at https://thesis.caltech.edu/9764/ dqL_prim_dx_n(1)%vf(i)%sf(i, j, k) =
+            ! du_i / dx at (i - 1/2, j, k) (eqn. 4.20a) (1D, 2D, 3D) dqR_prim_dx_n(1)%vf(i)%sf(i, j, k) = du_i / dx at (i + 1/2, j,
+            ! k) (eqn. 4.20a) (1D, 2D, 3D)
+
+            ! dqL_prim_dy_n(1)%vf(i)%sf(i, j, k) = du_i / dy at (i - 1/2, j, k) (eqn. 4.21c) (2D, 3D) dqR_prim_dy_n(1)%vf(i)%sf(i,
+            ! j, k) = du_i / dy at (i + 1/2, j, k) (eqn. 4.21c) (2D, 3D) dqL_prim_dy_n(2)%vf(i)%sf(i, j, k) = du_i / dy at (i, j -
+            ! 1/2, k) (eqn. 4.20b) (2D, 3D) dqR_prim_dy_n(2)%vf(i)%sf(i, j, k) = du_i / dy at (i, j + 1/2, k) (eqn. 4.20b) (2D, 3D)
+            ! dqL_prim_dx_n(2)%vf(i)%sf(i, j, k) = du_i / dx at (i, j - 1/2, k) (eqn. 4.21a) (2D, 3D) dqR_prim_dx_n(2)%vf(i)%sf(i,
+            ! j, k) = du_i / dx at (i, j + 1/2, k) (eqn. 4.21a) (2D, 3D)
+
+            ! dqL_prim_dz_n(1)%vf(i)%sf(i, j, k) = du_i / dz at (i - 1/2, j, k) (eqn. 4.21e) (3D) dqR_prim_dz_n(1)%vf(i)%sf(i, j, k)
+            ! = du_i / dz at (i + 1/2, j, k) (eqn. 4.21e) (3D) dqL_prim_dz_n(2)%vf(i)%sf(i, j, k) = du_i / dz at (i, j - 1/2, k)
+            ! (eqn. 4.21f) (3D) dqR_prim_dz_n(2)%vf(i)%sf(i, j, k) = du_i / dz at (i, j + 1/2, k) (eqn. 4.21f) (3D)
+            ! dqL_prim_dz_n(3)%vf(i)%sf(i, j, k) = du_i / dz at (i, j, k - 1/2) (eqn. 4.20c) (3D) dqR_prim_dz_n(3)%vf(i)%sf(i, j, k)
+            ! = du_i / dz at (i, j, k + 1/2) (eqn. 4.20c) (3D) dqL_prim_dy_n(3)%vf(i)%sf(i, j, k) = du_i / dy at (i, j, k - 1/2)
+            ! (eqn. 4.21d) (3D) dqR_prim_dy_n(3)%vf(i)%sf(i, j, k) = du_i / dy at (i, j, k + 1/2) (eqn. 4.21d) (3D)
+            ! dqL_prim_dx_n(3)%vf(i)%sf(i, j, k) = du_i / dx at (i, j, k - 1/2) (eqn. 4.21b) (3D) dqR_prim_dx_n(3)%vf(i)%sf(i, j, k)
+            ! = du_i / dx at (i, j, k + 1/2) (eqn. 4.21b) (3D)
+
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
             $:GPU_UPDATE(device='[iv]')
 
@@ -528,6 +548,7 @@ contains
 
             $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous]')
 
+            ! du_i / dx at (j - 1/2, k, l)
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = iy%beg, iy%end
@@ -542,6 +563,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
+            ! du_i / dx at (j + 1/2, k, l)
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
@@ -558,6 +580,7 @@ contains
 
             if (n > 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                    ! du_i / dy at (k, j - 1/2, l)
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
                         do j = is2_viscous%beg + 1, is2_viscous%end
@@ -572,6 +595,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
+                    ! du_i / dy at (k, j + 1/2, l)
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
                         do j = is2_viscous%beg, is2_viscous%end - 1
@@ -586,6 +610,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
+                    ! du_i / dx at (k, j - 1/2, l)
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
                         do j = is2_viscous%beg + 1, is2_viscous%end
@@ -603,6 +628,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
+                    ! du_i / dx at (k, j + 1/2, l)
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
                         do j = is2_viscous%beg, is2_viscous%end - 1
@@ -620,6 +646,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
+                    ! du_i / dy at (j - 1/2, k, l)
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
                         do k = is2_viscous%beg + 1, is2_viscous%end - 1
@@ -637,6 +664,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
+                    ! du_i / dy at (j + 1/2, k, l)
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
                         do k = is2_viscous%beg + 1, is2_viscous%end - 1
@@ -657,6 +685,7 @@ contains
 
                 if (p > 0) then
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                        ! du_i / dz at (k, l, j - 1/2)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do j = is3_viscous%beg + 1, is3_viscous%end
                             do l = is2_viscous%beg, is2_viscous%end
@@ -671,6 +700,7 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
+                        ! du_i / dz at (k, l, j + 1/2)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do j = is3_viscous%beg, is3_viscous%end - 1
                             do l = is2_viscous%beg, is2_viscous%end
@@ -685,6 +715,7 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
+                        ! du_i / dz at (j - 1/2, k, l)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do l = is3_viscous%beg + 1, is3_viscous%end - 1
                             do k = is2_viscous%beg, is2_viscous%end
@@ -703,6 +734,7 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
+                        ! du_i / dz at (j + 1/2, k, l)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do l = is3_viscous%beg + 1, is3_viscous%end - 1
                             do k = is2_viscous%beg, is2_viscous%end
@@ -721,6 +753,7 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
+                        ! du_i / dz at (k, j - 1/2, l)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do l = is3_viscous%beg + 1, is3_viscous%end - 1
                             do j = is2_viscous%beg + 1, is2_viscous%end
@@ -738,6 +771,7 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
+                        ! du_i / dz at (k, j + 1/2, l)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do l = is3_viscous%beg + 1, is3_viscous%end - 1
                             do j = is2_viscous%beg, is2_viscous%end - 1
@@ -756,6 +790,7 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
+                        ! du_i / dy at (k, k, j - 1/2)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do j = is3_viscous%beg + 1, is3_viscous%end
                             do l = is2_viscous%beg + 1, is2_viscous%end - 1
@@ -773,6 +808,7 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
+                        ! du_i / dy at (k, k, j + 1/2)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do j = is3_viscous%beg, is3_viscous%end - 1
                             do l = is2_viscous%beg + 1, is2_viscous%end - 1
@@ -790,6 +826,8 @@ contains
                             end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
+
+                        ! du_i / dx at (k, k, j - 1/2)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do j = is3_viscous%beg + 1, is3_viscous%end
                             do l = is2_viscous%beg, is2_viscous%end
@@ -806,6 +844,8 @@ contains
                             end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
+
+                        ! du_i / dx at (k, k, j + 1/2)
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do j = is3_viscous%beg, is3_viscous%end - 1
                             do l = is2_viscous%beg, is2_viscous%end
@@ -1152,6 +1192,7 @@ contains
 
         $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous]')
 
+        ! cell-centered derivatives in x direction at interior cells
         $:GPU_PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
@@ -1163,6 +1204,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (n > 0) then
+            ! cell-centered derivatives in y direction at interior cells
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
@@ -1175,6 +1217,7 @@ contains
         end if
 
         if (p > 0) then
+            ! cell cenetered derivatives in z direction at interior cells
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
@@ -1186,6 +1229,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
+        ! one-sided derivatives in the x-direction at buffer x-boundaries
         $:GPU_PARALLEL_LOOP(collapse=2)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -1196,7 +1240,9 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
         if (n > 0) then
+            ! one-sided derivatives in the y-direction at buffer y-boundaries
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1208,6 +1254,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
             if (p > 0) then
+                ! one-sided derivatives in the z-direction at buffer z-boundaries
                 $:GPU_PARALLEL_LOOP(collapse=2)
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1224,6 +1271,7 @@ contains
         end if
 
         if (bc_x%beg <= BC_GHOST_EXTRAP) then
+            ! one-sided derivatives in the x-direction at the left physical x-boundary
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -1233,6 +1281,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
         if (bc_x%end <= BC_GHOST_EXTRAP) then
+            ! one-sided derivatives in the x-direction at the right physical x-boundary
             $:GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -1244,6 +1293,7 @@ contains
         end if
         if (n > 0) then
             if (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_NULL) then
+                ! one-sided derivatives in the y-direction at the left physical y-boundary
                 $:GPU_PARALLEL_LOOP(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1253,6 +1303,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
             if (bc_y%end <= BC_GHOST_EXTRAP) then
+                ! one-sided derivatives in the y-direction at the right physical y-boundary
                 $:GPU_PARALLEL_LOOP(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1264,6 +1315,7 @@ contains
             end if
             if (p > 0) then
                 if (bc_z%beg <= BC_GHOST_EXTRAP) then
+                    ! one-sided derivatives in the z-direction at the left physical z-boundary
                     $:GPU_PARALLEL_LOOP(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1274,6 +1326,7 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
                 if (bc_z%end <= BC_GHOST_EXTRAP) then
+                    ! one-sided derivatives in the z-direction at the right physical z-boundary
                     $:GPU_PARALLEL_LOOP(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end

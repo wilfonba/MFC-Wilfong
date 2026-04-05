@@ -116,7 +116,6 @@ contains
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, dvelR_dy_vf, &
-
         & dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_vels), intent(in) :: velL_vf, velR_vf, dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, &
@@ -4115,7 +4114,6 @@ contains
 
     !> Compute cylindrical viscous source flux contributions for momentum and energy
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-
         & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_dims), intent(in)    :: velL_vf, velR_vf
@@ -4166,7 +4164,7 @@ contains
                     idx_rp(norm_dir) = idx_rp(norm_dir) + 1
 
                     ! Average velocities and their derivatives at the interface For cylindrical: x-dir ~ axial (z_cyl), y-dir ~
-                    ! radial (r_cyl), z-dir ~ azimuthal (theta_cyl)
+                    ! radial (r_cyl), z-dir ~ azimuthal (theta_cyl). Eqn. 4.19 from Jomela Meng's CalTech thesis
                     $:GPU_LOOP(parallelism='[seq]')
                     do i_vel = 1, num_dims
                         avg_v_int(i_vel) = 0.5_wp*(velL_vf(i_vel)%sf(j, k, l) + velR_vf(i_vel)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
@@ -4236,20 +4234,15 @@ contains
                                 #:endif
                             end if
                         case (2)  ! Y-face (radial normal, r_cyl)
-                            if (num_dims > 1) then
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                                    stress_vector_shear(1) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
-                                    stress_vector_shear(2) = (2.0_wp*avg_dvdy_int(2))/Re_s + div_v_term_const
-                                    if (num_dims > 2) then
-                                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                                            stress_vector_shear(3) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3) &
-                                                                & )/Re_s
-                                        #:endif
-                                    end if
-                                #:endif
-                            else
-                                stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
-                            end if
+                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                                stress_vector_shear(1) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
+                                stress_vector_shear(2) = (2.0_wp*avg_dvdy_int(2))/Re_s + div_v_term_const
+                                if (num_dims > 2) then
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                        stress_vector_shear(3) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
+                                    #:endif
+                                end if
+                            #:endif
                         case (3)  ! Z-face (azimuthal normal, theta_cyl)
                             if (num_dims > 2) then
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2

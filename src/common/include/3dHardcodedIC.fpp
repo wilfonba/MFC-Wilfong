@@ -168,7 +168,6 @@
         end if
 
         q_prim_vf(E_idx)%sf(i, j, k) = p_th*rcut*xcut + p_am
-
     case (304)
         lam = 1.0_wp
         eps = 1.0e-8_wp
@@ -177,25 +176,24 @@
         if (x_cc(i) <= 0.7_wp*lam) then
             d = x_cc(i) - lam*(0.4_wp - 0.1_wp*sin(2.0_wp*pi*(y_cc(j)/lam - 0.25_wp/lam)))
             fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx*dy))))
-            q_prim_vf(advxb)%sf(i, j, k) = eps + (1.0_wp - 2.0_wp*eps) * fsm
+            q_prim_vf(advxb)%sf(i, j, k) = eps + (1.0_wp - 2.0_wp*eps)*fsm
             q_prim_vf(advxe)%sf(i, j, k) = 1._wp - q_prim_vf(advxb)%sf(i, j, k)
             q_prim_vf(contxb)%sf(i, j, k) = q_prim_vf(advxb)%sf(i, j, k)*1.0_wp
             q_prim_vf(contxe)%sf(i, j, k) = q_prim_vf(advxe)%sf(i, j, k)*5.04_wp
-            q_prim_vf(E_idx)%sf(i, j, k) = 1._wp / 1.4_wp
+            q_prim_vf(E_idx)%sf(i, j, k) = 1._wp/1.4_wp
             q_prim_vf(momxb)%sf(i, j, k) = 1.24_wp
-            q_prim_vf(momxb+1)%sf(i, j, k) = 0._wp
+            q_prim_vf(momxb + 1)%sf(i, j, k) = 0._wp
             q_prim_vf(momxe)%sf(i, j, k) = 0._wp
         else
             q_prim_vf(advxb)%sf(i, j, k) = 1._wp - eps
             q_prim_vf(advxe)%sf(i, j, k) = 1._wp - q_prim_vf(advxb)%sf(i, j, k)
             q_prim_vf(contxb)%sf(i, j, k) = q_prim_vf(advxb)%sf(i, j, k)*1.4112
             q_prim_vf(contxe)%sf(i, j, k) = q_prim_vf(advxe)%sf(i, j, k)*5.04_wp
-            q_prim_vf(E_idx)%sf(i, j, k) = 1.6272_wp / 1.4_wp
+            q_prim_vf(E_idx)%sf(i, j, k) = 1.6272_wp/1.4_wp
             q_prim_vf(momxb)%sf(i, j, k) = 0.8787_wp
-            q_prim_vf(momxb+1)%sf(i, j, k) = 0._wp
+            q_prim_vf(momxb + 1)%sf(i, j, k) = 0._wp
             q_prim_vf(momxe)%sf(i, j, k) = 0._wp
         end if
-
     case (370)  ! 3D extrusion of 2D profile from external data
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
