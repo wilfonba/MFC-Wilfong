@@ -1102,6 +1102,8 @@ contains
                             call s_color_function_periodic(c_divs, 2, -1, k, l)
                         case (BC_REFLECTIVE)
                             call s_color_function_reflective(c_divs, 2, -1, k, l)
+                        case (BC_AXIS)
+                            call s_color_function_axis(c_divs, k, l)
                         case default
                             call s_color_function_ghost_cell_extrapolation(c_divs, 2, -1, k, l)
                         end select
@@ -1308,6 +1310,31 @@ contains
         end if
 
     end subroutine s_color_function_reflective
+
+    subroutine s_color_function_axis(c_divs, k, l)
+
+        $:GPU_ROUTINE(function_name='s_color_function_axis', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
+        integer, intent(in)                                        :: k, l
+        integer                                                    :: j, i
+
+        do j = 1, buff_size
+            if (z_cc(l) < pi) then
+                c_divs(1)%sf(k, -j, l) = c_divs(1)%sf(k, j - 1, l + ((p + 1)/2))
+                do i = 2, num_dims
+                    c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, j - 1, l + ((p + 1)/2))
+                end do
+                c_divs(num_dims + 1)%sf(k, -j, l) = c_divs(num_dims + 1)%sf(k, j - 1, l + ((p + 1)/2))
+            else
+                c_divs(1)%sf(k, -j, l) = c_divs(1)%sf(k, j - 1, l - ((p + 1)/2))
+                do i = 2, num_dims
+                    c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, j - 1, l - ((p + 1)/2))
+                end do
+                c_divs(num_dims + 1)%sf(k, -j, l) = c_divs(num_dims + 1)%sf(k, j - 1, l - ((p + 1)/2))
+            end if
+        end do
+
+    end subroutine s_color_function_axis
 
     !> Extrapolate the color function and its divergence into ghost cells by copying boundary values.
     subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)

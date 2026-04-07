@@ -253,16 +253,29 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (p > 0) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(c_idx)%sf(j, k, &
-                               & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
+            if (cyl_coord) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            c_divs(3)%sf(j, k, l) = 1._wp/((z_cc(l + 1) - z_cc(l - 1)) * y_cc(k))*(q_prim_vf(c_idx)%sf(j, k, &
+                                   & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
+                        end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            else
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(c_idx)%sf(j, k, &
+                                   & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end if
 
         $:GPU_PARALLEL_LOOP(collapse=3)

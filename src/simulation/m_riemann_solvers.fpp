@@ -3238,10 +3238,10 @@ contains
                                                                & + s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + (1._wp &
                                                                & - dir_flg(dir_idx(1)))*vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
                                         ! Geometrical source of the void fraction(s) is zero
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = advxb, advxe
-                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
-                                        end do
+                                        !$:GPU_LOOP(parallelism='[seq]')
+                                        !do i = advxb, advxe
+                                            !flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                        !end do
                                     end if
                                 #:endif
                                 #:if (NORM_DIR == 3)
@@ -4196,7 +4196,13 @@ contains
                         Re_s = Re_avg_rsy_vf(k, j, l, 1)
                         Re_b = Re_avg_rsy_vf(k, j, l, 2)
                         vel_src_int = vel_src_rsy_vf(k, j, l,1:num_dims)
-                        r_eff = y_cb(k)
+                        ! HACK: snap r_eff from the physical face position y_cb(k) to the
+                        ! cell-centered y_cc(k) so that the u_r/r_eff and du_theta/d_theta/r_eff
+                        ! contributions to divergence_cyl on r-faces line up with the theta-face
+                        ! values used in s_compute_additional_physics_rhs's metric coupling.
+                        ! Physically inconsistent (the r-face is not at y_cc(k)), but intended to
+                        ! improve the tau_rr vs tau_theta_theta cancellation for quasi-1D flows.
+                        r_eff = y_cc(k)
                     case (3)  ! z-face (azimuthal face in theta_cyl direction)
                         Re_s = Re_avg_rsz_vf(l, k, j, 1)
                         Re_b = Re_avg_rsz_vf(l, k, j, 2)
