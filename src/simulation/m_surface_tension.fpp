@@ -85,8 +85,9 @@ contains
         real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(wp) :: normWL, normWR, normW
         integer  :: j, k, l, i
-        integer  :: isxb, isxe, isyb, isye, iszb, isze  !< Plain-integer copies of bounds to avoid
-        !! OpenACC/OpenMP capture pitfalls with derived-type arguments under default(present).
+        !> Plain-integer copies of bounds to avoid OpenACC/OpenMP capture pitfalls with derived-type arguments under
+        !! default(present).
+        integer :: isxb, isxe, isyb, isye, iszb, isze
 
         isxb = isx%beg; isxe = isx%end
         isyb = isy%beg; isye = isy%end
@@ -264,7 +265,7 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            c_divs(3)%sf(j, k, l) = 1._wp/((z_cc(l + 1) - z_cc(l - 1)) * y_cc(k))*(q_prim_vf(c_idx)%sf(j, k, &
+                            c_divs(3)%sf(j, k, l) = 1._wp/((z_cc(l + 1) - z_cc(l - 1))*y_cc(k))*(q_prim_vf(c_idx)%sf(j, k, &
                                    & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
                         end do
                     end do

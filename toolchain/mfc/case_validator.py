@@ -426,8 +426,8 @@ class CaseValidator:
 
             # 3D cylindrical
             # if p is not None and p > 0:
-                # self.prohibit(bc_z_beg is not None and bc_z_beg not in [-1, -2], "bc_z%beg must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
-                # self.prohibit(bc_z_end is not None and bc_z_end not in [-1, -2], "bc_z%end must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
+            # self.prohibit(bc_z_beg is not None and bc_z_beg not in [-1, -2], "bc_z%beg must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
+            # self.prohibit(bc_z_end is not None and bc_z_end not in [-1, -2], "bc_z%end must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
 
     def check_bubbles_euler(self):
         """Checks constraints on bubble parameters"""

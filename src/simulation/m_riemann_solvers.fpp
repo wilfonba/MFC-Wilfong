@@ -3239,9 +3239,8 @@ contains
                                                                & - dir_flg(dir_idx(1)))*vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
                                         ! Geometrical source of the void fraction(s) is zero
                                         !$:GPU_LOOP(parallelism='[seq]')
-                                        !do i = advxb, advxe
-                                            !flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
-                                        !end do
+                                        ! do i = advxb, advxe flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i) end
+                                        ! do
                                     end if
                                 #:endif
                                 #:if (NORM_DIR == 3)
@@ -4153,8 +4152,9 @@ contains
         integer  :: j, k, l  !< Loop iterators for \f$x, y, z\f$ grid directions.
         integer  :: i_vel  !< Loop iterator for velocity components.
         integer  :: idx_rp(3)  !< Indices \f$(j,k,l)\f$ of 'right' point for averaging.
-        integer  :: ixb, ixe, iyb, iye, izb, ize  !< Plain-integer copies of bounds to avoid
-        !! OpenACC/OpenMP capture pitfalls with derived-type arguments under default(present).
+        !> Plain-integer copies of bounds to avoid OpenACC/OpenMP capture pitfalls with derived-type arguments under
+        !! default(present).
+        integer :: ixb, ixe, iyb, iye, izb, ize
 
         ixb = ix%beg; ixe = ix%end
         iyb = iy%beg; iye = iy%end
