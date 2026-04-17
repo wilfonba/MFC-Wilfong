@@ -85,12 +85,18 @@ contains
         real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(wp) :: normWL, normWR, normW
         integer  :: j, k, l, i
+        integer  :: isxb, isxe, isyb, isye, iszb, isze  !< Plain-integer copies of bounds to avoid
+        !! OpenACC/OpenMP capture pitfalls with derived-type arguments under default(present).
+
+        isxb = isx%beg; isxe = isx%end
+        isyb = isy%beg; isye = isy%end
+        iszb = isz%beg; isze = isz%end
 
         if (id == 1) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
-            do l = isz%beg, isz%end
-                do k = isy%beg, isy%end
-                    do j = isx%beg, isx%end
+            do l = iszb, isze
+                do k = isyb, isye
+                    do j = isxb, isxe
                         w1L = gL_x(j, k, l, 1)
                         w2L = gL_x(j, k, l, 2)
                         w3L = 0._wp
@@ -130,9 +136,9 @@ contains
         else if (id == 2) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
+                do l = iszb, isze
+                    do k = isyb, isye
+                        do j = isxb, isxe
                             w1L = gL_y(k, j, l, 1)
                             w2L = gL_y(k, j, l, 2)
                             w3L = 0._wp
@@ -172,9 +178,9 @@ contains
         else if (id == 3) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
+                do l = iszb, isze
+                    do k = isyb, isye
+                        do j = isxb, isxe
                             w1L = gL_z(l, k, j, 1)
                             w2L = gL_z(l, k, j, 2)
                             w3L = 0._wp

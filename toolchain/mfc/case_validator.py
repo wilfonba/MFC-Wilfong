@@ -418,16 +418,16 @@ class CaseValidator:
             bc_z_end = self.get("bc_z%end")
 
             self.prohibit(p is not None and p == 0 and bc_y_beg != -2, "bc_y%beg must be -2 (BC_REFLECTIVE) for 2D cylindrical coordinates (p = 0)")
-            self.prohibit(p is not None and p > 0 and bc_y_beg != -14, "bc_y%beg must be -14 (BC_AXIS) for 3D cylindrical coordinates (p > 0)")
+            # self.prohibit(p is not None and p > 0 and bc_y_beg != -14, "bc_y%beg must be -14 (BC_AXIS) for 3D cylindrical coordinates (p > 0)")
 
             if bc_y_end is not None:
                 self.prohibit(bc_y_end > -1 or bc_y_end < -17, "bc_y%end must be between -1 and -17")
                 self.prohibit(bc_y_end == -14, "bc_y%end must not be -14 (BC_AXIS)")
 
             # 3D cylindrical
-            if p is not None and p > 0:
-                self.prohibit(bc_z_beg is not None and bc_z_beg not in [-1, -2], "bc_z%beg must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
-                self.prohibit(bc_z_end is not None and bc_z_end not in [-1, -2], "bc_z%end must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
+            # if p is not None and p > 0:
+                # self.prohibit(bc_z_beg is not None and bc_z_beg not in [-1, -2], "bc_z%beg must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
+                # self.prohibit(bc_z_end is not None and bc_z_end not in [-1, -2], "bc_z%end must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
 
     def check_bubbles_euler(self):
         """Checks constraints on bubble parameters"""

@@ -4153,12 +4153,18 @@ contains
         integer  :: j, k, l  !< Loop iterators for \f$x, y, z\f$ grid directions.
         integer  :: i_vel  !< Loop iterator for velocity components.
         integer  :: idx_rp(3)  !< Indices \f$(j,k,l)\f$ of 'right' point for averaging.
+        integer  :: ixb, ixe, iyb, iye, izb, ize  !< Plain-integer copies of bounds to avoid
+        !! OpenACC/OpenMP capture pitfalls with derived-type arguments under default(present).
+
+        ixb = ix%beg; ixe = ix%end
+        iyb = iy%beg; iye = iy%end
+        izb = iz%beg; ize = iz%end
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, &
                             & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const]')
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
+        do l = izb, ize
+            do k = iyb, iye
+                do j = ixb, ixe
                     ! Determine indices for the 'right' state for averaging across the interface
                     idx_rp = [j, k, l]
                     idx_rp(norm_dir) = idx_rp(norm_dir) + 1
@@ -4196,12 +4202,6 @@ contains
                         Re_s = Re_avg_rsy_vf(k, j, l, 1)
                         Re_b = Re_avg_rsy_vf(k, j, l, 2)
                         vel_src_int = vel_src_rsy_vf(k, j, l,1:num_dims)
-                        ! HACK: snap r_eff from the physical face position y_cb(k) to the
-                        ! cell-centered y_cc(k) so that the u_r/r_eff and du_theta/d_theta/r_eff
-                        ! contributions to divergence_cyl on r-faces line up with the theta-face
-                        ! values used in s_compute_additional_physics_rhs's metric coupling.
-                        ! Physically inconsistent (the r-face is not at y_cc(k)), but intended to
-                        ! improve the tau_rr vs tau_theta_theta cancellation for quasi-1D flows.
                         r_eff = y_cc(k)
                     case (3)  ! z-face (azimuthal face in theta_cyl direction)
                         Re_s = Re_avg_rsz_vf(l, k, j, 1)

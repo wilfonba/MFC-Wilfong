@@ -1069,8 +1069,7 @@ contains
                                 velocity_val = q_prim_vf%vf(contxe + idir)%sf(l, q, k)
                                 flux_face1 = flux_n(3)%vf(j)%sf(l, q, k - 1)
                                 flux_face2 = flux_n(3)%vf(j)%sf(l, q, k)
-                                !rhs_vf(j)%sf(l, q, k) = rhs_vf(j)%sf(l, q, k) + inv_ds*velocity_val*(flux_face1 - flux_face2)
-                                rhs_vf(j)%sf(l, q, k) = rhs_vf(j)%sf(l, q, k) + inv_ds*(flux_face1 - flux_face2)
+                                rhs_vf(j)%sf(l, q, k) = rhs_vf(j)%sf(l, q, k) + inv_ds*velocity_val*(flux_face1 - flux_face2)
                             end do
                         end do
                     end do
@@ -1564,9 +1563,15 @@ contains
                     ! Diffusive geometric sources
                     ! momxb+1 (y in MFC, r in normal coordinates) -= 1/r * (tau_thetatheta)
                     ! momxe (z in MFC, theta in normal coordinates) += 1/r * (tau_rtheta)
+                    ! NOTE: k starts at 0 so the theta-direction geometric coupling
+                    ! (-tau_theta_theta/r in r-momentum, +tau_r_theta/r in theta-momentum)
+                    ! is applied at the first radial cell too. The axis-treatment path
+                    ! above handles the r-direction divergence at k=0, but not this
+                    ! theta-direction coupling.
+                    ! Diffusive geometric sources (original form)
                     $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                     do l = 0, p
-                        do k = 1, n
+                        do k = 0, n
                             do j = 0, m
                                 rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + 5.e-1_wp/y_cc(k)*(flux_src_n_in(momxe)%sf(j, &
                                        & k, l - 1) + flux_src_n_in(momxe)%sf(j, k, l))

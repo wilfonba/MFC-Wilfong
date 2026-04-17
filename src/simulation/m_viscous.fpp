@@ -551,7 +551,7 @@ contains
             ! du_i / dx at (j - 1/2, k, l)
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
-                do k = iy%beg, iy%end
+                do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg + 1, is1_viscous%end
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
