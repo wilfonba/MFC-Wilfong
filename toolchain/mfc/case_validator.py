@@ -414,8 +414,8 @@ class CaseValidator:
             self.prohibit(n is not None and n == 0, "n must be positive (2D or 3D) for cylindrical coordinates")
             bc_y_beg = self.get("bc_y%beg")
             bc_y_end = self.get("bc_y%end")
-            bc_z_beg = self.get("bc_z%beg")
-            bc_z_end = self.get("bc_z%end")
+            # bc_z_beg = self.get("bc_z%beg")
+            # bc_z_end = self.get("bc_z%end")
 
             self.prohibit(p is not None and p == 0 and bc_y_beg != -2, "bc_y%beg must be -2 (BC_REFLECTIVE) for 2D cylindrical coordinates (p = 0)")
             # self.prohibit(p is not None and p > 0 and bc_y_beg != -14, "bc_y%beg must be -14 (BC_AXIS) for 3D cylindrical coordinates (p > 0)")

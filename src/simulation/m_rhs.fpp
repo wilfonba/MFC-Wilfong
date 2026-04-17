@@ -667,7 +667,7 @@ contains
                     end if
                 else
                     if (.not. viscous) then
-                        iv%beg = 1; iv%end = eqn_idx%eqn_idx%E - 1
+                        iv%beg = 1; iv%end = eqn_idx%E - 1
                         call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                                                 & qR_rsx_vf, qR_rsy_vf, qR_rsz_vf, id)
 
@@ -1368,8 +1368,9 @@ contains
                                        & l) - flux_src_n_in(i)%sf(j, k, l))
                             end do
                             if (surface_tension) then
-                                rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, l) + 1._wp/dx(j)*q_prim_vf(eqn_idx%c)%sf(j, k, &
-                                       & l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j - 1, k, l))
+                                rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
+                                       & l) + 1._wp/dx(j)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, &
+                                       & k, l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j - 1, k, l))
                             end if
                         end do
                     end do
@@ -1383,13 +1384,14 @@ contains
                     do k = 0, n
                         do j = 0, m
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i = chemxb, chemxe
+                            do i = eqn_idx%species%beg, eqn_idx%species%end
                                 rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)*(flux_src_n_in(i)%sf(j - 1, k, &
                                        & l) - flux_src_n_in(i)%sf(j, k, l))
                             end do
                             if (.not. viscous) then
                                 rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
-                                       & l) + 1._wp/dx(j)*(flux_src_n_in(eqn_idx%E)%sf(j - 1, k, l) - flux_src_n_in(eqn_idx%E)%sf(j, k, l))
+                                       & l) + 1._wp/dx(j)*(flux_src_n_in(eqn_idx%E)%sf(j - 1, k, &
+                                       & l) - flux_src_n_in(eqn_idx%E)%sf(j, k, l))
                             end if
                         end do
                     end do
@@ -1398,13 +1400,13 @@ contains
         else if (idir == 2) then
             if (cyl_coord) then
                 if (viscous .or. dummy) then
-                    call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
-                        & dq_prim_dy_vf(mom_idx%beg:mom_idx%end), dq_prim_dz_vf(mom_idx%beg:mom_idx%end), tau_Re_vf, idwbuff(1), &
-                        & idwbuff(2), idwbuff(3))
+                    call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, dq_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                        & dq_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), dq_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                        & tau_Re_vf, idwbuff(1), idwbuff(2), idwbuff(3))
 
-                    ! Axis diffusive flux eqn_idx%mom%beg (x in MFC, z in normal coordinates) += div(tau_rz) eqn_idx%mom%beg+1 (y in MFC, r in normal
-                    ! coordinates) += div(tau_rr) eqn_idx%mom%beg+2 (z in MFC, theta in normal coordinates) += div(tau_rtheta) eqn_idx%E += u_z *
-                    ! tau_rz + u_r * tau_rr + u_theta * tau_rtheta
+                    ! Axis diffusive flux eqn_idx%mom%beg (x in MFC, z in normal coordinates) += div(tau_rz) eqn_idx%mom%beg+1 (y in
+                    ! MFC, r in normal coordinates) += div(tau_rr) eqn_idx%mom%beg+2 (z in MFC, theta in normal coordinates) +=
+                    ! div(tau_rtheta) eqn_idx%E += u_z * tau_rz + u_r * tau_rr + u_theta * tau_rtheta
                     $:GPU_PARALLEL_LOOP(private='[i, j, l]', collapse=2)
                     do l = 0, p
                         do j = 0, m
@@ -1417,9 +1419,9 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    ! Axis diffusive geometric source eqn_idx%mom%beg (x in MFC, z in normal coordinates) += 1/r * (tau_rz) eqn_idx%mom%beg+1 (y in MFC,
-                    ! r in normal coordinates) += 1/r * (tau_rr) eqn_idx%mom%beg+2 (z in MFC, theta in normal coordinates) += 1/r *
-                    ! (tau_rtheta) eqn_idx%E += (u_z * tau_rz + u_r * tau_rr + u_theta * tau_rtheta)/r
+                    ! Axis diffusive geometric source eqn_idx%mom%beg (x in MFC, z in normal coordinates) += 1/r * (tau_rz)
+                    ! eqn_idx%mom%beg+1 (y in MFC, r in normal coordinates) += 1/r * (tau_rr) eqn_idx%mom%beg+2 (z in MFC, theta in
+                    ! normal coordinates) += 1/r * (tau_rtheta) eqn_idx%E += (u_z * tau_rz + u_r * tau_rr + u_theta * tau_rtheta)/r
                     $:GPU_PARALLEL_LOOP(private='[i, j, l]', collapse=2)
                     do l = 0, p
                         do j = 0, m
@@ -1431,9 +1433,9 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    ! Interior diffusive fluxes eqn_idx%mom%beg (x in MFC, z in normal coordinates) += div(tau_rz) eqn_idx%mom%beg+1 (y in MFC, r in
-                    ! normal coordinates) += div(tau_rr) eqn_idx%mom%beg+2 (z in MFC, theta in normal coordinates) += div(tau_rtheta) eqn_idx%E +=
-                    ! u_z * tau_rz + u_r * tau_rr + u_theta * tau_rtheta
+                    ! Interior diffusive fluxes eqn_idx%mom%beg (x in MFC, z in normal coordinates) += div(tau_rz) eqn_idx%mom%beg+1
+                    ! (y in MFC, r in normal coordinates) += div(tau_rr) eqn_idx%mom%beg+2 (z in MFC, theta in normal coordinates)
+                    ! += div(tau_rtheta) eqn_idx%E += u_z * tau_rz + u_r * tau_rr + u_theta * tau_rtheta
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p
                         do k = 1, n
@@ -1448,9 +1450,9 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    ! Interior diffusive geometric source eqn_idx%mom%beg (x in MFC, z in normal coordinates) += 1/r * (tau_rz) eqn_idx%mom%beg+1 (y in
-                    ! MFC, r in normal coordinates) += 1/r * (tau_rr) eqn_idx%mom%beg+2 (z in MFC, theta in normal coordinates) += 1/r *
-                    ! (tau_rtheta) eqn_idx%E += (u_z * tau_rz + u_r * tau_rr + u_theta * tau_rtheta)/r
+                    ! Interior diffusive geometric source eqn_idx%mom%beg (x in MFC, z in normal coordinates) += 1/r * (tau_rz)
+                    ! eqn_idx%mom%beg+1 (y in MFC, r in normal coordinates) += 1/r * (tau_rr) eqn_idx%mom%beg+2 (z in MFC, theta in
+                    ! normal coordinates) += 1/r * (tau_rtheta) eqn_idx%E += (u_z * tau_rz + u_r * tau_rr + u_theta * tau_rtheta)/r
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p
                         do k = 1, n
@@ -1477,8 +1479,10 @@ contains
                                            & l) - flux_src_n_in(i)%sf(j, k, l))
                                 end do
                                 if (surface_tension) then
-                                    rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, l) + 1._wp/dy(k)*q_prim_vf(eqn_idx%c)%sf(j, k, &
-                                           & l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k - 1, l))
+                                    rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
+                                           & l) + 1._wp/dy(k)*q_prim_vf(eqn_idx%c)%sf(j, k, &
+                                           & l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
+                                           & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k - 1, l))
                                 end if
                             end do
                         end do
@@ -1492,14 +1496,14 @@ contains
                         do k = 0, n
                             do j = 0, m
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do i = chemxb, chemxe
+                                do i = eqn_idx%species%beg, eqn_idx%species%end
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)*(flux_src_n_in(i)%sf(j, k - 1, &
                                            & l) - flux_src_n_in(i)%sf(j, k, l))
                                 end do
                                 if (.not. viscous) then
                                     rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
-                                           & l) + 1._wp/dy(k)*(flux_src_n_in(eqn_idx%E)%sf(j, k - 1, l) - flux_src_n_in(eqn_idx%E)%sf(j, &
-                                           & k, l))
+                                           & l) + 1._wp/dy(k)*(flux_src_n_in(eqn_idx%E)%sf(j, k - 1, &
+                                           & l) - flux_src_n_in(eqn_idx%E)%sf(j, k, l))
                                 end if
                             end do
                         end do
@@ -1510,9 +1514,10 @@ contains
         else if (idir == 3) then
             if (cyl_coord) then
                 if (viscous) then
-                    ! diffusive fluxes eqn_idx%mom%beg (x in MFC, z, theta in normal coordinates) += div(tau_thetaz) eqn_idx%mom%beg+1 (y in MFC, r,
-                    ! theta in normal coordinates) += div(tau_thetar) eqn_idx%mom%beg+2 (z in MFC, theta in normal coordinates) +=
-                    ! div(tau_thetatheta) eqn_idx%E += u_z * tau_thetaz + u_r * tau_thetar + u_theta * tau_thetatheta
+                    ! diffusive fluxes eqn_idx%mom%beg (x in MFC, z, theta in normal coordinates) += div(tau_thetaz)
+                    ! eqn_idx%mom%beg+1 (y in MFC, r, theta in normal coordinates) += div(tau_thetar) eqn_idx%mom%beg+2 (z in MFC,
+                    ! theta in normal coordinates) += div(tau_thetatheta) eqn_idx%E += u_z * tau_thetaz + u_r * tau_thetar + u_theta
+                    ! * tau_thetatheta
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
@@ -1527,18 +1532,18 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    ! Diffusive geometric sources eqn_idx%mom%beg+1 (y in MFC, r in normal coordinates) -= 1/r * (tau_thetatheta) eqn_idx%mom%end (z in
-                    ! MFC, theta in normal coordinates) += 1/r * (tau_rtheta) NOTE: k starts at 0 so the theta-direction geometric
-                    ! coupling (-tau_theta_theta/r in r-momentum, +tau_r_theta/r in theta-momentum) is applied at the first radial
-                    ! cell too. The axis-treatment path above handles the r-direction divergence at k=0, but not this
-                    ! theta-direction coupling. Diffusive geometric sources (original form)
+                    ! Diffusive geometric sources eqn_idx%mom%beg+1 (y in MFC, r in normal coordinates) -= 1/r * (tau_thetatheta)
+                    ! eqn_idx%mom%end (z in MFC, theta in normal coordinates) += 1/r * (tau_rtheta) NOTE: k starts at 0 so the
+                    ! theta-direction geometric coupling (-tau_theta_theta/r in r-momentum, +tau_r_theta/r in theta-momentum) is
+                    ! applied at the first radial cell too. The axis-treatment path above handles the r-direction divergence at k=0,
+                    ! but not this theta-direction coupling. Diffusive geometric sources (original form)
                     $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
                                 rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                       & l) + 5.e-1_wp/y_cc(k)*(flux_src_n_in(eqn_idx%mom%end)%sf(j, k, l - 1) + flux_src_n_in(eqn_idx%mom%end)%sf(j, &
-                                       & k, l))
+                                       & l) + 5.e-1_wp/y_cc(k)*(flux_src_n_in(eqn_idx%mom%end)%sf(j, k, &
+                                       & l - 1) + flux_src_n_in(eqn_idx%mom%end)%sf(j, k, l))
                                 rhs_vf(eqn_idx%mom%end)%sf(j, k, l) = rhs_vf(eqn_idx%mom%end)%sf(j, k, &
                                        & l) - 5.e-1_wp/y_cc(k)*(flux_src_n_in(eqn_idx%mom%beg + 1)%sf(j, k, &
                                        & l - 1) + flux_src_n_in(eqn_idx%mom%beg + 1)%sf(j, k, l))
@@ -1559,8 +1564,10 @@ contains
                                            & l - 1) - flux_src_n_in(i)%sf(j, k, l))
                                 end do
                                 if (surface_tension) then
-                                    rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, l) + 1._wp/dz(l)*q_prim_vf(eqn_idx%c)%sf(j, k, &
-                                           & l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, l - 1))
+                                    rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
+                                           & l) + 1._wp/dz(l)*q_prim_vf(eqn_idx%c)%sf(j, k, &
+                                           & l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
+                                           & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, l - 1))
                                 end if
                             end do
                         end do
