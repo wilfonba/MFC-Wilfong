@@ -22,7 +22,7 @@
 
     eps = 1e-9_wp
 
-    if (patch_icpp(patch_id)%hcid == 303) then ! Reading rocket input data
+    if (patch_icpp(patch_id)%hcid == 303) then  ! Reading rocket input data
         eps_smooth = 3._wp
         open (unit=10, file="njet.txt", status="old", action="read")
         read (10, *) NJet
@@ -68,7 +68,7 @@
         end do
     end if
 
-    if (patch_icpp(patch_id)%hcid == 305) then ! Case 305 - Axisymmetric interface in cylindrical coordinates
+    if (patch_icpp(patch_id)%hcid == 305) then  ! Case 305 - Axisymmetric interface in cylindrical coordinates
         eps = 1e-8_wp
         allocate (ih(0:n_glb))
         open (unit=10, file="interface_profile.dat", status="old", action="read")
@@ -180,7 +180,7 @@
         end if
 
         q_prim_vf(eqn_idx%E)%sf(i, j, k) = p_th*rcut*xcut + p_am
-    case (304) ! Cylindrical Richtmyer-Meshkov instability
+    case (304)  ! Cylindrical Richtmyer-Meshkov instability
         lam = 1.0_wp
         eps = 1.0e-8_wp
         ei = 5.0_wp
@@ -206,10 +206,9 @@
             q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k) = 0._wp
             q_prim_vf(eqn_idx%mom%end)%sf(i, j, k) = 0._wp
         end if
-    case (305) ! Axisymmetric interface in cylindrical coordinates
-        d = x_cc(i) - ih(start_idx(2) + j)
-        ei = 5.0_wp
-        fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx*dy))))
+    case (305)  ! Axisymmetric interface in cylindrical coordinates
+        ei = 1.0_wp
+        fsm = 0.5_wp*(1.0_wp + tanh((x_cc(i) - ih(start_idx(2) + j))/(ei*sqrt(dx*dy))))
         q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k) = eps + (1.0_wp - 2.0_wp*eps)*fsm
         q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k)
         q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k)*1.0_wp

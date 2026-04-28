@@ -131,16 +131,20 @@ contains
         if (format == 1) then
             if (p > 0) then
                 if (grid_geometry == 3) then
-                    lo_offset(:) = (/offset_y%beg, offset_z%beg, offset_x%beg/)
-                    hi_offset(:) = (/offset_y%end, offset_z%end, offset_x%end/)
+                    !lo_offset(:) = (/offset_y%beg, offset_z%beg, offset_x%beg/)
+                    !hi_offset(:) = (/offset_y%end, offset_z%end, offset_x%end/)
+                    lo_offset(:) = (/offset_x%beg, offset_y%beg, offset_z%beg/)
+                    hi_offset(:) = (/offset_x%end, offset_y%end, offset_z%end/)
                 else
                     lo_offset(:) = (/offset_x%beg, offset_y%beg, offset_z%beg/)
                     hi_offset(:) = (/offset_x%end, offset_y%end, offset_z%end/)
                 end if
 
                 if (grid_geometry == 3) then
-                    dims(:) = (/n + offset_y%beg + offset_y%end + 2, p + offset_z%beg + offset_z%end + 2, &
-                         & m + offset_x%beg + offset_x%end + 2/)
+                    !dims(:) = (/n + offset_y%beg + offset_y%end + 2, p + offset_z%beg + offset_z%end + 2, &
+                         !& m + offset_x%beg + offset_x%end + 2/)
+                    dims(:) = (/m + offset_x%beg + offset_x%end + 2, n + offset_y%beg + offset_y%end + 2, &
+                         & p + offset_z%beg + offset_z%end + 2/)
                 else
                     dims(:) = (/m + offset_x%beg + offset_x%end + 2, n + offset_y%beg + offset_y%end + 2, &
                          & p + offset_z%beg + offset_z%end + 2/)
@@ -455,7 +459,8 @@ contains
                 call s_mpi_gather_spatial_extents(spatial_extents)
             else if (p > 0) then
                 if (grid_geometry == 3) then
-                    spatial_extents(:,0) = (/minval(y_cb), minval(z_cb), minval(x_cb), maxval(y_cb), maxval(z_cb), maxval(x_cb)/)
+                    !spatial_extents(:,0) = (/minval(y_cb), minval(z_cb), minval(x_cb), maxval(y_cb), maxval(z_cb), maxval(x_cb)/)
+                    spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), minval(z_cb), maxval(x_cb), maxval(y_cb), maxval(z_cb)/)
                 else
                     spatial_extents(:,0) = (/minval(x_cb), minval(y_cb), minval(z_cb), maxval(x_cb), maxval(y_cb), maxval(z_cb)/)
                 end if
@@ -492,7 +497,9 @@ contains
                 err = DBADDIAOPT(optlist, DBOPT_LO_OFFSET, size(lo_offset), lo_offset)
                 err = DBADDIAOPT(optlist, DBOPT_HI_OFFSET, size(hi_offset), hi_offset)
                 if (grid_geometry == 3) then
-                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb, z_cb, x_cb, dims, 3, DB_DOUBLE, &
+                    !err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb, z_cb, x_cb, dims, 3, DB_DOUBLE, &
+                                  !& DB_COLLINEAR, optlist, ierr)
+                    err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, z_cb, dims, 3, DB_DOUBLE, &
                                   & DB_COLLINEAR, optlist, ierr)
                 else
                     err = DBPUTQM(dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, z_cb, dims, 3, DB_DOUBLE, &
@@ -661,13 +668,13 @@ contains
             #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
                 if (precision == ${PRECISION}$) then
                     if (p > 0) then
-                        if (grid_geometry == 3) then
-                            err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, cyl_q_sf${SFX}$, &
-                                           & dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
-                        else
+                        !if (grid_geometry == 3) then
+                            !err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, cyl_q_sf${SFX}$, &
+                                           !& dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
+                        !else
                             err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, q_sf${SFX}$, &
                                            & dims - 1, 3, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
-                        end if
+                        !end if
                     else if (n > 0) then
                         err = DBPUTQV1(dbfile, trim(varname), len_trim(varname), 'rectilinear_grid', 16, q_sf${SFX}$, dims - 1, &
                                        & 2, DB_F77NULL, 0, ${DBT}$, DB_ZONECENT, DB_F77NULL, ierr)
