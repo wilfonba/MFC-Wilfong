@@ -17,8 +17,8 @@ module m_helper
     private
     public :: s_comp_n_from_prim, s_comp_n_from_cons, s_initialize_bubbles_model, s_initialize_nonpoly, s_simpson, s_transcoeff, &
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
-        & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
-        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product
+        & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, f_cut_on, &
+        & f_cut_off, s_downsample_data, s_upsample_data, s_cross_product
 
 contains
 
@@ -458,7 +458,7 @@ contains
         integer, intent(in)  :: l, m
         real(wp), intent(in) :: theta, phi
         real(wp)             :: Y, x, prefac
-        integer              :: m_abs
+        integer              :: m_abs, i
 
         m_abs = abs(m)
         if (m_abs > l) then
@@ -466,7 +466,12 @@ contains
             return
         end if
         x = cos(theta)
-        prefac = sqrt((2*l + 1)*real(factorial(l - m_abs), wp)/real(factorial(l + m_abs), wp)/(4._wp*pi))
+        ! (2l+1)/(4*pi)*(l-|m|)!/(l+|m|)! as a running ratio; integer factorials overflow for l+|m| >= 13
+        prefac = real(2*l + 1, wp)/(4._wp*pi)
+        do i = l - m_abs + 1, l + m_abs
+            prefac = prefac/real(i, wp)
+        end do
+        prefac = sqrt(prefac)
         if (m == 0) then
             Y = prefac*associated_legendre(x, l, 0)
         else if (m > 0) then
@@ -528,18 +533,6 @@ contains
         R_result = product((/(i, i=n_in, 1, -2)/))
 
     end function double_factorial
-
-    !> Calculate the factorial of an integer
-    elemental function factorial(n_in) result(R_result)
-
-        integer, intent(in)      :: n_in
-        integer, parameter       :: int64_kind = selected_int_kind(18)  !< 18 bytes for 64-bit integer
-        integer(kind=int64_kind) :: R_result
-        integer                  :: i
-
-        R_result = product((/(i, i=n_in, 1, -1)/))
-
-    end function factorial
 
     !> Calculate a smooth cut-on function that is zero for x values smaller than zero and goes to one, for generating smooth initial
     !! conditions
