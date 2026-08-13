@@ -71,6 +71,7 @@ print(
             "mp_weno": "T",
             "riemann_solver": "hllc",
             "wave_speeds": "direct",
+            "fd_order": 2,
             "bc_x%beg": -17,
             "bc_x%end": -8,
             "bc_y%beg": -15,
@@ -79,6 +80,7 @@ print(
             "ib": "T",
             "num_ibs": 0,
             "viscous": "T",
+            "many_ib_patch_parallelism": "T",
             # Collision model (soft-sphere, from 3D_mibm_sphere_head_on_collision)
             "collision_model": 1,
             "coefficient_of_restitution": 0.9,

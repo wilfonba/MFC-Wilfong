@@ -25,10 +25,9 @@ module m_riemann_solver_hll
 contains
 
     !> HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
-    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, &
-
-        & dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, &
-            & flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+    subroutine s_hll_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
+                                    & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
+                                    & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -57,46 +56,47 @@ contains
             real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
             real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
         #:endif
-        real(wp)                  :: rho_L, rho_R
-        real(wp)                  :: pres_L, pres_R
-        real(wp)                  :: E_L, E_R
-        real(wp)                  :: H_L, H_R
-        real(wp)                  :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
-        real(wp)                  :: T_L, T_R
-        real(wp)                  :: Y_L, Y_R
-        real(wp)                  :: MW_L, MW_R
-        real(wp)                  :: R_gas_L, R_gas_R
-        real(wp)                  :: Cp_L, Cp_R
-        real(wp)                  :: Cv_L, Cv_R
-        real(wp)                  :: Gamm_L, Gamm_R
-        real(wp)                  :: gamma_L, gamma_R
-        real(wp)                  :: pi_inf_L, pi_inf_R
-        real(wp)                  :: qv_L, qv_R
-        real(wp)                  :: c_L, c_R
-        real(wp), dimension(6)    :: tau_e_L, tau_e_R
-        real(wp)                  :: G_L, G_R
-        real(wp), dimension(2)    :: Re_L, Re_R
-        real(wp), dimension(3)    :: xi_field_L, xi_field_R
-        real(wp)                  :: rho_avg
-        real(wp)                  :: H_avg
-        real(wp)                  :: qv_avg
-        real(wp)                  :: gamma_avg
-        real(wp)                  :: c_avg
-        real(wp)                  :: s_L, s_R, s_M, s_P, s_S
-        real(wp)                  :: xi_M, xi_P
-        real(wp)                  :: ptilde_L, ptilde_R
-        real(wp)                  :: vel_L_rms, vel_R_rms, vel_avg_rms
-        real(wp)                  :: vel_L_tmp, vel_R_tmp
-        real(wp)                  :: Ms_L, Ms_R, pres_SL, pres_SR
-        real(wp)                  :: alpha_L_sum, alpha_R_sum
-        real(wp)                  :: zcoef, pcorr   !< low Mach number correction
-        type(riemann_states)      :: c_fast, pres_mag
+        real(wp) :: rho_L, rho_R
+        real(wp) :: pres_L, pres_R
+        real(wp) :: E_L, E_R
+        real(wp) :: H_L, H_R
+        real(wp) :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
+        real(wp) :: T_L, T_R
+        real(wp) :: Y_L, Y_R
+        real(wp) :: MW_L, MW_R
+        real(wp) :: R_gas_L, R_gas_R
+        real(wp) :: Cp_L, Cp_R
+        real(wp) :: Cv_L, Cv_R
+        real(wp) :: Gamm_L, Gamm_R
+        real(wp) :: gamma_L, gamma_R
+        real(wp) :: pi_inf_L, pi_inf_R
+        real(wp) :: qv_L, qv_R
+        real(wp) :: c_L, c_R
+        real(wp), dimension(6) :: tau_e_L, tau_e_R
+        real(wp) :: G_L, G_R
+        real(wp) :: damage_L, damage_R
+        real(wp), dimension(2) :: Re_L, Re_R
+        real(wp) :: rho_avg
+        real(wp) :: H_avg
+        real(wp) :: qv_avg
+        real(wp) :: gamma_avg
+        real(wp) :: c_avg
+        real(wp) :: s_L, s_R, s_M, s_P, s_S
+        real(wp) :: xi_M, xi_P
+        real(wp) :: ptilde_L, ptilde_R
+        real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
+        real(wp) :: vel_L_tmp, vel_R_tmp
+        real(wp) :: Ms_L, Ms_R, pres_SL, pres_SR
+        real(wp) :: alpha_L_sum, alpha_R_sum
+        real(wp) :: zcoef, pcorr               !< low Mach number correction
+        type(riemann_states) :: c_fast, pres_mag
         type(riemann_states_vec3) :: B
-        type(riemann_states)      :: Ga             !< Gamma (Lorentz factor)
-        type(riemann_states)      :: vdotB, B2
-        type(riemann_states_vec3) :: b4             !< 4-magnetic field components (spatial: b4x, b4y, b4z)
-        type(riemann_states_vec3) :: cm             !< Conservative momentum variables
-        integer                   :: i, j, k, l, q  !< Generic loop iterators
+        type(riemann_states) :: Ga             !< Gamma (Lorentz factor)
+        type(riemann_states) :: vdotB, B2
+        type(riemann_states_vec3) :: b4        !< 4-magnetic field components (spatial: b4x, b4y, b4z)
+        type(riemann_states_vec3) :: cm        !< Conservative momentum variables
+        integer :: i, j, k, l                  !< Generic loop iterators
+        integer :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -104,6 +104,7 @@ contains
 
         ! Reshaping inputted data based on dimensional splitting direction
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
                      (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'is2', 'is1', 'is3'), &
@@ -111,15 +112,16 @@ contains
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, &
-                                    & alpha_R, tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, &
-                                    & Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, &
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
+                                    & tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, Ys_L, Ys_R, Cp_iL, &
+                                    & Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, &
                                     & pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, &
                                     & pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, &
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
-                                    & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, &
-                                    & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
-                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]')
+                                    & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, damage_L, damage_R, &
+                                    & rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, &
+                                    & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', &
+                                    & copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -197,37 +199,12 @@ contains
                                 alpha_R = alpha_R/max(alpha_R_sum, sgm_eps)
                             end if
 
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                rho_L = rho_L + alpha_rho_L(i)
-                                gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-                                qv_L = qv_L + alpha_rho_L(i)*qvs(i)
-
-                                rho_R = rho_R + alpha_rho_R(i)
-                                gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                qv_R = qv_R + alpha_rho_R(i)*qvs(i)
-                            end do
+                            call s_accumulate_mixture_properties(num_fluids, alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_L)
+                            call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
 
                             if (viscous) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, 2
-                                    Re_L(i) = dflt_real
-                                    Re_R(i) = dflt_real
-
-                                    if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                    if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, Re_size(i)
-                                        Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                        Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                                    end do
-
-                                    Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                    Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                end do
+                                call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
+                                call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                             end if
 
                             if (chemistry) then
@@ -280,7 +257,7 @@ contains
                             else if (mhd .and. relativity) then
                                 Ga%L = 1._wp/sqrt(1._wp - vel_L_rms)
                                 Ga%R = 1._wp/sqrt(1._wp - vel_R_rms)
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
                                     vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
 
@@ -296,7 +273,7 @@ contains
                                 ! Hard-coded EOS
                                 H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
                                 H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     cm%L(1:3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1:3) - vdotB%L*B%L(1:3)
                                     cm%R(1:3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1:3) - vdotB%R*B%R(1:3)
                                 #:endif
@@ -304,7 +281,7 @@ contains
                                 E_L = rho_L*H_L*Ga%L**2 - pres_L + 0.5_wp*(B2%L + vel_L_rms*B2%L - vdotB%L**2._wp) - rho_L*Ga%L
                                 E_R = rho_R*H_R*Ga%R**2 - pres_R + 0.5_wp*(B2%R + vel_R_rms*B2%R - vdotB%R**2._wp) - rho_R*Ga%R
                             else if (mhd .and. .not. relativity) then
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
                                     pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
                                 #:endif
@@ -322,35 +299,23 @@ contains
                             end if
 
                             ! elastic energy update
+                            ! HLL handles hypoelasticity as inline branches like this one - one of three code
+                            ! shapes (cf. HLLC inline, and the separate HLLD dual-pass module). See s_riemann_solver.
                             if (hypoelasticity) then
-                                G_L = 0._wp; G_R = 0._wp
-
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_fluids
-                                    G_L = G_L + alpha_L(i)*Gs_rs(i)
-                                    G_R = G_R + alpha_R(i)*Gs_rs(i)
-                                end do
-
-                                if (cont_damage) then
-                                    G_L = G_L*max((1._wp - qL_prim_rsx_vf(${SF('')}$, eqn_idx%damage)), 0._wp)
-                                    G_R = G_R*max((1._wp - qR_prim_rsx_vf(${SF('')}$, eqn_idx%damage)), 0._wp)
-                                end if
-
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
                                     tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
                                     tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
-                                    ! Elastic contribution to energy if G large enough TODO take out if statement if stable without
-                                    if ((G_L > 1000) .and. (G_R > 1000)) then
-                                        E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                        E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                        ! Double for shear stresses
-                                        if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                        end if
-                                    end if
                                 end do
+
+                                damage_L = 0._wp; damage_R = 0._wp
+                                if (cont_damage) then
+                                    damage_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                    damage_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%damage)
+                                end if
+
+                                call s_compute_hypoelastic_interface_energy(num_fluids, alpha_L, alpha_R, damage_L, damage_R, &
+                                    & tau_e_L, tau_e_R, G_L, G_R, E_L, E_R)
                             end if
 
                             @:compute_average_state()
@@ -390,19 +355,7 @@ contains
                                     s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
                                 else if (hypoelasticity) then
                                     ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1))) &
-                                              & /rho_L), &
-                                              & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1))) &
-                                              & /rho_R))
-                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1))) &
-                                              & /rho_R), &
-                                              & vel_L(dir_idx(1)) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1))) &
-                                              & /rho_L))
-                                else if (hyperelasticity) then
-                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L), &
-                                              & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
-                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R), &
-                                              & vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
+                                    @:compute_elastic_wave_speeds_lr()
                                 else
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
@@ -526,7 +479,7 @@ contains
                             ! Energy
                             if (mhd .and. (.not. relativity)) then
                                 ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     flux_rsx_vf(${SF('')}$, &
                                                 & eqn_idx%E) = (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir) &
                                                 & *(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) - s_P*(vel_L(norm_dir) &
@@ -572,14 +525,55 @@ contains
                                 end do
                             end if
 
-                            ! Advection flux and source: interface velocity for volume fraction transport
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                flux_rsx_vf(${SF('')}$, i) = (qL_prim_rsx_vf(${SF('')}$, i) - qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                            & i))*s_M*s_P/(s_M - s_P)
-                                flux_src_rsx_vf(${SF('')}$, i) = (s_M*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                & i) - s_P*qL_prim_rsx_vf(${SF('')}$, i))/(s_M - s_P)
-                            end do
+                            ! Export interface velocity for NC RHS
+                            if (hypo_nc_mode == hypo_nc_mode_interface .or. (alt_soundspeed .and. .not. hll_u_interface)) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    if (0._wp <= s_L) then
+                                        nc_iface_vel_rsx_vf(${SF('')}$, dir_idx(i)) = vel_L(dir_idx(i))
+                                    else if (s_R <= 0._wp) then
+                                        nc_iface_vel_rsx_vf(${SF('')}$, dir_idx(i)) = vel_R(dir_idx(i))
+                                    else
+                                        nc_iface_vel_rsx_vf(${SF('')}$, &
+                                                            & dir_idx(i)) = (s_R*vel_L(dir_idx(i)) - s_L*vel_R(dir_idx(i)))/(s_R &
+                                                            & - s_L)
+                                    end if
+                                end do
+                            end if
+
+                            if (.not. hll_u_interface) then  ! HLL Method 1: per-fluid alpha interface flux
+                                ! Branchless: s_M/s_P fold the upwinding, so signs of s_L/s_R need no
+                                ! per-thread branches (which diverge across GPU warps)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                    flux_rsx_vf(${SF('')}$, i) = (qL_prim_rsx_vf(${SF('')}$, i) - qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & i))*s_M*s_P/(s_M - s_P)
+                                    flux_src_rsx_vf(${SF('')}$, i) = (s_M*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                    & i) - s_P*qL_prim_rsx_vf(${SF('')}$, i))/(s_M - s_P)
+                                end do
+                            else  ! HLL Method 2: shared velocity interface flux
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                    if (0._wp <= s_L) then
+                                        flux_rsx_vf(${SF('')}$, i) = qL_prim_rsx_vf(${SF('')}$, i)*vel_L(dir_idx(1))
+                                    else if (s_R <= 0._wp) then
+                                        flux_rsx_vf(${SF('')}$, i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)*vel_R(dir_idx(1))
+                                    else
+                                        flux_rsx_vf(${SF('')}$, i) = (s_R*qL_prim_rsx_vf(${SF('')}$, &
+                                                    & i)*vel_L(dir_idx(1)) - s_L*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                    & i)*vel_R(dir_idx(1)) + s_L*s_R*(qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                    & i) - qL_prim_rsx_vf(${SF('')}$, i)))/(s_R - s_L)
+                                    end if
+                                end do
+                                if (0._wp <= s_L) then
+                                    flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_L(dir_idx(1))
+                                else if (s_R <= 0._wp) then
+                                    flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_R(dir_idx(1))
+                                else
+                                    flux_src_rsx_vf(${SF('')}$, &
+                                                    & eqn_idx%adv%beg) = (s_R*vel_L(dir_idx(1)) - s_L*vel_R(dir_idx(1)))/(s_R - s_L)
+                                end if
+                            end if
 
                             if (bubbles_euler) then
                                 ! From HLLC: Kills mass transport @ bubble gas density
@@ -655,7 +649,11 @@ contains
                                     ! Geometrical source of the void fraction(s) is zero
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
+                                        if (.not. hll_u_interface) then
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
+                                        else
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                        end if
                                     end do
                                 end if
 

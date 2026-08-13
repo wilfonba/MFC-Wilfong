@@ -10,8 +10,8 @@
 !>
 !> **File Reading Operations:**
 !> - Reads primitive variable data from multiple files with pattern:
-!> `prim.<file_number>.00.<timestep>.dat` where timestep uses `zeros_default` padding
-!> - Files are read from directory specified by `init_dir` parameter
+!> `prim.<file_number>.00.<file_extension>.dat`
+!> - Files are read from directory specified by `files_dir` parameter
 !> - Supports 1D, 2D, and 3D computational domains
 !>
 !> **Grid Structure Detection:**
@@ -31,27 +31,38 @@
 !> - Uses files_loaded flag to prevent redundant file operations
 !> - Preserves data across multiple macro calls within same simulation
 !>
-!> @note File pattern uses `zeros_default` parameter (default: "000000") for timestep padding
-!> @note Directory path is hardcoded in `init_dir` parameter - modify as needed
+!> @note File pattern timestep field is controlled by the `file_extension` parameter
+!> @note Directory path is set via the `files_dir` parameter
 !> @warning Aborts execution if file reading errors occur.
 
 #:def HardcodedDimensionsExtrusion()
     integer                                 :: xRows, yRows, nRows, iix, iiy, max_files
-    integer                                 :: f, iter, ios, ios2, unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount
-    real(wp)                                :: x_len, x_step, y_len, y_step
+    integer                                 :: f, iter, unit, unit2, idx, idy, index_x, index_y, jump, line_count
+    real(wp)                                :: x_step, y_step
     real(wp)                                :: dummy_x, dummy_y, dummy_z, x0, y0
-    integer                                 :: global_offset_x, global_offset_y       !< MPI subdomain offset
+    integer                                 :: global_offset_x, global_offset_y  !< MPI subdomain offset
     real(wp)                                :: delta_x, delta_y
-    character(len=100), dimension(sys_size) :: fileNames                              !< Arrays to store all data from files
-    character(len=200)                      :: errmsg
+    character(len=300), dimension(sys_size) :: fileNames                         !< Arrays to store all data from files
     real(wp), allocatable                   :: stored_values(:,:,:)
     real(wp), allocatable                   :: x_coords(:), y_coords(:)
     logical                                 :: files_loaded = .false.
-    real(wp)                                :: domain_xstart, domain_xend, domain_ystart, domain_yend
-    character(len=*), parameter             :: init_dir = "/home/MFC/FilesDirectory"  !< For example /home/MFC/examples/1D_Shock/D/
-    character(len=20)                       :: file_num_str                           !< For storing the file number as a string
-    character(len=20)                       :: zeros_part                             !< For the trailing zeros part
-    character(len=6), parameter             :: zeros_default = "000000"               !< Default zeros (can be changed)
+    real(wp)                                :: domain_xstart
+    character(len=20)                       :: file_num_str                      !< For storing the file number as a string
+    integer                                 :: ios
+    integer                                 :: ios2
+
+    ! hcid=274 (2dHardcodedIC.fpp): full 2D field from external data, no extrusion.
+    ! Declared here (not in Hardcoded2DVariables()) so it's visible wherever
+    ! HardcodedDeallocation() is called, matching the pattern of stored_values/x_coords/
+    ! y_coords/files_loaded above.
+    real(wp), allocatable, dimension(:,:,:) :: stored_values274
+    logical                                 :: files_loaded274 = .false.
+    integer                                 :: f274, ix274, iy274, unit274, ios274
+    integer                                 :: local_ix_beg274, local_iy_beg274
+    character(len=300)                      :: fname274
+    character(len=20)                       :: file_num_str274
+    real(wp)                                :: dummy_x274, dummy_y274, dummy_val274, x0_274, y0_274, x_step274, y_step274
+    real(wp)                                :: file_dx274, file_dy274, r_align274
 #:enddef
 
 #:def HardcodedReadValues()
@@ -59,7 +70,7 @@
         max_files = merge(sys_size, sys_size - 1, num_dims == 1)
         do f = 1, max_files
             write (file_num_str, '(I0)') f
-            fileNames(f) = trim(init_dir) // "prim." // trim(file_num_str) // ".00." // zeros_default // ".dat"
+            fileNames(f) = trim(files_dir) // "/" // "prim." // trim(file_num_str) // ".00." // trim(file_extension) // ".dat"
         end do
 
         ! Common file reading setup
@@ -98,7 +109,7 @@
             ! Calculate offsets
             domain_xstart = x_coords(1)
             x_step = x_cc(1) - x_cc(0)
-            delta_x = merge(x_cc(0) - domain_xstart + x_step/2.0, x_cc(index_x) - domain_xstart + x_step/2.0, num_dims == 1)
+            delta_x = merge(x_cc(0) - domain_xstart, x_cc(index_x) - domain_xstart, num_dims == 1)
             global_offset_x = nint(abs(delta_x)/x_step)
         case (3)  ! 3D case - determine grid structure
             ! Find yRows by counting rows with same x
@@ -158,8 +169,8 @@
             ! Calculate offsets
             x_step = x_cc(1) - x_cc(0)
             y_step = y_cc(1) - y_cc(0)
-            delta_x = x_cc(index_x) - x_coords(1) + x_step/2.0_wp
-            delta_y = y_cc(index_y) - y_coords(1) + y_step/2.0_wp
+            delta_x = x_cc(index_x) - x_coords(1)
+            delta_y = y_cc(index_y) - y_coords(1)
             global_offset_x = nint(abs(delta_x)/x_step)
             global_offset_y = nint(abs(delta_y)/y_step)
         end select
@@ -171,11 +182,18 @@
     select case (num_dims)
     case (1)
         idx = i + 1 + global_offset_x
+        ! idx must land inside the file's row range: this rank's subdomain offset
+        ! (global_offset_x) was derived from this rank's own grid, so a miss means the
+        ! IC file is misaligned/mis-sized for the run grid, not a normal boundary case.
+        if (idx < 1 .or. idx > xRows) &
+            & call s_mpi_abort("Hardcoded IC extrusion: row index out of range (IC file misaligned with the run grid)")
         do f = 1, sys_size
             q_prim_vf(f)%sf(i, 0, 0) = stored_values(idx, 1, f)
         end do
     case (2)
         idx = i + 1 + global_offset_x - index_x
+        if (idx < 1 .or. idx > xRows) &
+            & call s_mpi_abort("Hardcoded IC extrusion: row index out of range (IC file misaligned with the run grid)")
         do f = 1, sys_size - 1
             jump = merge(1, 0, f >= eqn_idx%mom%end)
             q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, 1, f)
@@ -184,6 +202,8 @@
     case (3)
         idx = i + 1 + global_offset_x - index_x
         idy = j + 1 + global_offset_y - index_y
+        if (idx < 1 .or. idx > xRows .or. idy < 1 .or. idy > yRows) &
+            & call s_mpi_abort("Hardcoded IC extrusion: row/column index out of range (IC file misaligned with the run grid)")
         do f = 1, sys_size - 1
             jump = merge(1, 0, f >= eqn_idx%mom%end)
             q_prim_vf(f + jump)%sf(i, j, k) = stored_values(idx, idy, f)
@@ -192,7 +212,7 @@
     end select
 #:enddef
 
-#:def HardcodedDellacation()
+#:def HardcodedDeallocation()
     if (allocated(stored_values)) then
         @:DEALLOCATE(stored_values)
         @:DEALLOCATE(x_coords)
@@ -201,4 +221,12 @@
     if (allocated(y_coords)) then
         @:DEALLOCATE(y_coords)
     end if
+
+    files_loaded = .false.
+
+    if (allocated(stored_values274)) then
+        @:DEALLOCATE(stored_values274)
+    end if
+
+    files_loaded274 = .false.
 #:enddef

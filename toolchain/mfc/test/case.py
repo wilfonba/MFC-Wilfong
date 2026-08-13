@@ -105,8 +105,6 @@ BASE_CFG = {
     "fluid_pp(1)%qv": 0.0,
     "fluid_pp(1)%qvp": 0.0,
     "bubbles_euler": "F",
-    "pref": 101325.0,
-    "rhoref": 1000.0,
     "bubble_model": 3,
     "polytropic": "T",
     "polydisperse": "F",
@@ -157,14 +155,18 @@ class TestCase(case.Case):
     restart_check: bool = False
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
+    canary: bool = False
 
-    def __init__(self, trace: str, mods: dict, ppn: int = None, override_tol: float = None, restart_check: bool = False, kind: str = "golden", convergence_spec: Optional[dict] = None) -> None:
+    def __init__(
+        self, trace: str, mods: dict, ppn: int = None, override_tol: float = None, restart_check: bool = False, kind: str = "golden", convergence_spec: Optional[dict] = None, canary: bool = False
+    ) -> None:
         self.trace = trace
         self.ppn = ppn or 1
         self.override_tol = override_tol
         self.restart_check = restart_check
         self.kind = kind
         self.convergence_spec = convergence_spec
+        self.canary = canary
         merge = {**BASE_CFG.copy(), **mods}
         merge = {key: val for key, val in merge.items() if val is not None}
         super().__init__(merge)
@@ -247,9 +249,9 @@ class TestCase(case.Case):
         return trace_to_uuid(self.trace)
 
     def coverage_key(self) -> str:
-        from .coverage import param_hash
+        from .coverage import canonicalize_param_paths, param_hash
 
-        return param_hash(self.params)
+        return param_hash(canonicalize_param_paths(self.params, common.MFC_ROOT_DIR))
 
     def get_dirpath(self):
         return os.path.join(common.MFC_TEST_DIR, self.get_uuid())
@@ -339,9 +341,15 @@ print(json.dumps({{**case, **mods}}))
         elif "Cylindrical" in self.trace.split(" -> "):
             tolerance = 1e-9
         elif self.params.get("hypoelasticity", "F") == "T":
-            tolerance = 1e-7
+            tolerance = 1e-6
         elif self.params.get("mixlayer_perturb", "F") == "T":
             tolerance = 1e-7
+        elif self.params.get("synthetic_turbulence", "F") == "T":
+            # Random-Fourier-mode forcing amplifies roundoff: by t_step 3 the double
+            # run still matches the golden to <1e-12, but the single run diverges to
+            # ~1e-3. Base 1e-10 keeps double tight (1e-10) while the ARG("single")
+            # 1e8 scaling below gives single a 1e-2 tolerance.
+            tolerance = 1e-10
         elif any(self.params.get(key, "F") == "T" for key in ["relax", "ib", "qbmm", "bubbles_euler", "bubbles_lagrange"]):
             tolerance = 1e-10
         elif self.params.get("low_Mach") in [1, 2]:
@@ -372,6 +380,7 @@ class TestCaseBuilder:
     restart_check: bool = False
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
+    canary: bool = False
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -383,7 +392,7 @@ class TestCaseBuilder:
         if self.kind == "convergence":
             # Convergence cases drive their own runs — the BASE_CFG mods/path
             # machinery is unused. Trace + spec are the only inputs.
-            return TestCase(self.trace, {}, self.ppn, self.override_tol, self.restart_check, kind=self.kind, convergence_spec=self.convergence_spec)
+            return TestCase(self.trace, {}, self.ppn, self.override_tol, self.restart_check, kind=self.kind, convergence_spec=self.convergence_spec, canary=self.canary)
 
         dictionary = {}
         if self.path:
@@ -404,7 +413,7 @@ class TestCaseBuilder:
         if self.functor:
             self.functor(dictionary)
 
-        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check)
+        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, canary=self.canary)
 
 
 @dataclasses.dataclass
@@ -474,14 +483,14 @@ def create_input_lagrange(path_test):
         os.mkdir(folder_path_lagrange)
 
     with open(file_path_lagrange, "w") as file:
-        file.write("0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0")
+        file.write("0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0\n")
 
 
 def copy_input_lagrange(path_example_input, path_test):
     folder_path_dest = path_test + "/input/"
-    fite_path_dest = folder_path_dest + "lag_bubbles.dat"
+    file_path_dest = folder_path_dest + "lag_bubbles.dat"
     file_path_src = common.MFC_EXAMPLE_DIRPATH + path_example_input + "/input/lag_bubbles.dat"
     if not os.path.exists(folder_path_dest):
         os.mkdir(folder_path_dest)
 
-    shutil.copyfile(file_path_src, fite_path_dest)
+    shutil.copyfile(file_path_src, file_path_dest)

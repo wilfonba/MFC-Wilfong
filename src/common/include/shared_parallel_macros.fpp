@@ -117,4 +117,51 @@
     #:endif
     $:extraArgs_val
 #:enddef
+
+#:def FOLD_DIRECTIVE(directive, sentinel, width=200)
+    #! Fold a long GPU directive across free-form continuation lines so it stays under
+    #! nvfortran's ~1000-char source-line limit, breaking at whole-clause boundaries
+    #! (clause(args) groups and bare keywords) and repeating the sentinel (e.g. '!$acc&') on
+    #! each continuation -- which fypp's --no-folding cannot do (its generic folder omits the
+    #! sentinel). A single clause wider than `width` is split at its top-level commas too.
+    #:set _clauses = re.findall(r'\w+\([^)]*\)|\S+', directive)
+    #:set _toks = []
+    #:for _cl in _clauses
+        #:if len(_cl) > width and ',' in _cl
+            #:set _buf = ''
+            #:set _depth = 0
+            #:for _ch in _cl
+                #:if _ch == '('
+                    #:set _depth = _depth + 1
+                #:elif _ch == ')'
+                    #:set _depth = _depth - 1
+                #:endif
+                #:set _buf = _buf + _ch
+                #:if _ch == ',' and _depth == 1
+                    #:set _ = _toks.append(_buf.strip())
+                    #:set _buf = ''
+                #:endif
+            #:endfor
+            #:if _buf.strip() != ''
+                #:set _ = _toks.append(_buf.strip())
+            #:endif
+        #:else
+            #:set _ = _toks.append(_cl)
+        #:endif
+    #:endfor
+    #:set _lines = []
+    #:set _cur = ''
+    #:for _t in _toks
+        #:if _cur == ''
+            #:set _cur = _t
+        #:elif len(_cur) + 1 + len(_t) > width
+            #:set _lines = _lines + [_cur + ' &']
+            #:set _cur = sentinel + '& ' + _t
+        #:else
+            #:set _cur = _cur + ' ' + _t
+        #:endif
+    #:endfor
+    #:set _lines = _lines + [_cur]
+    $:'\n'.join(_lines)
+#:enddef
 ! New line at end of file is required for FYPP

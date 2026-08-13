@@ -53,12 +53,13 @@
 
 ## Why MFC?
 
-- **Exascale GPU performance** - Ideal weak scaling to 43K+ GPUs. Near compute-roofline behavior. [Compile-time case optimization](https://mflowcode.github.io/documentation/running.html) for up to 10x speedup.
-- **Compact codebase** - ~40K lines of Fortran with [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming. Small enough to read and modify; powerful enough for [Gordon Bell](https://awards.acm.org/bell).
+- **Performant at exascale** - Ideal weak scaling to 43K+ GPUs. Near compute-roofline behavior. [Compile-time case optimization](https://mflowcode.github.io/documentation/running.html) for ~10x speedup.
+- **Compact code** - ~40K lines of Fortran with [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming. Small enough to read and modify; powerful enough for [Gordon Bell](https://awards.acm.org/bell).
 - **Native multi-phase** - 4, 5, and 6-equation models, phase change, surface tension, bubble dynamics, and Euler-Lagrange particle tracking, all built in.
 - **Portable** - NVIDIA and AMD GPUs, CPUs, laptops to exascale. Docker, Codespaces, Homebrew, and [16+ HPC system templates](https://mflowcode.github.io/documentation/running.html).
-- **Tested** - 500+ regression tests per PR with line-level [coverage](https://app.codecov.io/gh/MFlowCode/MFC) across GNU, Intel, Cray, and NVIDIA compilers.
-- **Truly open** - MIT license, active [Slack](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw), and responsive development team.
+- **Tested** - 600+ regression tests per PR with line-level [coverage](https://app.codecov.io/gh/MFlowCode/MFC) on GNU, Intel, Cray, NVIDIA, and AMD compilers.
+- **Easy to shape** - If MFC is missing something you need, do not get stuck maintaining an old private copy. Open a PR and make your feature, fix, machine support, or workflow part of the maintained codebase.
+- **Open** - MIT license, active [Slack](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw), and a responsive development team.
 
 > If MFC is useful to your work, please ⭐ star the repo and [cite it](#citation)!
 
@@ -115,7 +116,7 @@ Run `./mfc.sh <command> --help` for detailed options, or see the [full documenta
 ## Is this _really_ exascale?
 
 MFC weak scales to the full machines on [El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan) (MI300A), [Frontier](https://www.olcf.ornl.gov/frontier/) (MI250X), and [Alps](https://www.cscs.ch/computers/alps) (GH200) with near-ideal efficiency.
-MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
+MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
 
 <p align="center">
     <picture>
@@ -131,31 +132,35 @@ MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Progr
 
 * 1-3D
 * Compressible
-	* Low Mach number treatment available
+	* Low Mach accuracy treatment available
 * Multi- and single-component
 	* 4, 5, and 6 equation models for multi-component/phase features
-   	* Kapila and Allaire models 5-equation models
-* Multi- and single-phase
+   	* Kapila and Allaire 5-equation models
+* Multi-phase support
 	* Phase change via p, pT, and pTg schemes
 * Grids
 	* 1-3D Cartesian, cylindrical, axisymmetric.
 	* Arbitrary grid stretching for multiple domain regions.
 	* Complex/arbitrary geometries via immersed boundary method
 	* STL geometry files supported
-* Surface tension for multiphase cases
-* Sub-grid bubble dynamics
-	* Euler-Euler volume-averaged bubble models
+* Surface tension (multi-material)
+* Sub-grid particle dynamics
+	* Euler-Euler volume-averaged models
 	* Euler-Lagrange particle tracking
 	* Quadrature-based moment methods (QBMM)
+ 	* Support for bubbles. Nascent support for particles.
 * Viscous effects (high-order accurate representations)
 	* Newtonian and non-Newtonian rheology (Herschel-Bulkley: power-law, Bingham, and yield-stress fluids)
-* Hypoelastic and hyperelastic material models
+* Solid-like material models
+	* Hypoelastic
+ 	* Hyperelastic
 * Ideal and stiffened gas equations of state
 * Body forces
-* Acoustic wave generation (one- and two-way sound sources)
+* Sound wave generation (one- and two-way sources)
 * Chemistry and multi-species transport via [Pyrometheus](https://github.com/pyrometheus/pyrometheus)
+	* Stiff time-integration support 
 * Magnetohydrodynamics (MHD)
-* Relativistic Magnetohydrodynamics (RMHD)
+	* Includes non- and standard-relativistic (RMHD)
 
 ### Numerics
 
@@ -163,7 +168,7 @@ MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Progr
 	* First-order upwinding
  	* MUSCL (order 2)
   		* Slope limiters: minmod, monotonized central, Van Albada, Van Leer, superbee
- 	* WENO reconstructions (orders 3, 5, and 7)
+ 	* WENO reconstructions (orders 3, 5, 7)
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
 	* Reliable handling of large density ratios
@@ -173,8 +178,10 @@ MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Progr
 	* Slip and no-slip
  	* Thompson-based characteristic BCs: non-reflecting sub/supersonic buffers, inflows, outflows
 	* Generalized characteristic relaxation boundary conditions
-* Runge-Kutta orders 1-3 (SSP TVD), adaptive time stepping
-* RK4-5 operator splitting for Euler-Lagrange modeling
+* Time stepping
+	* Base: Runge-Kutta orders 1-3 (SSP TVD)
+	* Opt-in: RK4-5 operator splitting for Euler-Lagrange modeling
+ 	* Opt-in: Alpha-QSS stiff thermochemistry/reacting flow substepper 
 * Interface sharpening (THINC-like)
 * Information geometric regularization (IGR)
     * Shock capturing without WENO and Riemann solvers
@@ -197,7 +204,7 @@ MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Progr
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* \>500 Regression tests with each PR.
+	* \>600 Regression tests with each PR.
  		* Performed with GNU (GCC), Intel (oneAPI), Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
@@ -263,21 +270,21 @@ MFC is under the MIT license (see [LICENSE](LICENSE) for full text).
 
 Federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE) and National Nuclear Security Administration (NNSA), and the National Science Foundation (NSF).
 
-MFC computations have used many supercomputing systems. A partial list is below
+MFC computations have been run on many supercomputing systems. A partial list is below
   * OLCF Frontier and Summit, and testbeds Wombat, Crusher, and Spock (allocation CFD154, PI Bryngelson).
   * LLNL El Capitan, Tuolumne, and Lassen; El Capitan early access system Tioga.
   * NCSA Delta and DeltaAI, PSC Bridges(1/2), SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI allocations from Bryngelson, Colonius, Rodriguez, and more.
   * DOD systems Blueback, Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program.
-  * Sandia National Labs systems Doom and Attaway, and testbed systems Weaver and Vortex.
+  * Sandia National Labs systems, Doom and Attaway, and testbed systems, Weaver and Vortex.
 
 ---
 
 <p align="center">
-  <a href="https://star-history.com/#MFlowCode/MFC&Date">
+  <a href="https://star-history.dera.page/#MFlowCode/MFC&Date">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" />
-      <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
+      <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=MFlowCode/MFC&type=Date" />
+      <img src="https://star-history.dera.page/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
     </picture>
   </a>
 </p>

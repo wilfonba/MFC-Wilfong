@@ -15,7 +15,7 @@ module m_global_parameters
     use m_helper_basic
     use m_thermochem, only: species_names
     use m_constants, only: format_silo, precision_single
-    ! Shared state: generated_decls, num_dims, num_vels, sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*
+    ! Shared state: generated_decls, num_dims, num_vels, sys_size, eqn_idx, chemistry, shear_*
     use m_global_parameters_common
 
     implicit none
@@ -75,7 +75,7 @@ module m_global_parameters
 
     !> @name Simulation Algorithm Parameters
     !> @{
-    ! sys_size, elasticity, b_size, tensor_size, chemistry, eqn_idx: in m_global_parameters_common
+    ! sys_size, chemistry, eqn_idx: in m_global_parameters_common
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
@@ -93,10 +93,17 @@ module m_global_parameters
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
+    type(bc_xyz_info)     :: bc
     !> @}
 
     ! shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices: in m_global_parameters_common
     ! proc_coords, start_idx, mpiiofs, mpi_info_int: in m_global_parameters_common
+    type(int_bounds_info), dimension(3)                    :: nidx  !< Neighbor index offsets per direction (#1290 decomposition)
+    integer, allocatable, dimension(:,:,:)                 :: neighbor_ranks  !< MPI ranks of neighbors (#1290 decomposition)
+    type(ib_airfoil_parameters), allocatable, dimension(:) :: ib_airfoil  !< Per-airfoil NACA parameters (unused in post_process)
+    !> Per-airfoil computed surface grids (unused in post_process)
+    type(ib_airfoil_grid), allocatable, dimension(:) :: ib_airfoil_grids
+
 #ifdef MFC_MPI
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
@@ -145,7 +152,7 @@ contains
 
         integer :: i  !< Generic loop iterator
 
-        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, elasticity, BC blocks,
+        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, BC blocks,
         ! recon/weno/muscl/num_fluids/igr/mhd/relativity under case-opt guard, Tait EOS, bubble flags,
         ! IB flags, parallel I/O flags, fft_wrt)
 
@@ -183,15 +190,15 @@ contains
         t_save = dflt_real
         t_stop = dflt_real
 
-        ! Simulation algorithm parameters (post-specific)
-        mixture_err = .false.
-        alt_soundspeed = .false.
-
         bc_io = .false.
         num_bc_patches = dflt_int
 
         chem_params%gamma_method = 1
         chem_params%transport_model = 1
+
+        chem_params%reaction_substeps = 0
+        chem_params%adap_substeps = .false.
+        chem_params%reaction_substeps_max = 0
 
         ! Fluids physical parameters (post-specific; G = dflt_real differs from pre/sim)
         do i = 1, num_fluids_max
@@ -287,11 +294,9 @@ contains
         schlieren_alpha = dflt_real
 
         fd_order = dflt_int
-        avg_state = dflt_int
 
         ! Bubble modeling (post-specific)
         nb = dflt_int
-        sigR = dflt_real
 
         ! Output partial domain (post-specific)
         output_partial_domain = .false.
@@ -313,6 +318,10 @@ contains
 
         if (n == 0) m_root = m_glb
 
+        ! Declared for the common conversion kernel but not a post_process input, so it is neither
+        ! defaulted on non-root ranks nor broadcast. Post-process never carries viscous stresses.
+        viscous = .false.
+
         ! Gamma/Pi_inf: force num_fluids=1 (post_process-specific side effect of the gamma-law model)
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1
 
@@ -320,8 +329,8 @@ contains
         ! (guard matches the original site: inside the 5-equation branch)
         if (model_eqns == model_eqns_5eq .and. qbmm) nmom = 6
 
-        ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom, nb)
+        ! Populate eqn_idx, sys_size, shear_* (shared logic)
+        call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.false.)
 
         ! post-only: 6eq alf is a dummy (no void fraction in 6eq)
         if (model_eqns == model_eqns_6eq) eqn_idx%alf = 1
@@ -374,40 +383,6 @@ contains
                         qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
                     end if
                 end do
-            end if
-        end if
-
-        if (model_eqns == model_eqns_4eq .and. bubbles_euler) then
-            allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
-            allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
-            allocate (weight(nb), R0(nb))
-
-            do i = 1, nb
-                if (polytropic .neqv. .true.) then
-                    fac = 4
-                else
-                    fac = 2
-                end if
-
-                qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
-                qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
-
-                if (polytropic .neqv. .true.) then
-                    qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
-                    qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
-                end if
-            end do
-
-            if (nb == 1) then
-                weight(:) = 1._wp
-                R0(:) = 1._wp
-            else if (nb < 1) then
-                stop 'Invalid value of nb'
-            end if
-
-            if (polytropic) then
-                rhoref = 1._wp
-                pref = 1._wp
             end if
         end if
 
@@ -581,6 +556,8 @@ contains
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

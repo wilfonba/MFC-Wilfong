@@ -11,11 +11,15 @@ module m_boundary_primitives
     use m_derived_types
     use m_global_parameters
     use m_constants
+    use m_mpi_common
 
     implicit none
 
     type(scalar_field), dimension(:,:), allocatable :: bc_buffers
     $:GPU_DECLARE(create='[bc_buffers]')
+
+    logical :: dirichlet_from_buffers = .false.
+    $:GPU_DECLARE(create='[dirichlet_from_buffers]')
 
 contains
 
@@ -134,15 +138,11 @@ contains
                         q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(1, i))%sf(-j, k, l) = -q_prim_vf(shear_BC_flip_indices(1, &
                                       & i))%sf(j - 1, k, l)
                         end do
-                    end if
-
-                    if (hyperelasticity) then
-                        q_prim_vf(eqn_idx%xi%beg)%sf(-j, k, l) = -q_prim_vf(eqn_idx%xi%beg)%sf(j - 1, k, l)
                     end if
                 end do
 
@@ -172,15 +172,11 @@ contains
                         q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(1, i))%sf(m + j, k, l) = -q_prim_vf(shear_BC_flip_indices(1, &
                                       & i))%sf(m - (j - 1), k, l)
                         end do
-                    end if
-
-                    if (hyperelasticity) then
-                        q_prim_vf(eqn_idx%xi%beg)%sf(m + j, k, l) = -q_prim_vf(eqn_idx%xi%beg)%sf(m - (j - 1), k, l)
                     end if
                 end do
                 if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
@@ -211,15 +207,11 @@ contains
                         q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, -j, l) = -q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, &
                                       & j - 1, l)
                         end do
-                    end if
-
-                    if (hyperelasticity) then
-                        q_prim_vf(eqn_idx%xi%beg + 1)%sf(k, -j, l) = -q_prim_vf(eqn_idx%xi%beg + 1)%sf(k, j - 1, l)
                     end if
                 end do
 
@@ -249,15 +241,11 @@ contains
                         q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, n + j, l) = -q_prim_vf(shear_BC_flip_indices(2, &
                                       & i))%sf(k, n - (j - 1), l)
                         end do
-                    end if
-
-                    if (hyperelasticity) then
-                        q_prim_vf(eqn_idx%xi%beg + 1)%sf(k, n + j, l) = -q_prim_vf(eqn_idx%xi%beg + 1)%sf(k, n - (j - 1), l)
                     end if
                 end do
 
@@ -289,15 +277,11 @@ contains
                         q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, -j) = -q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, &
                                       & l, j - 1)
                         end do
-                    end if
-
-                    if (hyperelasticity) then
-                        q_prim_vf(eqn_idx%xi%end)%sf(k, l, -j) = -q_prim_vf(eqn_idx%xi%end)%sf(k, l, j - 1)
                     end if
                 end do
 
@@ -327,15 +311,11 @@ contains
                         q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, p + j) = -q_prim_vf(shear_BC_flip_indices(3, &
                                       & i))%sf(k, l, p - (j - 1))
                         end do
-                    end if
-
-                    if (hyperelasticity) then
-                        q_prim_vf(eqn_idx%xi%end)%sf(k, l, p + j) = -q_prim_vf(eqn_idx%xi%end)%sf(k, l, p - (j - 1))
                     end if
                 end do
 
@@ -903,7 +883,11 @@ contains
         integer                                                :: j, i
         type(scalar_field), optional, intent(inout)            :: q_T_sf
 
-#ifdef MFC_SIMULATION
+        if (.not. dirichlet_from_buffers) then
+            call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+            return
+        end if
+
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, sys_size
@@ -981,9 +965,6 @@ contains
                 end if
             #:endif
         end if
-#else
-        call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
-#endif
 
     end subroutine s_dirichlet
 
@@ -1059,5 +1040,563 @@ contains
         end if
 
     end subroutine s_qbmm_extrapolation
+
+    !> Apply periodic boundary conditions to the color function and its divergence fields.
+    subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
+
+        $:GPU_ROUTINE(function_name='s_color_function_periodic', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
+        integer, intent(in)                                        :: bc_dir, bc_loc
+        integer, intent(in)                                        :: k, l
+        integer                                                    :: j, i
+
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(m - (j - 1), k, l)
+                    end do
+                end do
+            else  !< bc_x%end
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(j - 1, k, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, n - (j - 1), l)
+                    end do
+                end do
+            else  !< bc_y%end
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, j - 1, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, p - (j - 1))
+                    end do
+                end do
+            else  !< bc_z%end
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, j - 1)
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_color_function_periodic
+
+    !> Apply reflective boundary conditions to the color function and its divergence fields.
+    subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
+
+        $:GPU_ROUTINE(function_name='s_color_function_reflective', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
+        integer, intent(in)                                        :: bc_dir, bc_loc
+        integer, intent(in)                                        :: k, l
+        integer                                                    :: j, i
+
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        if (i == bc_dir) then
+                            c_divs(i)%sf(-j, k, l) = -c_divs(i)%sf(j - 1, k, l)
+                        else
+                            c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(j - 1, k, l)
+                        end if
+                    end do
+                end do
+            else  !< bc_x%end
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        if (i == bc_dir) then
+                            c_divs(i)%sf(m + j, k, l) = -c_divs(i)%sf(m - (j - 1), k, l)
+                        else
+                            c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(m - (j - 1), k, l)
+                        end if
+                    end do
+                end do
+            end if
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        if (i == bc_dir) then
+                            c_divs(i)%sf(k, -j, l) = -c_divs(i)%sf(k, j - 1, l)
+                        else
+                            c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, j - 1, l)
+                        end if
+                    end do
+                end do
+            else  !< bc_y%end
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        if (i == bc_dir) then
+                            c_divs(i)%sf(k, n + j, l) = -c_divs(i)%sf(k, n - (j - 1), l)
+                        else
+                            c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, n - (j - 1), l)
+                        end if
+                    end do
+                end do
+            end if
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        if (i == bc_dir) then
+                            c_divs(i)%sf(k, l, -j) = -c_divs(i)%sf(k, l, j - 1)
+                        else
+                            c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, j - 1)
+                        end if
+                    end do
+                end do
+            else  !< bc_z%end
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        if (i == bc_dir) then
+                            c_divs(i)%sf(k, l, p + j) = -c_divs(i)%sf(k, l, p - (j - 1))
+                        else
+                            c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, p - (j - 1))
+                        end if
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_color_function_reflective
+
+    !> Extrapolate the color function and its divergence into ghost cells by copying boundary values.
+    subroutine s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
+
+        $:GPU_ROUTINE(function_name='s_color_function_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
+        integer, intent(in)                                        :: bc_dir, bc_loc
+        integer, intent(in)                                        :: k, l
+        integer                                                    :: j, i
+
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc_x%beg
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(0, k, l)
+                    end do
+                end do
+            else  !< bc_x%end
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(m, k, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc_y%beg
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, 0, l)
+                    end do
+                end do
+            else  !< bc_y%end
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, n, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc_z%beg
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, 0)
+                    end do
+                end do
+            else  !< bc_z%end
+                do i = 1, num_dims + 1
+                    do j = 1, buff_size
+                        c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, p)
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_color_function_ghost_cell_extrapolation
+
+    !> Apply periodic boundary conditions to the IGR Jacobian field by copying values from the opposite domain boundary.
+    subroutine s_F_igr_periodic(jac_sf, bc_dir, bc_loc, k, l)
+
+        $:GPU_ROUTINE(function_name='s_F_igr_periodic', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(1:), intent(inout) :: jac_sf
+        integer, intent(in)                              :: bc_dir, bc_loc
+        integer, intent(in)                              :: k, l
+        integer                                          :: j
+
+        if (bc_dir == 1) then
+            if (bc_loc == -1) then
+                do j = 1, buff_size
+                    jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(m - j + 1, k, l)
+                end do
+            else
+                do j = 1, buff_size
+                    jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(j - 1, k, l)
+                end do
+            end if
+        else if (bc_dir == 2) then
+            if (bc_loc == -1) then
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, n - j + 1, l)
+                end do
+            else
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, j - 1, l)
+                end do
+            end if
+        else
+            if (bc_loc == -1) then
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, p - j + 1)
+                end do
+            else
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, j - 1)
+                end do
+            end if
+        end if
+
+    end subroutine s_F_igr_periodic
+
+    !> Apply reflective boundary conditions to the IGR Jacobian field by mirroring values across the boundary.
+    subroutine s_F_igr_reflective(jac_sf, bc_dir, bc_loc, k, l)
+
+        $:GPU_ROUTINE(function_name='s_F_igr_reflective', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(1:), intent(inout) :: jac_sf
+        integer, intent(in)                              :: bc_dir, bc_loc
+        integer, intent(in)                              :: k, l
+        integer                                          :: j
+
+        if (bc_dir == 1) then
+            if (bc_loc == -1) then
+                do j = 1, buff_size
+                    jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(j - 1, k, l)
+                end do
+            else
+                do j = 1, buff_size
+                    jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m - (j - 1), k, l)
+                end do
+            end if
+        else if (bc_dir == 2) then
+            if (bc_loc == -1) then
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, j - 1, l)
+                end do
+            else
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n - (j - 1), l)
+                end do
+            end if
+        else
+            if (bc_loc == -1) then
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, j - 1)
+                end do
+            else
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p - (j - 1))
+                end do
+            end if
+        end if
+
+    end subroutine s_F_igr_reflective
+
+    !> Extrapolate the IGR Jacobian field into ghost cells by copying boundary values.
+    subroutine s_F_igr_ghost_cell_extrapolation(jac_sf, bc_dir, bc_loc, k, l)
+
+        $:GPU_ROUTINE(function_name='s_F_igr_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(1:), intent(inout) :: jac_sf
+        integer, intent(in)                              :: bc_dir, bc_loc
+        integer, intent(in)                              :: k, l
+        integer                                          :: j
+
+        if (bc_dir == 1) then
+            if (bc_loc == -1) then
+                do j = 1, buff_size
+                    jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(0, k, l)
+                end do
+            else
+                do j = 1, buff_size
+                    jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m, k, l)
+                end do
+            end if
+        else if (bc_dir == 2) then
+            if (bc_loc == -1) then
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, 0, l)
+                end do
+            else
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n, l)
+                end do
+            end if
+        else
+            if (bc_loc == -1) then
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, 0)
+                end do
+            else
+                do j = 1, buff_size
+                    jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p)
+                end do
+            end if
+        end if
+
+    end subroutine s_F_igr_ghost_cell_extrapolation
+
+    subroutine s_beta_periodic(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar)
+
+        $:GPU_ROUTINE(function_name='s_beta_periodic', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: kahan_comp
+        integer, intent(in)                                        :: bc_dir, bc_loc
+        integer, intent(in)                                        :: k, l
+        integer, intent(in)                                        :: nvar
+        integer                                                    :: j, i
+        real(wp)                                                   :: y_kahan, t_kahan
+
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc%x%beg
+                do i = 1, nvar
+                    do j = -mapCells - 1, mapCells
+                        ! Kahan-compensated addition of ghost to interior
+                        y_kahan = real(q_beta(beta_vars(i))%sf(m + j + 1, k, l), &
+                                       & kind=wp) + kahan_comp(beta_vars(i))%sf(m + j + 1, k, l) - kahan_comp(beta_vars(i))%sf(j, &
+                                       & k, l)
+                        t_kahan = real(q_beta(beta_vars(i))%sf(j, k, l), kind=wp) + y_kahan
+                        kahan_comp(beta_vars(i))%sf(j, k, l) = (t_kahan - q_beta(beta_vars(i))%sf(j, k, l)) - y_kahan
+                        q_beta(beta_vars(i))%sf(j, k, l) = t_kahan
+                    end do
+                end do
+            else
+                do i = 1, nvar
+                    do j = -mapcells, mapcells + 1
+                        q_beta(beta_vars(i))%sf(m + j, k, l) = q_beta(beta_vars(i))%sf(j - 1, k, l)
+                        kahan_comp(beta_vars(i))%sf(m + j, k, l) = kahan_comp(beta_vars(i))%sf(j - 1, k, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc%y%beg
+                do i = 1, nvar
+                    do j = -mapcells - 1, mapcells
+                        y_kahan = real(q_beta(beta_vars(i))%sf(k, n + j + 1, l), kind=wp) + kahan_comp(beta_vars(i))%sf(k, &
+                                       & n + j + 1, l) - kahan_comp(beta_vars(i))%sf(k, j, l)
+                        t_kahan = real(q_beta(beta_vars(i))%sf(k, j, l), kind=wp) + y_kahan
+                        kahan_comp(beta_vars(i))%sf(k, j, l) = (t_kahan - q_beta(beta_vars(i))%sf(k, j, l)) - y_kahan
+                        q_beta(beta_vars(i))%sf(k, j, l) = t_kahan
+                    end do
+                end do
+            else
+                do i = 1, nvar
+                    do j = -mapcells, mapcells + 1
+                        q_beta(beta_vars(i))%sf(k, n + j, l) = q_beta(beta_vars(i))%sf(k, j - 1, l)
+                        kahan_comp(beta_vars(i))%sf(k, n + j, l) = kahan_comp(beta_vars(i))%sf(k, j - 1, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc%z%beg
+                do i = 1, nvar
+                    do j = -mapcells - 1, mapcells
+                        y_kahan = real(q_beta(beta_vars(i))%sf(k, l, p + j + 1), kind=wp) + kahan_comp(beta_vars(i))%sf(k, l, &
+                                       & p + j + 1) - kahan_comp(beta_vars(i))%sf(k, l, j)
+                        t_kahan = real(q_beta(beta_vars(i))%sf(k, l, j), kind=wp) + y_kahan
+                        kahan_comp(beta_vars(i))%sf(k, l, j) = (t_kahan - q_beta(beta_vars(i))%sf(k, l, j)) - y_kahan
+                        q_beta(beta_vars(i))%sf(k, l, j) = t_kahan
+                    end do
+                end do
+            else
+                do i = 1, nvar
+                    do j = -mapcells, mapcells + 1
+                        q_beta(beta_vars(i))%sf(k, l, p + j) = q_beta(beta_vars(i))%sf(k, l, j - 1)
+                        kahan_comp(beta_vars(i))%sf(k, l, p + j) = kahan_comp(beta_vars(i))%sf(k, l, j - 1)
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_beta_periodic
+
+    subroutine s_beta_extrapolation(q_beta, bc_dir, bc_loc, k, l, nvar)
+
+        $:GPU_ROUTINE(function_name='s_beta_extrapolation', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
+        integer, intent(in)                                        :: bc_dir, bc_loc
+        integer, intent(in)                                        :: k, l
+        integer, intent(in)                                        :: nvar
+        integer                                                    :: j, i
+
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc%x%beg
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(beta_vars(i))%sf(-j, k, l) = 0._wp
+                    end do
+                end do
+            else
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(beta_vars(i))%sf(m + j, k, l) = 0._wp
+                    end do
+                end do
+            end if
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc%y%beg
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(beta_vars(i))%sf(k, -j, l) = 0._wp
+                    end do
+                end do
+            else
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(beta_vars(i))%sf(k, n + j, l) = 0._wp
+                    end do
+                end do
+            end if
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc%z%beg
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(beta_vars(i))%sf(k, l, -j) = 0._wp
+                    end do
+                end do
+            else  !< bc%z%end
+                do i = 1, nvar
+                    do j = 1, buff_size
+                        q_beta(beta_vars(i))%sf(k, l, p + j) = 0._wp
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_beta_extrapolation
+
+    subroutine s_beta_reflective(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar)
+
+        $:GPU_ROUTINE(function_name='s_beta_reflective', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: kahan_comp
+        integer, intent(in)                                        :: bc_dir, bc_loc
+        integer, intent(in)                                        :: k, l
+        integer, intent(in)                                        :: nvar
+        integer                                                    :: j, i
+        real(wp)                                                   :: y_kahan, t_kahan
+
+        ! Reflective BC for void fraction: 1) Fold ghost-cell contributions back onto their mirror interior cells (Kahan) 2) Set
+        ! ghost cells = mirror of (now-folded) interior values
+
+        if (bc_dir == 1) then  !< x-direction
+            if (bc_loc == -1) then  ! bc%x%beg
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(beta_vars(i))%sf(-j, k, l), kind=wp) + kahan_comp(beta_vars(i))%sf(-j, k, &
+                                       & l) - kahan_comp(beta_vars(i))%sf(j - 1, k, l)
+                        t_kahan = real(q_beta(beta_vars(i))%sf(j - 1, k, l), kind=wp) + y_kahan
+                        kahan_comp(beta_vars(i))%sf(j - 1, k, l) = (t_kahan - q_beta(beta_vars(i))%sf(j - 1, k, l)) - y_kahan
+                        q_beta(beta_vars(i))%sf(j - 1, k, l) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(beta_vars(i))%sf(-j, k, l) = q_beta(beta_vars(i))%sf(j - 1, k, l)
+                        kahan_comp(beta_vars(i))%sf(-j, k, l) = kahan_comp(beta_vars(i))%sf(j - 1, k, l)
+                    end do
+                end do
+            else  !< bc%x%end
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(beta_vars(i))%sf(m + j, k, l), kind=wp) + kahan_comp(beta_vars(i))%sf(m + j, k, &
+                                       & l) - kahan_comp(beta_vars(i))%sf(m - (j - 1), k, l)
+                        t_kahan = real(q_beta(beta_vars(i))%sf(m - (j - 1), k, l), kind=wp) + y_kahan
+                        kahan_comp(beta_vars(i))%sf(m - (j - 1), k, l) = (t_kahan - q_beta(beta_vars(i))%sf(m - (j - 1), k, &
+                                   & l)) - y_kahan
+                        q_beta(beta_vars(i))%sf(m - (j - 1), k, l) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(beta_vars(i))%sf(m + j, k, l) = q_beta(beta_vars(i))%sf(m - (j - 1), k, l)
+                        kahan_comp(beta_vars(i))%sf(m + j, k, l) = kahan_comp(beta_vars(i))%sf(m - (j - 1), k, l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 2) then  !< y-direction
+            if (bc_loc == -1) then  !< bc%y%beg
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(beta_vars(i))%sf(k, -j, l), kind=wp) + kahan_comp(beta_vars(i))%sf(k, -j, &
+                                       & l) - kahan_comp(beta_vars(i))%sf(k, j - 1, l)
+                        t_kahan = real(q_beta(beta_vars(i))%sf(k, j - 1, l), kind=wp) + y_kahan
+                        kahan_comp(beta_vars(i))%sf(k, j - 1, l) = (t_kahan - q_beta(beta_vars(i))%sf(k, j - 1, l)) - y_kahan
+                        q_beta(beta_vars(i))%sf(k, j - 1, l) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(beta_vars(i))%sf(k, -j, l) = q_beta(beta_vars(i))%sf(k, j - 1, l)
+                        kahan_comp(beta_vars(i))%sf(k, -j, l) = kahan_comp(beta_vars(i))%sf(k, j - 1, l)
+                    end do
+                end do
+            else  !< bc%y%end
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(beta_vars(i))%sf(k, n + j, l), kind=wp) + kahan_comp(beta_vars(i))%sf(k, n + j, &
+                                       & l) - kahan_comp(beta_vars(i))%sf(k, n - (j - 1), l)
+                        t_kahan = real(q_beta(beta_vars(i))%sf(k, n - (j - 1), l), kind=wp) + y_kahan
+                        kahan_comp(beta_vars(i))%sf(k, n - (j - 1), l) = (t_kahan - q_beta(beta_vars(i))%sf(k, n - (j - 1), &
+                                   & l)) - y_kahan
+                        q_beta(beta_vars(i))%sf(k, n - (j - 1), l) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(beta_vars(i))%sf(k, n + j, l) = q_beta(beta_vars(i))%sf(k, n - (j - 1), l)
+                        kahan_comp(beta_vars(i))%sf(k, n + j, l) = kahan_comp(beta_vars(i))%sf(k, n - (j - 1), l)
+                    end do
+                end do
+            end if
+        else if (bc_dir == 3) then  !< z-direction
+            if (bc_loc == -1) then  !< bc%z%beg
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(beta_vars(i))%sf(k, l, -j), kind=wp) + kahan_comp(beta_vars(i))%sf(k, l, &
+                                       & -j) - kahan_comp(beta_vars(i))%sf(k, l, j - 1)
+                        t_kahan = real(q_beta(beta_vars(i))%sf(k, l, j - 1), kind=wp) + y_kahan
+                        kahan_comp(beta_vars(i))%sf(k, l, j - 1) = (t_kahan - q_beta(beta_vars(i))%sf(k, l, j - 1)) - y_kahan
+                        q_beta(beta_vars(i))%sf(k, l, j - 1) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(beta_vars(i))%sf(k, l, -j) = q_beta(beta_vars(i))%sf(k, l, j - 1)
+                        kahan_comp(beta_vars(i))%sf(k, l, -j) = kahan_comp(beta_vars(i))%sf(k, l, j - 1)
+                    end do
+                end do
+            else  !< bc%z%end
+                do i = 1, nvar
+                    do j = 1, mapCells + 1
+                        y_kahan = real(q_beta(beta_vars(i))%sf(k, l, p + j), kind=wp) + kahan_comp(beta_vars(i))%sf(k, l, &
+                                       & p + j) - kahan_comp(beta_vars(i))%sf(k, l, p - (j - 1))
+                        t_kahan = real(q_beta(beta_vars(i))%sf(k, l, p - (j - 1)), kind=wp) + y_kahan
+                        kahan_comp(beta_vars(i))%sf(k, l, p - (j - 1)) = (t_kahan - q_beta(beta_vars(i))%sf(k, l, &
+                                   & p - (j - 1))) - y_kahan
+                        q_beta(beta_vars(i))%sf(k, l, p - (j - 1)) = t_kahan
+                    end do
+                    do j = 1, mapCells + 1
+                        q_beta(beta_vars(i))%sf(k, l, p + j) = q_beta(beta_vars(i))%sf(k, l, p - (j - 1))
+                        kahan_comp(beta_vars(i))%sf(k, l, p + j) = kahan_comp(beta_vars(i))%sf(k, l, p - (j - 1))
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_beta_reflective
 
 end module m_boundary_primitives

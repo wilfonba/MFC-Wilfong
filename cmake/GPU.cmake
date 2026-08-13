@@ -115,6 +115,20 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
         add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
     endif()
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+    # AMD/LLVM flang (amdflang). These are CPU-build flags only; the OpenMP-offload GPU
+    # build sets its own flags (MFCTargets.cmake) and links via the offload wrapper, so
+    # it is left untouched here.
+    if (NOT (MFC_OpenMP OR MFC_OpenACC))
+        if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug")
+            # Ordinary (non-LTO) objects plus static deps built without -fPIC
+            # (e.g. libfftw3) hit ld.lld's default-PIE "relocation R_X86_64_32
+            # against local symbol". Link a non-PIE executable to accept them.
+            # Release links fine via LTO's link-time PIC codegen, so it is left alone.
+            add_link_options(-no-pie)
+            add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
+        endif()
+    endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
@@ -130,6 +144,20 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
+
+    # -Mfprelaxed enables relaxed-precision FP, including the a/sqrt(b) ->
+    # a*rsqrt(b) idiom. On NVHPC 24.5 that idiom can emit an AVX-512 reciprocal-
+    # sqrt node (X86ISD::RSQRT14S) that the non-AVX-512 GitHub Actions runner CPUs
+    # cannot select, crashing llc (signal 6) while building the release container
+    # images (e.g. s_read_stl_binary in m_model.fpp). Skip -Mfprelaxed for
+    # container builds only; cluster/normal builds are unaffected. The switch is
+    # set in .github/Dockerfile (MFC_CONTAINER_BUILD=1). Read it as a boolean so a
+    # stray empty/0/false export doesn't silently drop the flag from a normal
+    # build; only a truthy value skips it.
+    set(_mfc_container_build "$ENV{MFC_CONTAINER_BUILD}")
+    if (NOT _mfc_container_build)
+        add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-Mfprelaxed>)
+    endif()
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
