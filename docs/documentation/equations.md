@@ -845,6 +845,15 @@ where \f$a\f$ and \f$b\f$ are the left and right slope differences.
 
 where \f$A = \frac{\exp(\text{sign}(s)\,\beta\,(2C - 1))\,/\,\cosh(\beta) - 1}{\tanh(\beta)}\f$ and \f$\beta\f$ controls compression steepness.
 
+**Conservative diffuse-interface (CDI) sharpening** (`int_comp = 3`): instead of modifying the reconstruction, adds divergence-form regularization fluxes to the five-equation model that drive interfaces toward a fixed equilibrium thickness while conserving phase mass, mixture momentum, and total energy.
+The volume-fraction flux for phase \f$m\f$ uses the N-phase pairwise form
+
+\f[\mathbf{a}_m = \Gamma\left(\epsilon\,\nabla\alpha_m - \sum_{j \neq m}\alpha_m\,\alpha_j\,\hat{\mathbf{n}}_{mj}\right), \qquad \hat{\mathbf{n}}_{mj} = \frac{\nabla\alpha_{mj}}{|\nabla\alpha_{mj}|}, \qquad \alpha_{mj} = \frac{\alpha_m}{\alpha_m + \alpha_j},\f]
+
+with consistency fluxes \f$\rho_m \mathbf{a}_m\f$ in the phase continuity equations, \f$\mathbf{u} \sum_m \rho_m \mathbf{a}_m\f$ in the momentum equation, and \f$\sum_m \mathbf{a}_m (\frac{1}{2}\rho_m |\mathbf{u}|^2 + (\rho e)_m)\f$ in the energy equation, where the phase internal energy (not enthalpy) preserves pressure, temperature, and velocity equilibrium across interfaces.
+The interface thickness scale is \f$\epsilon = \Delta x\f$ (local face spacing) and the velocity scale \f$\Gamma\f$ is the global maximum velocity magnitude, or `ic_gamma` when set.
+References: Brill, Olson, and Bokman, JCP 542 (2025); Jain et al., JCP 475 (2023); Mirjalili and Mani, JCP 498 (2024).
+
 #### IGR Reconstruction
 
 5th-order or 3rd-order polynomial interpolation without WENO nonlinear weights, using Lax-Friedrichs numerical flux. Stencil coefficients:

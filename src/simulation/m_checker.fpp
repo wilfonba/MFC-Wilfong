@@ -13,7 +13,8 @@ module m_checker
     use m_helper
     use m_helper_basic
     use m_constants, only: model_eqns_5eq, riemann_solver_hll, riemann_solver_hllc, riemann_solver_hlld, recon_type_weno, &
-        & recon_type_muscl, muscl_order_first_order, riemann_solver_lax_friedrichs, wave_speeds_pressure
+        & recon_type_muscl, muscl_order_first_order, riemann_solver_lax_friedrichs, wave_speeds_pressure, int_comp_thinc, &
+        & int_comp_mthinc, int_comp_cdi
 
     implicit none
 
@@ -34,6 +35,16 @@ contains
             else if (recon_type == recon_type_muscl) then
                 call s_check_inputs_muscl
             end if
+        end if
+
+        if (int_comp == int_comp_cdi) then
+            @:PROHIBIT(model_eqns /= model_eqns_5eq, "int_comp = 3 (CDI) requires model_eqns = 2 (five-equation model)")
+            @:PROHIBIT(num_fluids < 2, "int_comp = 3 (CDI) requires num_fluids >= 2")
+            @:PROHIBIT(cyl_coord, "int_comp = 3 (CDI) does not support cylindrical coordinates")
+            @:PROHIBIT(alt_soundspeed, "int_comp = 3 (CDI) does not support alt_soundspeed")
+            @:PROHIBIT(bubbles_euler, "int_comp = 3 (CDI) does not support bubbles_euler")
+            @:PROHIBIT(surface_tension, "int_comp = 3 (CDI) does not support surface_tension: the color function is not sharpened")
+            @:PROHIBIT(mhd, "int_comp = 3 (CDI) does not support mhd")
         end if
 
         call s_check_inputs_time_stepping
@@ -148,8 +159,8 @@ contains
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*muscl_order, &
                    & "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " &
                    & // trim(numStr))
-        @:PROHIBIT(muscl_order == muscl_order_first_order .and. int_comp > 0, &
-                   & "int_comp requires muscl_order >= 2 (muscl_order=1 leaves the reconstruction workspace uninitialised)")
+        @:PROHIBIT(muscl_order == muscl_order_first_order .and. (int_comp == int_comp_thinc .or. int_comp == int_comp_mthinc), &
+                   & "int_comp = 1 or 2 requires muscl_order >= 2 (muscl_order=1 leaves the reconstruction workspace uninitialised)")
 
     end subroutine s_check_inputs_muscl
 

@@ -219,7 +219,7 @@ contains
             #:endfor
         end if
 
-        if (int_comp > 0 .and. v_size >= eqn_idx%adv%end) then
+        if ((int_comp == int_comp_thinc .or. int_comp == int_comp_mthinc) .and. v_size >= eqn_idx%adv%end) then
             call nvtxStartRange("WENO-INTCOMP")
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (muscl_dir == ${MUSCL_DIR}$) then

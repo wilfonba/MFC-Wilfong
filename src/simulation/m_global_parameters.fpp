@@ -396,6 +396,7 @@ contains
         int_comp = 0
         ic_eps = dflt_ic_eps
         ic_beta = dflt_ic_beta
+        ic_gamma = dflt_real
         rdma_mpi = .false.
         shear_stress = .false.
         bulk_stress = .false.
@@ -976,7 +977,7 @@ contains
             $:GPU_UPDATE(device='[num_fluids, num_dims, viscous, num_vels, nb, muscl_lim]')
         #:endif
 
-        $:GPU_UPDATE(device='[int_comp, ic_eps, ic_beta]')
+        $:GPU_UPDATE(device='[int_comp, ic_eps, ic_beta, ic_gamma]')
         $:GPU_UPDATE(device='[muscl_eps]')
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 

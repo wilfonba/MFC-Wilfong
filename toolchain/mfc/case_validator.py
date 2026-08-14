@@ -414,21 +414,30 @@ class CaseValidator:
         n = self.get("n", 0)
         num_fluids = self.get("num_fluids", 0)
         model_eqns = self.get("model_eqns", 2)
-        self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
+        self.prohibit(int_comp not in [0, 1, 2, 3], "int_comp must be 0 (off), 1 (THINC), 2 (MTHINC), or 3 (CDI)")
         self.prohibit(int_comp == 2 and n == 0, "int_comp = 2 (MTHINC) requires at least 2D (n > 0)")
-        self.prohibit(int_comp != 0 and num_fluids != 2, "int_comp > 0 requires num_fluids = 2")
+        self.prohibit(int_comp in [1, 2] and num_fluids != 2, "int_comp = 1 or 2 (THINC/MTHINC) requires num_fluids = 2")
         self.prohibit(
             int_comp != 0 and model_eqns == 3,
             "int_comp > 0 is not supported with model_eqns = 3: THINC does not update per-fluid internal energies, leaving thermodynamically inconsistent face states",
         )
 
+        if int_comp == 3:
+            self.prohibit(model_eqns != 2, "int_comp = 3 (CDI) requires model_eqns = 2 (five-equation model)")
+            self.prohibit(num_fluids < 2, "int_comp = 3 (CDI) requires num_fluids >= 2")
+            self.prohibit(self.get("cyl_coord", "F") == "T", "int_comp = 3 (CDI) does not support cylindrical coordinates")
+            self.prohibit(self.get("alt_soundspeed", "F") == "T", "int_comp = 3 (CDI) does not support alt_soundspeed")
+            self.prohibit(self.get("bubbles_euler", "F") == "T", "int_comp = 3 (CDI) does not support bubbles_euler")
+            self.prohibit(self.get("surface_tension", "F") == "T", "int_comp = 3 (CDI) does not support surface_tension: the color function is not sharpened")
+            self.prohibit(self.get("mhd", "F") == "T", "int_comp = 3 (CDI) does not support mhd")
+
         recon_type = self.get("recon_type", 1)
         if recon_type == 1:  # WENO
             weno_order = self.get("weno_order")
-            self.prohibit(weno_order == 1 and int_comp != 0, "int_comp must be 0 (off) when weno_order = 1")
+            self.prohibit(weno_order == 1 and int_comp in [1, 2], "int_comp must be 0 (off) or 3 (CDI) when weno_order = 1")
         elif recon_type == 2:  # MUSCL
             muscl_order = self.get("muscl_order")
-            self.prohibit(muscl_order == 1 and int_comp != 0, "int_comp must be 0 (off) when muscl_order = 1")
+            self.prohibit(muscl_order == 1 and int_comp in [1, 2], "int_comp must be 0 (off) or 3 (CDI) when muscl_order = 1")
 
     def check_boundary_conditions(self):
         """Checks constraints on boundary conditions"""

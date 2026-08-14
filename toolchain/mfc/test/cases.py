@@ -595,6 +595,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.push("weno_order=5", {"weno_order": 5})
         cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
+        cases.append(define_case_d(stack, "int_comp=3", {"int_comp": 3}))
+        if len(dimInfo[0]) == 1:
+            cases.append(define_case_d(stack, "int_comp=3 -> ic_gamma", {"int_comp": 3, "ic_gamma": 0.5}))
+        if len(dimInfo[0]) == 2:
+            # Three fluids: protects the pairwise N-phase CDI path, which is inert with two fluids
+            three_fluid_ic = {"int_comp": 3, "num_fluids": 3, "fluid_pp(3)%gamma": 2.0, "fluid_pp(3)%pi_inf": 0.0}
+            for patch, fluid in [(1, 1), (2, 2), (3, 3)]:
+                for f in [1, 2, 3]:
+                    alpha = 1.0 - 2 * eps if f == fluid else eps
+                    three_fluid_ic[f"patch_icpp({patch})%alpha({f})"] = alpha
+                    three_fluid_ic[f"patch_icpp({patch})%alpha_rho({f})"] = alpha
+            cases.append(define_case_d(stack, "int_comp=3 -> 3 Fluids", three_fluid_ic))
         if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
             cases.append(define_case_d(stack, "int_comp=2", {"int_comp": 2}))
             stack.push(

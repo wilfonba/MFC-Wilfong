@@ -14,8 +14,8 @@ module m_rhs
     use m_mpi_proxy
     use m_variables_conversion
     use m_weno
-    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
-        & recon_type_muscl
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_thinc, int_comp_mthinc, &
+        & int_comp_cdi, recon_type_weno, recon_type_muscl
     use m_muscl
     use m_riemann_solvers
     use m_cbc
@@ -35,6 +35,7 @@ module m_rhs
     use m_reactive_burn
     use m_igr
     use m_thinc
+    use m_cdi_sharpening
     use m_pressure_relaxation
 
     implicit none
@@ -806,6 +807,12 @@ contains
         end if
         ! END: Dimensional Splitting Loop
 
+        if (int_comp == int_comp_cdi) then
+            call nvtxStartRange("RHS-CDI-SHARPENING")
+            call s_compute_cdi_sharpening_rhs(q_prim_qp%vf, rhs_vf)
+            call nvtxEndRange
+        end if
+
         ! RHS additions for hypoelasticity (interface-consistent path, after all sweeps)
         if (hypo_nc_mode == hypo_nc_mode_interface) then
             call nvtxStartRange("RHS-HYPOELASTICITY-IFACE")
@@ -905,7 +912,7 @@ contains
         call nvtxStartRange("RHS-RECONSTRUCTION")
 
         if (.not. surface_tension) then
-            if ((.not. weno_Re_flux) .or. int_comp > 0) then
+            if ((.not. weno_Re_flux) .or. int_comp == int_comp_thinc .or. int_comp == int_comp_mthinc) then
                 ! Reconstruct densitiess
                 iv%beg = 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values(q_prim_qp%vf(1:sys_size), qL_rsx_vf, qR_rsx_vf, id)
@@ -933,7 +940,7 @@ contains
                 call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qR_rsx_vf, id)
             end if
         else
-            if (int_comp > 0) then
+            if (int_comp == int_comp_thinc .or. int_comp == int_comp_mthinc) then
                 ! THINC reads cont and adv from v_rs_ws; must reconstruct full sys_size range to populate both
                 iv%beg = 1; iv%end = sys_size
                 call s_reconstruct_cell_boundary_values(q_prim_qp%vf(1:sys_size), qL_rsx_vf, qR_rsx_vf, id)

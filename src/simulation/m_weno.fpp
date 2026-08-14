@@ -1483,7 +1483,7 @@ contains
             #:endif
         end if
 
-        if (int_comp > 0 .and. v_size >= eqn_idx%adv%end) then
+        if ((int_comp == int_comp_thinc .or. int_comp == int_comp_mthinc) .and. v_size >= eqn_idx%adv%end) then
             call nvtxStartRange("WENO-INTCOMP")
             call s_thinc_compression(v_rs_weno, vL_rs_vf_x, vR_rs_vf_x, weno_dir, is1_weno, is2_weno, is3_weno)
             call nvtxEndRange()

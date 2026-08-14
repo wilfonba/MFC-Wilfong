@@ -309,9 +309,9 @@ CONSTRAINTS = {
         "names": {"unlimited": 0, "minmod": 1, "mc": 2, "van_albada": 3, "van_leer": 4, "superbee": 5},
     },
     "int_comp": {
-        "choices": [0, 1, 2],
-        "value_labels": {0: "off", 1: "THINC", 2: "MTHINC"},
-        "names": {"off": 0, "thinc": 1, "mthinc": 2},
+        "choices": [0, 1, 2, 3],
+        "value_labels": {0: "off", 1: "THINC", 2: "MTHINC", 3: "CDI"},
+        "names": {"off": 0, "thinc": 1, "mthinc": 2, "cdi": 3},
     },
     # Time stepping
     "time_stepper": {
@@ -779,6 +779,7 @@ def _load():
         "alf_factor",
         "ic_eps",
         "ic_beta",
+        "ic_gamma",
     ]:
         _r(n, REAL)
     for n in [
@@ -1351,6 +1352,7 @@ _nv(
     "int_comp",
     "ic_eps",
     "ic_beta",
+    "ic_gamma",
     "riemann_hypo_ADC",
     "ADC_kappa",
     "hll_u_interface",
