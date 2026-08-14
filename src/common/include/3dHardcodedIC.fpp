@@ -19,11 +19,11 @@
 
     ! # 309 - multimode 3D RT / Faraday interface read from interface_profile.dat
     ! The 2D field y_interface(x, z) is loaded once and kept for the whole run.
-    logical, save :: pert3d_loaded = .false.
-    integer, save :: pert3d_nx, pert3d_nz
-    real(wp), allocatable, save :: pert3d_x(:), pert3d_z(:), pert3d_y(:, :)
-    real(wp) :: yI, wblend, dxf, dzf, fx, fz, y00, y10, y01, y11
-    integer  :: ix, iz, punit, pios
+    logical, save               :: pert3d_loaded = .false.
+    integer, save               :: pert3d_nx, pert3d_nz
+    real(wp), allocatable, save :: pert3d_x(:), pert3d_z(:), pert3d_y(:,:)
+    real(wp)                    :: yI, wblend, dxf, dzf, fx, fz, y00, y10, y01, y11
+    integer                     :: ix, iz, punit, pios
 
     eps = 1e-9_wp
 
@@ -322,8 +322,7 @@
         y10 = pert3d_y(ix + 1, iz)
         y01 = pert3d_y(ix, iz + 1)
         y11 = pert3d_y(ix + 1, iz + 1)
-        yI = (1._wp - fx)*(1._wp - fz)*y00 + fx*(1._wp - fz)*y10 &
-             + (1._wp - fx)*fz*y01 + fx*fz*y11
+        yI = (1._wp - fx)*(1._wp - fz)*y00 + fx*(1._wp - fz)*y10 + (1._wp - fx)*fz*y01 + fx*fz*y11
 
         rhoH = patch_icpp(patch_id)%a(2)
         rhoL = patch_icpp(patch_id)%a(3)

@@ -35,11 +35,11 @@
 
     ! # 209 - multimode RT / Faraday interface read from interface_profile.dat
     ! The profile (x, y_interface) is loaded once and kept for the whole run.
-    logical, save :: pert_loaded = .false.
-    integer, save :: pert_n
+    logical, save               :: pert_loaded = .false.
+    integer, save               :: pert_n
     real(wp), allocatable, save :: pert_x(:), pert_y(:)
-    real(wp) :: yI, wblend, dxf, posf, fracf
-    integer  :: il, ipert, punit, pios
+    real(wp)                    :: yI, wblend, dxf, posf, fracf
+    integer                     :: il, ipert, punit, pios
 
     eps = 1.e-9_wp
 #:enddef
