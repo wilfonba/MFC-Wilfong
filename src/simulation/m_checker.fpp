@@ -43,7 +43,6 @@ contains
             @:PROHIBIT(cyl_coord, "int_comp = 3 (CDI) does not support cylindrical coordinates")
             @:PROHIBIT(alt_soundspeed, "int_comp = 3 (CDI) does not support alt_soundspeed")
             @:PROHIBIT(bubbles_euler, "int_comp = 3 (CDI) does not support bubbles_euler")
-            @:PROHIBIT(surface_tension, "int_comp = 3 (CDI) does not support surface_tension: the color function is not sharpened")
             @:PROHIBIT(mhd, "int_comp = 3 (CDI) does not support mhd")
         end if
 

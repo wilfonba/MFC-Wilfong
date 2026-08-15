@@ -620,6 +620,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 },
             )
             cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
+            cases.append(define_case_d(stack, "int_comp=3", {"int_comp": 3}))
             stack.pop()
         stack.pop()
 

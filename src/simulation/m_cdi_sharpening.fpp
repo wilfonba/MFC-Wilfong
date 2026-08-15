@@ -10,9 +10,11 @@
 !! O(eps) while conserving phase mass, mixture momentum, and total energy. The volume-fraction flux for phase m is the N-phase
 !! pairwise CDI flux a_m = Gamma*(eps*grad(alpha_m) - sum_{j/=m} alpha_m*alpha_j*nhat_mj), with consistency fluxes rho_m*a_m
 !! (continuity), u*sum(rho_m*a_m) (momentum), and sum(a_m*(0.5*rho_m*|u|^2 + (rho*e)_m)) (energy). The energy flux carries phase
-!! internal energy, not enthalpy, which preserves pressure/temperature/velocity equilibrium across interfaces. References: S. R.
-!! Brill, B. J. Olson, and G. T. Bokman, JCP 542 (2025) 114366 (Eqs. 38-40, 68); S. S. Jain et al., JCP 475 (2023) 111866
-!! (divergence-form approach); S. Mirjalili and A. Mani, JCP 498 (2024) 112657 (N-phase pairwise formulation).
+!! internal energy, not enthalpy, which preserves pressure/temperature/velocity equilibrium across interfaces. With surface tension,
+!! the color function receives the same (two-phase) CDI flux so it stays co-located with the sharpened volume fraction; this term is
+!! purely kinematic since c carries no mass and sigma does not enter the pressure inversion. References: S. R. Brill, B. J. Olson,
+!! and G. T. Bokman, JCP 542 (2025) 114366 (Eqs. 38-40, 68); S. S. Jain et al., JCP 475 (2023) 111866 (divergence-form approach); S.
+!! Mirjalili and A. Mani, JCP 498 (2024) 112657 (N-phase pairwise formulation).
 module m_cdi_sharpening
 
     use m_derived_types
@@ -51,8 +53,13 @@ contains
     !> @brief Allocate the CDI sharpening module arrays
     impure subroutine s_initialize_cdi_sharpening_module()
 
+        integer :: flux_end
+
+        flux_end = eqn_idx%adv%end
+        if (surface_tension) flux_end = eqn_idx%c
+
         @:ALLOCATE(cdi_flux(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                   & 1:eqn_idx%adv%end))
+                   & 1:flux_end))
 
     end subroutine s_initialize_cdi_sharpening_module
 
@@ -69,7 +76,7 @@ contains
             real(wp), dimension(num_fluids) :: af_L, af_R, af_F, rho_F, sharp_t, a_reg
             real(wp), dimension(num_vels)   :: vel_F
         #:endif
-        real(wp) :: eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, vel_max_loc
+        real(wp) :: eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, vel_max_loc, cf_L, cf_R, cf_F
         integer  :: i, j, k, l, q1, q2, iq1, iq2
 
         ! Velocity scale Gamma = global max |u| unless the user set ic_gamma
@@ -118,7 +125,7 @@ contains
                 if (${RTG}$) then
                     ! ${XYZ}$-direction face fluxes
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q1, q2, iq1, iq2, af_L, af_R, af_F, rho_F, sharp_t, &
-                                        & a_reg, vel_F, eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum]')
+                                        & a_reg, vel_F, eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, cf_L, cf_R, cf_F]')
                     do l = ${LB}$
                         do k = ${KB}$
                             do j = ${JB}$
@@ -213,6 +220,42 @@ contains
                                                                 & + rho_F(i)*qvs(i))
                                 end do
                                 cdi_flux(j, k, l, eqn_idx%E) = flux_sum
+
+                                ! Color function sharpening: same two-phase CDI flux, keeping c co-located with the sharpened
+                                ! volume fraction. Kinematic only: c carries no mass and sigma does not enter the pressure
+                                ! inversion, so no consistency terms are needed.
+                                if (surface_tension) then
+                                    cf_L = min(max(q_prim_vf(eqn_idx%c)%sf(${IX()}$), 0._wp), 1._wp)
+                                    cf_R = min(max(q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1')}$), 0._wp), 1._wp)
+                                    cf_F = 5e-1_wp*(cf_L + cf_R)
+
+                                    gn = (cf_R - cf_L)/eps_face
+
+                                    g1 = 0._wp
+                                    if (${T1G}$) then
+                                        g1 = (q_prim_vf(eqn_idx%c)%sf(${IX(a=' + 1')}$) &
+                                              & - q_prim_vf(eqn_idx%c)%sf(${IX(a=' - 1')}$) &
+                                              & + q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1', a=' + 1')}$) &
+                                              & - q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1', a=' - 1')}$))/(2._wp*(${T1CC}$(${T1IX}$ &
+                                              & + 1) - ${T1CC}$(${T1IX}$ - 1)))
+                                    end if
+
+                                    g2 = 0._wp
+                                    if (${T2G}$) then
+                                        g2 = (q_prim_vf(eqn_idx%c)%sf(${IX(b=' + 1')}$) &
+                                              & - q_prim_vf(eqn_idx%c)%sf(${IX(b=' - 1')}$) &
+                                              & + q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1', b=' + 1')}$) &
+                                              & - q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1', b=' - 1')}$))/(2._wp*(${T2CC}$(${T2IX}$ &
+                                              & + 1) - ${T2CC}$(${T2IX}$ - 1)))
+                                    end if
+
+                                    rmag = sqrt(gn*gn + g1*g1 + g2*g2)
+
+                                    tpair = 0._wp
+                                    if (rmag > verysmall) tpair = cf_F*(1._wp - cf_F)*gn/rmag
+
+                                    cdi_flux(j, k, l, eqn_idx%c) = cdi_gamma*((cf_R - cf_L) - tpair)
+                                end if
                             end do
                         end do
                     end do
@@ -228,6 +271,10 @@ contains
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + (cdi_flux(j, k, l, &
                                            & i) - cdi_flux(${IX(n=' - 1')}$, i))/${DXI}$
                                 end do
+                                if (surface_tension) then
+                                    rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, l) + (cdi_flux(j, k, l, &
+                                           & eqn_idx%c) - cdi_flux(${IX(n=' - 1')}$, eqn_idx%c))/${DXI}$
+                                end if
                             end do
                         end do
                     end do
