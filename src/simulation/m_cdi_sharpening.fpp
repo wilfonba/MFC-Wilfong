@@ -25,7 +25,8 @@ module m_cdi_sharpening
 
     implicit none
 
-    private; public :: s_initialize_cdi_sharpening_module, s_compute_cdi_sharpening_rhs, s_finalize_cdi_sharpening_module
+    private; public :: s_initialize_cdi_sharpening_module, s_compute_cdi_gamma, s_compute_cdi_sharpening_rhs, &
+        & s_finalize_cdi_sharpening_module
 
     !> Face-centered regularization fluxes for equations 1..eqn_idx%adv%end, reused per direction
     real(wp), allocatable, dimension(:,:,:,:) :: cdi_flux
@@ -63,6 +64,52 @@ contains
 
     end subroutine s_initialize_cdi_sharpening_module
 
+    !> @brief Set the sharpening velocity scale Gamma for this time step: the global maximum velocity magnitude, or ic_gamma when
+    !! set by the user. Called once per time step, outside the RHS evaluation, so the MPI reduction runs in the same context as the
+    !! adaptive-dt reduction. Gamma is frozen across the Runge-Kutta stages of the step.
+    impure subroutine s_compute_cdi_gamma(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(wp)                                            :: vel_max_loc, vel_max_glb, velsq, rho
+        integer                                             :: i, j, k, l
+
+        if (f_is_default(ic_gamma)) then
+            vel_max_loc = 0._wp
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, velsq, rho]', reduction='[[vel_max_loc]]', reductionOp='[max]')
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rho = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                            rho = rho + q_cons_vf(i)%sf(j, k, l)
+                        end do
+                        velsq = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+                            velsq = velsq + q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)
+                        end do
+                        vel_max_loc = max(vel_max_loc, velsq/max(rho*rho, sgm_eps))
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            vel_max_loc = sqrt(vel_max_loc)
+
+            if (num_procs == 1) then
+                cdi_gamma = vel_max_loc
+            else
+                call s_mpi_allreduce_max(vel_max_loc, vel_max_glb)
+                cdi_gamma = vel_max_glb
+            end if
+        else
+            cdi_gamma = ic_gamma
+        end if
+        $:GPU_UPDATE(device='[cdi_gamma]')
+
+    end subroutine s_compute_cdi_gamma
+
     !> @brief Compute the CDI sharpening fluxes at cell faces and accumulate their divergence into the RHS
     impure subroutine s_compute_cdi_sharpening_rhs(q_prim_vf, rhs_vf)
 
@@ -76,38 +123,8 @@ contains
             real(wp), dimension(num_fluids) :: af_L, af_R, af_F, rho_F, sharp_t, a_reg
             real(wp), dimension(num_vels)   :: vel_F
         #:endif
-        real(wp) :: eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, vel_max_loc, cf_L, cf_R, cf_F
+        real(wp) :: eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, cf_L, cf_R, cf_F
         integer  :: i, j, k, l, q1, q2, iq1, iq2
-
-        ! Velocity scale Gamma = global max |u| unless the user set ic_gamma
-        if (f_is_default(ic_gamma)) then
-            vel_max_loc = 0._wp
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, velsq]', reduction='[[vel_max_loc]]', reductionOp='[max]')
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        velsq = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%mom%beg, eqn_idx%mom%end
-                            velsq = velsq + q_prim_vf(i)%sf(j, k, l)*q_prim_vf(i)%sf(j, k, l)
-                        end do
-                        vel_max_loc = max(vel_max_loc, velsq)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            vel_max_loc = sqrt(vel_max_loc)
-
-            if (num_procs == 1) then
-                cdi_gamma = vel_max_loc
-            else
-                call s_mpi_allreduce_max(vel_max_loc, cdi_gamma)
-            end if
-        else
-            cdi_gamma = ic_gamma
-        end if
-        $:GPU_UPDATE(device='[cdi_gamma]')
 
         #! Direction table: face (j, k, l) sits between a cell and its +1 neighbor along the normal. TPL builds index strings
         #! with offsets along the normal (n) and the two transverse directions (a, b). RTG guards inactive directions at
