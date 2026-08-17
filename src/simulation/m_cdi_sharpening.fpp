@@ -10,10 +10,13 @@
 !! O(eps) while conserving phase mass, mixture momentum, and total energy. The volume-fraction flux for phase m is the N-phase
 !! pairwise CDI flux a_m = Gamma*(eps*grad(alpha_m) - sum_{j/=m} alpha_m*alpha_j*nhat_mj), with consistency fluxes rho_m*a_m
 !! (continuity), u*sum(rho_m*a_m) (momentum), and sum(a_m*(0.5*rho_m*|u|^2 + (rho*e)_m)) (energy). The energy flux carries phase
-!! internal energy, not enthalpy, which preserves pressure/temperature/velocity equilibrium across interfaces. With surface tension,
-!! the color function receives the same (two-phase) CDI flux so it stays co-located with the sharpened volume fraction; this term is
-!! purely kinematic since c carries no mass and sigma does not enter the pressure inversion. References: S. R. Brill, B. J. Olson,
-!! and G. T. Bokman, JCP 542 (2025) 114366 (Eqs. 38-40, 68); S. S. Jain et al., JCP 475 (2023) 111866 (divergence-form approach); S.
+!! internal energy, not enthalpy, which preserves pressure/temperature/velocity equilibrium across interfaces. The sharpening term
+!! is gated by a THINC-style monotonicity test along the flux direction: unlike the compact-filtered framework of the reference, MFC
+!! has no high-wavenumber filter, and the ungated anti-diffusive flux amplifies non-monotone wiggles in under-resolved mixed regions
+!! into odd-even oscillations. Gated faces retain the diffusion term, so sub-grid noise decays. With surface tension, the color
+!! function receives the same (two-phase) CDI flux so it stays co-located with the sharpened volume fraction; this term is purely
+!! kinematic since c carries no mass and sigma does not enter the pressure inversion. References: S. R. Brill, B. J. Olson, and G.
+!! T. Bokman, JCP 542 (2025) 114366 (Eqs. 38-40, 68); S. S. Jain et al., JCP 475 (2023) 111866 (divergence-form approach); S.
 !! Mirjalili and A. Mani, JCP 498 (2024) 112657 (N-phase pairwise formulation).
 module m_cdi_sharpening
 
@@ -124,6 +127,8 @@ contains
             real(wp), dimension(num_vels)   :: vel_F
         #:endif
         real(wp) :: eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, cf_L, cf_R, cf_F
+        real(wp) :: r_m1, r_0, r_p1, r_p2
+        logical  :: cf_mon
         integer  :: i, j, k, l, q1, q2, iq1, iq2
 
         #! Direction table: face (j, k, l) sits between a cell and its +1 neighbor along the normal. TPL builds index strings
@@ -142,7 +147,8 @@ contains
                 if (${RTG}$) then
                     ! ${XYZ}$-direction face fluxes
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q1, q2, iq1, iq2, af_L, af_R, af_F, rho_F, sharp_t, &
-                                        & a_reg, vel_F, eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, cf_L, cf_R, cf_F]')
+                                        & a_reg, vel_F, eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, cf_L, cf_R, &
+                                        & cf_F, cf_mon, r_m1, r_0, r_p1, r_p2]')
                     do l = ${LB}$
                         do k = ${KB}$
                             do j = ${JB}$
@@ -168,9 +174,20 @@ contains
                                         iq1 = eqn_idx%adv%beg + q1 - 1
                                         iq2 = eqn_idx%adv%beg + q2 - 1
 
-                                        gn = (f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' + 1')}$), &
-                                              & q_prim_vf(iq2)%sf(${IX(n=' + 1')}$)) - f_pair_frac(q_prim_vf(iq1)%sf(${IX()}$), &
-                                              & q_prim_vf(iq2)%sf(${IX()}$)))/eps_face
+                                        r_m1 = f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' - 1')}$), q_prim_vf(iq2)%sf(${IX(n=' - 1')}$))
+                                        r_0 = f_pair_frac(q_prim_vf(iq1)%sf(${IX()}$), q_prim_vf(iq2)%sf(${IX()}$))
+                                        r_p1 = f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' + 1')}$), q_prim_vf(iq2)%sf(${IX(n=' + 1')}$))
+                                        r_p2 = f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' + 2')}$), q_prim_vf(iq2)%sf(${IX(n=' + 2')}$))
+
+                                        ! Monotonicity gate (THINC-style): sharpen only where the pair fraction is locally
+                                        ! monotone along the flux direction. Without it, the anti-diffusive term amplifies
+                                        ! any non-monotone wiggle (each extremum is treated as an interface), which drives
+                                        ! odd-even oscillations in under-resolved mixed regions; gated faces keep the
+                                        ! eps-diffusion term, so sub-grid noise is damped instead of staircased.
+                                        if ((r_p1 - r_0)*(r_0 - r_m1) <= moncon_cutoff .or. (r_p2 - r_p1)*(r_p1 - r_0) &
+                                            & <= moncon_cutoff) cycle
+
+                                        gn = (r_p1 - r_0)/eps_face
 
                                         g1 = 0._wp
                                         if (${T1G}$) then
@@ -246,6 +263,12 @@ contains
                                     cf_R = min(max(q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1')}$), 0._wp), 1._wp)
                                     cf_F = 5e-1_wp*(cf_L + cf_R)
 
+                                    ! Same monotonicity gate as the volume fraction sharpening
+                                    r_m1 = min(max(q_prim_vf(eqn_idx%c)%sf(${IX(n=' - 1')}$), 0._wp), 1._wp)
+                                    r_p2 = min(max(q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 2')}$), 0._wp), 1._wp)
+                                    cf_mon = (cf_R - cf_L)*(cf_L - r_m1) > moncon_cutoff .and. (r_p2 - cf_R)*(cf_R - cf_L) &
+                                              & > moncon_cutoff
+
                                     gn = (cf_R - cf_L)/eps_face
 
                                     g1 = 0._wp
@@ -269,7 +292,7 @@ contains
                                     rmag = sqrt(gn*gn + g1*g1 + g2*g2)
 
                                     tpair = 0._wp
-                                    if (rmag > verysmall) tpair = cf_F*(1._wp - cf_F)*gn/rmag
+                                    if (cf_mon .and. rmag > verysmall) tpair = cf_F*(1._wp - cf_F)*gn/rmag
 
                                     cdi_flux(j, k, l, eqn_idx%c) = cdi_gamma*((cf_R - cf_L) - tpair)
                                 end if

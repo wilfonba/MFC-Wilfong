@@ -1,10 +1,10 @@
-This file was created on 2026-08-15 01:53:47.879566.
+This file was created on 2026-08-16 21:41:41.944236.
 
 mfc.sh:
 
-    Invocation: test -j 6 --generate --only C871B317 89E148FD C4A39FBC 5B6293E9 EBD44D32 285D82A1
+    Invocation: test -j 6 --generate --only C871B317 FB90844E 89E148FD C4A39FBC 5B6293E9 EBD44D32 285D82A1
     Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        b91cf28a36a98d1a3266fc256cfcab230a197461 on BreakupSim (dirty)
+    Git:        a28d593bb84095c5fb2d574f536188d41a814d2c on BreakupSim (dirty)
 
 pre_process:
 
@@ -74,40 +74,6 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
-    
-        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
-        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : ON
-        OpenMP  : OFF
-    
-        Fypp    : /fastscratch/bwilfong3/software/MFCBreakup/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : nvc
-        CXX      : nvc++
-        FC       : nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
 simulation:
 
     CMake Configuration:
@@ -142,6 +108,40 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
+    
+        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
+        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : ON
+        OpenMP  : OFF
+    
+        Fypp    : /fastscratch/bwilfong3/software/MFCBreakup/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 CPU:
 
     CPU Info:
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      45%
+    CPU(s) scaling MHz:                      83%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00
