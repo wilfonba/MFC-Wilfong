@@ -780,6 +780,7 @@ def _load():
         "ic_eps",
         "ic_beta",
         "ic_gamma",
+        "ic_delta",
     ]:
         _r(n, REAL)
     for n in [
@@ -1353,6 +1354,7 @@ _nv(
     "ic_eps",
     "ic_beta",
     "ic_gamma",
+    "ic_delta",
     "riemann_hypo_ADC",
     "ADC_kappa",
     "hll_u_interface",

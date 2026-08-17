@@ -598,6 +598,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "int_comp=3", {"int_comp": 3}))
         if len(dimInfo[0]) == 1:
             cases.append(define_case_d(stack, "int_comp=3 -> ic_gamma", {"int_comp": 3, "ic_gamma": 0.5}))
+            cases.append(define_case_d(stack, "int_comp=3 -> ic_delta", {"int_comp": 3, "ic_delta": 2.0}))
         if len(dimInfo[0]) == 2:
             # Three fluids: protects the pairwise N-phase CDI path, which is inert with two fluids
             three_fluid_ic = {"int_comp": 3, "num_fluids": 3, "fluid_pp(3)%gamma": 2.0, "fluid_pp(3)%pi_inf": 0.0}

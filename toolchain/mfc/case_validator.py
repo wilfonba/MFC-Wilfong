@@ -429,6 +429,8 @@ class CaseValidator:
             self.prohibit(self.get("alt_soundspeed", "F") == "T", "int_comp = 3 (CDI) does not support alt_soundspeed")
             self.prohibit(self.get("bubbles_euler", "F") == "T", "int_comp = 3 (CDI) does not support bubbles_euler")
             self.prohibit(self.get("mhd", "F") == "T", "int_comp = 3 (CDI) does not support mhd")
+            ic_delta = self.get("ic_delta")
+            self.prohibit(ic_delta is not None and ic_delta <= 0, "ic_delta must be positive")
 
         recon_type = self.get("recon_type", 1)
         if recon_type == 1:  # WENO

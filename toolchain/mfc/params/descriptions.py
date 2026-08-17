@@ -201,6 +201,7 @@ DESCRIPTIONS = {
     "ic_eps": "Interface compression epsilon",
     "ic_beta": "Interface compression beta",
     "ic_gamma": "CDI sharpening velocity scale (default: global max |u|)",
+    "ic_delta": "CDI interface thickness in units of local grid spacing (default: 1)",
     "igr_pres_lim": "Enable IGR pressure limiting",
     "int_comp": "Interface compression: 0=off, 1=THINC, 2=MTHINC, 3=CDI",
     "nv_uvm_out_of_core": "Enable NVIDIA UVM out-of-core",

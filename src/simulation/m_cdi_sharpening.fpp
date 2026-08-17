@@ -7,17 +7,18 @@
 
 !> @brief Conservative diffuse-interface (CDI) sharpening for the five-equation model (int_comp=3). Adds divergence-form
 !! regularization fluxes to the RHS at every Runge-Kutta stage that drive material interfaces to a fixed equilibrium thickness
-!! O(eps) while conserving phase mass, mixture momentum, and total energy. The volume-fraction flux for phase m is the N-phase
-!! pairwise CDI flux a_m = Gamma*(eps*grad(alpha_m) - sum_{j/=m} alpha_m*alpha_j*nhat_mj), with consistency fluxes rho_m*a_m
-!! (continuity), u*sum(rho_m*a_m) (momentum), and sum(a_m*(0.5*rho_m*|u|^2 + (rho*e)_m)) (energy). The energy flux carries phase
-!! internal energy, not enthalpy, which preserves pressure/temperature/velocity equilibrium across interfaces. The sharpening term
-!! is gated by a THINC-style monotonicity test along the flux direction: unlike the compact-filtered framework of the reference, MFC
-!! has no high-wavenumber filter, and the ungated anti-diffusive flux amplifies non-monotone wiggles in under-resolved mixed regions
-!! into odd-even oscillations. Gated faces retain the diffusion term, so sub-grid noise decays. With surface tension, the color
-!! function receives the same (two-phase) CDI flux so it stays co-located with the sharpened volume fraction; this term is purely
-!! kinematic since c carries no mass and sigma does not enter the pressure inversion. References: S. R. Brill, B. J. Olson, and G.
-!! T. Bokman, JCP 542 (2025) 114366 (Eqs. 38-40, 68); S. S. Jain et al., JCP 475 (2023) 111866 (divergence-form approach); S.
-!! Mirjalili and A. Mani, JCP 498 (2024) 112657 (N-phase pairwise formulation).
+!! O(eps), eps = ic_delta times the local grid spacing, while conserving phase mass, mixture momentum, and total energy. The
+!! volume-fraction flux for phase m is the N-phase pairwise CDI flux a_m = Gamma*(eps*grad(alpha_m) - sum_{j/=m}
+!! alpha_m*alpha_j*nhat_mj), with consistency fluxes rho_m*a_m (continuity), u*sum(rho_m*a_m) (momentum), and
+!! sum(a_m*(0.5*rho_m*|u|^2 + (rho*e)_m)) (energy). The energy flux carries phase internal energy, not enthalpy, which preserves
+!! pressure/temperature/velocity equilibrium across interfaces. The sharpening term is gated by a THINC-style monotonicity test
+!! along the flux direction: unlike the compact-filtered framework of the reference, MFC has no high-wavenumber filter, and the
+!! ungated anti-diffusive flux amplifies non-monotone wiggles in under-resolved mixed regions into odd-even oscillations. Gated
+!! faces retain the diffusion term, so sub-grid noise decays. With surface tension, the color function receives the same (two-phase)
+!! CDI flux so it stays co-located with the sharpened volume fraction; this term is purely kinematic since c carries no mass and
+!! sigma does not enter the pressure inversion. References: S. R. Brill, B. J. Olson, and G. T. Bokman, JCP 542 (2025) 114366 (Eqs.
+!! 38-40, 68); S. S. Jain et al., JCP 475 (2023) 111866 (divergence-form approach); S. Mirjalili and A. Mani, JCP 498 (2024) 112657
+!! (N-phase pairwise formulation).
 module m_cdi_sharpening
 
     use m_derived_types
@@ -225,11 +226,12 @@ contains
                                     end do
                                 end do
 
-                                ! Volume fraction and continuity fluxes; eps*d(alpha)/dn with eps = eps_face reduces to af_R - af_L
+                                ! Volume fraction and continuity fluxes. With eps = ic_delta*eps_face, the diffusion term
+                                ! eps*d(alpha)/dn reduces to ic_delta*(af_R - af_L)
                                 flux_sum = 0._wp
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    a_reg(i) = cdi_gamma*((af_R(i) - af_L(i)) - sharp_t(i))
+                                    a_reg(i) = cdi_gamma*(ic_delta*(af_R(i) - af_L(i)) - sharp_t(i))
                                     cdi_flux(j, k, l, eqn_idx%adv%beg + i - 1) = a_reg(i)
                                     cdi_flux(j, k, l, eqn_idx%cont%beg + i - 1) = rho_F(i)*a_reg(i)
                                     flux_sum = flux_sum + rho_F(i)*a_reg(i)
@@ -294,7 +296,7 @@ contains
                                     tpair = 0._wp
                                     if (cf_mon .and. rmag > verysmall) tpair = cf_F*(1._wp - cf_F)*gn/rmag
 
-                                    cdi_flux(j, k, l, eqn_idx%c) = cdi_gamma*((cf_R - cf_L) - tpair)
+                                    cdi_flux(j, k, l, eqn_idx%c) = cdi_gamma*(ic_delta*(cf_R - cf_L) - tpair)
                                 end if
                             end do
                         end do

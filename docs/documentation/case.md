@@ -514,6 +514,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
 | `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
 | `ic_gamma`                 | Real    | CDI sharpening velocity scale (default: global maximum velocity magnitude) |
+| `ic_delta`                 | Real    | CDI equilibrium interface thickness in units of local grid spacing (default: 1) |
 | `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD (MHD or hypoelasticity) |
 | `hll_u_interface`          | Logical | HLL Method 2 (u-interface) for volume fraction advection (default F) |
 | `low_Mach`                 | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (\cite Chen22); [2] Velocity (\cite Thornber08)	 |
@@ -615,7 +616,7 @@ When not set (default), the threshold is 1e-9 for minmod/MC, and 1e-6 for others
 Setting `muscl_eps = 0` gives textbook limiter behavior where limiters activate whenever both slopes have the same sign.
 
 - `int_comp` activates interface compression using [1] THINC or [2] MTHINC (default off) used in variable reconstruction, with control parameters (`ic_eps`, and `ic_beta`), or [3] conservative diffuse-interface (CDI) sharpening, which instead adds conservative regularization fluxes to the governing equations that drive interfaces to a fixed equilibrium thickness (five-equation model only).
-The CDI velocity scale defaults to the global maximum velocity magnitude and can be overridden with `ic_gamma`.
+The CDI velocity scale defaults to the global maximum velocity magnitude and can be overridden with `ic_gamma`; the equilibrium interface thickness scale is `ic_delta` grid cells (default 1).
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro09).
