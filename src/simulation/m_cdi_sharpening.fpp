@@ -18,7 +18,9 @@
 !! CDI flux so it stays co-located with the sharpened volume fraction; this term is purely kinematic since c carries no mass and
 !! sigma does not enter the pressure inversion. References: S. R. Brill, B. J. Olson, and G. T. Bokman, JCP 542 (2025) 114366 (Eqs.
 !! 38-40, 68); S. S. Jain et al., JCP 475 (2023) 111866 (divergence-form approach); S. Mirjalili and A. Mani, JCP 498 (2024) 112657
-!! (N-phase pairwise formulation).
+!! (N-phase pairwise formulation). int_comp=4 (ACDI) evaluates the sharpening normal and magnitude via the signed-distance-like
+!! variable of S. S. Jain, JCP 469 (2022) 111529, which reduces grid-aligned shape distortion of small features; both variants share
+!! every other ingredient.
 module m_cdi_sharpening
 
     use m_derived_types
@@ -54,6 +56,25 @@ contains
         res = c1/(c1 + c2 + sgm_eps)
 
     end function f_pair_frac
+
+    !> @brief Sharpening variable at a stencil point: the pairwise fraction r itself for CDI, or for ACDI the signed-distance-like
+    !! variable psi/(2 eps) = 0.5*ln(r/(1-r)) (Jain, JCP 469 (2022) 111529), whose gradient is well-conditioned across the whole
+    !! interface (grad r vanishes in the tails), giving isotropic normals and reduced grid-aligned shape distortion of small
+    !! features.
+    pure function f_sharp_var(a1, a2) result(res)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: a1, a2
+        real(wp)             :: r, res
+
+        r = f_pair_frac(a1, a2)
+        if (int_comp == int_comp_acdi) then
+            res = 5e-1_wp*log((r + sgm_eps)/(1._wp - r + sgm_eps))
+        else
+            res = r
+        end if
+
+    end function f_sharp_var
 
     !> @brief Allocate the CDI sharpening module arrays
     impure subroutine s_initialize_cdi_sharpening_module()
@@ -128,7 +149,7 @@ contains
             real(wp), dimension(num_vels)   :: vel_F
         #:endif
         real(wp) :: eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, cf_L, cf_R, cf_F
-        real(wp) :: r_m1, r_0, r_p1, r_p2
+        real(wp) :: r_m2, r_m1, r_0, r_p1, r_p2, r_p3
         logical  :: cf_mon
         integer  :: i, j, k, l, q1, q2, iq1, iq2
 
@@ -175,43 +196,49 @@ contains
                                         iq1 = eqn_idx%adv%beg + q1 - 1
                                         iq2 = eqn_idx%adv%beg + q2 - 1
 
-                                        r_m1 = f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' - 1')}$), q_prim_vf(iq2)%sf(${IX(n=' - 1')}$))
-                                        r_0 = f_pair_frac(q_prim_vf(iq1)%sf(${IX()}$), q_prim_vf(iq2)%sf(${IX()}$))
-                                        r_p1 = f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' + 1')}$), q_prim_vf(iq2)%sf(${IX(n=' + 1')}$))
-                                        r_p2 = f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' + 2')}$), q_prim_vf(iq2)%sf(${IX(n=' + 2')}$))
+                                        r_m2 = f_sharp_var(q_prim_vf(iq1)%sf(${IX(n=' - 2')}$), q_prim_vf(iq2)%sf(${IX(n=' - 2')}$))
+                                        r_m1 = f_sharp_var(q_prim_vf(iq1)%sf(${IX(n=' - 1')}$), q_prim_vf(iq2)%sf(${IX(n=' - 1')}$))
+                                        r_0 = f_sharp_var(q_prim_vf(iq1)%sf(${IX()}$), q_prim_vf(iq2)%sf(${IX()}$))
+                                        r_p1 = f_sharp_var(q_prim_vf(iq1)%sf(${IX(n=' + 1')}$), q_prim_vf(iq2)%sf(${IX(n=' + 1')}$))
+                                        r_p2 = f_sharp_var(q_prim_vf(iq1)%sf(${IX(n=' + 2')}$), q_prim_vf(iq2)%sf(${IX(n=' + 2')}$))
+                                        r_p3 = f_sharp_var(q_prim_vf(iq1)%sf(${IX(n=' + 3')}$), q_prim_vf(iq2)%sf(${IX(n=' + 3')}$))
 
-                                        ! Monotonicity gate (THINC-style): sharpen only where the pair fraction is locally
-                                        ! monotone along the flux direction. Without it, the anti-diffusive term amplifies
-                                        ! any non-monotone wiggle (each extremum is treated as an interface), which drives
-                                        ! odd-even oscillations in under-resolved mixed regions; gated faces keep the
-                                        ! eps-diffusion term, so sub-grid noise is damped instead of staircased.
-                                        if ((r_p1 - r_0)*(r_0 - r_m1) <= moncon_cutoff .or. (r_p2 - r_p1)*(r_p1 - r_0) &
-                                            & <= moncon_cutoff) cycle
+                                        ! Alternation gate: sharpen everywhere except near a slope-sign zigzag (+/-/+ or
+                                        ! -/+/-), the odd-even pattern the anti-diffusive term would amplify. The test spans
+                                        ! any consecutive slope triple in the 6-point neighborhood so faces flanking a
+                                        ! developing oscillation are gated too. A single sign change (a droplet crest) has
+                                        ! no zigzag triple and is NOT gated: gating whole extrema suppresses transverse
+                                        ! compression at the poles of small droplets and squares them off. Gated faces keep
+                                        ! the eps-diffusion term, so sub-grid oscillations decay instead of staircasing.
+                                        if (((r_0 - r_m1)*(r_m1 - r_m2) < 0._wp .and. (r_p1 - r_0)*(r_0 - r_m1) < 0._wp) &
+                                            & .or. ((r_p1 - r_0)*(r_0 - r_m1) < 0._wp .and. (r_p2 - r_p1)*(r_p1 - r_0) < 0._wp) &
+                                            & .or. ((r_p2 - r_p1)*(r_p1 - r_0) < 0._wp .and. (r_p3 - r_p2)*(r_p2 - r_p1) < 0._wp)) &
+                                            & cycle
 
                                         gn = (r_p1 - r_0)/eps_face
 
                                         g1 = 0._wp
                                         if (${T1G}$) then
-                                            g1 = (f_pair_frac(q_prim_vf(iq1)%sf(${IX(a=' + 1')}$), &
+                                            g1 = (f_sharp_var(q_prim_vf(iq1)%sf(${IX(a=' + 1')}$), &
                                                   & q_prim_vf(iq2)%sf(${IX(a=' + 1')}$)) &
-                                                  & - f_pair_frac(q_prim_vf(iq1)%sf(${IX(a=' - 1')}$), &
+                                                  & - f_sharp_var(q_prim_vf(iq1)%sf(${IX(a=' - 1')}$), &
                                                   & q_prim_vf(iq2)%sf(${IX(a=' - 1')}$)) &
-                                                  & + f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' + 1', a=' + 1')}$), &
+                                                  & + f_sharp_var(q_prim_vf(iq1)%sf(${IX(n=' + 1', a=' + 1')}$), &
                                                   & q_prim_vf(iq2)%sf(${IX(n=' + 1', a=' + 1')}$)) &
-                                                  & - f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' + 1', a=' - 1')}$), &
+                                                  & - f_sharp_var(q_prim_vf(iq1)%sf(${IX(n=' + 1', a=' - 1')}$), &
                                                   & q_prim_vf(iq2)%sf(${IX(n=' + 1', a=' - 1')}$)))/(2._wp*(${T1CC}$(${T1IX}$ + 1) &
                                                   & - ${T1CC}$(${T1IX}$ - 1)))
                                         end if
 
                                         g2 = 0._wp
                                         if (${T2G}$) then
-                                            g2 = (f_pair_frac(q_prim_vf(iq1)%sf(${IX(b=' + 1')}$), &
+                                            g2 = (f_sharp_var(q_prim_vf(iq1)%sf(${IX(b=' + 1')}$), &
                                                   & q_prim_vf(iq2)%sf(${IX(b=' + 1')}$)) &
-                                                  & - f_pair_frac(q_prim_vf(iq1)%sf(${IX(b=' - 1')}$), &
+                                                  & - f_sharp_var(q_prim_vf(iq1)%sf(${IX(b=' - 1')}$), &
                                                   & q_prim_vf(iq2)%sf(${IX(b=' - 1')}$)) &
-                                                  & + f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' + 1', b=' + 1')}$), &
+                                                  & + f_sharp_var(q_prim_vf(iq1)%sf(${IX(n=' + 1', b=' + 1')}$), &
                                                   & q_prim_vf(iq2)%sf(${IX(n=' + 1', b=' + 1')}$)) &
-                                                  & - f_pair_frac(q_prim_vf(iq1)%sf(${IX(n=' + 1', b=' - 1')}$), &
+                                                  & - f_sharp_var(q_prim_vf(iq1)%sf(${IX(n=' + 1', b=' - 1')}$), &
                                                   & q_prim_vf(iq2)%sf(${IX(n=' + 1', b=' - 1')}$)))/(2._wp*(${T2CC}$(${T2IX}$ + 1) &
                                                   & - ${T2CC}$(${T2IX}$ - 1)))
                                         end if
@@ -219,7 +246,15 @@ contains
                                         rmag = sqrt(gn*gn + g1*g1 + g2*g2)
 
                                         if (rmag > verysmall) then
-                                            tpair = af_F(q1)*af_F(q2)*gn/rmag
+                                            if (int_comp == int_comp_acdi) then
+                                                ! (1 - tanh^2(psi_f/2eps))/4 from the face-averaged signed-distance variable;
+                                                ! equals r(1-r) at equilibrium. The (alpha_m + alpha_j)^2 factor restores the
+                                                ! pairwise alpha_m*alpha_j scaling for N fluids (unity for two fluids).
+                                                tpair = (af_F(q1) + af_F(q2))**2*25e-2_wp*(1._wp - tanh(5e-1_wp*(r_0 + r_p1))**2) &
+                                                         & *gn/rmag
+                                            else
+                                                tpair = af_F(q1)*af_F(q2)*gn/rmag
+                                            end if
                                             sharp_t(q1) = sharp_t(q1) + tpair
                                             sharp_t(q2) = sharp_t(q2) - tpair
                                         end if
@@ -265,36 +300,47 @@ contains
                                     cf_R = min(max(q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1')}$), 0._wp), 1._wp)
                                     cf_F = 5e-1_wp*(cf_L + cf_R)
 
-                                    ! Same monotonicity gate as the volume fraction sharpening
-                                    r_m1 = min(max(q_prim_vf(eqn_idx%c)%sf(${IX(n=' - 1')}$), 0._wp), 1._wp)
-                                    r_p2 = min(max(q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 2')}$), 0._wp), 1._wp)
-                                    cf_mon = (cf_R - cf_L)*(cf_L - r_m1) > moncon_cutoff .and. (r_p2 - cf_R)*(cf_R - cf_L) &
-                                              & > moncon_cutoff
+                                    ! Sharpening variable stencil along the normal (r = c for CDI, psi-like for ACDI),
+                                    ! with the same alternation gate as the volume fraction sharpening
+                                    #:set CS = lambda pt: 'f_sharp_var(q_prim_vf(eqn_idx%c)%sf(' + pt &
+                                        & + '), 1._wp - q_prim_vf(eqn_idx%c)%sf(' + pt + '))'
+                                    r_m2 = ${CS(IX(n=' - 2'))}$
+                                    r_m1 = ${CS(IX(n=' - 1'))}$
+                                    r_0 = ${CS(IX())}$
+                                    r_p1 = ${CS(IX(n=' + 1'))}$
+                                    r_p2 = ${CS(IX(n=' + 2'))}$
+                                    r_p3 = ${CS(IX(n=' + 3'))}$
+                                    cf_mon = .not. (((r_0 - r_m1)*(r_m1 - r_m2) < 0._wp .and. (r_p1 - r_0)*(r_0 - r_m1) < 0._wp) &
+                                                    & .or. ((r_p1 - r_0)*(r_0 - r_m1) < 0._wp .and. (r_p2 - r_p1)*(r_p1 - r_0) &
+                                                    & < 0._wp) .or. ((r_p2 - r_p1)*(r_p1 - r_0) < 0._wp .and. (r_p3 - r_p2)*(r_p2 &
+                                                    & - r_p1) < 0._wp))
 
-                                    gn = (cf_R - cf_L)/eps_face
+                                    gn = (r_p1 - r_0)/eps_face
 
                                     g1 = 0._wp
                                     if (${T1G}$) then
-                                        g1 = (q_prim_vf(eqn_idx%c)%sf(${IX(a=' + 1')}$) &
-                                              & - q_prim_vf(eqn_idx%c)%sf(${IX(a=' - 1')}$) &
-                                              & + q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1', a=' + 1')}$) &
-                                              & - q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1', a=' - 1')}$))/(2._wp*(${T1CC}$(${T1IX}$ &
-                                              & + 1) - ${T1CC}$(${T1IX}$ - 1)))
+                                        g1 = (${CS(IX(a=' + 1'))}$ - ${CS(IX(a=' - 1'))}$ + ${CS(IX(n=' + 1', a=' + 1'))}$ &
+                                              & - ${CS(IX(n=' + 1', a=' - 1'))}$)/(2._wp*(${T1CC}$(${T1IX}$ + 1) &
+                                              & - ${T1CC}$(${T1IX}$ - 1)))
                                     end if
 
                                     g2 = 0._wp
                                     if (${T2G}$) then
-                                        g2 = (q_prim_vf(eqn_idx%c)%sf(${IX(b=' + 1')}$) &
-                                              & - q_prim_vf(eqn_idx%c)%sf(${IX(b=' - 1')}$) &
-                                              & + q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1', b=' + 1')}$) &
-                                              & - q_prim_vf(eqn_idx%c)%sf(${IX(n=' + 1', b=' - 1')}$))/(2._wp*(${T2CC}$(${T2IX}$ &
-                                              & + 1) - ${T2CC}$(${T2IX}$ - 1)))
+                                        g2 = (${CS(IX(b=' + 1'))}$ - ${CS(IX(b=' - 1'))}$ + ${CS(IX(n=' + 1', b=' + 1'))}$ &
+                                              & - ${CS(IX(n=' + 1', b=' - 1'))}$)/(2._wp*(${T2CC}$(${T2IX}$ + 1) &
+                                              & - ${T2CC}$(${T2IX}$ - 1)))
                                     end if
 
                                     rmag = sqrt(gn*gn + g1*g1 + g2*g2)
 
                                     tpair = 0._wp
-                                    if (cf_mon .and. rmag > verysmall) tpair = cf_F*(1._wp - cf_F)*gn/rmag
+                                    if (cf_mon .and. rmag > verysmall) then
+                                        if (int_comp == int_comp_acdi) then
+                                            tpair = 25e-2_wp*(1._wp - tanh(5e-1_wp*(r_0 + r_p1))**2)*gn/rmag
+                                        else
+                                            tpair = cf_F*(1._wp - cf_F)*gn/rmag
+                                        end if
+                                    end if
 
                                     cdi_flux(j, k, l, eqn_idx%c) = cdi_gamma*(ic_delta*(cf_R - cf_L) - tpair)
                                 end if

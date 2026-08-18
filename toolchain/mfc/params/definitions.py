@@ -309,9 +309,9 @@ CONSTRAINTS = {
         "names": {"unlimited": 0, "minmod": 1, "mc": 2, "van_albada": 3, "van_leer": 4, "superbee": 5},
     },
     "int_comp": {
-        "choices": [0, 1, 2, 3],
-        "value_labels": {0: "off", 1: "THINC", 2: "MTHINC", 3: "CDI"},
-        "names": {"off": 0, "thinc": 1, "mthinc": 2, "cdi": 3},
+        "choices": [0, 1, 2, 3, 4],
+        "value_labels": {0: "off", 1: "THINC", 2: "MTHINC", 3: "CDI", 4: "ACDI"},
+        "names": {"off": 0, "thinc": 1, "mthinc": 2, "cdi": 3, "acdi": 4},
     },
     # Time stepping
     "time_stepper": {

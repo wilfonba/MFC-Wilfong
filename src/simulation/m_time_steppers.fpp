@@ -26,7 +26,7 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, int_comp_cdi
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, int_comp_cdi, int_comp_acdi
     use m_cdi_sharpening, only: s_compute_cdi_gamma
 
     implicit none
@@ -457,7 +457,7 @@ contains
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
         ! CDI sharpening velocity scale: once per time step, frozen across the RK stages
-        if (int_comp == int_comp_cdi) call s_compute_cdi_gamma(q_cons_ts(1)%vf)
+        if (int_comp == int_comp_cdi .or. int_comp == int_comp_acdi) call s_compute_cdi_gamma(q_cons_ts(1)%vf)
 
         do s = 1, nstage
             call system_clock(stage_t0)

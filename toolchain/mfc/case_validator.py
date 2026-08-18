@@ -414,7 +414,7 @@ class CaseValidator:
         n = self.get("n", 0)
         num_fluids = self.get("num_fluids", 0)
         model_eqns = self.get("model_eqns", 2)
-        self.prohibit(int_comp not in [0, 1, 2, 3], "int_comp must be 0 (off), 1 (THINC), 2 (MTHINC), or 3 (CDI)")
+        self.prohibit(int_comp not in [0, 1, 2, 3, 4], "int_comp must be 0 (off), 1 (THINC), 2 (MTHINC), 3 (CDI), or 4 (ACDI)")
         self.prohibit(int_comp == 2 and n == 0, "int_comp = 2 (MTHINC) requires at least 2D (n > 0)")
         self.prohibit(int_comp in [1, 2] and num_fluids != 2, "int_comp = 1 or 2 (THINC/MTHINC) requires num_fluids = 2")
         self.prohibit(
@@ -422,13 +422,13 @@ class CaseValidator:
             "int_comp > 0 is not supported with model_eqns = 3: THINC does not update per-fluid internal energies, leaving thermodynamically inconsistent face states",
         )
 
-        if int_comp == 3:
-            self.prohibit(model_eqns != 2, "int_comp = 3 (CDI) requires model_eqns = 2 (five-equation model)")
-            self.prohibit(num_fluids < 2, "int_comp = 3 (CDI) requires num_fluids >= 2")
-            self.prohibit(self.get("cyl_coord", "F") == "T", "int_comp = 3 (CDI) does not support cylindrical coordinates")
-            self.prohibit(self.get("alt_soundspeed", "F") == "T", "int_comp = 3 (CDI) does not support alt_soundspeed")
-            self.prohibit(self.get("bubbles_euler", "F") == "T", "int_comp = 3 (CDI) does not support bubbles_euler")
-            self.prohibit(self.get("mhd", "F") == "T", "int_comp = 3 (CDI) does not support mhd")
+        if int_comp in [3, 4]:
+            self.prohibit(model_eqns != 2, "int_comp = 3/4 (CDI/ACDI) requires model_eqns = 2 (five-equation model)")
+            self.prohibit(num_fluids < 2, "int_comp = 3/4 (CDI/ACDI) requires num_fluids >= 2")
+            self.prohibit(self.get("cyl_coord", "F") == "T", "int_comp = 3/4 (CDI/ACDI) does not support cylindrical coordinates")
+            self.prohibit(self.get("alt_soundspeed", "F") == "T", "int_comp = 3/4 (CDI/ACDI) does not support alt_soundspeed")
+            self.prohibit(self.get("bubbles_euler", "F") == "T", "int_comp = 3/4 (CDI/ACDI) does not support bubbles_euler")
+            self.prohibit(self.get("mhd", "F") == "T", "int_comp = 3/4 (CDI/ACDI) does not support mhd")
             ic_delta = self.get("ic_delta")
             self.prohibit(ic_delta is not None and ic_delta <= 0, "ic_delta must be positive")
 

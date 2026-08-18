@@ -14,7 +14,7 @@ module m_checker
     use m_helper_basic
     use m_constants, only: model_eqns_5eq, riemann_solver_hll, riemann_solver_hllc, riemann_solver_hlld, recon_type_weno, &
         & recon_type_muscl, muscl_order_first_order, riemann_solver_lax_friedrichs, wave_speeds_pressure, int_comp_thinc, &
-        & int_comp_mthinc, int_comp_cdi
+        & int_comp_mthinc, int_comp_cdi, int_comp_acdi
 
     implicit none
 
@@ -37,7 +37,7 @@ contains
             end if
         end if
 
-        if (int_comp == int_comp_cdi) then
+        if (int_comp == int_comp_cdi .or. int_comp == int_comp_acdi) then
             @:PROHIBIT(model_eqns /= model_eqns_5eq, "int_comp = 3 (CDI) requires model_eqns = 2 (five-equation model)")
             @:PROHIBIT(num_fluids < 2, "int_comp = 3 (CDI) requires num_fluids >= 2")
             @:PROHIBIT(cyl_coord, "int_comp = 3 (CDI) does not support cylindrical coordinates")

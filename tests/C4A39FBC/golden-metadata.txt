@@ -1,12 +1,12 @@
-This file was created on 2026-08-16 21:41:41.944236.
+This file was created on 2026-08-18 14:56:56.725121.
 
 mfc.sh:
 
-    Invocation: test -j 6 --generate --only C871B317 FB90844E 89E148FD C4A39FBC 5B6293E9 EBD44D32 285D82A1
+    Invocation: test -j 6 --generate --only C871B317 FB90844E 11094E69 89E148FD C4A39FBC 5B6293E9 EBD44D32 285D82A1
     Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        a28d593bb84095c5fb2d574f536188d41a814d2c on BreakupSim (dirty)
+    Git:        f07a8e43308acc5779a2349810a756ff9c1f05b8 on BreakupSim (dirty)
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
@@ -15,8 +15,8 @@ pre_process:
         C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -33,9 +33,9 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : nvc
-        CXX      : nvc++
-        FC       : nvfortran
+        CC       : /fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc
+        CXX      : /fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc++
+        FC       : /fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -74,7 +74,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+post_process:
 
     CMake Configuration:
     
@@ -84,8 +84,8 @@ simulation:
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -101,14 +101,14 @@ simulation:
     
     Configuration Environment:
     
-        CC       : /fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc
-        CXX      : /fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc++
-        FC       : /fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
@@ -117,9 +117,9 @@ post_process:
         C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      83%
+    CPU(s) scaling MHz:                      65%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00
