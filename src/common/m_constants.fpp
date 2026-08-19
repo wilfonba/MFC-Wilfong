@@ -51,11 +51,15 @@ module m_constants
     !> The spectral level constant to correct the magnitude at each frequency to ensure the source is overall broadband
     real(wp), parameter :: broadband_spectral_level_growth_rate = 10._wp
     ! Interface compression (THINC)
-    real(wp), parameter :: dflt_ic_eps = 1e-4_wp        !< Ensure compression is only applied to surface cells in THINC
-    real(wp), parameter :: dflt_ic_beta = 1.6_wp        !< Sharpness parameter's default value used in THINC
-    real(wp), parameter :: dflt_ic_delta = 1._wp        !< CDI interface thickness in units of local grid spacing
-    real(wp), parameter :: moncon_cutoff = 1e-8_wp      !< Monotonicity constraint's limiter to prevent extremas in THINC
-    real(wp), parameter :: mthinc_align_tol = 1.e-8_wp  !< Grid aligned snap tolerance for MTHINC normals
+    real(wp), parameter :: dflt_ic_eps = 1e-4_wp    !< Ensure compression is only applied to surface cells in THINC
+    real(wp), parameter :: dflt_ic_beta = 1.6_wp    !< Sharpness parameter's default value used in THINC
+    real(wp), parameter :: dflt_ic_delta = 1._wp    !< CDI interface thickness in units of local grid spacing
+    real(wp), parameter :: moncon_cutoff = 1e-8_wp  !< Monotonicity constraint's limiter to prevent extremas in THINC
+    real(wp), parameter :: mthinc_align_tol = 1.e-8_wp
+    !> Volume fraction floor below which the CDI/ACDI regularization is masked (Jain et al. 2023, phi^eps): without it, the
+    !> consistency fluxes (which scale with the phase density) act on normalized gradient noise in nearly-pure regions,
+    !> e.g. behind shocks, and can drive trace partial densities negative.
+    real(wp), parameter :: cdi_alpha_floor = 1.e-6_wp  !< Grid aligned snap tolerance for MTHINC normals
     ! Chemistry
     real(wp), parameter :: dflt_T_guess = 1200._wp  !< Default guess for temperature (when a previous value is not available)
 

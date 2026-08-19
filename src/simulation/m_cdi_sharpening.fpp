@@ -150,7 +150,7 @@ contains
         #:endif
         real(wp) :: eps_face, gn, g1, g2, rmag, tpair, pres_F, velsq, flux_sum, cf_L, cf_R, cf_F
         real(wp) :: r_m2, r_m1, r_0, r_p1, r_p2, r_p3
-        logical  :: cf_mon
+        logical  :: cf_mon, face_active
         integer  :: i, j, k, l, q1, q2, iq1, iq2
 
         #! Direction table: face (j, k, l) sits between a cell and its +1 neighbor along the normal. TPL builds index strings
@@ -187,12 +187,23 @@ contains
                                     sharp_t(i) = 0._wp
                                 end do
 
+                                ! Interface mask (Jain et al. phi^eps floor): regularize only faces where at least two
+                                ! phases are present; elsewhere the fluxes act on gradient noise in nearly-pure regions
+                                ! and their phase-density-scaled consistency terms corrupt trace partial densities.
+                                q1 = 0
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    if (af_F(i) >= cdi_alpha_floor) q1 = q1 + 1
+                                end do
+                                face_active = q1 >= 2
+
                                 ! Pairwise sharpening: each unordered pair computed once and applied antisymmetrically so that
                                 ! sum_m a_m = 0 holds bitwise (volume fraction compatibility)
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do q1 = 1, num_fluids - 1
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do q2 = q1 + 1, num_fluids
+                                        if (min(af_F(q1), af_F(q2)) <= cdi_alpha_floor) cycle
                                         iq1 = eqn_idx%adv%beg + q1 - 1
                                         iq2 = eqn_idx%adv%beg + q2 - 1
 
@@ -246,14 +257,18 @@ contains
                                         rmag = sqrt(gn*gn + g1*g1 + g2*g2)
 
                                         if (rmag > verysmall) then
+                                            ! Floor taper (Jain et al. Eq. 27): the sharpening magnitude vanishes smoothly
+                                            ! at the phi^eps floor, so the band just above it, where normals are still
+                                            ! noise-dominated in nearly-pure regions, is not driven at full strength
+                                            tpair = ((af_F(q1) - cdi_alpha_floor)/af_F(q1))*((af_F(q2) - cdi_alpha_floor)/af_F(q2))
                                             if (int_comp == int_comp_acdi) then
                                                 ! (1 - tanh^2(psi_f/2eps))/4 from the face-averaged signed-distance variable;
                                                 ! equals r(1-r) at equilibrium. The (alpha_m + alpha_j)^2 factor restores the
                                                 ! pairwise alpha_m*alpha_j scaling for N fluids (unity for two fluids).
-                                                tpair = (af_F(q1) + af_F(q2))**2*25e-2_wp*(1._wp - tanh(5e-1_wp*(r_0 + r_p1))**2) &
-                                                         & *gn/rmag
+                                                tpair = tpair*(af_F(q1) + af_F(q2))**2*25e-2_wp*(1._wp - tanh(5e-1_wp*(r_0 + r_p1) &
+                                                               & )**2)*gn/rmag
                                             else
-                                                tpair = af_F(q1)*af_F(q2)*gn/rmag
+                                                tpair = tpair*af_F(q1)*af_F(q2)*gn/rmag
                                             end if
                                             sharp_t(q1) = sharp_t(q1) + tpair
                                             sharp_t(q2) = sharp_t(q2) - tpair
@@ -266,7 +281,8 @@ contains
                                 flux_sum = 0._wp
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    a_reg(i) = cdi_gamma*(ic_delta*(af_R(i) - af_L(i)) - sharp_t(i))
+                                    a_reg(i) = 0._wp
+                                    if (face_active) a_reg(i) = cdi_gamma*(ic_delta*(af_R(i) - af_L(i)) - sharp_t(i))
                                     cdi_flux(j, k, l, eqn_idx%adv%beg + i - 1) = a_reg(i)
                                     cdi_flux(j, k, l, eqn_idx%cont%beg + i - 1) = rho_F(i)*a_reg(i)
                                     flux_sum = flux_sum + rho_F(i)*a_reg(i)
@@ -334,15 +350,20 @@ contains
                                     rmag = sqrt(gn*gn + g1*g1 + g2*g2)
 
                                     tpair = 0._wp
-                                    if (cf_mon .and. rmag > verysmall) then
+                                    if (cf_mon .and. rmag > verysmall .and. min(cf_F, 1._wp - cf_F) > cdi_alpha_floor) then
+                                        ! Same floor taper as the volume fraction sharpening
+                                        tpair = ((cf_F - cdi_alpha_floor)/cf_F)*((1._wp - cf_F - cdi_alpha_floor)/(1._wp - cf_F))
                                         if (int_comp == int_comp_acdi) then
-                                            tpair = 25e-2_wp*(1._wp - tanh(5e-1_wp*(r_0 + r_p1))**2)*gn/rmag
+                                            tpair = tpair*25e-2_wp*(1._wp - tanh(5e-1_wp*(r_0 + r_p1))**2)*gn/rmag
                                         else
-                                            tpair = cf_F*(1._wp - cf_F)*gn/rmag
+                                            tpair = tpair*cf_F*(1._wp - cf_F)*gn/rmag
                                         end if
                                     end if
 
-                                    cdi_flux(j, k, l, eqn_idx%c) = cdi_gamma*(ic_delta*(cf_R - cf_L) - tpair)
+                                    cdi_flux(j, k, l, eqn_idx%c) = 0._wp
+                                    if (min(cf_F, 1._wp - cf_F) >= cdi_alpha_floor) then
+                                        cdi_flux(j, k, l, eqn_idx%c) = cdi_gamma*(ic_delta*(cf_R - cf_L) - tpair)
+                                    end if
                                 end if
                             end do
                         end do
