@@ -353,7 +353,6 @@ contains
         real(wp)             :: edge_location, overlap_distance, max_overlap
 
         ! iterate over all ghost points to detect the one that is most-overlapping in each direction
-
         max_overlap = 0._wp
         $:GPU_PARALLEL_LOOP(private='[patch_id, edge_location, overlap_distance]', reduction='[[max_overlap]]', reductionOp='[max]')
         do patch_id = 1, num_ibs
