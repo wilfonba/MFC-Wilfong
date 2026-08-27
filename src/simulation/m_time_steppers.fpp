@@ -678,32 +678,34 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    if (igr) then
-                        call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
-                    else
-                        call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                    if (ib_markers%sf(j, k, l) == 0) then
+                        if (igr) then
+                            call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                        else
+                            call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                        end if
+
+                        ! Compute mixture sound speed
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+
+                        if (any_non_newtonian) then
+                            Re(1) = 0._wp
+                            do fl = 1, num_fluids
+                                if (is_non_newtonian(fl)) then
+                                    Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                                else
+                                    Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                                end if
+                            end do
+                            Re(1) = 1._wp/max(Re(1), sgm_eps)
+                        end if
+
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+
+                        icfl_dt_local = min(icfl_dt_local, max_dt(1))
+                        vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
+                        ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
                     end if
-
-                    ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
-
-                    if (any_non_newtonian) then
-                        Re(1) = 0._wp
-                        do fl = 1, num_fluids
-                            if (is_non_newtonian(fl)) then
-                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
-                            else
-                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
-                            end if
-                        end do
-                        Re(1) = 1._wp/max(Re(1), sgm_eps)
-                    end if
-
-                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
-
-                    icfl_dt_local = min(icfl_dt_local, max_dt(1))
-                    vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
-                    ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
                 end do
             end do
         end do
