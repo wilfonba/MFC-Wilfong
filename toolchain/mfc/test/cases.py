@@ -517,6 +517,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
+    def alter_projection(dimInfo):
+        stack.push("Projection", {"proj_method": "T", "proj_tol": 1e-10, "proj_max_iters": 200})
+
+        cases.append(define_case_d(stack, "Jacobi", {"proj_iter_solver": 1}))
+        if len(dimInfo[0]) == 2:
+            # Red-black GS is deterministic (unlike IGR's in-place sweep), so the
+            # trace avoids the "Gauss Seidel" label that test.py skips on GPU
+            cases.append(define_case_d(stack, "Red-Black GS", {"proj_iter_solver": 2}))
+            cases.append(define_case_d(stack, "Jacobi -> 2 MPI Ranks", {"proj_iter_solver": 1}, ppn=2))
+
+        stack.pop()
+
     def alter_muscl():
         for muscl_order in [1, 2]:
             stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
@@ -660,6 +672,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
                 alter_igr()
+            alter_projection(dimInfo)
 
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
