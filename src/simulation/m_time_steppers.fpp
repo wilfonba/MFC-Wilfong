@@ -17,6 +17,7 @@ module m_time_steppers
     use m_bubbles_EE
     use m_bubbles_EL
     use m_ibm
+    use m_projection
     use m_mpi_proxy
     use m_boundary_common
     use m_helper
@@ -505,6 +506,15 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+
+            ! Semi-implicit projection: pressure solve and correction of the star state
+            if (proj_method) then
+                call nvtxStartRange("TIMESTEP-PROJECTION")
+                call s_projection_apply(q_cons_ts(1)%vf, bc_type, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf, rk_coef(s, 1), rk_coef(s, 2), &
+                                        & rk_coef(s, 3), rk_coef(s, 4), s, nstage)
+                call nvtxEndRange
+            end if
+
             ! Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
                 $:GPU_PARALLEL_LOOP(collapse=5)
@@ -647,26 +657,33 @@ contains
             real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
         #:endif
-        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
-        real(wp)               :: pres     !< Cell-avg. pressure
-        real(wp)               :: gamma    !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv       !< Cell-avg. fluid reference energy
-        real(wp)               :: c        !< Cell-avg. sound speed
-        real(wp)               :: H        !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum   !< Cell-avg. velocity sum
+        real(wp)               :: pres      !< Cell-avg. pressure
+        real(wp)               :: gamma     !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf    !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv        !< Cell-avg. fluid reference energy
+        real(wp)               :: c         !< Cell-avg. sound speed
+        real(wp)               :: H         !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re        !< Cell-avg. Reynolds numbers
         real(wp)               :: max_dt
+        real(wp)               :: max_dt_ac
         real(wp)               :: dt_local
-        integer                :: j, k, l  !< Generic loop iterators
-        integer                :: fl       !< Fluid loop iterator
+        real(wp)               :: ac_scale  !< acoustic CFL cap ratio (projection method)
+        logical                :: proj_on
+        integer                :: j, k, l   !< Generic loop iterators
+        integer                :: fl        !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
+        proj_on = proj_method
+        ac_scale = 0._wp
+        if (proj_method .and. proj_cfl_ac > 0._wp) ac_scale = proj_cfl_ac/cfl_target
+
         dt_local = huge(1.0_wp)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt]', &
-                            & reduction='[[dt_local]]', reductionOp='[min]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt, &
+                            & max_dt_ac]', firstprivate='[proj_on, ac_scale]', reduction='[[dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -691,7 +708,17 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                    if (proj_on) then
+                        ! Advective CFL only: the implicit pressure solve lifts the
+                        ! acoustic restriction (sgm_eps floors the quiescent-flow speed)
+                        call s_compute_dt_from_cfl(vel, sgm_eps, max_dt, rho, Re, j, k, l)
+                        if (ac_scale > 0._wp) then
+                            call s_compute_dt_from_cfl(vel, c, max_dt_ac, rho, Re, j, k, l)
+                            max_dt = min(max_dt, max_dt_ac*ac_scale)
+                        end if
+                    else
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                    end if
 
                     dt_local = min(dt_local, max_dt)
                 end do

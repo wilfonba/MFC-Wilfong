@@ -184,21 +184,27 @@ contains
         real(wp)               :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
         real(wp)               :: icfl, vcfl, ccfl, Rc
         integer                :: fl                          !< Fluid loop iterator
+        logical                :: proj_on
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
         ccfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
+        proj_on = proj_method
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
-                            & vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
-                            & reductionOp='[max, min]')
+                            & vcfl, Rc, ccfl, fl]', firstprivate='[proj_on]', reduction='[[icfl_max_loc, vcfl_max_loc, &
+                            & ccfl_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
 
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+
+                    ! The semi-implicit projection method is stable at the advective
+                    ! CFL, so the acoustic speed is excluded from the ICFL criterion
+                    if (proj_on) c = sgm_eps
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp

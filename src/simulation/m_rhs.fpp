@@ -34,6 +34,7 @@ module m_rhs
     use m_chemistry
     use m_reactive_burn
     use m_igr
+    use m_projection
     use m_thinc
     use m_pressure_relaxation
 
@@ -709,7 +710,13 @@ contains
                 if (.not. igr) then
                     call s_reconstruct_riemann_states(id)
 
-                    call s_compute_directional_rhs(id, rhs_vf, .false.)
+                    if (proj_method) then
+                        ! Face-left states live in qR_rsx_vf (cell right-boundary values) and
+                        ! face-right states in qL_rsx_vf, as in the s_riemann_solver call below
+                        call s_projection_directional_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf)
+                    else
+                        call s_compute_directional_rhs(id, rhs_vf, .false.)
+                    end if
 
                     ! RHS additions for hypoelasticity
                     if (hypo_nc_mode == hypo_nc_mode_finite_diff) then

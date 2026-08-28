@@ -1402,6 +1402,14 @@ class CaseValidator:
         self.prohibit(int_comp > 0, "proj_method does not support interface compression")
         self.prohibit(body_forces, "proj_method does not support body forces")
 
+        # The projection flux path bypasses the Riemann solver, so the Riemann-state
+        # extrapolation (-4) and characteristic (-5..-12) BCs are not applied
+        for dir in ["x", "y", "z"]:
+            for bound in ["beg", "end"]:
+                bc = self.get(f"bc_{dir}%{bound}")
+                if bc is not None:
+                    self.prohibit(bc == -4 or -12 <= bc <= -5, f"Boundary condition bc_{dir}%{bound} = {bc} is not compatible with proj_method")
+
     def check_acoustic_source(self):
         """Checks acoustic source parameters (simulation)"""
         acoustic_source = self.get("acoustic_source", "F") == "T"

@@ -51,6 +51,7 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
+    use m_projection
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
 
     implicit none
@@ -839,6 +840,8 @@ contains
 
         call s_initialize_rhs_module()
 
+        if (proj_method) call s_initialize_projection_module()
+
         if (surface_tension) call s_initialize_surface_tension_module()
 
         if (relax) call s_initialize_phasechange_module()
@@ -1109,6 +1112,7 @@ contains
         if (hypoelasticity) call s_finalize_hypoelastic_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
+        if (proj_method) call s_finalize_projection_module()
         call s_finalize_rhs_module()
         if (igr) then
             call s_finalize_igr_module()
