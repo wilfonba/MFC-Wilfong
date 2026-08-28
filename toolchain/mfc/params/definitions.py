@@ -319,6 +319,14 @@ CONSTRAINTS = {
         "value_labels": {1: "RK1 (Forward Euler)", 2: "RK2", 3: "RK3 (SSP)"},
         "names": {"rk1": 1, "rk2": 2, "rk3": 3},
     },
+    # Semi-implicit pressure projection
+    "proj_iter_solver": {
+        "choices": [1, 2],
+        "value_labels": {1: "Jacobi", 2: "red-black Gauss-Seidel"},
+        "names": {"jacobi": 1, "gauss_seidel": 2},
+    },
+    "proj_max_iters": {"min": 1},
+    "proj_check_iters": {"min": 1},
     # Riemann solver
     "riemann_solver": {
         "choices": [1, 2, 4, 5],
@@ -752,6 +760,9 @@ def _load():
         "igr_iter_solver",
         "nv_uvm_igr_temps_on_gpu",
         "flux_lim",
+        "proj_iter_solver",
+        "proj_max_iters",
+        "proj_check_iters",
     ]:
         _r(n, INT)
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
@@ -771,6 +782,8 @@ def _load():
         "alf_factor",
         "ic_eps",
         "ic_beta",
+        "proj_tol",
+        "proj_cfl_ac",
     ]:
         _r(n, REAL)
     for n in [
@@ -779,6 +792,7 @@ def _load():
         "adv_n",
         "cont_damage",
         "igr",
+        "proj_method",
         "down_sample",
         "old_grid",
         "old_ic",
@@ -1401,6 +1415,12 @@ _nv(
     "num_igr_iters",
     "num_igr_warm_start_iters",
     "igr_iter_solver",
+    "proj_method",
+    "proj_iter_solver",
+    "proj_tol",
+    "proj_max_iters",
+    "proj_check_iters",
+    "proj_cfl_ac",
     "igr_pres_lim",
     "nv_uvm_out_of_core",
     "nv_uvm_igr_temps_on_gpu",

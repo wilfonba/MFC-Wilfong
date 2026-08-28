@@ -196,6 +196,17 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "explanation": ("Requires model_eqns = 2. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
     },
+    "check_projection": {
+        "title": "Semi-Implicit Pressure Projection",
+        "category": "Feature Compatibility",
+        "explanation": (
+            "Kwatra-type semi-implicit pressure projection: pressure is removed from the "
+            "Riemann flux and solved implicitly each stage, lifting the acoustic CFL "
+            "restriction. Requires model_eqns = 2 and HLLC, inviscid only. Incompatible "
+            "with IGR, bubbles, surface tension, elastic models, MHD, chemistry, immersed "
+            "boundaries, cylindrical coordinates, and body forces."
+        ),
+    },
     "check_non_newtonian": {
         "title": "Non-Newtonian (Herschel-Bulkley) Viscosity",
         "category": "Feature Compatibility",
@@ -1343,6 +1354,53 @@ class CaseValidator:
                 bc = self.get(f"bc_{dir}%{bound}")
                 if bc is not None:
                     self.prohibit(-12 <= bc <= -5, f"Characteristic boundary condition bc_{dir}%{bound} is not compatible with IGR")
+
+    def check_projection(self):
+        """Checks semi-implicit pressure projection constraints (simulation)"""
+        proj_method = self.get("proj_method", "F") == "T"
+
+        if not proj_method:
+            return
+
+        proj_tol = self.get("proj_tol")
+        model_eqns = self.get("model_eqns")
+        riemann_solver = self.get("riemann_solver")
+        igr = self.get("igr", "F") == "T"
+        viscous = self.get("viscous", "F") == "T"
+        ib = self.get("ib", "F") == "T"
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
+        surface_tension = self.get("surface_tension", "F") == "T"
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
+        acoustic_source = self.get("acoustic_source", "F") == "T"
+        relax = self.get("relax", "F") == "T"
+        mhd = self.get("mhd", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
+        cyl_coord = self.get("cyl_coord", "F") == "T"
+        adv_n = self.get("adv_n", "F") == "T"
+        int_comp = self.get("int_comp", 0)
+        body_forces = any(self.get(f"bf_{d}", "F") == "T" for d in ["x", "y", "z"])
+
+        self.prohibit(proj_tol is not None and proj_tol <= 0, "proj_tol must be positive")
+        self.prohibit(model_eqns is not None and model_eqns != 2, "proj_method only supports model_eqns = 2")
+        self.prohibit(riemann_solver is not None and riemann_solver != 2, "proj_method requires riemann_solver = 2 (HLLC)")
+        self.prohibit(igr, "proj_method is incompatible with IGR")
+        self.prohibit(viscous, "proj_method does not support viscosity")
+        self.prohibit(ib, "proj_method does not support the immersed boundary method")
+        self.prohibit(bubbles_euler, "proj_method does not support Euler-Euler bubble models")
+        self.prohibit(bubbles_lagrange, "proj_method does not support Euler-Lagrange bubble models")
+        self.prohibit(alt_soundspeed, "proj_method does not support alt_soundspeed = T")
+        self.prohibit(surface_tension, "proj_method does not support surface tension")
+        self.prohibit(hypoelasticity, "proj_method does not support hypoelasticity")
+        self.prohibit(acoustic_source, "proj_method does not support acoustic sources")
+        self.prohibit(relax, "proj_method does not support phase change")
+        self.prohibit(mhd, "proj_method does not support magnetohydrodynamics")
+        self.prohibit(chemistry, "proj_method does not support chemistry")
+        self.prohibit(cyl_coord, "proj_method does not support cylindrical or axisymmetric coordinates")
+        self.prohibit(adv_n, "proj_method does not support adv_n")
+        self.prohibit(int_comp > 0, "proj_method does not support interface compression")
+        self.prohibit(body_forces, "proj_method does not support body forces")
 
     def check_acoustic_source(self):
         """Checks acoustic source parameters (simulation)"""
@@ -2638,6 +2696,7 @@ class CaseValidator:
         self.check_non_newtonian()
         self.check_mhd_simulation()
         self.check_igr_simulation()
+        self.check_projection()
         self.check_acoustic_source()
         self.check_adaptive_time_stepping()
         self.check_alt_soundspeed()

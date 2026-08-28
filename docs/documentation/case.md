@@ -552,6 +552,12 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `igr_iter_solver`          | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
 | `num_igr_iters`            | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
+| `proj_method`              | Logical | Enable the semi-implicit pressure projection method* |
+| `proj_iter_solver`         | Integer | Solution method for the projection pressure solve [1] Jacobi [2] red-black Gauss-Seidel |
+| `proj_tol`                 | Real    | Convergence tolerance (max pressure change) for the projection pressure solve (default 1e-8) |
+| `proj_max_iters`           | Integer | Maximum number of iterations for the projection pressure solve (default 100) |
+| `proj_check_iters`         | Integer | Interval, in iterations, between residual checks in the projection pressure solve (default 5) |
+| `proj_cfl_ac`              | Real    | Maximum acoustic CFL cap on the projection time step; unset or non-positive disables the cap |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.

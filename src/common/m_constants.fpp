@@ -39,6 +39,9 @@ module m_constants
     integer, parameter  :: dflt_num_igr_iters = 2              !< number of iterations for IGR elliptic solve
     integer, parameter  :: dflt_num_igr_warm_start_iters = 50  !< default number of iterations for IGR elliptic solve
     real(wp), parameter :: dflt_alf_factor = 10._wp            !< scaling factor for IGR alpha
+    real(wp), parameter :: dflt_proj_tol = 1.e-8_wp            !< convergence tolerance for projection pressure solve
+    integer, parameter  :: dflt_proj_max_iters = 100           !< max iterations for projection pressure solve
+    integer, parameter  :: dflt_proj_check_iters = 5           !< residual check interval for projection pressure solve
     integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
     !> color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: capillary_cutoff = 1.e-6

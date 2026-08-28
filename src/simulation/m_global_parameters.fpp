@@ -404,6 +404,13 @@ contains
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
 
+        proj_method = .false.
+        proj_iter_solver = 1
+        proj_tol = dflt_proj_tol
+        proj_max_iters = dflt_proj_max_iters
+        proj_check_iters = dflt_proj_check_iters
+        proj_cfl_ac = dflt_real
+
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
             wenoz = .false.
