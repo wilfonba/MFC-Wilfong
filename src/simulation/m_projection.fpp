@@ -183,27 +183,29 @@ contains
     !! equation)
     subroutine s_projection_directional_rhs(id, q_faceL_rs_vf, q_faceR_rs_vf, q_prim_vf, flux_vf, rhs_vf)
 
-        integer, intent(in) :: id
+        integer, intent(in)                                                                 :: id
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: q_faceL_rs_vf, q_faceR_rs_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(int_bounds_info) :: is1, is2, is3
+        type(scalar_field), dimension(sys_size), intent(in)                                 :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout)                              :: flux_vf
+        type(scalar_field), dimension(sys_size), intent(inout)                              :: rhs_vf
+        ! Plain scalar sweep bounds: loop-bound-only scalars are implicitly
+        ! firstprivate on device, so no device residency is needed for them
+        integer  :: isb1, ise1, isb2, ise2, isb3, ise3
         real(wp) :: rho_L, rho_R
         real(wp) :: u_L, u_R, pres_L, pres_R
         real(wp) :: s_L, s_R, s_star, rho_star
         real(wp) :: F_mass, F_mom, face_vel, pres_flux
         real(wp) :: nrm, vl, vr, alpha_f, a_flux, ar_c, a_c
         real(wp) :: inv_ds, f_m, f_p, divu_c
-        integer :: ibr
-        integer :: i, j, k, l
+        integer  :: ibr
+        integer  :: i, j, k, l
 
         if (id == 1) then
-            is1%beg = -1; is1%end = m; is2%beg = 0; is2%end = n; is3%beg = 0; is3%end = p
+            isb1 = -1; ise1 = m; isb2 = 0; ise2 = n; isb3 = 0; ise3 = p
         else if (id == 2) then
-            is1%beg = -1; is1%end = n; is2%beg = 0; is2%end = m; is3%beg = 0; is3%end = p
+            isb1 = -1; ise1 = n; isb2 = 0; ise2 = m; isb3 = 0; ise3 = p
         else
-            is1%beg = -1; is1%end = p; is2%beg = 0; is2%end = n; is3%beg = 0; is3%end = m
+            isb1 = -1; ise1 = p; isb2 = 0; ise2 = n; isb3 = 0; ise3 = m
         end if
 
         ! Pressure at the start of the stage, used by the p*div(u) source and
@@ -220,18 +222,18 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        #:for NORM_DIR, XYZ, SV, COORDS, X_BND, Y_BND, Z_BND in &
-            [(1, 'x', 'j', '{SI}, k, l', 'is1', 'is2', 'is3'), &
-             (2, 'y', 'k', 'j, {SI}, l', 'is2', 'is1', 'is3'), &
-             (3, 'z', 'l', 'j, k, {SI}', 'is3', 'is2', 'is1')]
+        #:for NORM_DIR, XYZ, SV, COORDS, JB, JE, KB, KE, LB, LE in &
+            [(1, 'x', 'j', '{SI}, k, l', 'isb1', 'ise1', 'isb2', 'ise2', 'isb3', 'ise3'), &
+             (2, 'y', 'k', 'j, {SI}, l', 'isb2', 'ise2', 'isb1', 'ise1', 'isb3', 'ise3'), &
+             (3, 'z', 'l', 'j, k, {SI}', 'isb3', 'ise3', 'isb2', 'ise2', 'isb1', 'ise1')]
             #:set SF = lambda offs: COORDS.format(SI=SV + offs)
             if (id == ${NORM_DIR}$) then
                 ! Face fluxes: left state at the face index, right state at face index + 1
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_L, rho_R, u_L, u_R, pres_L, pres_R, s_L, s_R, s_star, &
                                     & rho_star, F_mass, F_mom, face_vel, pres_flux, nrm, vl, vr, alpha_f, a_flux, ar_c, a_c, ibr]')
-                do l = ${Z_BND}$%beg, ${Z_BND}$%end
-                    do k = ${Y_BND}$%beg, ${Y_BND}$%end
-                        do j = ${X_BND}$%beg, ${X_BND}$%end
+                do l = ${LB}$, ${LE}$
+                    do k = ${KB}$, ${KE}$
+                        do j = ${JB}$, ${JE}$
                             rho_L = 0._wp; rho_R = 0._wp
 
                             $:GPU_LOOP(parallelism='[seq]')
@@ -250,6 +252,12 @@ contains
                             s_R = max(u_L, u_R)
                             s_star = 0.5_wp*(u_L + u_R)
 
+                            ! With advective wave speeds the star densities
+                            ! rho_K*(s_K - u_K)/(s_K - s_star) reduce exactly to 0 (the
+                            ! near velocity is the extremum, zero numerator) or 2*rho_K
+                            ! (the far one is). The division form produces Inf when
+                            ! u_L - u_R underflows while its half rounds to zero, so the
+                            ! reduced form is used instead
                             rho_star = 0._wp
                             if (s_L >= 0._wp) then
                                 ibr = 1
@@ -263,13 +271,13 @@ contains
                                 pres_flux = pres_R*u_R
                             else if (s_star >= 0._wp) then
                                 ibr = 3
-                                rho_star = rho_L*(s_L - u_L)/(s_L - s_star)
+                                if (u_L > u_R) rho_star = 2._wp*rho_L
                                 F_mass = rho_L*u_L + s_L*(rho_star - rho_L)
                                 face_vel = s_star
                                 pres_flux = pres_L*s_star
                             else
                                 ibr = 4
-                                rho_star = rho_R*(s_R - u_R)/(s_R - s_star)
+                                if (u_R < u_L) rho_star = 2._wp*rho_R
                                 F_mass = rho_R*u_R + s_R*(rho_star - rho_R)
                                 face_vel = s_star
                                 pres_flux = pres_R*s_star
