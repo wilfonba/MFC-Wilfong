@@ -527,6 +527,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # Red-black GS is deterministic (unlike IGR's in-place sweep), so the
             # trace avoids the "Gauss Seidel" label that test.py skips on GPU
             cases.append(define_case_d(stack, "Red-Black GS", {"proj_iter_solver": 2}))
+            cases.append(define_case_d(stack, "Chebyshev", {"proj_iter_solver": 3}))
             cases.append(define_case_d(stack, "Jacobi -> 2 MPI Ranks", {"proj_iter_solver": 1}, ppn=2))
             if num_fluids == 2:
                 cases.append(

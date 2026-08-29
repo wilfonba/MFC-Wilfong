@@ -95,7 +95,8 @@ module m_projection
         & s_projection_apply, s_finalize_projection_module
 
     real(stp), allocatable, target, dimension(:,:,:) :: pres_proj      !< pressure iterate of the Helmholtz solve
-    real(stp), allocatable, dimension(:,:,:)         :: pres_proj_old  !< previous iterate (Jacobi only)
+    real(stp), allocatable, dimension(:,:,:)         :: pres_proj_old  !< previous iterate (Jacobi and Chebyshev)
+    real(stp), allocatable, dimension(:,:,:)         :: d_cheb         !< Chebyshev search increment
     real(stp), allocatable, dimension(:,:,:)         :: pres_stage     !< pressure at the start of the current RK stage
     real(stp), allocatable, dimension(:,:,:)         :: pres_step0     !< pressure at the start of the time step (RK2/RK3 only)
     real(stp), allocatable, dimension(:,:,:)         :: rhs_p_adv      !< RHS of the explicit pressure advection equation
@@ -104,7 +105,7 @@ module m_projection
     real(stp), allocatable, dimension(:,:,:)         :: rhoc2_cell     !< mixture rho*c^2 (Wood's sound speed)
     real(stp), allocatable, dimension(:,:,:)         :: flux_face_vel  !< Riemann face velocity (per direction sweep)
     real(stp), allocatable, dimension(:,:,:)         :: flux_pu        !< upwinded p*u face flux (per direction sweep)
-    $:GPU_DECLARE(create='[pres_proj, pres_proj_old, pres_stage, pres_step0]')
+    $:GPU_DECLARE(create='[pres_proj, pres_proj_old, d_cheb, pres_stage, pres_step0]')
     $:GPU_DECLARE(create='[rhs_p_adv, div_u_face, helm_rhs, rhoc2_cell]')
     $:GPU_DECLARE(create='[flux_face_vel, flux_pu]')
 
@@ -128,8 +129,13 @@ contains
         integer :: j, k, l
 
         @:ALLOCATE(pres_proj(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-        if (proj_iter_solver == proj_iter_solver_jacobi) then
+        if (proj_iter_solver /= proj_iter_solver_gauss_seidel) then
             @:ALLOCATE(pres_proj_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        end if
+        if (proj_iter_solver == proj_iter_solver_chebyshev) then
+            @:ALLOCATE(d_cheb(0:m, 0:n, 0:p))
+            d_cheb = 0._stp
+            $:GPU_UPDATE(device='[d_cheb]')
         end if
 
         @:ALLOCATE(pres_stage(0:m, 0:n, 0:p))
@@ -155,7 +161,7 @@ contains
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     pres_proj(j, k, l) = 0._stp
-                    if (proj_iter_solver == proj_iter_solver_jacobi) pres_proj_old(j, k, l) = 0._stp
+                    if (proj_iter_solver /= proj_iter_solver_gauss_seidel) pres_proj_old(j, k, l) = 0._stp
                 end do
             end do
         end do
@@ -543,6 +549,7 @@ contains
         real(wp) :: rho_c, rho_nb, u_m, u_p
         real(wp) :: coeff, c_f, offd, diag, p_new, res_loc, res_glb
         real(wp) :: dpds, ke, gamma_mix, pi_inf_mix, qv_mix, mom_sq
+        real(wp) :: zv, dv, mu_loc, mu_glb, sigma_ch, rho_ch, rho_prev, alpha_ch, beta_ch
         integer :: i, j, k, l, iter, color
 
         ! Star-state ghost cells (density and momentum feed the divergence and the Laplacian face densities)
@@ -616,7 +623,7 @@ contains
         ! Ghost fill of the initial pressure iterate
         call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
 
-        if (proj_iter_solver == proj_iter_solver_jacobi) then
+        if (proj_iter_solver /= proj_iter_solver_gauss_seidel) then
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -626,6 +633,30 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        sigma_ch = 0._wp; rho_ch = 0._wp; mu_glb = 0._wp
+        if (proj_iter_solver == proj_iter_solver_chebyshev) then
+            ! Gershgorin bound on the Jacobi iteration matrix: its rows are nonnegative
+            ! with sum coeff*diag/(1 + coeff*diag) < 1, so the Jacobi-preconditioned
+            ! operator spectrum is known in advance to lie in [1 - mu, 1 + mu], which
+            ! is what lets Chebyshev run with no global reductions inside the loop
+            mu_loc = 0._wp
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, rho_c, rho_nb]', &
+                                & reduction='[[mu_loc]]', reductionOp='[max]')
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        @:PROJECTION_STENCIL(pres_proj)
+                        mu_loc = max(mu_loc, coeff*diag/(1._wp + coeff*diag))
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            call s_mpi_allreduce_max(mu_loc, mu_glb)
+            mu_glb = min(max(mu_glb, sgm_eps), 1._wp - sgm_eps)
+            sigma_ch = 1._wp/mu_glb
+            rho_ch = mu_glb
         end if
 
         do iter = 1, proj_max_iters
@@ -641,6 +672,48 @@ contains
                             p_new = (real(helm_rhs(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
                             res_loc = max(res_loc, abs(p_new - real(pres_proj_old(j, k, l), wp)))
                             pres_proj(j, k, l) = real(p_new, stp)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+
+                call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+
+                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            pres_proj_old(j, k, l) = pres_proj(j, k, l)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            else if (proj_iter_solver == proj_iter_solver_chebyshev) then
+                ! Chebyshev acceleration of the Jacobi iteration (Saad, Alg. 12.1) on
+                ! [1 - mu, 1 + mu] (theta = 1, delta = mu): the Jacobi update supplies
+                ! z = D^{-1} r, combined through the scalar rho recurrence
+                if (iter == 1) then
+                    alpha_ch = 1._wp
+                    beta_ch = 0._wp
+                else
+                    rho_prev = rho_ch
+                    rho_ch = 1._wp/(2._wp*sigma_ch - rho_prev)
+                    alpha_ch = 2._wp*rho_ch/mu_glb
+                    beta_ch = rho_ch*rho_prev
+                end if
+
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, p_new, zv, dv, rho_c, rho_nb]', &
+                                    & firstprivate='[alpha_ch, beta_ch]', reduction='[[res_loc]]', reductionOp='[max]')
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            @:PROJECTION_STENCIL(pres_proj_old)
+                            p_new = (real(helm_rhs(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
+                            zv = p_new - real(pres_proj_old(j, k, l), wp)
+                            dv = beta_ch*real(d_cheb(j, k, l), wp) + alpha_ch*zv
+                            d_cheb(j, k, l) = real(dv, stp)
+                            res_loc = max(res_loc, abs(dv))
+                            pres_proj(j, k, l) = real(real(pres_proj_old(j, k, l), wp) + dv, stp)
                         end do
                     end do
                 end do
@@ -732,8 +805,11 @@ contains
         $:GPU_EXIT_DATA(detach='[pres_proj_sf(1)%sf]')
 
         @:DEALLOCATE(pres_proj)
-        if (proj_iter_solver == proj_iter_solver_jacobi) then
+        if (proj_iter_solver /= proj_iter_solver_gauss_seidel) then
             @:DEALLOCATE(pres_proj_old)
+        end if
+        if (proj_iter_solver == proj_iter_solver_chebyshev) then
+            @:DEALLOCATE(d_cheb)
         end if
         @:DEALLOCATE(pres_stage)
         if (time_stepper /= time_stepper_rk1) then
