@@ -86,6 +86,7 @@ module m_projection
     use m_mpi_proxy
     use m_boundary_common
     use m_body_forces, only: s_compute_acceleration
+    use m_surface_tension, only: s_compute_capillary_source_flux
 
     implicit none
 
@@ -112,6 +113,12 @@ module m_projection
     integer :: rb_offset  !< global parity offset of this rank for red-black coloring
     $:GPU_DECLARE(create='[rb_offset]')
 
+    !> Zero face-velocity array for the capillary flux call: its velocity-work terms only feed the energy flux, which the projection
+    !! EOS rebuild discards
+    real(wp), allocatable, dimension(:,:,:,:) :: cap_vsrc
+    type(int_bounds_info)                     :: cap_isx, cap_isy, cap_isz
+    $:GPU_DECLARE(create='[cap_vsrc, cap_isx, cap_isy, cap_isz]')
+
 contains
 
     !> Initialize the projection module
@@ -135,6 +142,12 @@ contains
 
         @:ALLOCATE(flux_face_vel(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ALLOCATE(flux_pu(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+
+        if (surface_tension) then
+            @:ALLOCATE(cap_vsrc(-1:m + 1, -1:n + 1, -1:p + 1, 1:num_dims))
+            cap_vsrc = 0._wp
+            $:GPU_UPDATE(device='[cap_vsrc]')
+        end if
 
         $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -182,12 +195,13 @@ contains
     !> Compute the pressure-free convective RHS contribution of one direction sweep: an HLLC flux with advective-only wave speeds
     !! and no pressure terms, plus the face velocity (for div(u)) and the upwinded p*u flux (for the explicit pressure advection
     !! equation)
-    subroutine s_projection_directional_rhs(id, q_faceL_rs_vf, q_faceR_rs_vf, q_prim_vf, flux_vf, rhs_vf)
+    subroutine s_projection_directional_rhs(id, q_faceL_rs_vf, q_faceR_rs_vf, q_prim_vf, flux_vf, flux_src_vf, rhs_vf)
 
         integer, intent(in)                                                                 :: id
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: q_faceL_rs_vf, q_faceR_rs_vf
         type(scalar_field), dimension(sys_size), intent(in)                                 :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout)                              :: flux_vf
+        type(scalar_field), dimension(sys_size), intent(inout)                              :: flux_src_vf
         type(scalar_field), dimension(sys_size), intent(inout)                              :: rhs_vf
         ! Plain scalar sweep bounds: loop-bound-only scalars are implicitly
         ! firstprivate on device, so no device residency is needed for them
@@ -331,6 +345,16 @@ contains
                                 end if
                             end do
 
+                            ! Color function advects like the volume fractions
+                            if (surface_tension) then
+                                if (ibr == 1 .or. (ibr >= 3 .and. s_star >= 0._wp)) then
+                                    alpha_f = q_faceL_rs_vf(${SF('')}$, eqn_idx%c)
+                                else
+                                    alpha_f = q_faceR_rs_vf(${SF(' + 1')}$, eqn_idx%c)
+                                end if
+                                flux_vf(eqn_idx%c)%sf(${SF('')}$) = real(alpha_f*face_vel, stp)
+                            end if
+
                             ! Energy flux is unused: total energy is rebuilt from the EOS
                             ! after every pressure solve, so its RHS never enters the state
                             flux_vf(eqn_idx%E)%sf(${SF('')}$) = 0._stp
@@ -375,6 +399,46 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
+
+                ! Capillary momentum flux at the faces (explicit CSF stress), differenced
+                ! like the convective fluxes. The velocity-work energy terms vanish with
+                ! the zero cap_vsrc; the energy RHS is dead under the projection anyway
+                if (surface_tension) then
+                    cap_isx%beg = ${JB}$; cap_isx%end = ${JE}$
+                    cap_isy%beg = ${KB}$; cap_isy%end = ${KE}$
+                    cap_isz%beg = ${LB}$; cap_isz%end = ${LE}$
+                    $:GPU_UPDATE(device='[cap_isx, cap_isy, cap_isz]')
+
+                    $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l]')
+                    do i = eqn_idx%mom%beg, eqn_idx%E
+                        do l = ${LB}$, ${LE}$
+                            do k = ${KB}$, ${KE}$
+                                do j = ${JB}$, ${JE}$
+                                    flux_src_vf(i)%sf(j, k, l) = 0._stp
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                    call s_compute_capillary_source_flux(cap_vsrc, flux_src_vf, ${NORM_DIR}$, cap_isx, cap_isy, cap_isz)
+
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, inv_ds, f_m, f_p]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                inv_ds = 1._wp/d${XYZ}$ (${SV}$)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%mom%beg, eqn_idx%E
+                                    f_m = real(flux_src_vf(i)%sf(${SF(' - 1')}$), wp)
+                                    f_p = real(flux_src_vf(i)%sf(${SF('')}$), wp)
+                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + real(inv_ds*(f_m - f_p), stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
             end if
         #:endfor
 
@@ -390,6 +454,10 @@ contains
                             rhs_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l) = rhs_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, &
                                    & l) + real(real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)*divu_c, stp)
                         end do
+                        if (surface_tension) then
+                            rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, l) + real(real(q_prim_vf(eqn_idx%c)%sf(j, &
+                                   & k, l), wp)*divu_c, stp)
+                        end if
                         rhs_p_adv(j, k, l) = rhs_p_adv(j, k, l) + real(real(pres_stage(j, k, l), wp)*divu_c, stp)
                     end do
                 end do
@@ -635,6 +703,9 @@ contains
         end if
         @:DEALLOCATE(rhs_p_adv, div_u_face, helm_rhs, rhoc2_cell)
         @:DEALLOCATE(flux_face_vel, flux_pu)
+        if (surface_tension) then
+            @:DEALLOCATE(cap_vsrc)
+        end if
 
     end subroutine s_finalize_projection_module
 

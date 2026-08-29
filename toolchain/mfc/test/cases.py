@@ -517,7 +517,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
-    def alter_projection(dimInfo):
+    def alter_projection(dimInfo, num_fluids):
         stack.push("Projection", {"proj_method": "T", "proj_tol": 1e-10, "proj_max_iters": 200})
 
         cases.append(define_case_d(stack, "Jacobi", {"proj_iter_solver": 1}))
@@ -528,6 +528,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # trace avoids the "Gauss Seidel" label that test.py skips on GPU
             cases.append(define_case_d(stack, "Red-Black GS", {"proj_iter_solver": 2}))
             cases.append(define_case_d(stack, "Jacobi -> 2 MPI Ranks", {"proj_iter_solver": 1}, ppn=2))
+            if num_fluids == 2:
+                cases.append(
+                    define_case_d(
+                        stack, "Jacobi -> capillary=T", {"proj_iter_solver": 1, "patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 1, "surface_tension": "T"}
+                    )
+                )
 
         stack.pop()
 
@@ -674,7 +680,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
                 alter_igr()
-            alter_projection(dimInfo)
+            alter_projection(dimInfo, num_fluids)
 
             if num_fluids == 2:
                 alter_int_comp(dimInfo)

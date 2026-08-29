@@ -203,9 +203,9 @@ PHYSICS_DOCS = {
             "Kwatra-type semi-implicit pressure projection: pressure is removed from the "
             "Riemann flux and solved implicitly each stage, lifting the acoustic CFL "
             "restriction. Requires model_eqns = 2 and HLLC, inviscid only. Incompatible "
-            "with IGR, bubbles, surface tension, elastic models, MHD, chemistry, immersed "
-            "boundaries, and cylindrical coordinates. Body forces are applied to the "
-            "star momentum before the pressure solve."
+            "with IGR, bubbles, elastic models, MHD, chemistry, immersed boundaries, "
+            "and cylindrical coordinates. Body forces and surface tension are applied "
+            "explicitly within the projection predictor."
         ),
     },
     "check_non_newtonian": {
@@ -1372,7 +1372,6 @@ class CaseValidator:
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
-        surface_tension = self.get("surface_tension", "F") == "T"
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
         acoustic_source = self.get("acoustic_source", "F") == "T"
         relax = self.get("relax", "F") == "T"
@@ -1392,7 +1391,6 @@ class CaseValidator:
         self.prohibit(bubbles_euler, "proj_method does not support Euler-Euler bubble models")
         self.prohibit(bubbles_lagrange, "proj_method does not support Euler-Lagrange bubble models")
         self.prohibit(alt_soundspeed, "proj_method does not support alt_soundspeed = T")
-        self.prohibit(surface_tension, "proj_method does not support surface tension")
         self.prohibit(hypoelasticity, "proj_method does not support hypoelasticity")
         self.prohibit(acoustic_source, "proj_method does not support acoustic sources")
         self.prohibit(relax, "proj_method does not support phase change")

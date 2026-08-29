@@ -713,7 +713,8 @@ contains
                     if (proj_method) then
                         ! Face-left states live in qR_rsx_vf (cell right-boundary values) and
                         ! face-right states in qL_rsx_vf, as in the s_riemann_solver call below
-                        call s_projection_directional_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf)
+                        call s_projection_directional_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, &
+                                                          & flux_src_n(id)%vf, rhs_vf)
                     else
                         call s_compute_directional_rhs(id, rhs_vf, .false.)
                     end if
