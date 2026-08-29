@@ -18,6 +18,7 @@ module m_time_steppers
     use m_bubbles_EL
     use m_ibm
     use m_projection
+    use m_collisions, only: collisions_active
     use m_mpi_proxy
     use m_boundary_common
     use m_helper
@@ -661,33 +662,39 @@ contains
             real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
         #:endif
-        real(wp)               :: vel_sum   !< Cell-avg. velocity sum
-        real(wp)               :: pres      !< Cell-avg. pressure
-        real(wp)               :: gamma     !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf    !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv        !< Cell-avg. fluid reference energy
-        real(wp)               :: c         !< Cell-avg. sound speed
-        real(wp)               :: H         !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re        !< Cell-avg. Reynolds numbers
-        real(wp)               :: max_dt
-        real(wp)               :: max_dt_ac
-        real(wp)               :: dt_local
-        real(wp)               :: ac_scale  !< acoustic CFL cap ratio (projection method)
+        real(wp)               :: vel_sum            !< Cell-avg. velocity sum
+        real(wp)               :: pres               !< Cell-avg. pressure
+        real(wp)               :: gamma              !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf             !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv                 !< Cell-avg. fluid reference energy
+        real(wp)               :: c                  !< Cell-avg. sound speed
+        real(wp)               :: H                  !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
+        real(wp), dimension(3) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary)
+        real(wp), dimension(3) :: max_dt_ac          !< Acoustic-CFL cell dt candidates (projection method)
+        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, coll_dt_local
+        real(wp)               :: acfl_dt_local      !< Acoustic inviscid dt candidate (projection method)
+        real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, collision cap, acoustic)
+        real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, collision cap, acoustic)
+        real(wp)               :: dt_prev
         logical                :: proj_on
-        integer                :: j, k, l   !< Generic loop iterators
-        integer                :: fl        !< Fluid loop iterator
+        integer                :: j, k, l            !< Generic loop iterators
+        integer                :: fl                 !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
         proj_on = proj_method
-        ac_scale = 0._wp
-        if (proj_method .and. proj_cfl_ac > 0._wp) ac_scale = proj_cfl_ac/cfl_target
-
-        dt_local = huge(1.0_wp)
+        dt_prev = dt
+        icfl_dt_local = huge(1.0_wp)
+        vcfl_dt_local = huge(1.0_wp)
+        ccfl_dt_local = huge(1.0_wp)
+        coll_dt_local = huge(1.0_wp)
+        acfl_dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt, &
-                            & max_dt_ac]', firstprivate='[proj_on, ac_scale]', reduction='[[dt_local]]', reductionOp='[min]')
+                            & max_dt_ac]', firstprivate='[proj_on]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
+                            & acfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -713,27 +720,68 @@ contains
                     end if
 
                     if (proj_on) then
-                        ! Advective CFL only: the implicit pressure solve lifts the
-                        ! acoustic restriction (sgm_eps floors the quiescent-flow speed)
+                        ! Advective CFL: the implicit pressure solve lifts the acoustic
+                        ! restriction (sgm_eps floors the quiescent-flow speed). The
+                        ! acoustic candidate seeds the first adaptive dt, which the ramp
+                        ! limiter then grows toward the advective limit, and feeds the
+                        ! optional proj_cfl_ac cap
                         call s_compute_dt_from_cfl(vel, sgm_eps, max_dt, rho, Re, j, k, l)
-                        if (ac_scale > 0._wp) then
-                            call s_compute_dt_from_cfl(vel, c, max_dt_ac, rho, Re, j, k, l)
-                            max_dt = min(max_dt, max_dt_ac*ac_scale)
-                        end if
+                        call s_compute_dt_from_cfl(vel, c, max_dt_ac, rho, Re, j, k, l)
+                        acfl_dt_local = min(acfl_dt_local, max_dt_ac(1))
                     else
                         call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
                     end if
 
-                    dt_local = min(dt_local, max_dt)
+                    icfl_dt_local = min(icfl_dt_local, max_dt(1))
+                    vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
+                    ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! restrict the time step so an ongoing collision spans at least collision_temporal_resolution time steps; the collision
+        ! flag is rank-local, so the cap enters as a candidate before the global elementwise min propagates it to all ranks
+        if (collision_model > 0 .and. collision_temporal_resolution > 0) then
+            if (collisions_active) coll_dt_local = collision_time/real(collision_temporal_resolution, wp)
+            collisions_active = .false.
+        end if
+
+        dt_candidates_loc(1) = icfl_dt_local
+        dt_candidates_loc(2) = vcfl_dt_local
+        dt_candidates_loc(3) = ccfl_dt_local
+        dt_candidates_loc(4) = coll_dt_local
+        dt_candidates_loc(5) = acfl_dt_local
+
         if (num_procs == 1) then
-            dt = dt_local
+            dt_candidates_glb = dt_candidates_loc
         else
-            call s_mpi_allreduce_min(dt_local, dt)
+            call s_mpi_allreduce_min_vec(dt_candidates_loc, dt_candidates_glb)
+        end if
+
+        dt = minval(dt_candidates_glb(1:4))
+        dt_limiter = dt_limiter_names(minloc(dt_candidates_glb(1:4), dim=1))
+
+        if (proj_on) then
+            ! Under the projection the inviscid candidate is the advective CFL
+            if (dt_limiter == 'ICFL') dt_limiter = 'ACFL'
+            if (dt_prev <= 0._wp) then
+                ! First adaptive dt: start from the acoustic CFL (the quiescent-flow
+                ! advective dt is unbounded); the ramp limiter grows it from there
+                if (dt_candidates_glb(5) < dt) then
+                    dt = dt_candidates_glb(5)
+                    dt_limiter = 'ICFL'
+                end if
+            else if (proj_cfl_ac > 0._wp .and. dt_candidates_glb(5)*proj_cfl_ac/cfl_target < dt) then
+                dt = dt_candidates_glb(5)*proj_cfl_ac/cfl_target
+                dt_limiter = 'ICFL'
+            end if
+        end if
+
+        ! limit how much the time step can grow relative to the previous step
+        if (ramp_ratio > 0._wp .and. dt_prev > 0._wp .and. ramp_ratio*dt_prev < dt) then
+            dt = ramp_ratio*dt_prev
+            dt_limiter = 'RAMP'
         end if
 
         $:GPU_UPDATE(device='[dt]')
