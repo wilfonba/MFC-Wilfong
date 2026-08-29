@@ -18,6 +18,8 @@ module m_rhs
         & recon_type_muscl
     use m_muscl
     use m_riemann_solvers
+    use m_riemann_state, only: s_populate_riemann_states_variables_buffers, s_initialize_riemann_solver, &
+        & s_compute_viscous_source_flux
     use m_cbc
     use m_bubbles_EE
     use m_bubbles_EL
@@ -711,10 +713,55 @@ contains
                     call s_reconstruct_riemann_states(id)
 
                     if (proj_method) then
+                        if (viscous .or. surface_tension) then
+                            ! Zero the source fluxes and set the Riemann-state module face
+                            ! bounds that the viscous flux kernels loop over
+                            if (id == 1) then
+                                irx%beg = -1; iry%beg = 0; irz%beg = 0
+                            else if (id == 2) then
+                                irx%beg = 0; iry%beg = -1; irz%beg = 0
+                            else
+                                irx%beg = 0; iry%beg = 0; irz%beg = -1
+                            end if
+                            irx%end = m; iry%end = n; irz%end = p
+                            call s_populate_riemann_states_variables_buffers(qR_rsx_vf, dqR_prim_dx_n(id)%vf, &
+                                & dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, &
+                                & dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, id, irx, iry, irz)
+                            call s_initialize_riemann_solver(flux_src_n(id)%vf, id)
+                        end if
+
                         ! Face-left states live in qR_rsx_vf (cell right-boundary values) and
                         ! face-right states in qL_rsx_vf, as in the s_riemann_solver call below
                         call s_projection_directional_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, &
                                                           & flux_src_n(id)%vf, rhs_vf)
+
+                        ! Explicit viscous stress flux from the face-averaged velocity
+                        ! gradients, with the same face-left/right argument swap
+                        if (viscous) then
+                            if (weno_Re_flux) then
+                                call s_compute_viscous_source_flux(qR_prim(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqR_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqR_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqR_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & qL_prim(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqL_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqL_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqL_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & flux_src_n(id)%vf, q_prim_qp%vf, id, irx, iry, irz)
+                            else
+                                call s_compute_viscous_source_flux(q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqR_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqR_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqR_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqL_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqL_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & dqL_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                                   & flux_src_n(id)%vf, q_prim_qp%vf, id, irx, iry, irz)
+                            end if
+                        end if
+
+                        if (viscous .or. surface_tension) call s_projection_add_flux_src(id, flux_src_n(id)%vf, rhs_vf)
                     else
                         call s_compute_directional_rhs(id, rhs_vf, .false.)
                     end if
@@ -733,8 +780,9 @@ contains
                         call nvtxEndRange
                     end if
 
-                    ! Viscous stress contribution to RHS
-                    if (viscous .or. surface_tension .or. chem_params%diffusion) then
+                    ! Viscous stress contribution to RHS (the projection path differences
+                    ! its source fluxes itself in s_projection_add_flux_src)
+                    if ((viscous .or. surface_tension .or. chem_params%diffusion) .and. .not. proj_method) then
                         call nvtxStartRange("RHS-ADD-PHYSICS")
                         call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
                                                               & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)

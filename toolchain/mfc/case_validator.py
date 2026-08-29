@@ -202,10 +202,11 @@ PHYSICS_DOCS = {
         "explanation": (
             "Kwatra-type semi-implicit pressure projection: pressure is removed from the "
             "Riemann flux and solved implicitly each stage, lifting the acoustic CFL "
-            "restriction. Requires model_eqns = 2 and HLLC, inviscid only. Incompatible "
-            "with IGR, bubbles, elastic models, MHD, chemistry, immersed boundaries, "
-            "and cylindrical coordinates. Body forces and surface tension are applied "
-            "explicitly within the projection predictor."
+            "restriction. Requires model_eqns = 2 and HLLC. Incompatible with IGR, "
+            "bubbles, elastic models, MHD, chemistry, immersed boundaries, and "
+            "cylindrical coordinates. Body forces, surface tension, and viscous "
+            "stresses are applied explicitly within the projection predictor, so the "
+            "viscous and capillary CFL limits still constrain the time step."
         ),
     },
     "check_non_newtonian": {
@@ -1367,7 +1368,6 @@ class CaseValidator:
         model_eqns = self.get("model_eqns")
         riemann_solver = self.get("riemann_solver")
         igr = self.get("igr", "F") == "T"
-        viscous = self.get("viscous", "F") == "T"
         ib = self.get("ib", "F") == "T"
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
@@ -1386,7 +1386,6 @@ class CaseValidator:
         self.prohibit(model_eqns is not None and model_eqns != 2, "proj_method only supports model_eqns = 2")
         self.prohibit(riemann_solver is not None and riemann_solver != 2, "proj_method requires riemann_solver = 2 (HLLC)")
         self.prohibit(igr, "proj_method is incompatible with IGR")
-        self.prohibit(viscous, "proj_method does not support viscosity")
         self.prohibit(ib, "proj_method does not support the immersed boundary method")
         self.prohibit(bubbles_euler, "proj_method does not support Euler-Euler bubble models")
         self.prohibit(bubbles_lagrange, "proj_method does not support Euler-Lagrange bubble models")

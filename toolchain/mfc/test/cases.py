@@ -692,6 +692,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 if len(dimInfo[0]) > 1:
                     alter_igr()
+                if len(dimInfo[0]) == 2:
+                    cases.append(define_case_d(stack, "Projection -> Jacobi", {"proj_method": "T", "proj_iter_solver": 1, "proj_tol": 1e-10, "proj_max_iters": 200, "weno_Re_flux": "F"}))
 
                 cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
                 cases.append(define_case_d(stack, "weno_Re_flux", {"weno_Re_flux": "T"}))
@@ -759,6 +761,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 if len(dimInfo[0]) > 1:
                     alter_igr()
+                if len(dimInfo[0]) == 2:
+                    cases.append(define_case_d(stack, "Projection -> Jacobi", {"proj_method": "T", "proj_iter_solver": 1, "proj_tol": 1e-10, "proj_max_iters": 200, "weno_Re_flux": "F"}))
 
                 cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
                 cases.append(define_case_d(stack, "weno_Re_flux", {"weno_Re_flux": "T"}))

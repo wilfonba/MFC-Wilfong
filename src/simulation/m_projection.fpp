@@ -87,11 +87,12 @@ module m_projection
     use m_boundary_common
     use m_body_forces, only: s_compute_acceleration
     use m_surface_tension, only: s_compute_capillary_source_flux
+    use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, Res_gs
 
     implicit none
 
-    private; public :: s_initialize_projection_module, s_projection_directional_rhs, s_projection_apply, &
-        & s_finalize_projection_module
+    private; public :: s_initialize_projection_module, s_projection_directional_rhs, s_projection_add_flux_src, &
+        & s_projection_apply, s_finalize_projection_module
 
     real(stp), allocatable, target, dimension(:,:,:) :: pres_proj      !< pressure iterate of the Helmholtz solve
     real(stp), allocatable, dimension(:,:,:)         :: pres_proj_old  !< previous iterate (Jacobi only)
@@ -212,8 +213,9 @@ contains
         real(wp) :: F_mass, F_mom, face_vel, pres_flux
         real(wp) :: nrm, vl, vr, alpha_f, a_flux, ar_c, a_c
         real(wp) :: inv_ds, f_m, f_p, divu_c
+        real(wp) :: re_l, re_r
         integer  :: ibr
-        integer  :: i, j, k, l
+        integer  :: i, j, k, l, q
 
         if (id == 1) then
             isb1 = -1; ise1 = m; isb2 = 0; ise2 = n; isb3 = 0; ise3 = p
@@ -246,8 +248,9 @@ contains
             #:set SF = lambda offs: COORDS.format(SI=SV + offs)
             if (id == ${NORM_DIR}$) then
                 ! Face fluxes: left state at the face index, right state at face index + 1
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_L, rho_R, u_L, u_R, pres_L, pres_R, s_L, s_R, s_star, &
-                                    & rho_star, F_mass, F_mom, face_vel, pres_flux, nrm, vl, vr, alpha_f, a_flux, ar_c, a_c, ibr]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_L, rho_R, u_L, u_R, pres_L, pres_R, s_L, s_R, &
+                                    & s_star, rho_star, F_mass, F_mom, face_vel, pres_flux, nrm, vl, vr, alpha_f, a_flux, ar_c, &
+                                    & a_c, re_l, re_r, ibr]')
                 do l = ${LB}$, ${LE}$
                     do k = ${KB}$, ${KE}$
                         do j = ${JB}$, ${JE}$
@@ -355,6 +358,31 @@ contains
                                 flux_vf(eqn_idx%c)%sf(${SF('')}$) = real(alpha_f*face_vel, stp)
                             end if
 
+                            ! Face-averaged Reynolds numbers for the viscous source flux
+                            ! (harmonic mean, as in the Riemann solvers); the face velocity
+                            ! array only feeds the discarded viscous energy work terms
+                            if (viscous) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_vels
+                                    vel_src_rsx_vf(${SF('')}$, i) = 0._wp
+                                end do
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, 2
+                                    re_l = dflt_real; re_r = dflt_real
+                                    if (Re_size(i) > 0) then
+                                        re_l = 0._wp; re_r = 0._wp
+                                    end if
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do q = 1, Re_size(i)
+                                        re_l = re_l + q_faceL_rs_vf(${SF('')}$, eqn_idx%adv%beg + Re_idx(i, q) - 1)/Res_gs(i, q)
+                                        re_r = re_r + q_faceR_rs_vf(${SF(' + 1')}$, eqn_idx%adv%beg + Re_idx(i, q) - 1)/Res_gs(i, q)
+                                    end do
+                                    re_l = 1._wp/max(re_l, sgm_eps)
+                                    re_r = 1._wp/max(re_r, sgm_eps)
+                                    Re_avg_rsx_vf(${SF('')}$, i) = 2._wp/(1._wp/re_l + 1._wp/re_r)
+                                end do
+                            end if
+
                             ! Energy flux is unused: total energy is rebuilt from the EOS
                             ! after every pressure solve, so its RHS never enters the state
                             flux_vf(eqn_idx%E)%sf(${SF('')}$) = 0._stp
@@ -400,44 +428,18 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                ! Capillary momentum flux at the faces (explicit CSF stress), differenced
-                ! like the convective fluxes. The velocity-work energy terms vanish with
-                ! the zero cap_vsrc; the energy RHS is dead under the projection anyway
+                ! Capillary momentum flux at the faces (explicit CSF stress), accumulated
+                ! into flux_src_vf (zeroed by s_initialize_riemann_solver in the caller)
+                ! and differenced by s_projection_add_flux_src after any viscous flux is
+                ! added. The velocity-work energy terms vanish with the zero cap_vsrc;
+                ! the energy RHS is dead under the projection anyway
                 if (surface_tension) then
                     cap_isx%beg = ${JB}$; cap_isx%end = ${JE}$
                     cap_isy%beg = ${KB}$; cap_isy%end = ${KE}$
                     cap_isz%beg = ${LB}$; cap_isz%end = ${LE}$
                     $:GPU_UPDATE(device='[cap_isx, cap_isy, cap_isz]')
 
-                    $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l]')
-                    do i = eqn_idx%mom%beg, eqn_idx%E
-                        do l = ${LB}$, ${LE}$
-                            do k = ${KB}$, ${KE}$
-                                do j = ${JB}$, ${JE}$
-                                    flux_src_vf(i)%sf(j, k, l) = 0._stp
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-
                     call s_compute_capillary_source_flux(cap_vsrc, flux_src_vf, ${NORM_DIR}$, cap_isx, cap_isy, cap_isz)
-
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, inv_ds, f_m, f_p]')
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                inv_ds = 1._wp/d${XYZ}$ (${SV}$)
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = eqn_idx%mom%beg, eqn_idx%E
-                                    f_m = real(flux_src_vf(i)%sf(${SF(' - 1')}$), wp)
-                                    f_p = real(flux_src_vf(i)%sf(${SF('')}$), wp)
-                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + real(inv_ds*(f_m - f_p), stp)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
         #:endfor
@@ -489,6 +491,42 @@ contains
         end if
 
     end subroutine s_projection_directional_rhs
+
+    !> Difference the accumulated source fluxes (viscous stress and capillary CSF) of one direction sweep into the RHS, matching the
+    !! convective flux convention
+    subroutine s_projection_add_flux_src(id, flux_src_vf, rhs_vf)
+
+        integer, intent(in)                                    :: id
+        type(scalar_field), dimension(sys_size), intent(in)    :: flux_src_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        real(wp)                                               :: inv_ds, f_m, f_p
+        integer                                                :: i, j, k, l
+
+        #:for NORM_DIR, XYZ, SV, COORDS in &
+            [(1, 'x', 'j', '{SI}, k, l'), &
+             (2, 'y', 'k', 'j, {SI}, l'), &
+             (3, 'z', 'l', 'j, k, {SI}')]
+            #:set SF = lambda offs: COORDS.format(SI=SV + offs)
+            if (id == ${NORM_DIR}$) then
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, inv_ds, f_m, f_p]')
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            inv_ds = 1._wp/d${XYZ}$ (${SV}$)
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%mom%beg, eqn_idx%E
+                                f_m = real(flux_src_vf(i)%sf(${SF(' - 1')}$), wp)
+                                f_p = real(flux_src_vf(i)%sf(${SF('')}$), wp)
+                                rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + real(inv_ds*(f_m - f_p), stp)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_projection_add_flux_src
 
     !> Apply the implicit pressure solve and correction to the star state produced by the explicit RK blend: assemble the Helmholtz
     !! RHS from the blended advected pressure and div(u*), solve for the new pressure with Jacobi or red-black Gauss-Seidel, correct
