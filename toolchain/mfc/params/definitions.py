@@ -321,9 +321,9 @@ CONSTRAINTS = {
     },
     # Semi-implicit pressure projection
     "proj_iter_solver": {
-        "choices": [1, 2, 3],
-        "value_labels": {1: "Jacobi", 2: "red-black Gauss-Seidel", 3: "Chebyshev-accelerated Jacobi"},
-        "names": {"jacobi": 1, "gauss_seidel": 2, "chebyshev": 3},
+        "choices": [1, 2, 3, 4],
+        "value_labels": {1: "Jacobi", 2: "red-black Gauss-Seidel", 3: "Chebyshev-accelerated Jacobi", 4: "geometric multigrid"},
+        "names": {"jacobi": 1, "gauss_seidel": 2, "chebyshev": 3, "multigrid": 4},
     },
     "proj_max_iters": {"min": 1},
     "proj_check_iters": {"min": 1},

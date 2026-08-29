@@ -457,6 +457,36 @@ contains
 
     end subroutine s_mpi_allreduce_min_vec
 
+    !> Nonblocking exchange of equal-count wp slabs with a direction's two side partners (either may be absent, partner < 0).
+    !! Posting all requests before waiting avoids the ring deadlock of blocking exchanges, and the side tags keep messages from
+    !! cross-matching when both partners are the same rank (two-rank periodic layouts).
+    impure subroutine s_mpi_exchange_sides_wp(sb, rb, se, re, cnt, pb, pe)
+
+        real(wp), dimension(:), intent(in)  :: sb, se
+        real(wp), dimension(:), intent(out) :: rb, re
+        integer, intent(in)                 :: cnt, pb, pe
+
+#ifdef MFC_MPI
+        integer :: reqs(4), nreq
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        nreq = 0
+        if (pb >= 0) then
+            nreq = nreq + 1; call MPI_IRECV(rb, cnt, mpi_p, pb, 0, MPI_COMM_WORLD, reqs(nreq), ierr)
+            nreq = nreq + 1; call MPI_ISEND(sb, cnt, mpi_p, pb, 1, MPI_COMM_WORLD, reqs(nreq), ierr)
+        end if
+        if (pe >= 0) then
+            nreq = nreq + 1; call MPI_IRECV(re, cnt, mpi_p, pe, 1, MPI_COMM_WORLD, reqs(nreq), ierr)
+            nreq = nreq + 1; call MPI_ISEND(se, cnt, mpi_p, pe, 0, MPI_COMM_WORLD, reqs(nreq), ierr)
+        end if
+        if (nreq > 0) call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
+#else
+        if (pb >= 0) rb(1:cnt) = sb(1:cnt)
+        if (pe >= 0) re(1:cnt) = se(1:cnt)
+#endif
+
+    end subroutine s_mpi_exchange_sides_wp
+
     !> Reduce a local real value to its global maximum across all MPI ranks.
     impure subroutine s_mpi_allreduce_max(var_loc, var_glb)
 

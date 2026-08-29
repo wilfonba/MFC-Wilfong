@@ -207,7 +207,7 @@ DESCRIPTIONS = {
     "num_igr_warm_start_iters": "Number of IGR warm-start iterations",
     "igr_iter_solver": "IGR iterative solver type",
     "proj_method": "Enable semi-implicit pressure projection method",
-    "proj_iter_solver": "Projection pressure solver: 1=Jacobi, 2=red-black Gauss-Seidel, 3=Chebyshev-accelerated Jacobi",
+    "proj_iter_solver": "Projection pressure solver: 1=Jacobi, 2=red-black Gauss-Seidel, 3=Chebyshev-accelerated Jacobi, 4=geometric multigrid",
     "proj_tol": "Projection pressure solve convergence tolerance (max |dp|)",
     "proj_max_iters": "Maximum projection pressure solve iterations",
     "proj_check_iters": "Projection residual check interval (iterations)",

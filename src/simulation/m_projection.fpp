@@ -72,6 +72,44 @@
     end if
 #:enddef
 
+#! Same Helmholtz stencil row on multigrid level `lv` at cell (j, k, l), reading
+#! neighbor values of `pfield`, the level's cell densities/coefficients, and the
+#! level's cell widths. Accumulates offd/diag; coeff is the level coefficient
+#:def MG_STENCIL(lv, pfield)
+    coeff = real(mg_coeff(${lv}$)%sf(j, k, l), wp)
+    offd = 0._wp
+    diag = 0._wp
+    rho_c = real(mg_rho(${lv}$)%sf(j, k, l), wp)
+    rho_nb = real(mg_rho(${lv}$)%sf(j - 1, k, l), wp)
+    c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dx(${lv}$, j - 1) + mg_dx(${lv}$, j))*mg_dx(${lv}$, j))
+    offd = offd + c_f*real(${pfield}$ (j - 1, k, l), wp)
+    diag = diag + c_f
+    rho_nb = real(mg_rho(${lv}$)%sf(j + 1, k, l), wp)
+    c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dx(${lv}$, j) + mg_dx(${lv}$, j + 1))*mg_dx(${lv}$, j))
+    offd = offd + c_f*real(${pfield}$ (j + 1, k, l), wp)
+    diag = diag + c_f
+    if (num_dims > 1) then
+        rho_nb = real(mg_rho(${lv}$)%sf(j, k - 1, l), wp)
+        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dy(${lv}$, k - 1) + mg_dy(${lv}$, k))*mg_dy(${lv}$, k))
+        offd = offd + c_f*real(${pfield}$ (j, k - 1, l), wp)
+        diag = diag + c_f
+        rho_nb = real(mg_rho(${lv}$)%sf(j, k + 1, l), wp)
+        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dy(${lv}$, k) + mg_dy(${lv}$, k + 1))*mg_dy(${lv}$, k))
+        offd = offd + c_f*real(${pfield}$ (j, k + 1, l), wp)
+        diag = diag + c_f
+    end if
+    if (num_dims > 2) then
+        rho_nb = real(mg_rho(${lv}$)%sf(j, k, l - 1), wp)
+        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dz(${lv}$, l - 1) + mg_dz(${lv}$, l))*mg_dz(${lv}$, l))
+        offd = offd + c_f*real(${pfield}$ (j, k, l - 1), wp)
+        diag = diag + c_f
+        rho_nb = real(mg_rho(${lv}$)%sf(j, k, l + 1), wp)
+        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dz(${lv}$, l) + mg_dz(${lv}$, l + 1))*mg_dz(${lv}$, l))
+        offd = offd + c_f*real(${pfield}$ (j, k, l + 1), wp)
+        diag = diag + c_f
+    end if
+#:enddef
+
 !> @brief Semi-implicit pressure projection method (Kwatra et al.). Pressure is removed from the Riemann flux (advective-only wave
 !! speeds), advected explicitly, then solved implicitly each RK stage from the Helmholtz equation p - rho*c^2*dt^2 div(grad(p)/rho)
 !! = p_adv - rho*c^2*dt*div(u*), after which momentum is corrected and total energy is rebuilt from the EOS. This lifts the acoustic
@@ -121,6 +159,30 @@ module m_projection
     type(int_bounds_info)                     :: cap_isx, cap_isy, cap_isz
     $:GPU_DECLARE(create='[cap_vsrc, cap_isx, cap_isy, cap_isz]')
 
+    !> @name Geometric multigrid hierarchy (proj_iter_solver = 4). Each rank coarsens its local grid only: the Helmholtz identity
+    !! term makes the coarsest system diagonally dominant once rho*c^2*dt^2/dX^2 < 1, so no rank agglomeration or global coarse
+    !! solve is needed. Level 1 is the fine grid; mg_p(1) is unused (the fine solution lives in pres_proj with the standard halo
+    !! machinery)
+    !> @{
+    integer, parameter                            :: mg_max_levels = 12
+    integer, parameter                            :: mg_nu_pre = 2  !< pre-smoothing sweeps
+    integer, parameter                            :: mg_nu_post = 2  !< post-smoothing sweeps
+    integer, parameter                            :: mg_nu_coarse = 8  !< coarsest-level sweeps
+    integer                                       :: nlev_mg = 0
+    integer, dimension(mg_max_levels)             :: mg_m, mg_n, mg_p_dim  !< local cells - 1 per level
+    integer, dimension(mg_max_levels)             :: mg_rboff  !< red-black global parity per level
+    type(scalar_field), allocatable, dimension(:) :: mg_p  !< level solution/correction (1-layer ghosts)
+    type(scalar_field), allocatable, dimension(:) :: mg_rhs  !< level right-hand side
+    type(scalar_field), allocatable, dimension(:) :: mg_res  !< level residual
+    type(scalar_field), allocatable, dimension(:) :: mg_rho  !< level cell density (1-layer ghosts)
+    type(scalar_field), allocatable, dimension(:) :: mg_coeff  !< level rho*c^2*dt^2
+    real(wp), allocatable, dimension(:,:)         :: mg_dx, mg_dy, mg_dz  !< level cell widths (1 ghost each side)
+    real(wp), allocatable, dimension(:)           :: mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e  !< coarse-level halo slabs (wp)
+    logical                                       :: mg_dx_built = .false.
+    $:GPU_DECLARE(create='[mg_p, mg_rhs, mg_res, mg_rho, mg_coeff, mg_dx, mg_dy, mg_dz, mg_rboff]')
+    $:GPU_DECLARE(create='[mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e]')
+    !> @}
+
 contains
 
     !> Initialize the projection module
@@ -137,6 +199,7 @@ contains
             d_cheb = 0._stp
             $:GPU_UPDATE(device='[d_cheb]')
         end if
+        if (proj_iter_solver == proj_iter_solver_multigrid) call s_initialize_projection_mg()
 
         @:ALLOCATE(pres_stage(0:m, 0:n, 0:p))
         if (time_stepper /= time_stepper_rk1) then
@@ -659,6 +722,8 @@ contains
             rho_ch = mu_glb
         end if
 
+        if (proj_iter_solver == proj_iter_solver_multigrid) call s_mg_setup_solve(q_cons_vf, bc_type)
+
         do iter = 1, proj_max_iters
             res_loc = 0._wp
 
@@ -725,6 +790,20 @@ contains
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
+                            pres_proj_old(j, k, l) = pres_proj(j, k, l)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            else if (proj_iter_solver == proj_iter_solver_multigrid) then
+                ! One V-cycle per outer iteration; convergence measured as the cycle-to-cycle change of the fine iterate
+                call s_mg_vcycle(bc_type)
+
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', reduction='[[res_loc]]', reductionOp='[max]')
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            res_loc = max(res_loc, abs(real(pres_proj(j, k, l), wp) - real(pres_proj_old(j, k, l), wp)))
                             pres_proj_old(j, k, l) = pres_proj(j, k, l)
                         end do
                     end do
@@ -802,6 +881,8 @@ contains
     !> Finalize the projection module
     impure subroutine s_finalize_projection_module()
 
+        integer :: i
+
         $:GPU_EXIT_DATA(detach='[pres_proj_sf(1)%sf]')
 
         @:DEALLOCATE(pres_proj)
@@ -810,6 +891,18 @@ contains
         end if
         if (proj_iter_solver == proj_iter_solver_chebyshev) then
             @:DEALLOCATE(d_cheb)
+        end if
+        if (proj_iter_solver == proj_iter_solver_multigrid) then
+            $:GPU_EXIT_DATA(detach='[mg_p(1)%sf]')
+            do i = 2, nlev_mg
+                @:DEALLOCATE(mg_p(i)%sf)
+            end do
+            do i = 1, nlev_mg
+                @:DEALLOCATE(mg_rho(i)%sf, mg_rhs(i)%sf, mg_res(i)%sf, mg_coeff(i)%sf)
+            end do
+            @:DEALLOCATE(mg_p, mg_rhs, mg_res, mg_rho, mg_coeff)
+            @:DEALLOCATE(mg_dx, mg_dy, mg_dz)
+            @:DEALLOCATE(mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e)
         end if
         @:DEALLOCATE(pres_stage)
         if (time_stepper /= time_stepper_rk1) then
@@ -822,5 +915,460 @@ contains
         end if
 
     end subroutine s_finalize_projection_module
+
+    !> Build the multigrid hierarchy: each rank halves its local grid while every rank's local cell counts stay even (agreed by a
+    !! global reduction), so coarse cells remain aligned with the global grid and the red-black parity is well defined on every
+    !! level. Level 1 aliases the fine-grid solve arrays
+    impure subroutine s_initialize_projection_mg()
+
+        real(wp) :: nl_loc, nl_glb
+        integer  :: lv, j, d, mx, cnt
+        logical  :: can
+
+        mg_m(1) = m; mg_n(1) = n; mg_p_dim(1) = p
+        nl_loc = 1._wp
+        do lv = 1, mg_max_levels - 1
+            can = mod(mg_m(lv) + 1, 2) == 0 .and. (mg_m(lv) + 1)/2 >= 2
+            if (n > 0) can = can .and. mod(mg_n(lv) + 1, 2) == 0 .and. (mg_n(lv) + 1)/2 >= 2
+            if (p > 0) can = can .and. mod(mg_p_dim(lv) + 1, 2) == 0 .and. (mg_p_dim(lv) + 1)/2 >= 2
+            if (.not. can) exit
+            mg_m(lv + 1) = (mg_m(lv) + 1)/2 - 1
+            mg_n(lv + 1) = mg_n(lv); if (n > 0) mg_n(lv + 1) = (mg_n(lv) + 1)/2 - 1
+            mg_p_dim(lv + 1) = mg_p_dim(lv); if (p > 0) mg_p_dim(lv + 1) = (mg_p_dim(lv) + 1)/2 - 1
+            nl_loc = real(lv + 1, wp)
+        end do
+        call s_mpi_allreduce_min(nl_loc, nl_glb)
+        nlev_mg = int(nl_glb)
+
+        ! Global red-black parity per level (offsets stay divisible because every
+        ! rank's local counts are even on all levels above the agreed coarsest)
+        do lv = 1, nlev_mg
+            mg_rboff(lv) = 0
+            if (num_procs > 1) then
+                cnt = f_global_offset(m_glb, num_procs_x, proc_coords(1))/2**(lv - 1)
+                if (num_dims > 1) cnt = cnt + f_global_offset(n_glb, num_procs_y, proc_coords(2))/2**(lv - 1)
+                if (num_dims > 2) cnt = cnt + f_global_offset(p_glb, num_procs_z, proc_coords(3))/2**(lv - 1)
+                mg_rboff(lv) = mod(cnt, 2)
+            end if
+        end do
+        $:GPU_UPDATE(device='[mg_rboff]')
+
+        @:ALLOCATE(mg_p(1:nlev_mg))
+        @:ALLOCATE(mg_rhs(1:nlev_mg))
+        @:ALLOCATE(mg_res(1:nlev_mg))
+        @:ALLOCATE(mg_rho(1:nlev_mg))
+        @:ALLOCATE(mg_coeff(1:nlev_mg))
+
+        ! Level 1 solution is the fine iterate itself (standard halo machinery)
+        mg_p(1)%sf => pres_proj
+        $:GPU_ENTER_DATA(attach='[mg_p(1)%sf]')
+
+        do lv = 1, nlev_mg
+            if (lv > 1) then
+                @:ALLOCATE(mg_p(lv)%sf(-1:mg_m(lv) + 1, -1:mg_n(lv) + 1, -1:mg_p_dim(lv) + 1))
+                @:ACC_SETUP_SFs(mg_p(lv))
+            end if
+            @:ALLOCATE(mg_rho(lv)%sf(-1:mg_m(lv) + 1, -1:mg_n(lv) + 1, -1:mg_p_dim(lv) + 1))
+            @:ALLOCATE(mg_rhs(lv)%sf(0:mg_m(lv), 0:mg_n(lv), 0:mg_p_dim(lv)))
+            @:ALLOCATE(mg_res(lv)%sf(0:mg_m(lv), 0:mg_n(lv), 0:mg_p_dim(lv)))
+            @:ALLOCATE(mg_coeff(lv)%sf(0:mg_m(lv), 0:mg_n(lv), 0:mg_p_dim(lv)))
+            @:ACC_SETUP_SFs(mg_rho(lv), mg_rhs(lv), mg_res(lv), mg_coeff(lv))
+        end do
+
+        ! Level cell widths are built lazily at the first solve: the fine grid's
+        ! ghost widths are only populated after the modules initialize
+        mx = max(m, max(n, p))
+        @:ALLOCATE(mg_dx(1:nlev_mg, -1:mx + 1))
+        @:ALLOCATE(mg_dy(1:nlev_mg, -1:mx + 1))
+        @:ALLOCATE(mg_dz(1:nlev_mg, -1:mx + 1))
+        ! Coarse-level halo slabs (level 2 has the largest faces)
+        cnt = max((mg_n(min(2, nlev_mg)) + 1)*(mg_p_dim(min(2, nlev_mg)) + 1), (mg_m(min(2, nlev_mg)) + 1)*(mg_p_dim(min(2, &
+                  & nlev_mg)) + 1))
+        cnt = max(cnt, (mg_m(min(2, nlev_mg)) + 1)*(mg_n(min(2, nlev_mg)) + 1))
+        @:ALLOCATE(mg_sbuf_b(1:max(cnt, 1)))
+        @:ALLOCATE(mg_rbuf_b(1:max(cnt, 1)))
+        @:ALLOCATE(mg_sbuf_e(1:max(cnt, 1)))
+        @:ALLOCATE(mg_rbuf_e(1:max(cnt, 1)))
+
+    end subroutine s_initialize_projection_mg
+
+    !> Build the per-level cell widths, pairwise-summed from the fine grid (supports grid stretching); ghost widths mirror the edge
+    !! value except for single-rank periodic wrap. Rank-boundary coarse ghost widths are mirrored too: on stretched grids this only
+    !! perturbs the coarse operators, which affects the convergence rate, never the converged fine-grid solution
+    impure subroutine s_mg_build_dx()
+
+        integer :: lv, j
+
+        mg_dx = 1._wp; mg_dy = 1._wp; mg_dz = 1._wp
+        mg_dx(1,-1:m + 1) = dx(-1:m + 1)
+        if (n > 0) mg_dy(1,-1:n + 1) = dy(-1:n + 1)
+        if (p > 0) mg_dz(1,-1:p + 1) = dz(-1:p + 1)
+        do lv = 2, nlev_mg
+            do j = 0, mg_m(lv)
+                mg_dx(lv, j) = mg_dx(lv - 1, 2*j) + mg_dx(lv - 1, 2*j + 1)
+            end do
+            mg_dx(lv, -1) = mg_dx(lv, 0); mg_dx(lv, mg_m(lv) + 1) = mg_dx(lv, mg_m(lv))
+            if (bc_x%beg == BC_PERIODIC) mg_dx(lv, -1) = mg_dx(lv, mg_m(lv))
+            if (bc_x%end == BC_PERIODIC) mg_dx(lv, mg_m(lv) + 1) = mg_dx(lv, 0)
+            if (n > 0) then
+                do j = 0, mg_n(lv)
+                    mg_dy(lv, j) = mg_dy(lv - 1, 2*j) + mg_dy(lv - 1, 2*j + 1)
+                end do
+                mg_dy(lv, -1) = mg_dy(lv, 0); mg_dy(lv, mg_n(lv) + 1) = mg_dy(lv, mg_n(lv))
+                if (bc_y%beg == BC_PERIODIC) mg_dy(lv, -1) = mg_dy(lv, mg_n(lv))
+                if (bc_y%end == BC_PERIODIC) mg_dy(lv, mg_n(lv) + 1) = mg_dy(lv, 0)
+            end if
+            if (p > 0) then
+                do j = 0, mg_p_dim(lv)
+                    mg_dz(lv, j) = mg_dz(lv - 1, 2*j) + mg_dz(lv - 1, 2*j + 1)
+                end do
+                mg_dz(lv, -1) = mg_dz(lv, 0); mg_dz(lv, mg_p_dim(lv) + 1) = mg_dz(lv, mg_p_dim(lv))
+                if (bc_z%beg == BC_PERIODIC) mg_dz(lv, -1) = mg_dz(lv, mg_p_dim(lv))
+                if (bc_z%end == BC_PERIODIC) mg_dz(lv, mg_p_dim(lv) + 1) = mg_dz(lv, 0)
+            end if
+        end do
+        $:GPU_UPDATE(device='[mg_dx, mg_dy, mg_dz]')
+        mg_dx_built = .true.
+
+    end subroutine s_mg_build_dx
+
+    !> Per-solve multigrid setup: level-1 density, coefficient, and right-hand side from the assembled fine system, then averaged
+    !! down the hierarchy (rediscretized coarse operators)
+    impure subroutine s_mg_setup_solve(q_cons_vf, bc_type)
+
+        type(scalar_field), dimension(sys_size), intent(in)        :: q_cons_vf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        real(wp)                                                   :: sm, cf_s
+        integer                                                    :: lv, mml, nnl, ppl
+        integer                                                    :: i, j, k, l, jf, kf, lf, nchild
+
+        if (.not. mg_dx_built) call s_mg_build_dx()
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, sm]')
+        do l = -1, p + 1
+            do k = -1, n + 1
+                do j = -1, m + 1
+                    sm = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        sm = sm + real(q_cons_vf(i)%sf(j, k, l), wp)
+                    end do
+                    mg_rho(1)%sf(j, k, l) = real(sm, stp)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    mg_coeff(1)%sf(j, k, l) = real(real(rhoc2_cell(j, k, l), wp)*dt*dt, stp)
+                    mg_rhs(1)%sf(j, k, l) = helm_rhs(j, k, l)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        nchild = 2**num_dims
+        do lv = 1, nlev_mg - 1
+            mml = mg_m(lv + 1); nnl = mg_n(lv + 1); ppl = mg_p_dim(lv + 1)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, jf, kf, lf, sm, cf_s]', firstprivate='[lv, nchild]')
+            do l = 0, ppl
+                do k = 0, nnl
+                    do j = 0, mml
+                        jf = 2*j; kf = k; lf = l
+                        if (num_dims > 1) kf = 2*k
+                        if (num_dims > 2) lf = 2*l
+                        sm = real(mg_rho(lv)%sf(jf, kf, lf), wp) + real(mg_rho(lv)%sf(jf + 1, kf, lf), wp)
+                        cf_s = real(mg_coeff(lv)%sf(jf, kf, lf), wp) + real(mg_coeff(lv)%sf(jf + 1, kf, lf), wp)
+                        if (num_dims > 1) then
+                            sm = sm + real(mg_rho(lv)%sf(jf, kf + 1, lf), wp) + real(mg_rho(lv)%sf(jf + 1, kf + 1, lf), wp)
+                            cf_s = cf_s + real(mg_coeff(lv)%sf(jf, kf + 1, lf), wp) + real(mg_coeff(lv)%sf(jf + 1, kf + 1, lf), wp)
+                        end if
+                        if (num_dims > 2) then
+                            sm = sm + real(mg_rho(lv)%sf(jf, kf, lf + 1), wp) + real(mg_rho(lv)%sf(jf + 1, kf, lf + 1), &
+                                           & wp) + real(mg_rho(lv)%sf(jf, kf + 1, lf + 1), wp) + real(mg_rho(lv)%sf(jf + 1, &
+                                           & kf + 1, lf + 1), wp)
+                            cf_s = cf_s + real(mg_coeff(lv)%sf(jf, kf, lf + 1), wp) + real(mg_coeff(lv)%sf(jf + 1, kf, lf + 1), &
+                                               & wp) + real(mg_coeff(lv)%sf(jf, kf + 1, lf + 1), &
+                                               & wp) + real(mg_coeff(lv)%sf(jf + 1, kf + 1, lf + 1), wp)
+                        end if
+                        mg_rho(lv + 1)%sf(j, k, l) = real(sm/real(nchild, wp), stp)
+                        mg_coeff(lv + 1)%sf(j, k, l) = real(cf_s/real(nchild, wp), stp)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            call s_mg_halo_coarse(lv + 1, mg_rho(lv + 1))
+        end do
+
+    end subroutine s_mg_setup_solve
+
+    !> One-layer halo exchange plus physical BCs for a coarse-level field: MPI neighbors from the domain-level bc codes, periodic
+    !! wrap on a single rank, zero-order extrapolation otherwise. Face-varying bc patches reduce to the domain code here, which only
+    !! perturbs the coarse operators. 5/7-point stencils read no corner ghosts, so faces alone suffice
+    impure subroutine s_mg_halo_coarse(lv_in, f)
+
+        integer, intent(in)               :: lv_in
+        type(scalar_field), intent(inout) :: f
+        integer                           :: mml, nnl, ppl, cnt, j, k, l, lv
+
+        lv = lv_in
+        mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
+
+        #:for DIR, BCV, T1, T1E, T2, T2E, GBEG, IBEG, GEND, IEND in &
+            [(1, 'bc_x', 'k', 'nnl', 'l', 'ppl', '(-1, k, l)', '(0, k, l)', '(mml + 1, k, l)', '(mml, k, l)'), &
+             (2, 'bc_y', 'j', 'mml', 'l', 'ppl', '(j, -1, l)', '(j, 0, l)', '(j, nnl + 1, l)', '(j, nnl, l)'), &
+             (3, 'bc_z', 'j', 'mml', 'k', 'nnl', '(j, k, -1)', '(j, k, 0)', '(j, k, ppl + 1)', '(j, k, ppl)')]
+            if (num_dims >= ${DIR}$) then
+                cnt = (${T1E}$ + 1)*(${T2E}$ + 1)
+                if (${BCV}$%beg >= 0 .or. ${BCV}$%end >= 0) then
+                    ! Pack the interior layers of both MPI sides, exchange them with
+                    ! nonblocking requests, and unpack into the ghost layers
+                    if (${BCV}$%beg >= 0) then
+                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                        do ${T2}$ = 0, ${T2E}$
+                            do ${T1}$ = 0, ${T1E}$
+                                mg_sbuf_b(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1)) = real(f%sf${IBEG}$, wp)
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                        $:GPU_UPDATE(host='[mg_sbuf_b]')
+                    end if
+                    if (${BCV}$%end >= 0) then
+                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                        do ${T2}$ = 0, ${T2E}$
+                            do ${T1}$ = 0, ${T1E}$
+                                mg_sbuf_e(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1)) = real(f%sf${IEND}$, wp)
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                        $:GPU_UPDATE(host='[mg_sbuf_e]')
+                    end if
+                    call s_mpi_exchange_sides_wp(mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e, cnt, ${BCV}$%beg, ${BCV}$%end)
+                    if (${BCV}$%beg >= 0) then
+                        $:GPU_UPDATE(device='[mg_rbuf_b]')
+                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                        do ${T2}$ = 0, ${T2E}$
+                            do ${T1}$ = 0, ${T1E}$
+                                f%sf${GBEG}$ = real(mg_rbuf_b(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1)), stp)
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                    if (${BCV}$%end >= 0) then
+                        $:GPU_UPDATE(device='[mg_rbuf_e]')
+                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                        do ${T2}$ = 0, ${T2E}$
+                            do ${T1}$ = 0, ${T1E}$
+                                f%sf${GEND}$ = real(mg_rbuf_e(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1)), stp)
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                end if
+                ! Physical sides: periodic wrap on a single rank, else zero-gradient
+                if (${BCV}$%beg < 0) then
+                    if (${BCV}$%beg == BC_PERIODIC) then
+                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                        do ${T2}$ = 0, ${T2E}$
+                            do ${T1}$ = 0, ${T1E}$
+                                f%sf${GBEG}$ = f%sf${IEND}$
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    else
+                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                        do ${T2}$ = 0, ${T2E}$
+                            do ${T1}$ = 0, ${T1E}$
+                                f%sf${GBEG}$ = f%sf${IBEG}$
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                end if
+                if (${BCV}$%end < 0) then
+                    if (${BCV}$%end == BC_PERIODIC) then
+                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                        do ${T2}$ = 0, ${T2E}$
+                            do ${T1}$ = 0, ${T1E}$
+                                f%sf${GEND}$ = f%sf${IBEG}$
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    else
+                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                        do ${T2}$ = 0, ${T2E}$
+                            do ${T1}$ = 0, ${T1E}$
+                                f%sf${GEND}$ = f%sf${IEND}$
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                end if
+            end if
+        #:endfor
+
+    end subroutine s_mg_halo_coarse
+
+    !> Red-black Gauss-Seidel smoothing sweeps on one level (halo before each color, so freshly restricted or prolonged iterates
+    !! enter consistently)
+    impure subroutine s_mg_smooth(lv_in, nsweeps, bc_type)
+
+        integer, intent(in)                                        :: lv_in, nsweeps
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        real(wp)                                                   :: coeff, c_f, offd, diag, p_new, rho_c, rho_nb
+        integer                                                    :: lv, mml, nnl, ppl, sweep, color, rboff
+        integer                                                    :: i, j, k, l
+
+        lv = lv_in
+        mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
+        rboff = mg_rboff(lv)
+
+        do sweep = 1, nsweeps
+            do color = 0, 1
+                if (lv == 1) then
+                    call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+                else
+                    call s_mg_halo_coarse(lv, mg_p(lv))
+                end if
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, p_new, rho_c, rho_nb]', &
+                                    & firstprivate='[lv, mml, nnl, ppl, rboff, color]')
+                do l = 0, ppl
+                    do k = 0, nnl
+                        do j = 0, mml
+                            if (mod(j + k + l + rboff, 2) == color) then
+                                @:MG_STENCIL(lv, mg_p(lv)%sf)
+                                p_new = (real(mg_rhs(lv)%sf(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
+                                mg_p(lv)%sf(j, k, l) = real(p_new, stp)
+                            end if
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end do
+        end do
+
+    end subroutine s_mg_smooth
+
+    !> Residual r = rhs - A p on one level (with a fresh halo on p)
+    impure subroutine s_mg_residual(lv_in, bc_type)
+
+        integer, intent(in)                                        :: lv_in
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        real(wp)                                                   :: coeff, c_f, offd, diag, rho_c, rho_nb
+        integer                                                    :: lv, mml, nnl, ppl
+        integer                                                    :: i, j, k, l
+
+        lv = lv_in
+        mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
+
+        if (lv == 1) then
+            call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+        else
+            call s_mg_halo_coarse(lv, mg_p(lv))
+        end if
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, rho_c, rho_nb]', firstprivate='[lv, mml, &
+                            & nnl, ppl]')
+        do l = 0, ppl
+            do k = 0, nnl
+                do j = 0, mml
+                    @:MG_STENCIL(lv, mg_p(lv)%sf)
+                    mg_res(lv)%sf(j, k, l) = real(real(mg_rhs(lv)%sf(j, k, l), wp) - (1._wp + coeff*diag)*real(mg_p(lv)%sf(j, k, &
+                           & l), wp) + coeff*offd, stp)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_mg_residual
+
+    !> Full-weighting restriction of the level residual into the next level's right-hand side; the coarse correction starts from
+    !! zero
+    impure subroutine s_mg_restrict(lv_in)
+
+        integer, intent(in) :: lv_in
+        real(wp)            :: sm
+        integer             :: lv, mml, nnl, ppl, nchild
+        integer             :: j, k, l, jf, kf, lf
+
+        lv = lv_in
+        mml = mg_m(lv + 1); nnl = mg_n(lv + 1); ppl = mg_p_dim(lv + 1)
+        nchild = 2**num_dims
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, jf, kf, lf, sm]', firstprivate='[lv, mml, nnl, ppl, nchild]')
+        do l = -1, ppl + 1
+            do k = -1, nnl + 1
+                do j = -1, mml + 1
+                    mg_p(lv + 1)%sf(j, k, l) = 0._stp
+                    if (j >= 0 .and. j <= mml .and. k >= 0 .and. k <= nnl .and. l >= 0 .and. l <= ppl) then
+                        jf = 2*j; kf = k; lf = l
+                        if (num_dims > 1) kf = 2*k
+                        if (num_dims > 2) lf = 2*l
+                        sm = real(mg_res(lv)%sf(jf, kf, lf), wp) + real(mg_res(lv)%sf(jf + 1, kf, lf), wp)
+                        if (num_dims > 1) then
+                            sm = sm + real(mg_res(lv)%sf(jf, kf + 1, lf), wp) + real(mg_res(lv)%sf(jf + 1, kf + 1, lf), wp)
+                        end if
+                        if (num_dims > 2) then
+                            sm = sm + real(mg_res(lv)%sf(jf, kf, lf + 1), wp) + real(mg_res(lv)%sf(jf + 1, kf, lf + 1), &
+                                           & wp) + real(mg_res(lv)%sf(jf, kf + 1, lf + 1), wp) + real(mg_res(lv)%sf(jf + 1, &
+                                           & kf + 1, lf + 1), wp)
+                        end if
+                        mg_rhs(lv + 1)%sf(j, k, l) = real(sm/real(nchild, wp), stp)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_mg_restrict
+
+    !> Piecewise-constant prolongation: add each coarse-cell correction to its child cells on the finer level
+    impure subroutine s_mg_prolong(lv_in)
+
+        integer, intent(in) :: lv_in
+        integer             :: lv, mml, nnl, ppl
+        integer             :: j, k, l, jc, kc, lc
+
+        lv = lv_in
+        mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, jc, kc, lc]', firstprivate='[lv, mml, nnl, ppl]')
+        do l = 0, ppl
+            do k = 0, nnl
+                do j = 0, mml
+                    jc = j/2; kc = k; lc = l
+                    if (num_dims > 1) kc = k/2
+                    if (num_dims > 2) lc = l/2
+                    mg_p(lv)%sf(j, k, l) = real(real(mg_p(lv)%sf(j, k, l), wp) + real(mg_p(lv + 1)%sf(jc, kc, lc), wp), stp)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_mg_prolong
+
+    !> One multigrid V-cycle on the assembled hierarchy
+    impure subroutine s_mg_vcycle(bc_type)
+
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer                                                    :: lv
+
+        do lv = 1, nlev_mg - 1
+            call s_mg_smooth(lv, mg_nu_pre, bc_type)
+            call s_mg_residual(lv, bc_type)
+            call s_mg_restrict(lv)
+        end do
+
+        call s_mg_smooth(nlev_mg, mg_nu_coarse, bc_type)
+
+        do lv = nlev_mg - 1, 1, -1
+            call s_mg_prolong(lv)
+            call s_mg_smooth(lv, mg_nu_post, bc_type)
+        end do
+
+    end subroutine s_mg_vcycle
 
 end module m_projection
