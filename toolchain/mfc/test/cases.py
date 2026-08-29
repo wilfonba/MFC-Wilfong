@@ -521,6 +521,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("Projection", {"proj_method": "T", "proj_tol": 1e-10, "proj_max_iters": 200})
 
         cases.append(define_case_d(stack, "Jacobi", {"proj_iter_solver": 1}))
+        if len(dimInfo[0]) == 1:
+            cases.append(define_case_d(stack, "Jacobi -> Bodyforces", {"proj_iter_solver": 1, "bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10}))
         if len(dimInfo[0]) == 2:
             # Red-black GS is deterministic (unlike IGR's in-place sweep), so the
             # trace avoids the "Gauss Seidel" label that test.py skips on GPU

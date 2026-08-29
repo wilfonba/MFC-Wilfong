@@ -507,7 +507,9 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            ! Semi-implicit projection: pressure solve and correction of the star state
+            ! Semi-implicit projection: pressure solve and correction of the star state.
+            ! Body forces enter the projection RHS itself, so the star momentum (and
+            ! div(u*) in the pressure solve) already carries them (hydrostatic balance)
             if (proj_method) then
                 call nvtxStartRange("TIMESTEP-PROJECTION")
                 call s_projection_apply(q_cons_ts(1)%vf, bc_type, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf, rk_coef(s, 1), rk_coef(s, 2), &
@@ -540,7 +542,9 @@ contains
             end if
 
             $:GPU_UPDATE(device='[mytime]')
-            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
+            ! Under proj_method the body forces were already applied before the pressure solve
+            if (bodyForces .and. .not. proj_method) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
+                & 3)*dt/rk_coef(s, 4))
 
             if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
                 & 3)*dt/rk_coef(s, 4))

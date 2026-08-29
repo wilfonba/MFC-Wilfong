@@ -204,7 +204,8 @@ PHYSICS_DOCS = {
             "Riemann flux and solved implicitly each stage, lifting the acoustic CFL "
             "restriction. Requires model_eqns = 2 and HLLC, inviscid only. Incompatible "
             "with IGR, bubbles, surface tension, elastic models, MHD, chemistry, immersed "
-            "boundaries, cylindrical coordinates, and body forces."
+            "boundaries, and cylindrical coordinates. Body forces are applied to the "
+            "star momentum before the pressure solve."
         ),
     },
     "check_non_newtonian": {
@@ -1380,7 +1381,7 @@ class CaseValidator:
         cyl_coord = self.get("cyl_coord", "F") == "T"
         adv_n = self.get("adv_n", "F") == "T"
         int_comp = self.get("int_comp", 0)
-        body_forces = any(self.get(f"bf_{d}", "F") == "T" for d in ["x", "y", "z"])
+        bf_spatial_support = self.get("bf_spatial_support", "F") == "T"
 
         self.prohibit(proj_tol is not None and proj_tol <= 0, "proj_tol must be positive")
         self.prohibit(model_eqns is not None and model_eqns != 2, "proj_method only supports model_eqns = 2")
@@ -1400,7 +1401,7 @@ class CaseValidator:
         self.prohibit(cyl_coord, "proj_method does not support cylindrical or axisymmetric coordinates")
         self.prohibit(adv_n, "proj_method does not support adv_n")
         self.prohibit(int_comp > 0, "proj_method does not support interface compression")
-        self.prohibit(body_forces, "proj_method does not support body forces")
+        self.prohibit(bf_spatial_support, "proj_method does not support bf_spatial_support")
 
         # The projection flux path bypasses the Riemann solver, so the Riemann-state
         # extrapolation (-4) and characteristic (-5..-12) BCs are not applied

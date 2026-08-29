@@ -85,6 +85,7 @@ module m_projection
     use m_mpi_common
     use m_mpi_proxy
     use m_boundary_common
+    use m_body_forces, only: s_compute_acceleration
 
     implicit none
 
@@ -207,6 +208,8 @@ contains
         else
             isb1 = -1; ise1 = p; isb2 = 0; ise2 = n; isb3 = 0; ise3 = m
         end if
+
+        if (id == 1 .and. bodyForces) call s_compute_acceleration(mytime)
 
         ! Pressure at the start of the stage, used by the p*div(u) source and
         ! the pressure-advection RK blend (captured before any state update)
@@ -392,6 +395,29 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+
+            ! Body-force momentum source, inside the blended RHS so the star momentum
+            ! (and div(u*) in the pressure solve) carries it: hydrostatic balance
+            if (bodyForces) then
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_L]')
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rho_L = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                rho_L = rho_L + real(q_prim_vf(i)%sf(j, k, l), wp)
+                            end do
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_dims
+                                rhs_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
+                                       & l) + real(rho_L*accel_bf(i), stp)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end if
 
     end subroutine s_projection_directional_rhs
