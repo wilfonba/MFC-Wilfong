@@ -763,8 +763,6 @@ contains
         dt_limiter = dt_limiter_names(minloc(dt_candidates_glb(1:4), dim=1))
 
         if (proj_on) then
-            ! Under the projection the inviscid candidate is the advective CFL
-            if (dt_limiter == 'ICFL') dt_limiter = 'ACFL'
             if (dt_prev <= 0._wp) then
                 ! First adaptive dt: start from the acoustic CFL (the quiescent-flow
                 ! advective dt is unbounded); the ramp limiter grows it from there
