@@ -537,6 +537,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, "Jacobi -> int_comp=1", {"proj_iter_solver": 1, "int_comp": 1}))
+                cases.append(define_case_d(stack, "Jacobi -> normalization", {"proj_iter_solver": 1, "proj_normalization": "T"}))
 
         stack.pop()
 

@@ -408,6 +408,8 @@ contains
         proj_method = .false.
         proj_iter_solver = 1
         proj_tol = dflt_proj_tol
+        proj_tol_rel = dflt_real
+        proj_normalization = .false.
         proj_max_iters = dflt_proj_max_iters
         proj_check_iters = dflt_proj_check_iters
         proj_cfl_ac = dflt_real

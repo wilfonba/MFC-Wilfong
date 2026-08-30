@@ -796,6 +796,7 @@ def _load():
         "ic_eps",
         "ic_beta",
         "proj_tol",
+        "proj_tol_rel",
         "proj_cfl_ac",
     ]:
         _r(n, REAL)
@@ -806,6 +807,7 @@ def _load():
         "cont_damage",
         "igr",
         "proj_method",
+        "proj_normalization",
         "down_sample",
         "old_grid",
         "old_ic",
@@ -1433,6 +1435,8 @@ _nv(
     "proj_method",
     "proj_iter_solver",
     "proj_tol",
+    "proj_tol_rel",
+    "proj_normalization",
     "proj_max_iters",
     "proj_check_iters",
     "proj_cfl_ac",

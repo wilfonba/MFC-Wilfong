@@ -614,7 +614,37 @@ contains
         real(wp) :: coeff, c_f, offd, diag, p_new, res_loc, res_glb
         real(wp) :: dpds, ke, gamma_mix, pi_inf_mix, qv_mix, mom_sq
         real(wp) :: zv, dv, mu_loc, mu_glb, sigma_ch, rho_ch, rho_prev, alpha_ch, beta_ch
+        real(wp) :: tol_eff, pmax_loc, pmax_glb
         integer :: i, j, k, l, iter, color
+
+        ! Post-blend clamp and renormalization of the star state (matches the
+        ! reference SemiImplicitFV): floors the partial densities and volume
+        ! fractions and renormalizes the fractions to sum to one before they
+        ! feed the divergence, the Helmholtz coefficients, and the EOS rebuild
+
+        if (proj_normalization) then
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, a_sum]')
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        a_sum = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            q_cons_vf(i)%sf(j, k, l) = max(q_cons_vf(i)%sf(j, k, l), real(sgm_eps, stp))
+                            q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l) = max(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), &
+                                      & real(sgm_eps, stp))
+                            a_sum = a_sum + real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
+                        end do
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l) = real(real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, &
+                                      & k, l), wp)/max(a_sum, sgm_eps), stp)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
         ! Star-state ghost cells (density and momentum feed the divergence and the Laplacian face densities)
 
@@ -733,6 +763,23 @@ contains
 
         if (proj_iter_solver == proj_iter_solver_multigrid) call s_mg_setup_solve(q_cons_vf, bc_type)
 
+        ! Convergence threshold: absolute (proj_tol), or relative to the maximum pressure magnitude when proj_tol_rel is specified
+        tol_eff = proj_tol
+        if (proj_tol_rel > 0._wp) then
+            pmax_loc = 0._wp
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', reduction='[[pmax_loc]]', reductionOp='[max]')
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        pmax_loc = max(pmax_loc, abs(real(pres_stage(j, k, l), wp)))
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            call s_mpi_allreduce_max(pmax_loc, pmax_glb)
+            tol_eff = proj_tol_rel*max(pmax_glb, sgm_eps)
+        end if
+
         do iter = 1, proj_max_iters
             res_loc = 0._wp
 
@@ -842,7 +889,7 @@ contains
 
             if (mod(iter, proj_check_iters) == 0 .or. iter == proj_max_iters) then
                 call s_mpi_allreduce_max(res_loc, res_glb)
-                if (res_glb < proj_tol) exit
+                if (res_glb < tol_eff) exit
             end if
         end do
 

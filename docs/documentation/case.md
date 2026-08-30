@@ -558,7 +558,9 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
 | `proj_method`              | Logical | Enable the semi-implicit pressure projection method* |
 | `proj_iter_solver`         | Integer | Solution method for the projection pressure solve [1] Jacobi [2] red-black Gauss-Seidel [3] Chebyshev-accelerated Jacobi [4] geometric multigrid (proj_max_iters counts V-cycles) |
-| `proj_tol`                 | Real    | Convergence tolerance (max pressure change) for the projection pressure solve (default 1e-8) |
+| `proj_tol`                 | Real    | Absolute convergence tolerance (max pressure change) for the projection pressure solve (default 1e-8) |
+| `proj_tol_rel`             | Real    | Relative convergence tolerance for the projection pressure solve, as a fraction of the maximum pressure magnitude; overrides `proj_tol` when set |
+| `proj_normalization`       | Logical | Clamp partial densities and volume fractions to physical bounds and renormalize the fractions after each projection predictor (default F) |
 | `proj_max_iters`           | Integer | Maximum number of iterations for the projection pressure solve (default 100) |
 | `proj_check_iters`         | Integer | Interval, in iterations, between residual checks in the projection pressure solve (default 5) |
 | `proj_cfl_ac`              | Real    | Maximum acoustic CFL cap on the projection time step; unset or non-positive disables the cap |

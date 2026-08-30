@@ -1381,7 +1381,10 @@ class CaseValidator:
         adv_n = self.get("adv_n", "F") == "T"
         bf_spatial_support = self.get("bf_spatial_support", "F") == "T"
 
+        proj_tol_rel = self.get("proj_tol_rel")
         self.prohibit(proj_tol is not None and proj_tol <= 0, "proj_tol must be positive")
+        self.prohibit(proj_tol_rel is not None and proj_tol_rel <= 0, "proj_tol_rel must be positive")
+        self.prohibit(proj_tol is not None and proj_tol_rel is not None, "Specify either proj_tol (absolute) or proj_tol_rel (relative), not both")
         self.prohibit(model_eqns is not None and model_eqns != 2, "proj_method only supports model_eqns = 2")
         self.prohibit(riemann_solver is not None and riemann_solver != 2, "proj_method requires riemann_solver = 2 (HLLC)")
         self.prohibit(igr, "proj_method is incompatible with IGR")
