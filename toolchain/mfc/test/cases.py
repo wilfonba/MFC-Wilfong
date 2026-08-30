@@ -536,6 +536,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack, "Jacobi -> capillary=T", {"proj_iter_solver": 1, "patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 1, "surface_tension": "T"}
                     )
                 )
+                cases.append(define_case_d(stack, "Jacobi -> int_comp=1", {"proj_iter_solver": 1, "int_comp": 1}))
 
         stack.pop()
 

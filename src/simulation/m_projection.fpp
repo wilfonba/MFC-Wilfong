@@ -411,7 +411,8 @@ contains
                                         ar_c = real(q_prim_vf(i)%sf(${SF(' + 1')}$), wp)
                                         a_c = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(${SF(' + 1')}$), wp)
                                     end if
-                                    flux_vf(i)%sf(${SF('')}$) = real(ar_c/max(a_c, sgm_eps)*a_flux, stp)
+                                    ! Clamp so out-of-bounds cell alphas near sharpened interfaces cannot blow up the density ratio
+                                    flux_vf(i)%sf(${SF('')}$) = real(max(ar_c, 0._wp)/min(max(a_c, sgm_eps), 1._wp)*a_flux, stp)
                                 else
                                     flux_vf(i)%sf(${SF('')}$) = real(F_mass, stp)
                                 end if
@@ -608,7 +609,7 @@ contains
         type(scalar_field), optional, intent(inout) :: q_T_sf
         real(wp), intent(in) :: rkc1, rkc2, rkc3, rkc4
         integer, intent(in) :: stage, nstage
-        real(wp) :: p_adv_blend, p0v, rhoc2_sum, blkmod, divs
+        real(wp) :: p_adv_blend, p0v, rhoc2_sum, blkmod, divs, a_cl, a_sum
         real(wp) :: rho_c, rho_nb, u_m, u_p
         real(wp) :: coeff, c_f, offd, diag, p_new, res_loc, res_glb
         real(wp) :: dpds, ke, gamma_mix, pi_inf_mix, qv_mix, mom_sq
@@ -621,7 +622,8 @@ contains
 
         ! Helmholtz RHS: blended advected pressure minus rho*c^2*dt*div(u*),
         ! with div(u*) as a face-averaged central difference of the star velocity
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_adv_blend, p0v, rhoc2_sum, blkmod, divs, rho_c, rho_nb, u_m, u_p]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_adv_blend, p0v, rhoc2_sum, blkmod, divs, a_cl, a_sum, rho_c, &
+                            & rho_nb, u_m, u_p]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -633,14 +635,21 @@ contains
                     end if
                     p_adv_blend = (rkc1*real(pres_stage(j, k, l), wp) + rkc2*p0v + rkc3*dt*real(rhs_p_adv(j, k, l), wp))/rkc4
 
-                    ! Wood's mixture sound speed: 1/(rho*c^2) = sum(alpha_k/(gamma_k*(p + pi_inf_k)))
+                    ! Wood's mixture sound speed: 1/(rho*c^2) = sum(alpha_k/(gamma_k*(p + pi_inf_k))).
+                    ! Star alphas can leave [0, 1] near sharpened interfaces (THINC,
+                    ! mpp_lim), which would collapse the sum and blow the Helmholtz
+                    ! coefficient up to 1/sgm_eps, so they are clamped and the sum
+                    ! renormalized; a fully degenerate cell gets rhoc2 = 0 (identity row)
                     rhoc2_sum = 0._wp
+                    a_sum = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
+                        a_cl = min(max(real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp), 0._wp), 1._wp)
                         blkmod = ((gammas(i) + 1._wp)*real(pres_stage(j, k, l), wp) + pi_infs(i))/gammas(i)
-                        rhoc2_sum = rhoc2_sum + real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)/max(blkmod, sgm_eps)
+                        rhoc2_sum = rhoc2_sum + a_cl/max(blkmod, sgm_eps)
+                        a_sum = a_sum + a_cl
                     end do
-                    rhoc2_cell(j, k, l) = real(1._wp/max(rhoc2_sum, sgm_eps), stp)
+                    rhoc2_cell(j, k, l) = real(a_sum/max(rhoc2_sum, sgm_eps), stp)
 
                     rho_c = 0._wp; rho_nb = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')

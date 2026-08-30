@@ -1379,7 +1379,6 @@ class CaseValidator:
         chemistry = self.get("chemistry", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
         adv_n = self.get("adv_n", "F") == "T"
-        int_comp = self.get("int_comp", 0)
         bf_spatial_support = self.get("bf_spatial_support", "F") == "T"
 
         self.prohibit(proj_tol is not None and proj_tol <= 0, "proj_tol must be positive")
@@ -1397,7 +1396,6 @@ class CaseValidator:
         self.prohibit(chemistry, "proj_method does not support chemistry")
         self.prohibit(cyl_coord, "proj_method does not support cylindrical or axisymmetric coordinates")
         self.prohibit(adv_n, "proj_method does not support adv_n")
-        self.prohibit(int_comp > 0, "proj_method does not support interface compression")
         self.prohibit(bf_spatial_support, "proj_method does not support bf_spatial_support")
 
         # The projection flux path bypasses the Riemann solver, so the Riemann-state
