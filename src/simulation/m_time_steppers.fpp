@@ -671,6 +671,7 @@ contains
         real(wp)               :: H                  !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
         real(wp), dimension(3) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary)
+        real(wp)               :: rho_cap            !< Phase-density sum for the capillary criterion
         real(wp), dimension(3) :: max_dt_ac          !< Acoustic-CFL cell dt candidates (projection method)
         real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, coll_dt_local
         real(wp)               :: acfl_dt_local      !< Acoustic inviscid dt candidate (projection method)
@@ -693,8 +694,8 @@ contains
         coll_dt_local = huge(1.0_wp)
         acfl_dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt, &
-                            & max_dt_ac]', firstprivate='[proj_on]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
-                            & acfl_dt_local]]', reductionOp='[min]')
+                            & max_dt_ac, rho_cap]', firstprivate='[proj_on]', reduction='[[icfl_dt_local, vcfl_dt_local, &
+                            & ccfl_dt_local, acfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -719,17 +720,30 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
+                    ! Capillary-wave limit uses the phase-density sum (recoverable
+                    ! from any cell's partial densities), not the local mixture rho
+                    rho_cap = rho
+                    if (surface_tension) then
+                        rho_cap = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do fl = 1, num_fluids
+                            rho_cap = rho_cap + real(q_prim_vf(fl)%sf(j, k, l), &
+                                                     & wp)/min(max(real(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, l), wp), &
+                                                     & sgm_eps), 1._wp)
+                        end do
+                    end if
+
                     if (proj_on) then
                         ! Advective CFL: the implicit pressure solve lifts the acoustic
                         ! restriction (sgm_eps floors the quiescent-flow speed). The
                         ! acoustic candidate seeds the first adaptive dt, which the ramp
                         ! limiter then grows toward the advective limit, and feeds the
                         ! optional proj_cfl_ac cap
-                        call s_compute_dt_from_cfl(vel, sgm_eps, max_dt, rho, Re, j, k, l)
-                        call s_compute_dt_from_cfl(vel, c, max_dt_ac, rho, Re, j, k, l)
+                        call s_compute_dt_from_cfl(vel, sgm_eps, max_dt, rho, rho_cap, Re, j, k, l)
+                        call s_compute_dt_from_cfl(vel, c, max_dt_ac, rho, rho_cap, Re, j, k, l)
                         acfl_dt_local = min(acfl_dt_local, max_dt_ac(1))
                     else
-                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, rho_cap, Re, j, k, l)
                     end if
 
                     icfl_dt_local = min(icfl_dt_local, max_dt(1))

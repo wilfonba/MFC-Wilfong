@@ -109,11 +109,12 @@ contains
     end subroutine s_compute_enthalpy
 
     !> Computes stability criterion for a specified dt
-    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc, ccfl)
+    subroutine s_compute_stability_from_dt(vel, c, rho, rho_cap, Re_l, j, k, l, icfl, vcfl, Rc, ccfl)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in)                      :: c, rho
+        real(wp), intent(in)                      :: rho_cap  !< phase-density sum for the capillary criterion
         real(wp), intent(inout)                   :: icfl
         real(wp), intent(inout)                   :: vcfl, Rc, ccfl
         real(wp), dimension(2), intent(in)        :: Re_l
@@ -168,15 +169,15 @@ contains
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp))
+                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho_cap*min(dx(j), dy(k), fltr_dtheta)**3._wp))
                     else
-                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), dz(l))**3._wp))
+                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho_cap*min(dx(j), dy(k), dz(l))**3._wp))
                     end if
                 #:endif
             else if (n > 0) then
-                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k))**3._wp))
+                ccfl = dt*sqrt(2._wp*pi*sigma/(rho_cap*min(dx(j), dy(k))**3._wp))
             else
-                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*dx(j)**3._wp))
+                ccfl = dt*sqrt(2._wp*pi*sigma/(rho_cap*dx(j)**3._wp))
             end if
         end if
 
@@ -184,11 +185,12 @@ contains
 
     !> Computes the candidate dts for a specified CFL number: max_dt(1) from the inviscid, max_dt(2) the viscous, and max_dt(3) the
     !! capillary criterion (huge where the criterion is inactive)
-    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
+    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, rho_cap, Re_l, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in)                      :: c, rho
+        real(wp), intent(in)                      :: rho_cap  !< phase-density sum for the capillary criterion
         real(wp), dimension(3), intent(out)       :: max_dt
         real(wp), dimension(2), intent(in)        :: Re_l
         integer, intent(in)                       :: j, k, l
@@ -235,21 +237,25 @@ contains
             max_dt(2) = vcfl_dt
         end if
 
-        ! Capillary CFL calculations
+        ! Capillary CFL calculations. The Brackbill-type capillary-wave limit
+        ! involves the interface's phase-density sum, not the local mixture
+        ! density: evaluating it with the light phase's density in pure-phase
+        ! cells (where surface tension exerts no force) over-restricts dt by
+        ! sqrt(rho_heavy/rho_light) at large density ratios
         if (surface_tension) then
             if (p > 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp/(2._wp*pi*sigma))
+                        ccfl_dt = cfl_target*sqrt(rho_cap*min(dx(j), dy(k), fltr_dtheta)**3._wp/(2._wp*pi*sigma))
                     else
-                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), dz(l))**3._wp/(2._wp*pi*sigma))
+                        ccfl_dt = cfl_target*sqrt(rho_cap*min(dx(j), dy(k), dz(l))**3._wp/(2._wp*pi*sigma))
                     end if
                 #:endif
             else if (n > 0) then
-                ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k))**3._wp/(2._wp*pi*sigma))
+                ccfl_dt = cfl_target*sqrt(rho_cap*min(dx(j), dy(k))**3._wp/(2._wp*pi*sigma))
             else
-                ccfl_dt = cfl_target*sqrt(rho*dx(j)**3._wp/(2._wp*pi*sigma))
+                ccfl_dt = cfl_target*sqrt(rho_cap*dx(j)**3._wp/(2._wp*pi*sigma))
             end if
             max_dt(3) = ccfl_dt
         end if

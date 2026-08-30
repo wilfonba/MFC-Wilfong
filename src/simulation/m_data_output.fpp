@@ -183,6 +183,7 @@ contains
         real(wp)               :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
         real(wp)               :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
         real(wp)               :: icfl, vcfl, ccfl, Rc
+        real(wp)               :: rho_cap                     !< Phase-density sum for the capillary criterion
         integer                :: fl                          !< Fluid loop iterator
         logical                :: proj_on
 
@@ -193,7 +194,7 @@ contains
         proj_on = proj_method
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
-                            & vcfl, Rc, ccfl, fl]', firstprivate='[proj_on]', reduction='[[icfl_max_loc, vcfl_max_loc, &
+                            & vcfl, Rc, ccfl, fl, rho_cap]', firstprivate='[proj_on]', reduction='[[icfl_max_loc, vcfl_max_loc, &
                             & ccfl_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
@@ -218,7 +219,20 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc, ccfl)
+                    ! Capillary-wave limit uses the phase-density sum (recoverable
+                    ! from any cell's partial densities), not the local mixture rho
+                    rho_cap = rho
+                    if (surface_tension) then
+                        rho_cap = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do fl = 1, num_fluids
+                            rho_cap = rho_cap + real(q_prim_vf(fl)%sf(j, k, l), &
+                                                     & wp)/min(max(real(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, l), wp), &
+                                                     & sgm_eps), 1._wp)
+                        end do
+                    end if
+
+                    call s_compute_stability_from_dt(vel, c, rho, rho_cap, Re, j, k, l, icfl, vcfl, Rc, ccfl)
 
                     icfl_max_loc = max(icfl_max_loc, icfl)
                     vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
