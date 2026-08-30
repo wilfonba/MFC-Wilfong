@@ -796,6 +796,9 @@ contains
             dt_limiter = 'RAMP'
         end if
 
+        ! Acoustic CFL of the chosen step, reported in the step output
+        if (proj_on) proj_acfl = cfl_target*dt/max(dt_candidates_glb(5), sgm_eps)
+
         $:GPU_UPDATE(device='[dt]')
 
     end subroutine s_compute_dt
