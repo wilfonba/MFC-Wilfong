@@ -165,18 +165,20 @@ module m_projection
     !! machinery)
     !> @{
     integer, parameter                            :: mg_max_levels = 12
-    integer, parameter                            :: mg_nu_pre = 2         !< pre-smoothing sweeps
-    integer, parameter                            :: mg_nu_post = 2        !< post-smoothing sweeps
-    integer, parameter                            :: mg_nu_coarse = 8      !< coarsest-level sweeps
+    integer, parameter                            :: mg_nu_pre = 2  !< pre-smoothing sweeps
+    integer, parameter                            :: mg_nu_post = 2  !< post-smoothing sweeps
+    integer, parameter                            :: mg_nu_coarse = 8  !< coarsest-level sweeps
     integer                                       :: nlev_mg = 0
+    integer                                       :: nlev_eff = 0  !< per-solve V-cycle depth (screening truncates the rest)
+    real(wp), dimension(mg_max_levels)            :: mg_dmin  !< per-level minimum cell width (host, set with the dx tables)
     integer, dimension(mg_max_levels)             :: mg_m, mg_n, mg_p_dim  !< local cells - 1 per level
-    integer, dimension(mg_max_levels)             :: mg_rboff              !< red-black global parity per level
-    type(scalar_field), allocatable, dimension(:) :: mg_p                  !< level solution/correction (1-layer ghosts)
-    type(scalar_field), allocatable, dimension(:) :: mg_rhs                !< level right-hand side
-    type(scalar_field), allocatable, dimension(:) :: mg_res                !< level residual
-    type(scalar_field), allocatable, dimension(:) :: mg_rho                !< level cell density (1-layer ghosts)
-    type(scalar_field), allocatable, dimension(:) :: mg_coeff              !< level rho*c^2*dt^2
-    real(wp), allocatable, dimension(:,:)         :: mg_dx, mg_dy, mg_dz   !< level cell widths (1 ghost each side)
+    integer, dimension(mg_max_levels)             :: mg_rboff  !< red-black global parity per level
+    type(scalar_field), allocatable, dimension(:) :: mg_p  !< level solution/correction (1-layer ghosts)
+    type(scalar_field), allocatable, dimension(:) :: mg_rhs  !< level right-hand side
+    type(scalar_field), allocatable, dimension(:) :: mg_res  !< level residual
+    type(scalar_field), allocatable, dimension(:) :: mg_rho  !< level cell density (1-layer ghosts)
+    type(scalar_field), allocatable, dimension(:) :: mg_coeff  !< level rho*c^2*dt^2
+    real(wp), allocatable, dimension(:,:)         :: mg_dx, mg_dy, mg_dz  !< level cell widths (1 ghost each side)
     !> coarse-level halo slabs (wp), one column per direction
     real(wp), allocatable, dimension(:,:) :: mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e
     logical                               :: mg_dx_built = .false.
@@ -1088,6 +1090,12 @@ contains
             end if
         end do
         $:GPU_UPDATE(device='[mg_dx, mg_dy, mg_dz]')
+
+        do lv = 1, nlev_mg
+            mg_dmin(lv) = minval(mg_dx(lv,0:mg_m(lv)))
+            if (n > 0) mg_dmin(lv) = min(mg_dmin(lv), minval(mg_dy(lv,0:mg_n(lv))))
+            if (p > 0) mg_dmin(lv) = min(mg_dmin(lv), minval(mg_dz(lv,0:mg_p_dim(lv))))
+        end do
         mg_dx_built = .true.
 
     end subroutine s_mg_build_dx
@@ -1134,8 +1142,32 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! Effective depth: coarsen only while the screened operator is still
+        ! stiff. On level lv the off-diagonal weight is ~coeff*2*num_dims/dx^2
+        ! relative to the identity; once it drops below one the level is
+        ! diagonally dominant and the coarsest sweeps finish the job, so
+        ! deeper levels add halo latency without helping convergence
+        cf_s = 0._wp
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', reduction='[[cf_s]]', reductionOp='[max]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    cf_s = max(cf_s, real(mg_coeff(1)%sf(j, k, l), wp))
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        call s_mpi_allreduce_max(cf_s, sm)
+        nlev_eff = nlev_mg
+        do lv = 1, nlev_mg
+            if (sm*2._wp*real(num_dims, wp)/max(mg_dmin(lv)**2, sgm_eps) <= 1._wp) then
+                nlev_eff = lv
+                exit
+            end if
+        end do
+
         nchild = 2**num_dims
-        do lv = 1, nlev_mg - 1
+        do lv = 1, nlev_eff - 1
             mml = mg_m(lv + 1); nnl = mg_n(lv + 1); ppl = mg_p_dim(lv + 1)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, jf, kf, lf, sm, cf_s]', firstprivate='[lv, nchild]')
             do l = 0, ppl
@@ -1458,15 +1490,15 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: lv
 
-        do lv = 1, nlev_mg - 1
+        do lv = 1, nlev_eff - 1
             call s_mg_smooth(lv, mg_nu_pre, bc_type)
             call s_mg_residual(lv, bc_type)
             call s_mg_restrict(lv)
         end do
 
-        call s_mg_smooth(nlev_mg, mg_nu_coarse, bc_type)
+        call s_mg_smooth(nlev_eff, mg_nu_coarse, bc_type)
 
-        do lv = nlev_mg - 1, 1, -1
+        do lv = nlev_eff - 1, 1, -1
             call s_mg_prolong(lv)
             call s_mg_smooth(lv, mg_nu_post, bc_type)
         end do
