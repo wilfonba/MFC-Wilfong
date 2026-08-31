@@ -1686,13 +1686,20 @@ contains
         real(wp)                                                   :: coeff, c_f, offd, diag, rho_c, rho_nb
         integer                                                    :: lv, mml, nnl, ppl
         integer                                                    :: i, j, k, l
+        integer                                                    :: reqs(12), nreq
 
         call nvtxStartRange("TIMESTEP-PROJECTION-MG-RESIDUAL")
         lv = lv_in
         mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
 
         if (lv == 1) then
-            call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+            ! The 7-point residual stencil reads one ghost layer, so exchange
+            ! depth-1 slabs like the smoother rather than the buff_size-deep
+            ! generic fine halo
+            nreq = 0
+            call s_mg_halo_fine_begin(reqs, nreq)
+            call s_mpi_wait_requests(reqs, nreq)
+            call s_mg_halo_fine_end(bc_type)
         else
             call s_mg_halo_coarse(lv, mg_p(lv))
         end if
