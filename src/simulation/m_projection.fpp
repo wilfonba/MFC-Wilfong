@@ -888,7 +888,10 @@ contains
                 end do
             end if
 
-            if (mod(iter, proj_check_iters) == 0 .or. iter == proj_max_iters) then
+            ! Multigrid checks every cycle: a V-cycle costs far more than the
+            ! reduction, so amortizing the check only overshoots converged solves
+            if (proj_iter_solver == proj_iter_solver_multigrid .or. mod(iter, &
+                & proj_check_iters) == 0 .or. iter == proj_max_iters) then
                 call s_mpi_allreduce_max(res_loc, res_glb)
                 if (res_glb < tol_eff) exit
             end if
