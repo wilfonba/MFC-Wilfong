@@ -465,27 +465,58 @@ contains
         real(wp), dimension(:), intent(in)  :: sb, se
         real(wp), dimension(:), intent(out) :: rb, re
         integer, intent(in)                 :: cnt, pb, pe
-
-#ifdef MFC_MPI
-        integer :: reqs(4), nreq
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
+        integer                             :: reqs(4), nreq
 
         nreq = 0
+        call s_mpi_iexchange_sides_wp(sb, rb, se, re, cnt, pb, pe, 0, reqs, nreq)
+        call s_mpi_wait_requests(reqs, nreq)
+
+    end subroutine s_mpi_exchange_sides_wp
+
+    !> Post the nonblocking sends/receives of one paired side exchange without waiting, appending the requests to the caller's list
+    !! so several independent exchanges (e.g. one per direction) can share a single completion wait. tag_base and tag_base + 1
+    !! distinguish the two travel directions, so callers batching exchanges must pass distinct even bases to keep messages from
+    !! cross-matching when partners repeat (two-rank periodic layouts)
+    impure subroutine s_mpi_iexchange_sides_wp(sb, rb, se, re, cnt, pb, pe, tag_base, reqs, nreq)
+
+        real(wp), dimension(:), intent(in)   :: sb, se
+        real(wp), dimension(:), intent(out)  :: rb, re
+        integer, intent(in)                  :: cnt, pb, pe, tag_base
+        integer, dimension(:), intent(inout) :: reqs
+        integer, intent(inout)               :: nreq
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
         if (pb >= 0) then
-            nreq = nreq + 1; call MPI_IRECV(rb, cnt, mpi_p, pb, 0, MPI_COMM_WORLD, reqs(nreq), ierr)
-            nreq = nreq + 1; call MPI_ISEND(sb, cnt, mpi_p, pb, 1, MPI_COMM_WORLD, reqs(nreq), ierr)
+            nreq = nreq + 1; call MPI_IRECV(rb, cnt, mpi_p, pb, tag_base, MPI_COMM_WORLD, reqs(nreq), ierr)
+            nreq = nreq + 1; call MPI_ISEND(sb, cnt, mpi_p, pb, tag_base + 1, MPI_COMM_WORLD, reqs(nreq), ierr)
         end if
         if (pe >= 0) then
-            nreq = nreq + 1; call MPI_IRECV(re, cnt, mpi_p, pe, 1, MPI_COMM_WORLD, reqs(nreq), ierr)
-            nreq = nreq + 1; call MPI_ISEND(se, cnt, mpi_p, pe, 0, MPI_COMM_WORLD, reqs(nreq), ierr)
+            nreq = nreq + 1; call MPI_IRECV(re, cnt, mpi_p, pe, tag_base + 1, MPI_COMM_WORLD, reqs(nreq), ierr)
+            nreq = nreq + 1; call MPI_ISEND(se, cnt, mpi_p, pe, tag_base, MPI_COMM_WORLD, reqs(nreq), ierr)
         end if
-        if (nreq > 0) call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
 #else
         if (pb >= 0) rb(1:cnt) = sb(1:cnt)
         if (pe >= 0) re(1:cnt) = se(1:cnt)
 #endif
 
-    end subroutine s_mpi_exchange_sides_wp
+    end subroutine s_mpi_iexchange_sides_wp
+
+    !> Wait for all requests posted by s_mpi_iexchange_sides_wp and reset the count
+    impure subroutine s_mpi_wait_requests(reqs, nreq)
+
+        integer, dimension(:), intent(inout) :: reqs
+        integer, intent(inout)               :: nreq
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        if (nreq > 0) call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
+#endif
+        nreq = 0
+
+    end subroutine s_mpi_wait_requests
 
     !> Reduce a local real value to its global maximum across all MPI ranks.
     impure subroutine s_mpi_allreduce_max(var_loc, var_glb)

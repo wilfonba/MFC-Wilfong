@@ -165,20 +165,21 @@ module m_projection
     !! machinery)
     !> @{
     integer, parameter                            :: mg_max_levels = 12
-    integer, parameter                            :: mg_nu_pre = 2  !< pre-smoothing sweeps
-    integer, parameter                            :: mg_nu_post = 2  !< post-smoothing sweeps
-    integer, parameter                            :: mg_nu_coarse = 8  !< coarsest-level sweeps
+    integer, parameter                            :: mg_nu_pre = 2         !< pre-smoothing sweeps
+    integer, parameter                            :: mg_nu_post = 2        !< post-smoothing sweeps
+    integer, parameter                            :: mg_nu_coarse = 8      !< coarsest-level sweeps
     integer                                       :: nlev_mg = 0
     integer, dimension(mg_max_levels)             :: mg_m, mg_n, mg_p_dim  !< local cells - 1 per level
-    integer, dimension(mg_max_levels)             :: mg_rboff  !< red-black global parity per level
-    type(scalar_field), allocatable, dimension(:) :: mg_p  !< level solution/correction (1-layer ghosts)
-    type(scalar_field), allocatable, dimension(:) :: mg_rhs  !< level right-hand side
-    type(scalar_field), allocatable, dimension(:) :: mg_res  !< level residual
-    type(scalar_field), allocatable, dimension(:) :: mg_rho  !< level cell density (1-layer ghosts)
-    type(scalar_field), allocatable, dimension(:) :: mg_coeff  !< level rho*c^2*dt^2
-    real(wp), allocatable, dimension(:,:)         :: mg_dx, mg_dy, mg_dz  !< level cell widths (1 ghost each side)
-    real(wp), allocatable, dimension(:)           :: mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e  !< coarse-level halo slabs (wp)
-    logical                                       :: mg_dx_built = .false.
+    integer, dimension(mg_max_levels)             :: mg_rboff              !< red-black global parity per level
+    type(scalar_field), allocatable, dimension(:) :: mg_p                  !< level solution/correction (1-layer ghosts)
+    type(scalar_field), allocatable, dimension(:) :: mg_rhs                !< level right-hand side
+    type(scalar_field), allocatable, dimension(:) :: mg_res                !< level residual
+    type(scalar_field), allocatable, dimension(:) :: mg_rho                !< level cell density (1-layer ghosts)
+    type(scalar_field), allocatable, dimension(:) :: mg_coeff              !< level rho*c^2*dt^2
+    real(wp), allocatable, dimension(:,:)         :: mg_dx, mg_dy, mg_dz   !< level cell widths (1 ghost each side)
+    !> coarse-level halo slabs (wp), one column per direction
+    real(wp), allocatable, dimension(:,:) :: mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e
+    logical                               :: mg_dx_built = .false.
     $:GPU_DECLARE(create='[mg_p, mg_rhs, mg_res, mg_rho, mg_coeff, mg_dx, mg_dy, mg_dz, mg_rboff]')
     $:GPU_DECLARE(create='[mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e]')
     !> @}
@@ -1041,10 +1042,10 @@ contains
         cnt = max((mg_n(min(2, nlev_mg)) + 1)*(mg_p_dim(min(2, nlev_mg)) + 1), (mg_m(min(2, nlev_mg)) + 1)*(mg_p_dim(min(2, &
                   & nlev_mg)) + 1))
         cnt = max(cnt, (mg_m(min(2, nlev_mg)) + 1)*(mg_n(min(2, nlev_mg)) + 1))
-        @:ALLOCATE(mg_sbuf_b(1:max(cnt, 1)))
-        @:ALLOCATE(mg_rbuf_b(1:max(cnt, 1)))
-        @:ALLOCATE(mg_sbuf_e(1:max(cnt, 1)))
-        @:ALLOCATE(mg_rbuf_e(1:max(cnt, 1)))
+        @:ALLOCATE(mg_sbuf_b(1:max(cnt, 1), 1:num_dims))
+        @:ALLOCATE(mg_rbuf_b(1:max(cnt, 1), 1:num_dims))
+        @:ALLOCATE(mg_sbuf_e(1:max(cnt, 1), 1:num_dims))
+        @:ALLOCATE(mg_rbuf_e(1:max(cnt, 1), 1:num_dims))
 
     end subroutine s_initialize_projection_mg
 
@@ -1173,120 +1174,137 @@ contains
         integer, intent(in)               :: lv_in
         type(scalar_field), intent(inout) :: f
         integer                           :: mml, nnl, ppl, cnt, j, k, l, lv
+        integer                           :: reqs(12), nreq
 
         lv = lv_in
         mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
+        nreq = 0
 
+        ! Pack the interior layers of every MPI side of every direction
         #:for DIR, BCV, T1, T1E, T2, T2E, GBEG, IBEG, GEND, IEND in &
             [(1, 'bc_x', 'k', 'nnl', 'l', 'ppl', '(-1, k, l)', '(0, k, l)', '(mml + 1, k, l)', '(mml, k, l)'), &
              (2, 'bc_y', 'j', 'mml', 'l', 'ppl', '(j, -1, l)', '(j, 0, l)', '(j, nnl + 1, l)', '(j, nnl, l)'), &
              (3, 'bc_z', 'j', 'mml', 'k', 'nnl', '(j, k, -1)', '(j, k, 0)', '(j, k, ppl + 1)', '(j, k, ppl)')]
             if (num_dims >= ${DIR}$) then
-                cnt = (${T1E}$ + 1)*(${T2E}$ + 1)
-                if (${BCV}$%beg >= 0 .or. ${BCV}$%end >= 0) then
-                    ! Pack the interior layers of both MPI sides, exchange them with
-                    ! nonblocking requests, and unpack into the ghost layers
-                    if (${BCV}$%beg >= 0) then
-                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
-                        do ${T2}$ = 0, ${T2E}$
-                            do ${T1}$ = 0, ${T1E}$
-                                mg_sbuf_b(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1)) = real(f%sf${IBEG}$, wp)
-                            end do
+                if (${BCV}$%beg >= 0) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            mg_sbuf_b(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1), ${DIR}$) = real(f%sf${IBEG}$, wp)
                         end do
-                        $:END_GPU_PARALLEL_LOOP()
-                        if (.not. rdma_mpi) then
-                            $:GPU_UPDATE(host='[mg_sbuf_b]')
-                        end if
-                    end if
-                    if (${BCV}$%end >= 0) then
-                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
-                        do ${T2}$ = 0, ${T2E}$
-                            do ${T1}$ = 0, ${T1E}$
-                                mg_sbuf_e(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1)) = real(f%sf${IEND}$, wp)
-                            end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+                if (${BCV}$%end >= 0) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            mg_sbuf_e(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1), ${DIR}$) = real(f%sf${IEND}$, wp)
                         end do
-                        $:END_GPU_PARALLEL_LOOP()
-                        if (.not. rdma_mpi) then
-                            $:GPU_UPDATE(host='[mg_sbuf_e]')
-                        end if
-                    end if
-                    #:for RDMA in [False, True]
-                        if (rdma_mpi .eqv. ${'.true.' if RDMA else '.false.'}$) then
-                            #:if RDMA
-                                #:call GPU_HOST_DATA(use_device_addr='[mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e]')
-                                    call s_mpi_exchange_sides_wp(mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e, cnt, ${BCV}$%beg, &
-                                                                 & ${BCV}$%end)
-                                #:endcall GPU_HOST_DATA
-                                $:GPU_WAIT()
-                            #:else
-                                call s_mpi_exchange_sides_wp(mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e, cnt, ${BCV}$%beg, &
-                                                             & ${BCV}$%end)
-                            #:endif
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+            end if
+        #:endfor
+        if (.not. rdma_mpi) then
+            $:GPU_UPDATE(host='[mg_sbuf_b, mg_sbuf_e]')
+        end if
+
+        ! Post every direction's nonblocking exchange (even per-direction tag
+        ! bases keep messages apart when partners repeat), then wait once
+        #:for RDMA in [False, True]
+            if (rdma_mpi .eqv. ${'.true.' if RDMA else '.false.'}$) then
+                #:if RDMA
+                    #:call GPU_HOST_DATA(use_device_addr='[mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e]')
+                        #:for DIR, BCV, T1, T1E, T2, T2E, GBEG, IBEG, GEND, IEND in &
+            [(1, 'bc_x', 'k', 'nnl', 'l', 'ppl', '(-1, k, l)', '(0, k, l)', '(mml + 1, k, l)', '(mml, k, l)'), &
+             (2, 'bc_y', 'j', 'mml', 'l', 'ppl', '(j, -1, l)', '(j, 0, l)', '(j, nnl + 1, l)', '(j, nnl, l)'), &
+             (3, 'bc_z', 'j', 'mml', 'k', 'nnl', '(j, k, -1)', '(j, k, 0)', '(j, k, ppl + 1)', '(j, k, ppl)')]
+                            if (num_dims >= ${DIR}$) then
+                                cnt = (${T1E}$ + 1)*(${T2E}$ + 1)
+                                call s_mpi_iexchange_sides_wp(mg_sbuf_b(:,${DIR}$), mg_rbuf_b(:,${DIR}$), mg_sbuf_e(:,${DIR}$), &
+                                                              & mg_rbuf_e(:,${DIR}$), cnt, ${BCV}$%beg, ${BCV}$%end, &
+                                                              & 2*(${DIR}$ - 1), reqs, nreq)
+                            end if
+                        #:endfor
+                        call s_mpi_wait_requests(reqs, nreq)
+                    #:endcall GPU_HOST_DATA
+                    $:GPU_WAIT()
+                #:else
+                    #:for DIR, BCV, T1, T1E, T2, T2E, GBEG, IBEG, GEND, IEND in &
+            [(1, 'bc_x', 'k', 'nnl', 'l', 'ppl', '(-1, k, l)', '(0, k, l)', '(mml + 1, k, l)', '(mml, k, l)'), &
+             (2, 'bc_y', 'j', 'mml', 'l', 'ppl', '(j, -1, l)', '(j, 0, l)', '(j, nnl + 1, l)', '(j, nnl, l)'), &
+             (3, 'bc_z', 'j', 'mml', 'k', 'nnl', '(j, k, -1)', '(j, k, 0)', '(j, k, ppl + 1)', '(j, k, ppl)')]
+                        if (num_dims >= ${DIR}$) then
+                            cnt = (${T1E}$ + 1)*(${T2E}$ + 1)
+                            call s_mpi_iexchange_sides_wp(mg_sbuf_b(:,${DIR}$), mg_rbuf_b(:,${DIR}$), mg_sbuf_e(:,${DIR}$), &
+                                                          & mg_rbuf_e(:,${DIR}$), cnt, ${BCV}$%beg, ${BCV}$%end, 2*(${DIR}$ - 1), &
+                                                          & reqs, nreq)
                         end if
                     #:endfor
-                    if (${BCV}$%beg >= 0) then
-                        if (.not. rdma_mpi) then
-                            $:GPU_UPDATE(device='[mg_rbuf_b]')
-                        end if
-                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
-                        do ${T2}$ = 0, ${T2E}$
-                            do ${T1}$ = 0, ${T1E}$
-                                f%sf${GBEG}$ = real(mg_rbuf_b(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1)), stp)
-                            end do
+                    call s_mpi_wait_requests(reqs, nreq)
+                #:endif
+            end if
+        #:endfor
+        if (.not. rdma_mpi) then
+            $:GPU_UPDATE(device='[mg_rbuf_b, mg_rbuf_e]')
+        end if
+
+        ! Unpack MPI sides; physical sides wrap (single-rank periodic) or mirror
+        #:for DIR, BCV, T1, T1E, T2, T2E, GBEG, IBEG, GEND, IEND in &
+            [(1, 'bc_x', 'k', 'nnl', 'l', 'ppl', '(-1, k, l)', '(0, k, l)', '(mml + 1, k, l)', '(mml, k, l)'), &
+             (2, 'bc_y', 'j', 'mml', 'l', 'ppl', '(j, -1, l)', '(j, 0, l)', '(j, nnl + 1, l)', '(j, nnl, l)'), &
+             (3, 'bc_z', 'j', 'mml', 'k', 'nnl', '(j, k, -1)', '(j, k, 0)', '(j, k, ppl + 1)', '(j, k, ppl)')]
+            if (num_dims >= ${DIR}$) then
+                if (${BCV}$%beg >= 0) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            f%sf${GBEG}$ = real(mg_rbuf_b(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1), ${DIR}$), stp)
                         end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-                    if (${BCV}$%end >= 0) then
-                        if (.not. rdma_mpi) then
-                            $:GPU_UPDATE(device='[mg_rbuf_e]')
-                        end if
-                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
-                        do ${T2}$ = 0, ${T2E}$
-                            do ${T1}$ = 0, ${T1E}$
-                                f%sf${GEND}$ = real(mg_rbuf_e(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1)), stp)
-                            end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                else if (${BCV}$%beg == BC_PERIODIC) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            f%sf${GBEG}$ = f%sf${IEND}$
                         end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                else
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            f%sf${GBEG}$ = f%sf${IBEG}$
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
-                ! Physical sides: periodic wrap on a single rank, else zero-gradient
-                if (${BCV}$%beg < 0) then
-                    if (${BCV}$%beg == BC_PERIODIC) then
-                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
-                        do ${T2}$ = 0, ${T2E}$
-                            do ${T1}$ = 0, ${T1E}$
-                                f%sf${GBEG}$ = f%sf${IEND}$
-                            end do
+                if (${BCV}$%end >= 0) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            f%sf${GEND}$ = real(mg_rbuf_e(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1), ${DIR}$), stp)
                         end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    else
-                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
-                        do ${T2}$ = 0, ${T2E}$
-                            do ${T1}$ = 0, ${T1E}$
-                                f%sf${GBEG}$ = f%sf${IBEG}$
-                            end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                else if (${BCV}$%end == BC_PERIODIC) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            f%sf${GEND}$ = f%sf${IBEG}$
                         end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-                end if
-                if (${BCV}$%end < 0) then
-                    if (${BCV}$%end == BC_PERIODIC) then
-                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
-                        do ${T2}$ = 0, ${T2E}$
-                            do ${T1}$ = 0, ${T1E}$
-                                f%sf${GEND}$ = f%sf${IBEG}$
-                            end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                else
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            f%sf${GEND}$ = f%sf${IEND}$
                         end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    else
-                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
-                        do ${T2}$ = 0, ${T2E}$
-                            do ${T1}$ = 0, ${T1E}$
-                                f%sf${GEND}$ = f%sf${IEND}$
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
         #:endfor
