@@ -1194,7 +1194,9 @@ contains
                             end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
-                        $:GPU_UPDATE(host='[mg_sbuf_b]')
+                        if (.not. rdma_mpi) then
+                            $:GPU_UPDATE(host='[mg_sbuf_b]')
+                        end if
                     end if
                     if (${BCV}$%end >= 0) then
                         $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
@@ -1204,11 +1206,28 @@ contains
                             end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
-                        $:GPU_UPDATE(host='[mg_sbuf_e]')
+                        if (.not. rdma_mpi) then
+                            $:GPU_UPDATE(host='[mg_sbuf_e]')
+                        end if
                     end if
-                    call s_mpi_exchange_sides_wp(mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e, cnt, ${BCV}$%beg, ${BCV}$%end)
+                    #:for RDMA in [False, True]
+                        if (rdma_mpi .eqv. ${'.true.' if RDMA else '.false.'}$) then
+                            #:if RDMA
+                                #:call GPU_HOST_DATA(use_device_addr='[mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e]')
+                                    call s_mpi_exchange_sides_wp(mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e, cnt, ${BCV}$%beg, &
+                                                                 & ${BCV}$%end)
+                                #:endcall GPU_HOST_DATA
+                                $:GPU_WAIT()
+                            #:else
+                                call s_mpi_exchange_sides_wp(mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e, cnt, ${BCV}$%beg, &
+                                                             & ${BCV}$%end)
+                            #:endif
+                        end if
+                    #:endfor
                     if (${BCV}$%beg >= 0) then
-                        $:GPU_UPDATE(device='[mg_rbuf_b]')
+                        if (.not. rdma_mpi) then
+                            $:GPU_UPDATE(device='[mg_rbuf_b]')
+                        end if
                         $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
                         do ${T2}$ = 0, ${T2E}$
                             do ${T1}$ = 0, ${T1E}$
@@ -1218,7 +1237,9 @@ contains
                         $:END_GPU_PARALLEL_LOOP()
                     end if
                     if (${BCV}$%end >= 0) then
-                        $:GPU_UPDATE(device='[mg_rbuf_e]')
+                        if (.not. rdma_mpi) then
+                            $:GPU_UPDATE(device='[mg_rbuf_e]')
+                        end if
                         $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[mml, nnl, ppl]')
                         do ${T2}$ = 0, ${T2E}$
                             do ${T1}$ = 0, ${T1E}$
