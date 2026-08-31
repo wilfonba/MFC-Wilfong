@@ -126,6 +126,7 @@ module m_projection
     use m_body_forces, only: s_compute_acceleration
     use m_surface_tension, only: s_compute_capillary_source_flux
     use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, Res_gs
+    use m_sim_helpers, only: proj_iters
 
     implicit none
 
@@ -915,6 +916,13 @@ contains
                 if (res_glb < tol_eff) exit
             end if
         end do
+
+        ! Step-line diagnostic: iterations summed over this step's RK stages
+        if (stage == 1) then
+            proj_iters = min(iter, proj_max_iters)
+        else
+            proj_iters = proj_iters + min(iter, proj_max_iters)
+        end if
 
         ! Momentum correction with the face-averaged new pressure gradient,
         ! then total energy rebuilt from the EOS with the new pressure

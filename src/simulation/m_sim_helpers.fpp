@@ -15,12 +15,14 @@ module m_sim_helpers
     implicit none
 
     private; public :: s_compute_enthalpy, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names, &
-        & proj_acfl
+        & proj_acfl, proj_iters
 
     !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, the collision cap, or the ramp limiter)
     character(len=4) :: dt_limiter = 'none'
     !> Acoustic CFL number of the current adaptive time step (projection method; < 0 until computed)
-    real(wp)                                  :: proj_acfl = -1._wp
+    real(wp) :: proj_acfl = -1._wp
+    !> Pressure-solve iterations (V-cycles or sweeps) summed over the last step's RK stages (projection method)
+    integer                                   :: proj_iters = 0
     character(len=4), dimension(4), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'COLL'/)
 
 contains

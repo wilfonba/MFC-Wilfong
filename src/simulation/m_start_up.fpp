@@ -572,7 +572,7 @@ contains
         real(wp)                :: eta_sec
         real(wp)                :: dt_floor
         character(len=8)        :: lim_str   !< Time-step limiter tag, e.g. ' (ICFL)'
-        character(len=16)       :: acfl_str  !< Acoustic CFL column (projection method)
+        character(len=28)       :: acfl_str  !< Acoustic CFL and solve-iteration columns (projection method)
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
@@ -615,7 +615,8 @@ contains
                 lim_str = ''
                 if (cfl_adap_dt) lim_str = ' (' // dt_limiter // ')'
                 acfl_str = ''
-                if (proj_method .and. proj_acfl >= 0._wp) write (acfl_str, '(A, F7.2)') ' ACFL ', min(proj_acfl, 9999.99_wp)
+                if (proj_method .and. proj_acfl >= 0._wp) write (acfl_str, '(A, F7.2, A, I0)') ' ACFL ', min(proj_acfl, &
+                    & 9999.99_wp), ' itr ', proj_iters
                 print '(" [", I3, "%] t = ", ES11.4, " dt = ", ES11.4, A, A, " @ step ", I0, " t/step ", ES9.2, "s (avg ", ES9.2, "s) ETA ", I0, ":", I2.2, ":", I2.2)', &
                     & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, trim(lim_str), trim(acfl_str), t_step, wall_time, &
                     & wall_time_avg, eta_hh, eta_mm, eta_ss
