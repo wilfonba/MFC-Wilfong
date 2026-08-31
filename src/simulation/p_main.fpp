@@ -44,7 +44,11 @@ program p_main
 
     ! Setting the time-stepper to the first time-step
     if (cfl_dt) then
+        ! t_step_start is a pure-namelist parameter for fixed-dt runs and keeps
+        ! its dflt_int sentinel here; zero it so step-relative logic (wall-time
+        ! averaging, warmup exclusion, print phase) counts from the first step
         t_step = 0
+        t_step_start = 0
         mytime = t_save*n_start
     else
         t_step = t_step_start
