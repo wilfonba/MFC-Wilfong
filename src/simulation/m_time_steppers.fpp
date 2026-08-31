@@ -680,7 +680,8 @@ contains
                 do j = 0, m
                     if ((.not. ib) .or. (ib_markers%sf(j, k, l) == 0)) then
                         if (igr) then
-                            call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                            call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, &
+                                                    & k, l)
                         else
                             call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
                         end if

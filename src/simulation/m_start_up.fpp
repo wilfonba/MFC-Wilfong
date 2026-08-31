@@ -1402,8 +1402,10 @@ contains
 
     end subroutine s_reduce_ib_patch_array
 
-    !> Build ib_neighbor_ranks(-1:1,-1:1,-1:1): MPI ranks of all neighbor domains. Uses two rounds of MPI_SENDRECV cascades - face
-    !! neighbors are known from bc_*, edge neighbors are obtained in round 1, and (3D) corner neighbors in round 2.
+    !> Build ib_neighbor_ranks: MPI ranks of all neighbor domains. Uses two rounds of MPI_SENDRECV cascades - face neighbors are
+    !! known from bc_*, edge neighbors are obtained in round 1, and (3D) corner neighbors in round 2. The table spans twice
+    !! ib_neighborhood_radius because s_communicate_ib_forces reduces over that stencil: two ranks can hold cells of the same
+    !! immersed boundary only if each is within ib_neighborhood_radius of its owner, hence within twice that of each other.
     subroutine s_compute_ib_neighbor_ranks()
 
         integer                :: ax, k, nbr_idx, nreqs, sx, sy, sz, dx, dy, dz
@@ -1415,7 +1417,7 @@ contains
         integer, dimension(4) :: buf4, rbuf4
         integer, dimension(2) :: buf2, rbuf2
 
-        ax = ib_neighborhood_radius
+        ax = 2*ib_neighborhood_radius
 
         if (allocated(ib_neighbor_ranks)) deallocate (ib_neighbor_ranks)
         allocate (ib_neighbor_ranks(-ax:ax,-ax:ax,-ax:ax))

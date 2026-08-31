@@ -396,8 +396,8 @@ contains
                 end if
             end do
             if (near1_id > 0) then
-                print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '  nearest particle    id=', near1_id, ' dist=', &
-                    & near1_dist, ' gap=', near1_dist - patch_ib(near1_id)%radius, ' vel=', patch_ib(near1_id)%vel
+                print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '  nearest particle    id=', near1_id, ' dist=', near1_dist, &
+                    & ' gap=', near1_dist - patch_ib(near1_id)%radius, ' vel=', patch_ib(near1_id)%vel
                 print '(A,3(ES16.6,1X))', '    centroid    = ', patch_ib(near1_id)%x_centroid, patch_ib(near1_id)%y_centroid, &
                     & patch_ib(near1_id)%z_centroid
                 print '(A,3(ES16.6,1X))', '    angular_vel = ', patch_ib(near1_id)%angular_vel
@@ -407,8 +407,8 @@ contains
                     & patch_ib(near1_id)%mass, ' moment=', patch_ib(near1_id)%moment
             end if
             if (near2_id > 0) then
-                print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '  2nd nearest particle id=', near2_id, ' dist=', &
-                    & near2_dist, ' gap=', near2_dist - patch_ib(near2_id)%radius, ' vel=', patch_ib(near2_id)%vel
+                print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '  2nd nearest particle id=', near2_id, ' dist=', near2_dist, &
+                    & ' gap=', near2_dist - patch_ib(near2_id)%radius, ' vel=', patch_ib(near2_id)%vel
                 print '(A,3(ES16.6,1X))', '    centroid    = ', patch_ib(near2_id)%x_centroid, patch_ib(near2_id)%y_centroid, &
                     & patch_ib(near2_id)%z_centroid
                 print '(A,3(ES16.6,1X))', '    angular_vel = ', patch_ib(near2_id)%angular_vel

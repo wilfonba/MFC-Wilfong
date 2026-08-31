@@ -43,10 +43,15 @@ module m_ibm
 #endif
     logical :: moving_immersed_boundary_flag
 
-    ! IB MPI buffers
-    integer, allocatable  :: send_ids(:), recv_ids(:)
-    real(wp), allocatable :: send_ft(:,:), recv_ft(:,:)
-    real(wp), allocatable :: recv_forces_snap(:,:), recv_torques_snap(:,:)
+    ! Persistent buffers and neighbor lists for the IB force reduction (s_communicate_ib_forces). Host-only: the forces being
+    ! reduced are host-current for the whole of that routine.
+    integer, allocatable          :: send_ids(:), recv_ids(:)
+    real(wp), allocatable         :: send_ft(:,:), recv_ft(:,:)
+    character(len=1), allocatable :: ib_force_send_buf(:), ib_force_recv_bufs(:,:)
+    integer, allocatable          :: ib_force_requests(:)
+    integer, allocatable          :: ib_axis_nbrs(:,:)  !< distinct ranks to reduce with, per axis
+    integer, dimension(3)         :: num_axis_nbrs      !< how many of ib_axis_nbrs(:,d) are populated
+    integer                       :: ib_force_buf_size
 
 contains
 
@@ -93,14 +98,8 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
-        ! allocate some arrays for MPI communication, if required by this simulation
-#ifdef MFC_MPI
-        if (num_procs > 1) then
-            @:ALLOCATE(send_ids(size(patch_ib)), send_ft(6, size(patch_ib)))
-            allocate (recv_forces_snap(size(patch_ib), 3), recv_torques_snap(size(patch_ib), 3), recv_ids(size(patch_ib)), &
-                      & recv_ft(6, size(patch_ib)))
-        end if
-#endif
+        ! build the neighbor lists and buffers used to reduce IB forces across ranks
+        call s_initialize_ib_force_comm()
 
         call s_update_ib_lookup()
 
@@ -231,12 +230,10 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
-            @:ALLOCATE(alpha_rho_IP_buf(1:num_fluids, 1:num_gps), alpha_IP_buf(1:num_fluids, 1:num_gps), &
-                       & pres_IP_buf(1:num_gps), c_IP_buf(1:num_gps), vel_IP_buf(1:3, 1:num_gps), &
-                       & r_IP_buf(1:nb, 1:num_gps), v_IP_buf(1:nb, 1:num_gps), pb_IP_buf(1:nb, 1:num_gps), &
-                       & mv_IP_buf(1:nb, 1:num_gps), nmom_IP_buf(1:nb*nmom, 1:num_gps), &
-                       & presb_IP_buf(1:nb*nnode, 1:num_gps), massv_IP_buf(1:nb*nnode, 1:num_gps), &
-                       & Ys_IP_buf(1:num_species, 1:num_gps))
+            @:ALLOCATE(alpha_rho_IP_buf(1:num_fluids, 1:num_gps), alpha_IP_buf(1:num_fluids, 1:num_gps), pres_IP_buf(1:num_gps), &
+                       & c_IP_buf(1:num_gps), vel_IP_buf(1:3, 1:num_gps), r_IP_buf(1:nb, 1:num_gps), v_IP_buf(1:nb, 1:num_gps), &
+                       & pb_IP_buf(1:nb, 1:num_gps), mv_IP_buf(1:nb, 1:num_gps), nmom_IP_buf(1:nb*nmom, 1:num_gps), &
+                       & presb_IP_buf(1:nb*nnode, 1:num_gps), massv_IP_buf(1:nb*nnode, 1:num_gps), Ys_IP_buf(1:num_species, 1:num_gps))
 
             ! Phase 1: interpolate image-point primitives for every ghost point from the pre-correction field only. Kept in its
             ! own kernel (rather than fused with phase 2 below) so the kernel-launch boundary between them guarantees every
@@ -264,19 +261,19 @@ contains
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                 end if
 
-                alpha_rho_IP_buf(:, i) = alpha_rho_IP(1:num_fluids)
-                alpha_IP_buf(:, i) = alpha_IP(1:num_fluids)
+                alpha_rho_IP_buf(:,i) = alpha_rho_IP(1:num_fluids)
+                alpha_IP_buf(:,i) = alpha_IP(1:num_fluids)
                 pres_IP_buf(i) = pres_IP
-                vel_IP_buf(:, i) = vel_IP
+                vel_IP_buf(:,i) = vel_IP
                 c_IP_buf(i) = c_IP
-                r_IP_buf(:, i) = r_IP(1:nb)
-                v_IP_buf(:, i) = v_IP(1:nb)
-                pb_IP_buf(:, i) = pb_IP(1:nb)
-                mv_IP_buf(:, i) = mv_IP(1:nb)
-                nmom_IP_buf(:, i) = nmom_IP(1:nb*nmom)
-                presb_IP_buf(:, i) = presb_IP(1:nb*nnode)
-                massv_IP_buf(:, i) = massv_IP(1:nb*nnode)
-                Ys_IP_buf(:, i) = Ys_IP(1:num_species)
+                r_IP_buf(:,i) = r_IP(1:nb)
+                v_IP_buf(:,i) = v_IP(1:nb)
+                pb_IP_buf(:,i) = pb_IP(1:nb)
+                mv_IP_buf(:,i) = mv_IP(1:nb)
+                nmom_IP_buf(:,i) = nmom_IP(1:nb*nmom)
+                presb_IP_buf(:,i) = presb_IP(1:nb*nnode)
+                massv_IP_buf(:,i) = massv_IP(1:nb*nnode)
+                Ys_IP_buf(:,i) = Ys_IP(1:num_species)
             end do
             $:END_GPU_PARALLEL_LOOP()
 
@@ -300,19 +297,19 @@ contains
                 end if
 
                 ! Recover the image-point interpolation computed for this ghost point in phase 1
-                alpha_rho_IP(1:num_fluids) = alpha_rho_IP_buf(:, i)
-                alpha_IP(1:num_fluids) = alpha_IP_buf(:, i)
+                alpha_rho_IP(1:num_fluids) = alpha_rho_IP_buf(:,i)
+                alpha_IP(1:num_fluids) = alpha_IP_buf(:,i)
                 pres_IP = pres_IP_buf(i)
-                vel_IP = vel_IP_buf(:, i)
+                vel_IP = vel_IP_buf(:,i)
                 c_IP = c_IP_buf(i)
-                r_IP(1:nb) = r_IP_buf(:, i)
-                v_IP(1:nb) = v_IP_buf(:, i)
-                pb_IP(1:nb) = pb_IP_buf(:, i)
-                mv_IP(1:nb) = mv_IP_buf(:, i)
-                nmom_IP(1:nb*nmom) = nmom_IP_buf(:, i)
-                presb_IP(1:nb*nnode) = presb_IP_buf(:, i)
-                massv_IP(1:nb*nnode) = massv_IP_buf(:, i)
-                Ys_IP(1:num_species) = Ys_IP_buf(:, i)
+                r_IP(1:nb) = r_IP_buf(:,i)
+                v_IP(1:nb) = v_IP_buf(:,i)
+                pb_IP(1:nb) = pb_IP_buf(:,i)
+                mv_IP(1:nb) = mv_IP_buf(:,i)
+                nmom_IP(1:nb*nmom) = nmom_IP_buf(:,i)
+                presb_IP(1:nb*nnode) = presb_IP_buf(:,i)
+                massv_IP(1:nb*nnode) = massv_IP_buf(:,i)
+                Ys_IP(1:num_species) = Ys_IP_buf(:,i)
 
                 ! Injecting (burning) surface: replace the mirrored ghost composition with pure
                 ! injected fuel at the local pressure and the ambient (image-point) temperature.
@@ -512,7 +509,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
             @:DEALLOCATE(alpha_rho_IP_buf, alpha_IP_buf, pres_IP_buf, c_IP_buf, vel_IP_buf, r_IP_buf, v_IP_buf, pb_IP_buf, &
-                        & mv_IP_buf, nmom_IP_buf, presb_IP_buf, massv_IP_buf, Ys_IP_buf)
+                         & mv_IP_buf, nmom_IP_buf, presb_IP_buf, massv_IP_buf, Ys_IP_buf)
         end if
 
     end subroutine s_ibm_correct_state
@@ -1170,8 +1167,8 @@ contains
         $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
         do i = 1, num_ibs
             do l = 1, 3
-                patch_ib(i)%force(l) = forces(i,l)
-                patch_ib(i)%torque(l) = torques(i,l)
+                patch_ib(i)%force(l) = forces(i, l)
+                patch_ib(i)%torque(l) = torques(i, l)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -1345,151 +1342,159 @@ contains
 
     end subroutine s_wrap_periodic_ibs
 
-    !> @brief Swaps ownership of IBs and passes ownership of IBs to neighbor processors
-    !> Reduces forces and torques across the local neighborhood without a global allreduce. Accumulation phase: 2 passes per
-    !! dimension receiving from the low-index (-X) neighbor. Pass 1: add received values; save what was received as recv_snap. Pass
-    !! 2: send current (post-pass-1) values; add received; subtract recv_snap to remove double-counting of the direct contribution
-    !! already added in pass 1. Back-propagation phase: 2 passes per dimension receiving from the high-index (+X) neighbor, each
-    !! overwriting local forces with the neighbor's accumulated total.
+    !> @brief Allocates the persistent buffers and builds the per-axis neighbor lists used by s_communicate_ib_forces. The reduction
+    !! stencil is the set of distinct ranks at axis offsets +/-1..2*ib_neighborhood_radius. Offsets are de-duplicated (and this rank
+    !! dropped) because a periodic axis spanning few ranks maps several offsets onto the same rank, which would otherwise add the
+    !! same partial sum more than once.
+    impure subroutine s_initialize_ib_force_comm()
+
+#ifdef MFC_MPI
+        integer :: d, k, nbr, rank_k, max_nbrs
+        logical :: seen
+
+        num_axis_nbrs = 0
+        if (num_procs == 1) return
+
+        allocate (ib_axis_nbrs(4*ib_neighborhood_radius, 3))
+        ib_axis_nbrs = MPI_PROC_NULL
+
+        do d = 1, num_dims
+            do k = -2*ib_neighborhood_radius, 2*ib_neighborhood_radius
+                if (k == 0) cycle
+                select case (d)
+                case (1)
+                    rank_k = ib_neighbor_ranks(k, 0, 0)
+                case (2)
+                    rank_k = ib_neighbor_ranks(0, k, 0)
+                case default
+                    rank_k = ib_neighbor_ranks(0, 0, k)
+                end select
+                if (rank_k < 0 .or. rank_k == proc_rank) cycle
+
+                seen = .false.
+                do nbr = 1, num_axis_nbrs(d)
+                    if (ib_axis_nbrs(nbr, d) == rank_k) seen = .true.
+                end do
+                if (seen) cycle
+
+                num_axis_nbrs(d) = num_axis_nbrs(d) + 1
+                ib_axis_nbrs(num_axis_nbrs(d), d) = rank_k
+            end do
+        end do
+
+        ! One message carries a rank's whole neighborhood, whose only hard bound is size(patch_ib); the buffers are allocated
+        ! once here rather than per call, so the over-sizing costs host memory but no per-step work.
+        max_nbrs = max(1, maxval(num_axis_nbrs))
+        ib_force_buf_size = storage_size(0)/8 + (storage_size(0)/8 + 6*storage_size(0._wp)/8)*size(patch_ib)
+        allocate (send_ids(size(patch_ib)), send_ft(6, size(patch_ib)))
+        allocate (recv_ids(size(patch_ib)), recv_ft(6, size(patch_ib)))
+        allocate (ib_force_send_buf(ib_force_buf_size), ib_force_recv_bufs(ib_force_buf_size, max_nbrs))
+        allocate (ib_force_requests(2*max_nbrs))
+#endif
+
+    end subroutine s_initialize_ib_force_comm
+
+    !> @brief Sums each immersed boundary's force and torque over every rank in its neighborhood, without a global allreduce.
+    !!
+    !! Two ranks can hold cells of the same IB only if they are within 2*ib_neighborhood_radius hops of each other, so the wanted
+    !! quantity is a sum over a box stencil of that radius - and a box sum is separable. Each dimension is therefore a single
+    !! non-blocking round: send this rank's current partial sums to every distinct rank on that axis within the stencil, receive
+    !! theirs, add. After x a rank holds the sum over its x line, after y over the xy block, after z over the full box, so every
+    !! rank in a box ends with the same total. A round always sends the rank's own current value and never forwards a neighbor's
+    !! contribution onward, so nothing is double counted.
+    !!
+    !! Runs entirely on the host: forces and torques are host-current on entry (every kernel that builds them, here and in
+    !! m_collisions, carries a copy= clause) and are consumed on the host immediately after.
     subroutine s_communicate_ib_forces(forces, torques)
 
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
 #ifdef MFC_MPI
-        integer                       :: i, j, k, l, pack_pos, unpack_pos, buf_size, ierr
-        integer                       :: send_neighbor, recv_neighbor, recv_count, tag
-        character(len=1), allocatable :: ib_force_send_buf(:), ib_force_recv_buf(:)
+        integer :: i, j, l, d, nbr, nreqs, recv_count, pack_pos, unpack_pos, ierr
 
         if (num_procs == 1) return
 
-        buf_size = storage_size(0)/8 + (storage_size(0)/8 + 6*storage_size(0._wp)/8)*size(patch_ib)
-        allocate (ib_force_send_buf(buf_size), ib_force_recv_buf(buf_size))
+        do d = 1, num_dims
+            if (num_axis_nbrs(d) == 0) cycle
 
-        ! Accumulation phase: propagate contributions toward the high-index corner.
-        #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-            if (num_dims >= ${ID}$) then
-                send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
-                recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
-
-                recv_forces_snap = 0._wp
-                recv_torques_snap = 0._wp
-                tag = 300
-
-                do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
-                    ! send forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
-                    pack_pos = 0
-                    $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
-                    do i = 1, num_ibs
-                        send_ids(i) = patch_ib(i)%gbl_patch_id
-                        do l = 1, 3
-                            send_ft(l,i) = forces(i,l)
-                            send_ft(l + 3,i) = torques(i,l)
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                    $:GPU_UPDATE(host='[send_ids, send_ft]')
-                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_SENDRECV(ib_force_send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, ib_force_recv_buf, buf_size, &
-                                      & MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
-                    if (recv_neighbor /= MPI_PROC_NULL) then
-                        unpack_pos = 0
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
-                                        & MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j, l]', copyin='[recv_ft, recv_ids]', copy='[forces, torques, &
-                                            & recv_forces_snap, recv_torques_snap]')
-                        do i = 1, recv_count
-                            call s_get_neighborhood_idx(recv_ids(i), j)
-                            if (j > 0) then
-                                ! add forces and subtract recv_snap prevent double-counting
-                                do l = 1, 3
-                                    forces(j,l) = forces(j,l) + recv_ft(l,i) - recv_forces_snap(j,l)
-                                    torques(j,l) = torques(j,l) + recv_ft(l + 3,i) - recv_torques_snap(j,l)
-                                    recv_forces_snap(j,l) = recv_ft(l,i)
-                                    recv_torques_snap(j,l) = recv_ft(l + 3,i)
-                                end do
-                            end if
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-                    tag = tag + 2
+            do i = 1, num_ibs
+                send_ids(i) = patch_ib(i)%gbl_patch_id
+                do l = 1, 3
+                    send_ft(l, i) = forces(i, l)
+                    send_ft(l + 3, i) = torques(i, l)
                 end do
-            end if
-        #:endfor
+            end do
 
-        ! Send final sums back to neighbors in -X direction
-        #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-            if (num_dims >= ${ID}$) then
-                send_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
-                recv_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
+            pack_pos = 0
+            call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, ib_force_buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+            call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, ib_force_buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+            call MPI_PACK(send_ft, 6*num_ibs, mpi_p, ib_force_send_buf, ib_force_buf_size, pack_pos, MPI_COMM_WORLD, ierr)
 
-                do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
-                    pack_pos = 0
-                    $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
-                    do i = 1, num_ibs
-                        send_ids(i) = patch_ib(i)%gbl_patch_id
+            nreqs = 0
+            do nbr = 1, num_axis_nbrs(d)
+                nreqs = nreqs + 1
+                call MPI_IRECV(ib_force_recv_bufs(:,nbr), ib_force_buf_size, MPI_PACKED, ib_axis_nbrs(nbr, d), 300 + d, &
+                               & MPI_COMM_WORLD, ib_force_requests(nreqs), ierr)
+            end do
+            do nbr = 1, num_axis_nbrs(d)
+                nreqs = nreqs + 1
+                call MPI_ISEND(ib_force_send_buf, pack_pos, MPI_PACKED, ib_axis_nbrs(nbr, d), 300 + d, MPI_COMM_WORLD, &
+                               & ib_force_requests(nreqs), ierr)
+            end do
+            call MPI_WAITALL(nreqs, ib_force_requests, MPI_STATUSES_IGNORE, ierr)
+
+            do nbr = 1, num_axis_nbrs(d)
+                unpack_pos = 0
+                call MPI_UNPACK(ib_force_recv_bufs(:,nbr), ib_force_buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, &
+                                & MPI_COMM_WORLD, ierr)
+                if (recv_count == 0) cycle
+                call MPI_UNPACK(ib_force_recv_bufs(:,nbr), ib_force_buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
+                                & MPI_COMM_WORLD, ierr)
+                call MPI_UNPACK(ib_force_recv_bufs(:,nbr), ib_force_buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, &
+                                & MPI_COMM_WORLD, ierr)
+
+                do i = 1, recv_count
+                    call s_get_neighborhood_idx(recv_ids(i), j)
+                    if (j > 0) then
                         do l = 1, 3
-                            send_ft(l,i) = forces(i,l)
-                            send_ft(l + 3,i) = torques(i,l)
+                            forces(j, l) = forces(j, l) + recv_ft(l, i)
+                            torques(j, l) = torques(j, l) + recv_ft(l + 3, i)
                         end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                    $:GPU_UPDATE(host='[send_ids, send_ft]')
-                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_SENDRECV(ib_force_send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, ib_force_recv_buf, buf_size, &
-                                      & MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    if (recv_neighbor /= MPI_PROC_NULL) then
-                        unpack_pos = 0
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
-                                        & MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j, l]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
-                        do i = 1, recv_count
-                            call s_get_neighborhood_idx(recv_ids(i), j)
-                            if (j > 0) then
-                                do l = 1, 3
-                                    forces(j,l) = recv_ft(l,i)
-                                    torques(j,l) = recv_ft(l + 3,i)
-                                end do
-                            end if
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
                     end if
-                    tag = tag + 2
                 end do
-            end if
-        #:endfor
+            end do
+        end do
 #endif
 
     end subroutine s_communicate_ib_forces
 
+    !> @brief Drops IBs that have left this rank's neighborhood and hands newly owned ones to the neighbors that now need them. Two
+    !! non-blocking rounds: round 1 exchanges handoff counts so round 2's buffers hold exactly the patches actually in flight (a
+    !! handful in a typical step) rather than the num_local_ibs_max worst case.
     subroutine s_handoff_ib_ownership()
 
-        integer                               :: i, j, k, output_idx, local_output_idx
-        integer                               :: old_num_local_ibs
-        integer                               :: new_count, recv_count
-        integer                               :: pack_pos, unpack_pos, buf_size, patch_bytes
-        integer                               :: send_neighbor, recv_neighbor, ierr
-        integer                               :: dx, dy, dz, tag, nbr_idx, nreqs
-        real(wp), dimension(3)                :: centroid
-        logical                               :: is_new
-        type(ib_patch_parameters)             :: tmp_patch
-        integer, dimension(num_local_ibs_max) :: local_ib_idx_old
-        ! 26 neighbors max in 3D (8 in 2D); each gets its own recv buffer
-        integer, parameter             :: max_nbrs = 26
-        character(len=1), allocatable  :: send_buf(:), recv_bufs(:,:)
-        integer, dimension(2*max_nbrs) :: requests
-        integer, dimension(max_nbrs)   :: recv_neighbor_list
+        integer                                :: i, j, k, output_idx, local_output_idx
+        integer                                :: old_num_local_ibs
+        integer                                :: new_count, patch_bytes
+        integer                                :: send_neighbor, recv_neighbor, ierr
+        integer                                :: dx, dy, dz, tag, tag_base, nbr_idx, nreqs
+        integer                                :: nbr_span, max_nbrs, total_recv
+        real(wp), dimension(3)                 :: centroid
+        logical                                :: is_new
+        type(ib_patch_parameters)              :: tmp_patch
+        integer, dimension(num_local_ibs_max)  :: local_ib_idx_old
+        integer, allocatable                   :: requests(:), recv_counts(:), recv_offsets(:)
+        type(ib_patch_parameters), allocatable :: send_patches(:), recv_patches(:)
 
 #ifdef MFC_MPI
         if (num_procs > 1) then
+            ! One entry per offset visited by the loops below; tags are a mixed-radix encoding of that offset, so they stay
+            ! distinct for every ib_neighborhood_radius.
+            nbr_span = 2*ib_neighborhood_radius + 1
+            max_nbrs = merge(nbr_span**3, nbr_span**2, num_dims == 3) - 1
+            tag_base = 200 + nbr_span**3
+            allocate (requests(2*max_nbrs), recv_counts(max_nbrs), recv_offsets(max_nbrs))
+
             ! save a copy of the local IB's global indices to cross-reference for later.
             local_ib_idx_old = 0
             old_num_local_ibs = num_local_ibs
@@ -1499,7 +1504,7 @@ contains
 
             ! Sync GPU-updated fields (angles, angular_vel, centroids) to host before
             ! compaction and MPI packing, which read from host memory.
-            $:GPU_UPDATE(host='[patch_ib]')
+            $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
             ! delete any particles that no longer need to be tracked and coalesce the array
             output_idx = 0
@@ -1526,19 +1531,11 @@ contains
             end do
             num_ibs = output_idx
             num_local_ibs = local_output_idx
-            $:GPU_UPDATE(device='[patch_ib]')
             call s_update_ib_lookup()
 
-            ! Broadcast newly-owned patches to all neighborhood neighbors
+            ! collect the patches this rank has newly taken ownership of
             patch_bytes = storage_size(tmp_patch)/8
-            buf_size = storage_size(0)/8 + patch_bytes*num_local_ibs_max
-            allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs))
-
-            ! Write placeholder count at position 0
-            pack_pos = 0
-            call MPI_PACK(0, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-
-            ! pack new patches and count them
+            allocate (send_patches(max(1, num_local_ibs)))
             new_count = 0
             do i = 1, num_local_ibs
                 k = local_ib_patch_ids(i)
@@ -1550,17 +1547,13 @@ contains
                     end if
                 end do
                 if (is_new) then
-                    call MPI_PACK(patch_ib(k), patch_bytes, MPI_BYTE, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     new_count = new_count + 1
+                    send_patches(new_count) = patch_ib(k)
                 end if
             end do
 
-            ! Overwrite the placeholder with the real count
-            pack_pos = 0
-            call MPI_PACK(new_count, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-            pack_pos = storage_size(0)/8 + new_count*patch_bytes
-
-            ! Post all receives first, then sends
+            ! Round 1: tell each neighbor how many patches it is about to receive
+            recv_counts = 0
             nreqs = 0
             nbr_idx = 0
             do dz = merge(-ib_neighborhood_radius, 0, num_dims == 3), merge(ib_neighborhood_radius, 0, num_dims == 3)
@@ -1568,53 +1561,73 @@ contains
                     do dx = -ib_neighborhood_radius, ib_neighborhood_radius
                         if (dx == 0 .and. dy == 0 .and. dz == 0) cycle
                         nbr_idx = nbr_idx + 1
-                        tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
+                        tag = ((dx + ib_neighborhood_radius)*nbr_span + (dy + ib_neighborhood_radius))*nbr_span + (dz &
+                               & + ib_neighborhood_radius)
                         recv_neighbor = ib_neighbor_ranks(-dx, -dy, -dz)
-                        recv_neighbor_list(nbr_idx) = MPI_PROC_NULL
-                        if (recv_neighbor < 0) cycle
-                        recv_neighbor_list(nbr_idx) = recv_neighbor
-                        nreqs = nreqs + 1
-                        call MPI_IRECV(recv_bufs(:,nbr_idx), buf_size, MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, &
-                                       & requests(nreqs), ierr)
+                        send_neighbor = ib_neighbor_ranks(dx, dy, dz)
+                        if (recv_neighbor >= 0) then
+                            nreqs = nreqs + 1
+                            call MPI_IRECV(recv_counts(nbr_idx), 1, MPI_INTEGER, recv_neighbor, 200 + tag, MPI_COMM_WORLD, &
+                                           & requests(nreqs), ierr)
+                        end if
+                        if (send_neighbor >= 0) then
+                            nreqs = nreqs + 1
+                            call MPI_ISEND(new_count, 1, MPI_INTEGER, send_neighbor, 200 + tag, MPI_COMM_WORLD, requests(nreqs), &
+                                           & ierr)
+                        end if
                     end do
                 end do
             end do
+            call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
 
+            ! Round 2: exchange the patches themselves, each neighbor's arriving in its own slice of one exactly-sized buffer
+            total_recv = 0
+            do nbr_idx = 1, max_nbrs
+                recv_offsets(nbr_idx) = total_recv
+                total_recv = total_recv + recv_counts(nbr_idx)
+            end do
+            allocate (recv_patches(max(1, total_recv)))
+
+            nreqs = 0
+            nbr_idx = 0
             do dz = merge(-ib_neighborhood_radius, 0, num_dims == 3), merge(ib_neighborhood_radius, 0, num_dims == 3)
                 do dy = -ib_neighborhood_radius, ib_neighborhood_radius
                     do dx = -ib_neighborhood_radius, ib_neighborhood_radius
                         if (dx == 0 .and. dy == 0 .and. dz == 0) cycle
-                        tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
+                        nbr_idx = nbr_idx + 1
+                        tag = tag_base + ((dx + ib_neighborhood_radius)*nbr_span + (dy + ib_neighborhood_radius))*nbr_span + (dz &
+                                          & + ib_neighborhood_radius)
+                        recv_neighbor = ib_neighbor_ranks(-dx, -dy, -dz)
                         send_neighbor = ib_neighbor_ranks(dx, dy, dz)
-                        if (send_neighbor < 0) cycle
-                        nreqs = nreqs + 1
-                        call MPI_ISEND(send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, MPI_COMM_WORLD, requests(nreqs), ierr)
+                        if (recv_neighbor >= 0 .and. recv_counts(nbr_idx) > 0) then
+                            nreqs = nreqs + 1
+                            call MPI_IRECV(recv_patches(recv_offsets(nbr_idx) + 1), recv_counts(nbr_idx)*patch_bytes, MPI_BYTE, &
+                                           & recv_neighbor, tag, MPI_COMM_WORLD, requests(nreqs), ierr)
+                        end if
+                        if (send_neighbor >= 0 .and. new_count > 0) then
+                            nreqs = nreqs + 1
+                            call MPI_ISEND(send_patches, new_count*patch_bytes, MPI_BYTE, send_neighbor, tag, MPI_COMM_WORLD, &
+                                           & requests(nreqs), ierr)
+                        end if
                     end do
                 end do
             end do
-
             call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
 
-            ! Unpack all received buffers
-            do nbr_idx = 1, ((2*ib_neighborhood_radius+1)**num_dims) - 1
-                if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
-                unpack_pos = 0
-                call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                do i = 1, recv_count
-                    call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, &
-                                    & ierr)
-                    call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j)
-                    if (j < 0) then
-                        num_ibs = num_ibs + 1
-                        @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
-                        patch_ib(num_ibs) = tmp_patch
-                        ib_gbl_idx_lookup(tmp_patch%gbl_patch_id) = num_ibs
-                    end if
-                end do
+            ! adopt every arrival that is not already tracked here; the lookup is updated inline so a patch sent by two
+            ! neighbors is only adopted once
+            do i = 1, total_recv
+                call s_get_neighborhood_idx(recv_patches(i)%gbl_patch_id, j)
+                if (j < 0) then
+                    num_ibs = num_ibs + 1
+                    @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
+                    patch_ib(num_ibs) = recv_patches(i)
+                    ib_gbl_idx_lookup(recv_patches(i)%gbl_patch_id) = num_ibs
+                end if
             end do
 
-            deallocate (send_buf, recv_bufs)
-            $:GPU_UPDATE(device='[patch_ib, num_ibs]')
+            deallocate (send_patches, recv_patches, requests, recv_counts, recv_offsets)
+            $:GPU_UPDATE(device='[patch_ib(1:num_ibs), num_ibs]')
             call s_update_ib_lookup()
         end if
 #endif
@@ -1633,10 +1646,10 @@ contains
 
     end subroutine s_get_neighborhood_idx
 
-    !> Rebuilds ib_gbl_idx_lookup from patch_ib on the host and mirrors the result to the device. Built on the host because
-    !! patch_ib is already host-current at every call site (compaction and neighbor-unpack are host-side Fortran), and
-    !! because the populate step is a scatter write (target index = patch_ib(i)%gbl_patch_id, not the loop index) that was
-    !! found to leave stale entries behind under GPU offload after compaction shrinks num_ibs.
+    !> Rebuilds ib_gbl_idx_lookup from patch_ib on the host and mirrors the result to the device. Built on the host because patch_ib
+    !! is already host-current at every call site (compaction and neighbor-unpack are host-side Fortran), and because the populate
+    !! step is a scatter write (target index = patch_ib(i)%gbl_patch_id, not the loop index) that was found to leave stale entries
+    !! behind under GPU offload after compaction shrinks num_ibs.
     subroutine s_update_ib_lookup()
 
         integer :: i
@@ -1672,8 +1685,8 @@ contains
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI
         if (num_procs > 1) then
-            @:DEALLOCATE(send_ids, send_ft)
-            deallocate (recv_forces_snap, recv_torques_snap, recv_ids, recv_ft)
+            deallocate (send_ids, send_ft, recv_ids, recv_ft, ib_axis_nbrs, ib_force_send_buf, ib_force_recv_bufs, &
+                        & ib_force_requests)
         end if
 #endif
 

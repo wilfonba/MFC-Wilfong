@@ -68,3 +68,16 @@ def test_hemi_shell_validator_rejects_shell_outside_domain():
     params = {**_valid_cloud_params(), "particle_cloud(1)%x_centroid": 0.9, "particle_cloud(1)%shell_outer_radius": 0.3}
     with pytest.raises(CaseConstraintError, match="x-extent must lie within x_domain"):
         CaseValidator(params).validate("simulation")
+
+
+def test_hemi_shell_validator_rejects_invalid_shell_axis():
+    params = {**_valid_cloud_params(), "particle_cloud(1)%shell_axis": 0}
+    with pytest.raises(CaseConstraintError, match="shell_axis must be 1"):
+        CaseValidator(params).validate("simulation")
+
+
+def test_hemi_shell_validator_applies_standoff_to_the_open_axis():
+    # shell_axis = 1 opens the shell toward +x, so the flat face at x_centroid only needs one
+    # particle radius of clearance from x_domain%beg, not the full outer radius.
+    params = {**_valid_cloud_params(), "particle_cloud(1)%shell_axis": 1, "particle_cloud(1)%x_centroid": -0.95}
+    CaseValidator(params).validate("simulation")
