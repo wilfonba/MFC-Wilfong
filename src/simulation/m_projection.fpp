@@ -1097,12 +1097,16 @@ contains
         real(wp)                                                   :: sm, cf_s
         integer                                                    :: lv, mml, nnl, ppl
         integer                                                    :: i, j, k, l, jf, kf, lf, nchild
+        integer                                                    :: gy, gz
 
         if (.not. mg_dx_built) call s_mg_build_dx()
 
+        ! Ghost planes exist only in active dimensions: q_cons_vf has no
+        ! y/z ghosts in 1D/2D, and the coarse stencil never reads them there
+        gy = min(1, n); gz = min(1, p)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, sm]')
-        do l = -1, p + 1
-            do k = -1, n + 1
+        do l = -gz, p + gz
+            do k = -gy, n + gy
                 do j = -1, m + 1
                     sm = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
