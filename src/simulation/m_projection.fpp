@@ -1196,7 +1196,7 @@ contains
         call s_mpi_allreduce_max(cf_s, sm)
         nlev_eff = nlev_mg
         do lv = 1, nlev_mg
-            if (sm*2._wp*real(num_dims, wp)/max(mg_dmin(lv)**2, sgm_eps) <= 1._wp) then
+            if (sm*2._wp*real(num_dims, wp)/max(mg_dmin(lv)**2, sgm_eps) <= 4._wp) then
                 nlev_eff = lv
                 exit
             end if
