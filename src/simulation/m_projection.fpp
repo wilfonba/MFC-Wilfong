@@ -181,9 +181,12 @@ module m_projection
     real(wp), allocatable, dimension(:,:)         :: mg_dx, mg_dy, mg_dz  !< level cell widths (1 ghost each side)
     !> coarse-level halo slabs (wp), one column per direction
     real(wp), allocatable, dimension(:,:) :: mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e
+    !> fine-level depth-1 halo slabs, one column per direction
+    real(wp), allocatable, dimension(:,:) :: mg_fsbuf_b, mg_frbuf_b, mg_fsbuf_e, mg_frbuf_e
     logical                               :: mg_dx_built = .false.
     $:GPU_DECLARE(create='[mg_p, mg_rhs, mg_res, mg_rho, mg_coeff, mg_dx, mg_dy, mg_dz, mg_rboff]')
     $:GPU_DECLARE(create='[mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e]')
+    $:GPU_DECLARE(create='[mg_fsbuf_b, mg_frbuf_b, mg_fsbuf_e, mg_frbuf_e]')
     !> @}
 
 contains
@@ -626,6 +629,7 @@ contains
         ! feed the divergence, the Helmholtz coefficients, and the EOS rebuild
 
         if (proj_normalization) then
+            call nvtxStartRange("TIMESTEP-PROJECTION-NORMALIZE")
             $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, a_sum]')
             do l = 0, p
                 do k = 0, n
@@ -647,14 +651,17 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+            call nvtxEndRange()
         end if
 
         ! Star-state ghost cells (density and momentum feed the divergence and the Laplacian face densities)
-
+        call nvtxStartRange("TIMESTEP-PROJECTION-COMM")
         call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
+        call nvtxEndRange
 
         ! Helmholtz RHS: blended advected pressure minus rho*c^2*dt*div(u*),
         ! with div(u*) as a face-averaged central difference of the star velocity
+        call nvtxStartRange("TIMESTEP-PROJECTION-HELM-RHS")
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_adv_blend, p0v, rhoc2_sum, blkmod, divs, a_cl, a_sum, rho_c, &
                             & rho_nb, u_m, u_p]')
         do l = 0, p
@@ -724,10 +731,14 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        call nvtxEndRange
 
         ! Ghost fill of the initial pressure iterate
+        call nvtxStartRange("TIMESTEP-PROJECTION-COMM")
         call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+        call nvtxEndRange
 
+        call nvtxStartRange("TIMESTEP-PROJECTION-ITER-SETUP")
         if (proj_iter_solver /= proj_iter_solver_gauss_seidel) then
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -782,10 +793,11 @@ contains
             call s_mpi_allreduce_max(pmax_loc, pmax_glb)
             tol_eff = proj_tol_rel*max(pmax_glb, sgm_eps)
         end if
+        call nvtxEndRange
 
         do iter = 1, proj_max_iters
             res_loc = 0._wp
-
+            call nvtxStartRange("TIMESTEP-PROJECTION-ITER")
             if (proj_iter_solver == proj_iter_solver_jacobi) then
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, p_new, rho_c, rho_nb]', &
                                     & reduction='[[res_loc]]', reductionOp='[max]')
@@ -801,7 +813,9 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
+                call nvtxStartRange("TIMESTEP-PROJECTION-COMM")
                 call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+                call nvtxEndRange
 
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -843,7 +857,9 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
+                call nvtxStartRange("TIMESTEP-PROJECTION-COMM")
                 call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+                call nvtxEndRange
 
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -885,11 +901,12 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-
+                    call nvtxStartRange("TIMESTEP-PROJECTION-COMM")
                     call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+                    call nvtxEndRange
                 end do
             end if
-
+            call nvtxEndRange
             ! Multigrid checks every cycle: a V-cycle costs far more than the
             ! reduction, so amortizing the check only overshoots converged solves
             if (proj_iter_solver == proj_iter_solver_multigrid .or. mod(iter, &
@@ -901,6 +918,7 @@ contains
 
         ! Momentum correction with the face-averaged new pressure gradient,
         ! then total energy rebuilt from the EOS with the new pressure
+        call nvtxStartRange("TIMESTEP-PROJECTION-CORRECT")
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, dpds, ke, gamma_mix, pi_inf_mix, qv_mix, mom_sq, rho_c]')
         do l = 0, p
             do k = 0, n
@@ -937,6 +955,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        call nvtxEndRange
 
     end subroutine s_projection_apply
 
@@ -965,6 +984,7 @@ contains
             @:DEALLOCATE(mg_p, mg_rhs, mg_res, mg_rho, mg_coeff)
             @:DEALLOCATE(mg_dx, mg_dy, mg_dz)
             @:DEALLOCATE(mg_sbuf_b, mg_rbuf_b, mg_sbuf_e, mg_rbuf_e)
+            @:DEALLOCATE(mg_fsbuf_b, mg_frbuf_b, mg_fsbuf_e, mg_frbuf_e)
         end if
         @:DEALLOCATE(pres_stage)
         if (time_stepper /= time_stepper_rk1) then
@@ -1051,6 +1071,13 @@ contains
         @:ALLOCATE(mg_rbuf_b(1:max(cnt, 1), 1:num_dims))
         @:ALLOCATE(mg_sbuf_e(1:max(cnt, 1), 1:num_dims))
         @:ALLOCATE(mg_rbuf_e(1:max(cnt, 1), 1:num_dims))
+        ! Fine-level depth-1 slabs for the overlapped smoother halo
+        cnt = max((n + 1)*(p + 1), (m + 1)*(p + 1))
+        cnt = max(cnt, (m + 1)*(n + 1))
+        @:ALLOCATE(mg_fsbuf_b(1:max(cnt, 1), 1:num_dims))
+        @:ALLOCATE(mg_frbuf_b(1:max(cnt, 1), 1:num_dims))
+        @:ALLOCATE(mg_fsbuf_e(1:max(cnt, 1), 1:num_dims))
+        @:ALLOCATE(mg_frbuf_e(1:max(cnt, 1), 1:num_dims))
 
     end subroutine s_initialize_projection_mg
 
@@ -1111,6 +1138,7 @@ contains
         integer                                                    :: i, j, k, l, jf, kf, lf, nchild
         integer                                                    :: gy, gz
 
+        call nvtxStartRange("TIMESTEP-PROJECTION-MG-SETUP")
         if (.not. mg_dx_built) call s_mg_build_dx()
 
         ! Ghost planes exist only in active dimensions: q_cons_vf has no
@@ -1199,6 +1227,8 @@ contains
             call s_mg_halo_coarse(lv + 1, mg_rho(lv + 1))
         end do
 
+        call nvtxEndRange
+
     end subroutine s_mg_setup_solve
 
     !> One-layer halo exchange plus physical BCs for a coarse-level field: MPI neighbors from the domain-level bc codes, periodic
@@ -1211,6 +1241,7 @@ contains
         integer                           :: mml, nnl, ppl, cnt, j, k, l, lv
         integer                           :: reqs(12), nreq
 
+        call nvtxStartRange("TIMESTEP-PROJECTION-MG-COMM")
         lv = lv_in
         mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
         nreq = 0
@@ -1344,50 +1375,306 @@ contains
             end if
         #:endfor
 
+        call nvtxEndRange
+
     end subroutine s_mg_halo_coarse
 
     !> Red-black Gauss-Seidel smoothing sweeps on one level (halo before each color, so freshly restricted or prolonged iterates
     !! enter consistently)
+    !> Pack the depth-1 interior face layers of the fine pressure iterate and post every direction's nonblocking exchange. The
+    !! caller overlaps host-side completion with device work and then calls s_mg_halo_fine_end
+    impure subroutine s_mg_halo_fine_begin(reqs, nreq)
+
+        integer, dimension(:), intent(inout) :: reqs
+        integer, intent(inout)               :: nreq
+        integer                              :: cnt, j, k, l
+
+        #:for DIR, BCV, T1, T1E, T2, T2E, IBEG, IEND in &
+            [(1, 'bc_x', 'k', 'n', 'l', 'p', '(0, k, l)', '(m, k, l)'), &
+             (2, 'bc_y', 'j', 'm', 'l', 'p', '(j, 0, l)', '(j, n, l)'), &
+             (3, 'bc_z', 'j', 'm', 'k', 'n', '(j, k, 0)', '(j, k, p)')]
+            if (num_dims >= ${DIR}$) then
+                if (${BCV}$%beg >= 0) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            mg_fsbuf_b(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1), ${DIR}$) = real(pres_proj${IBEG}$, wp)
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+                if (${BCV}$%end >= 0) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            mg_fsbuf_e(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1), ${DIR}$) = real(pres_proj${IEND}$, wp)
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+            end if
+        #:endfor
+        if (.not. rdma_mpi) then
+            $:GPU_UPDATE(host='[mg_fsbuf_b, mg_fsbuf_e]')
+        end if
+
+        #:for RDMA in [False, True]
+            if (rdma_mpi .eqv. ${'.true.' if RDMA else '.false.'}$) then
+                #:if RDMA
+                    #:call GPU_HOST_DATA(use_device_addr='[mg_fsbuf_b, mg_frbuf_b, mg_fsbuf_e, mg_frbuf_e]')
+                        if (num_dims >= 1) then
+                            cnt = (n + 1)*(p + 1)
+                            call s_mpi_iexchange_sides_wp(mg_fsbuf_b(:,1), mg_frbuf_b(:,1), mg_fsbuf_e(:,1), mg_frbuf_e(:,1), &
+                                                          & cnt, bc_x%beg, bc_x%end, 0, reqs, nreq)
+                        end if
+                        if (num_dims >= 2) then
+                            cnt = (m + 1)*(p + 1)
+                            call s_mpi_iexchange_sides_wp(mg_fsbuf_b(:,2), mg_frbuf_b(:,2), mg_fsbuf_e(:,2), mg_frbuf_e(:,2), &
+                                                          & cnt, bc_y%beg, bc_y%end, 2, reqs, nreq)
+                        end if
+                        if (num_dims >= 3) then
+                            cnt = (m + 1)*(n + 1)
+                            call s_mpi_iexchange_sides_wp(mg_fsbuf_b(:,3), mg_frbuf_b(:,3), mg_fsbuf_e(:,3), mg_frbuf_e(:,3), &
+                                                          & cnt, bc_z%beg, bc_z%end, 4, reqs, nreq)
+                        end if
+                    #:endcall GPU_HOST_DATA
+                #:else
+                    if (num_dims >= 1) then
+                        cnt = (n + 1)*(p + 1)
+                        call s_mpi_iexchange_sides_wp(mg_fsbuf_b(:,1), mg_frbuf_b(:,1), mg_fsbuf_e(:,1), mg_frbuf_e(:,1), cnt, &
+                                                      & bc_x%beg, bc_x%end, 0, reqs, nreq)
+                    end if
+                    if (num_dims >= 2) then
+                        cnt = (m + 1)*(p + 1)
+                        call s_mpi_iexchange_sides_wp(mg_fsbuf_b(:,2), mg_frbuf_b(:,2), mg_fsbuf_e(:,2), mg_frbuf_e(:,2), cnt, &
+                                                      & bc_y%beg, bc_y%end, 2, reqs, nreq)
+                    end if
+                    if (num_dims >= 3) then
+                        cnt = (m + 1)*(n + 1)
+                        call s_mpi_iexchange_sides_wp(mg_fsbuf_b(:,3), mg_frbuf_b(:,3), mg_fsbuf_e(:,3), mg_frbuf_e(:,3), cnt, &
+                                                      & bc_z%beg, bc_z%end, 4, reqs, nreq)
+                    end if
+                #:endif
+            end if
+        #:endfor
+
+    end subroutine s_mg_halo_fine_begin
+
+    !> Unpack the completed fine-level exchange into the depth-1 ghost layer and apply the physical fills, reading the same
+    !! per-point bc_type codes as the standard fine halo (periodic wrap; reflective and extrapolation coincide at depth one)
+    impure subroutine s_mg_halo_fine_end(bc_type)
+
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer                                                    :: j, k, l, bcc
+
+        if (.not. rdma_mpi) then
+            $:GPU_UPDATE(device='[mg_frbuf_b, mg_frbuf_e]')
+        end if
+
+        #:for DIR, BCV, T1, T1E, T2, T2E, GBEG, IBEG, GEND, IEND, BCB, BCE in &
+            [(1, 'bc_x', 'k', 'n', 'l', 'p', '(-1, k, l)', '(0, k, l)', '(m + 1, k, l)', '(m, k, l)', &
+              & 'bc_type(1, 1)%sf(0, k, l)', 'bc_type(1, 2)%sf(0, k, l)'), &
+             (2, 'bc_y', 'j', 'm', 'l', 'p', '(j, -1, l)', '(j, 0, l)', '(j, n + 1, l)', '(j, n, l)', &
+              & 'bc_type(2, 1)%sf(j, 0, l)', 'bc_type(2, 2)%sf(j, 0, l)'), &
+             (3, 'bc_z', 'j', 'm', 'k', 'n', '(j, k, -1)', '(j, k, 0)', '(j, k, p + 1)', '(j, k, p)', &
+              & 'bc_type(3, 1)%sf(j, k, 0)', 'bc_type(3, 2)%sf(j, k, 0)')]
+            if (num_dims >= ${DIR}$) then
+                if (${BCV}$%beg >= 0) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            pres_proj${GBEG}$ = real(mg_frbuf_b(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1), ${DIR}$), stp)
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                else
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l, bcc]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            bcc = int(${BCB}$)
+                            if (bcc == BC_PERIODIC) then
+                                pres_proj${GBEG}$ = pres_proj${IEND}$
+                            else
+                                pres_proj${GBEG}$ = pres_proj${IBEG}$
+                            end if
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+                if (${BCV}$%end >= 0) then
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            pres_proj${GEND}$ = real(mg_frbuf_e(1 + ${T1}$ + ${T2}$*(${T1E}$ + 1), ${DIR}$), stp)
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                else
+                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l, bcc]')
+                    do ${T2}$ = 0, ${T2E}$
+                        do ${T1}$ = 0, ${T1E}$
+                            bcc = int(${BCE}$)
+                            if (bcc == BC_PERIODIC) then
+                                pres_proj${GEND}$ = pres_proj${IBEG}$
+                            else
+                                pres_proj${GEND}$ = pres_proj${IEND}$
+                            end if
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+            end if
+        #:endfor
+
+    end subroutine s_mg_halo_fine_end
+
     impure subroutine s_mg_smooth(lv_in, nsweeps, bc_type)
 
         integer, intent(in)                                        :: lv_in, nsweeps
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         real(wp)                                                   :: coeff, c_f, offd, diag, p_new, rho_c, rho_nb
         integer                                                    :: lv, mml, nnl, ppl, sweep, color, rboff
-        integer                                                    :: i, j, k, l
+        integer                                                    :: i, j, k, l, jj
+        integer                                                    :: kib, kie, lib, lie
+        integer                                                    :: reqs(12), nreq
 
+        call nvtxStartRange("TIMESTEP-PROJECTION-MG-SMOOTH")
         lv = lv_in
         mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
         rboff = mg_rboff(lv)
 
-        do sweep = 1, nsweeps
-            do color = 0, 1
-                ! Opt-in: exchange only before the first color; the second color
-                ! then reads half-sweep-stale ghosts, halving smoother
-                ! communication at the cost of exact rank-invariance
-                if (color == 0 .or. .not. proj_mg_single_halo) then
-                    if (lv == 1) then
-                        call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+        if (lv == 1) then
+            ! Fine level: the halo exchange is overlapped with the interior
+            ! update. Pack + post, smooth the cells one layer in from every
+            ! face while the host completes MPI, then unpack and finish the
+            ! boundary shells. Same values in the same order as the plain
+            ! sweep, so results are unchanged
+            kib = min(1, n); kie = n - min(1, n)
+            lib = min(1, p); lie = p - min(1, p)
+            do sweep = 1, nsweeps
+                do color = 0, 1
+                    if (color == 0 .or. .not. proj_mg_single_halo) then
+                        nreq = 0
+                        call nvtxStartRange("TIMESTEP-PROJECTION-MG-COMM-POST")
+                        call s_mg_halo_fine_begin(reqs, nreq)
+                        call nvtxEndRange
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, p_new, rho_c, rho_nb]', &
+                                            & firstprivate='[lv, rboff, color, kib, kie, lib, lie]', extraAccArgs='async(1)', extraOmpArgs='nowait')
+                        do l = lib, lie
+                            do k = kib, kie
+                                do j = 1, m - 1
+                                    if (mod(j + k + l + rboff, 2) == color) then
+                                        @:MG_STENCIL(lv, mg_p(lv)%sf)
+                                        p_new = (real(mg_rhs(lv)%sf(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
+                                        mg_p(lv)%sf(j, k, l) = real(p_new, stp)
+                                    end if
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                        call nvtxStartRange("TIMESTEP-PROJECTION-MG-COMM-WAIT")
+                        call s_mpi_wait_requests(reqs, nreq)
+                        $:GPU_WAIT()
+                        call nvtxEndRange
+                        call nvtxStartRange("TIMESTEP-PROJECTION-MG-COMM-UNPACK")
+                        call s_mg_halo_fine_end(bc_type)
+                        call nvtxEndRange
+                        ! x-faces: j = 0 and j = m, full k/l extent
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jj, coeff, c_f, offd, diag, p_new, rho_c, rho_nb]', &
+                                            & firstprivate='[lv, rboff, color]')
+                        do l = 0, p
+                            do k = 0, n
+                                do jj = 0, 1
+                                    j = jj*m
+                                    if (mod(j + k + l + rboff, 2) == color) then
+                                        @:MG_STENCIL(lv, mg_p(lv)%sf)
+                                        p_new = (real(mg_rhs(lv)%sf(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
+                                        mg_p(lv)%sf(j, k, l) = real(p_new, stp)
+                                    end if
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                        if (n > 0) then
+                            ! y-faces: k = 0 and k = n, interior x extent
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jj, coeff, c_f, offd, diag, p_new, rho_c, &
+                                                & rho_nb]', firstprivate='[lv, rboff, color]')
+                            do l = 0, p
+                                do jj = 0, 1
+                                    do j = 1, m - 1
+                                        k = jj*n
+                                        if (mod(j + k + l + rboff, 2) == color) then
+                                            @:MG_STENCIL(lv, mg_p(lv)%sf)
+                                            p_new = (real(mg_rhs(lv)%sf(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
+                                            mg_p(lv)%sf(j, k, l) = real(p_new, stp)
+                                        end if
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
+                        if (p > 0) then
+                            ! z-faces: l = 0 and l = p, interior x/y extent
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jj, coeff, c_f, offd, diag, p_new, rho_c, &
+                                                & rho_nb]', firstprivate='[lv, rboff, color]')
+                            do jj = 0, 1
+                                do k = 1, n - 1
+                                    do j = 1, m - 1
+                                        l = jj*p
+                                        if (mod(j + k + l + rboff, 2) == color) then
+                                            @:MG_STENCIL(lv, mg_p(lv)%sf)
+                                            p_new = (real(mg_rhs(lv)%sf(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
+                                            mg_p(lv)%sf(j, k, l) = real(p_new, stp)
+                                        end if
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
                     else
+                        ! proj_mg_single_halo second color: no exchange, full sweep
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, p_new, rho_c, rho_nb]', &
+                                            & firstprivate='[lv, rboff, color]')
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    if (mod(j + k + l + rboff, 2) == color) then
+                                        @:MG_STENCIL(lv, mg_p(lv)%sf)
+                                        p_new = (real(mg_rhs(lv)%sf(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
+                                        mg_p(lv)%sf(j, k, l) = real(p_new, stp)
+                                    end if
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                end do
+            end do
+        else
+            do sweep = 1, nsweeps
+                do color = 0, 1
+                    if (color == 0 .or. .not. proj_mg_single_halo) then
                         call s_mg_halo_coarse(lv, mg_p(lv))
                     end if
-                end if
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, p_new, rho_c, rho_nb]', &
-                                    & firstprivate='[lv, mml, nnl, ppl, rboff, color]')
-                do l = 0, ppl
-                    do k = 0, nnl
-                        do j = 0, mml
-                            if (mod(j + k + l + rboff, 2) == color) then
-                                @:MG_STENCIL(lv, mg_p(lv)%sf)
-                                p_new = (real(mg_rhs(lv)%sf(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
-                                mg_p(lv)%sf(j, k, l) = real(p_new, stp)
-                            end if
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, p_new, rho_c, rho_nb]', &
+                                        & firstprivate='[lv, mml, nnl, ppl, rboff, color]')
+                    do l = 0, ppl
+                        do k = 0, nnl
+                            do j = 0, mml
+                                if (mod(j + k + l + rboff, 2) == color) then
+                                    @:MG_STENCIL(lv, mg_p(lv)%sf)
+                                    p_new = (real(mg_rhs(lv)%sf(j, k, l), wp) + coeff*offd)/(1._wp + coeff*diag)
+                                    mg_p(lv)%sf(j, k, l) = real(p_new, stp)
+                                end if
+                            end do
                         end do
                     end do
+                    $:END_GPU_PARALLEL_LOOP()
                 end do
-                $:END_GPU_PARALLEL_LOOP()
             end do
-        end do
+        end if
+
+        call nvtxEndRange
 
     end subroutine s_mg_smooth
 
@@ -1400,6 +1687,7 @@ contains
         integer                                                    :: lv, mml, nnl, ppl
         integer                                                    :: i, j, k, l
 
+        call nvtxStartRange("TIMESTEP-PROJECTION-MG-RESIDUAL")
         lv = lv_in
         mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
 
@@ -1422,6 +1710,8 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        call nvtxEndRange
+
     end subroutine s_mg_residual
 
     !> Full-weighting restriction of the level residual into the next level's right-hand side; the coarse correction starts from
@@ -1433,6 +1723,7 @@ contains
         integer             :: lv, mml, nnl, ppl, nchild
         integer             :: j, k, l, jf, kf, lf
 
+        call nvtxStartRange("TIMESTEP-PROJECTION-MG-RESTRICT")
         lv = lv_in
         mml = mg_m(lv + 1); nnl = mg_n(lv + 1); ppl = mg_p_dim(lv + 1)
         nchild = 2**num_dims
@@ -1462,6 +1753,8 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        call nvtxEndRange
+
     end subroutine s_mg_restrict
 
     !> Piecewise-constant prolongation: add each coarse-cell correction to its child cells on the finer level
@@ -1471,6 +1764,7 @@ contains
         integer             :: lv, mml, nnl, ppl
         integer             :: j, k, l, jc, kc, lc
 
+        call nvtxStartRange("TIMESTEP-PROJECTION-MG-PROLONG")
         lv = lv_in
         mml = mg_m(lv); nnl = mg_n(lv); ppl = mg_p_dim(lv)
 
@@ -1486,6 +1780,8 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        call nvtxEndRange
 
     end subroutine s_mg_prolong
 
