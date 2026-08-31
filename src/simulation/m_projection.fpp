@@ -1362,10 +1362,15 @@ contains
 
         do sweep = 1, nsweeps
             do color = 0, 1
-                if (lv == 1) then
-                    call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
-                else
-                    call s_mg_halo_coarse(lv, mg_p(lv))
+                ! Opt-in: exchange only before the first color; the second color
+                ! then reads half-sweep-stale ghosts, halving smoother
+                ! communication at the cost of exact rank-invariance
+                if (color == 0 .or. .not. proj_mg_single_halo) then
+                    if (lv == 1) then
+                        call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+                    else
+                        call s_mg_halo_coarse(lv, mg_p(lv))
+                    end if
                 end if
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, coeff, c_f, offd, diag, p_new, rho_c, rho_nb]', &
                                     & firstprivate='[lv, mml, nnl, ppl, rboff, color]')

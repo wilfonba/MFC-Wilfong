@@ -561,6 +561,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `proj_tol`                 | Real    | Absolute convergence tolerance (max pressure change) for the projection pressure solve (default 1e-8) |
 | `proj_tol_rel`             | Real    | Relative convergence tolerance for the projection pressure solve, as a fraction of the maximum pressure magnitude; overrides `proj_tol` when set |
 | `proj_normalization`       | Logical | Clamp partial densities and volume fractions to physical bounds and renormalize the fractions after each projection predictor (default F) |
+| `proj_mg_single_halo`      | Logical | Multigrid smoother halo exchange once per sweep instead of per red-black color: halves smoother communication; results then depend slightly on the rank decomposition (default F) |
 | `proj_max_iters`           | Integer | Maximum number of iterations for the projection pressure solve (default 100) |
 | `proj_check_iters`         | Integer | Interval, in iterations, between residual checks in the projection pressure solve (default 5) |
 | `proj_cfl_ac`              | Real    | Maximum acoustic CFL cap on the projection time step; unset or non-positive disables the cap |
