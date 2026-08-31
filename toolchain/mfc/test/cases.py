@@ -529,6 +529,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "Red-Black GS", {"proj_iter_solver": 2}))
             cases.append(define_case_d(stack, "Chebyshev", {"proj_iter_solver": 3}))
             cases.append(define_case_d(stack, "Multigrid", {"proj_iter_solver": 4}))
+            cases.append(define_case_d(stack, "Multigrid -> single solve", {"proj_iter_solver": 4, "proj_single_solve": "T"}))
             cases.append(define_case_d(stack, "Jacobi -> 2 MPI Ranks", {"proj_iter_solver": 1}, ppn=2))
             if num_fluids == 2:
                 cases.append(

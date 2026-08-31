@@ -655,6 +655,41 @@ contains
             call nvtxEndRange()
         end if
 
+        ! Single pressure solve: intermediate stages advance advectively with the
+        ! stage-start pressure frozen. Rebuilding the total energy from the EOS
+        ! with that pressure and the blended (star) momenta makes the next
+        ! stage's cons->prim recover it exactly, mirroring the reference's data
+        ! flow where the stage energy is never read back
+        if (proj_single_solve .and. stage < nstage) then
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, ke, gamma_mix, pi_inf_mix, qv_mix, mom_sq, rho_c]')
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        ! The final stage's pressure blend needs the step-start pressure even though this stage skips the solve
+                        if (stage == 1) pres_step0(j, k, l) = pres_stage(j, k, l)
+                        rho_c = 0._wp; gamma_mix = 0._wp; pi_inf_mix = 0._wp; qv_mix = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            rho_c = rho_c + real(q_cons_vf(i)%sf(j, k, l), wp)
+                            qv_mix = qv_mix + real(q_cons_vf(i)%sf(j, k, l), wp)*qvs(i)
+                            gamma_mix = gamma_mix + real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)*gammas(i)
+                            pi_inf_mix = pi_inf_mix + real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)*pi_infs(i)
+                        end do
+                        mom_sq = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_dims
+                            mom_sq = mom_sq + real(q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l), wp)**2
+                        end do
+                        ke = 0.5_wp*mom_sq/max(rho_c, sgm_eps)
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = real(gamma_mix*real(pres_stage(j, k, l), &
+                                  & wp) + pi_inf_mix + qv_mix + ke, stp)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            return
+        end if
+
         ! Star-state ghost cells (density and momentum feed the divergence and the Laplacian face densities)
         call nvtxStartRange("TIMESTEP-PROJECTION-COMM")
         call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
@@ -917,8 +952,8 @@ contains
             end if
         end do
 
-        ! Step-line diagnostic: iterations summed over this step's RK stages
-        if (stage == 1) then
+        ! Step-line diagnostic: iterations summed over this step's RK stages (a single solve per step when proj_single_solve)
+        if (stage == 1 .or. proj_single_solve) then
             proj_iters = min(iter, proj_max_iters)
         else
             proj_iters = proj_iters + min(iter, proj_max_iters)

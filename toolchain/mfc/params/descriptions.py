@@ -209,6 +209,7 @@ DESCRIPTIONS = {
     "proj_method": "Enable semi-implicit pressure projection method",
     "proj_iter_solver": "Projection pressure solver: 1=Jacobi, 2=red-black Gauss-Seidel, 3=Chebyshev-accelerated Jacobi, 4=geometric multigrid",
     "proj_mg_single_halo": "Multigrid smoother halo exchange once per sweep instead of per color: halves smoother communication; results depend slightly on the rank decomposition (default F)",
+    "proj_single_solve": "Solve the projection pressure system only at the final RK stage; intermediate stages advance advectively with the stage-start pressure frozen (default F)",
     "proj_tol": "Projection pressure solve absolute convergence tolerance (max |dp|)",
     "proj_tol_rel": "Projection pressure solve relative convergence tolerance (max |dp| below this fraction of max |p|); overrides proj_tol when set",
     "proj_normalization": "Clamp partial densities and volume fractions and renormalize the fractions after each projection predictor",
