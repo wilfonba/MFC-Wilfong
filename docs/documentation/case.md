@@ -428,6 +428,7 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `x[y,z]_centroid` | Real    | Centre of the cloud region in the [x,y,z]-direction. |
 | `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction for `cloud_geometry = 1`; ignored by `cloud_geometry = 2`. |
 | `num_particles`   | Integer | Number of particles to place in the region. |
+| `void_fraction`   | Real    | Fraction of the region occupied by particles, as an alternative to `num_particles`. |
 | `radius`          | Real    | Radius of every particle in the cloud. |
 | `mass`            | Real    | Mass of every particle in the cloud. |
 | `min_spacing`     | Real    | Minimum surface-to-surface gap between particles (centres are `2*radius + min_spacing` apart). |
@@ -439,13 +440,15 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `seed`            | Integer | Random seed for reproducible placement (used by `packing_method = 1`). |
 | `packing_method`  | Integer | Algorithm used to place the particles. |
 
+- Every cloud specifies its particle count exactly once, either directly through `num_particles` or through `void_fraction`; giving both is rejected during input validation. `void_fraction` is the fraction of the cloud region's area (2D) or volume (3D) taken up by particles, so the count it implies is `void_fraction` times the region measure divided by that of a single particle, rounded to the nearest whole particle. A void fraction the packer cannot reach with the given `radius` and `min_spacing` aborts the run when the bed is placed.
 - `cloud_geometry` selects the cloud region:
   - `1` (box) uses `x[y,z]_centroid` and `length_x[y,z]` to define the region.
   - `2` uses `x[y,z]_centroid`, `shell_inner_radius`, and `shell_outer_radius` to define a half-annulus in 2D and a hemisphere shell in 3D. Particle centres are sampled between `shell_inner_radius + radius` and `shell_outer_radius - radius`, and the flat plane is kept clear by one particle radius. `shell_axis` selects the axis the shell opens toward: the flat face lies at that axis' centroid and the filled region opens toward its positive end. 2D has no z-axis, so `shell_axis = 3` (the default) opens toward positive `y` there, as does `shell_axis = 2`. The full shell extent (`x[y,z]_centroid +/- shell_outer_radius` on the open side, and one particle radius of clearance on the flat-face side) must lie inside the computational domain; a hemisphere shell also requires at least two dimensions (`n > 0`).
 - `packing_method` selects how the `num_particles` are positioned within the cloud region:
-  - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
+  - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible. Its achievable packing fraction is limited; use `packing_method = 3` for dense beds.
   - `2` (lattice) places the particles on the optimally dense lattice for the geometry — a triangular lattice in 2D and a face-centered cubic lattice in 3D. The lattice spacing is derived from the particle density (`num_particles` over the region area/volume); if that spacing is below the required `2*radius + min_spacing`, the region is too dense and the run aborts.
-  - Hemisphere-shell clouds currently support rejection sampling only; `cloud_geometry = 2` with `packing_method = 2` is rejected during input validation.
+  - `3` (relaxation) drops all `num_particles` into the region at random, overlaps included, then relaxes them apart until no pair is closer than `2*radius + min_spacing`. `seed` makes the placement reproducible, as for `packing_method = 1`. Because particles keep moving after they are placed, this reaches far higher packing fractions than rejection sampling — which never moves a particle and so saturates near the random sequential addition limit of roughly 0.38 by volume in 3D and 0.55 by area in 2D — while keeping the bed disordered, unlike the lattice method. A bed too dense to relax never clears and the run aborts.
+  - Hemisphere-shell clouds support rejection sampling and relaxation; `cloud_geometry = 2` with `packing_method = 2` is rejected during input validation.
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 

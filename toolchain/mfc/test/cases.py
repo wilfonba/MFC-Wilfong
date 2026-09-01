@@ -1102,6 +1102,38 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # Relaxation packing at a density rejection packing cannot reach: 30 particles of radius 0.02 fill
+            # 15% of this shell, roughly half again what packing_method 1 saturates at here. Covers the shell
+            # clamp (radial band and flat-face clearance) as well as the relaxation itself.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Relaxation Packing",
+                    {
+                        "ib": "T",
+                        "num_ibs": 0,
+                        "num_particle_clouds": 1,
+                        "fd_order": 2,
+                        "ib_state_wrt": "T",
+                        "n": 49,
+                        "particle_cloud(1)%cloud_geometry": 2,
+                        "particle_cloud(1)%packing_method": 3,
+                        "particle_cloud(1)%x_centroid": 0.5,
+                        "particle_cloud(1)%y_centroid": 0.1,
+                        "particle_cloud(1)%num_particles": 30,
+                        "particle_cloud(1)%radius": 0.02,
+                        "particle_cloud(1)%mass": 1.0,
+                        "particle_cloud(1)%min_spacing": 0.005,
+                        "particle_cloud(1)%shell_inner_radius": 0.1,
+                        "particle_cloud(1)%shell_outer_radius": 0.3,
+                        "particle_cloud(1)%moving_ibm": 0,
+                        "particle_cloud(1)%seed": 12345,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                )
+            )
 
         if len(dimInfo[0]) == 3 and not viscous:
             cases.append(

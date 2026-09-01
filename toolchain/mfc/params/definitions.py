@@ -1016,6 +1016,7 @@ def _load():
         _pb_attrs[f"{_d}_centroid"] = (REAL, _pb_tags)
         _pb_attrs[f"length_{_d}"] = (REAL, _pb_tags)
     _pb_attrs["num_particles"] = (INT, _pb_tags)
+    _pb_attrs["void_fraction"] = (REAL, _pb_tags)
     _pb_attrs["radius"] = (REAL, _pb_tags)
     _pb_attrs["mass"] = (REAL, _pb_tags)
     _pb_attrs["min_spacing"] = (REAL, _pb_tags)

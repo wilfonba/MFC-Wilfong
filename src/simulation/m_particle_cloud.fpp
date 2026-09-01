@@ -53,14 +53,17 @@ contains
         glbl_idx = num_ibs
 
         do cloud_idx = 1, num_particle_clouds
-            ! Dispatch on packing method only: rejection sampling handles both box and hemisphere-shell
-            ! geometries (the per-candidate geometry sampling lives in s_sample_cloud_candidate), while lattice
-            ! packing is box-only - the hemisphere-shell + lattice combination is rejected in case_validator.py.
+            ! Dispatch on packing method only: rejection sampling and relaxation both handle box and
+            ! hemisphere-shell geometries (the per-candidate geometry sampling lives in s_sample_cloud_candidate),
+            ! while lattice packing is box-only - the hemisphere-shell + lattice combination is rejected in
+            ! case_validator.py.
             select case (particle_cloud(cloud_idx)%packing_method)
             case (1)  ! rejection (random) packing method
                 call s_particle_cloud_rejection_pack(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
             case (2)  ! lattice packing method
                 call s_particle_cloud_lattice(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
+            case (3)  ! relaxation (collective rearrangement) packing method
+                call s_particle_cloud_relaxation_pack(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
             case default
                 call s_mpi_abort("Particle cloud packing method is not a known packing method of MFC. Exiting.")
             end select
@@ -363,6 +366,238 @@ contains
         num_cloud_ibs = ib_idx
 
     end subroutine s_particle_cloud_lattice
+
+    !> Places particles by collective rearrangement: n_target centres are dropped into the cloud region at random, overlaps and all,
+    !! and are then relaxed apart until none remain. Rejection packing never moves a particle once placed, so it saturates at the
+    !! random sequential addition limit - roughly 0.38 by volume in 3D and 0.55 by area in 2D, and well below either once the region
+    !! is only a few particles thick. Relaxation reaches random close packing (~0.63 in 3D) instead, and the bed stays disordered,
+    !! unlike the lattice method. Every sweep is a Jacobi step - each overlapping pair contributes a displacement along its line of
+    !! centres, the contributions are summed per particle and applied together - so the result does not depend on the order pairs
+    !! are visited in, and every rank relaxing the same cloud reaches the same bed.
+    subroutine s_particle_cloud_relaxation_pack(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
+
+        integer, intent(in)                                               :: cloud_idx
+        integer, intent(inout)                                            :: glbl_idx
+        type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: cloud_ibs
+        integer, intent(out)                                              :: num_cloud_ibs
+
+        ! A bed too dense to relax never clears, so the sweep cap is what turns that into an abort rather than a hang. The
+        ! tolerance is relative to min_dist; a residual overlap this small is orders of magnitude below any grid spacing the
+        ! particles could be resolved on.
+        integer, parameter  :: max_sweeps = 10000
+        real(wp), parameter :: converged_overlap = 1.e-8_wp
+        ! Jacobi damping: a particle wedged between several neighbours receives one displacement per overlapping pair, and
+        ! applying their sum undamped overshoots and sets the bed ringing instead of settling.
+        real(wp), parameter   :: damping = 0.5_wp
+        integer               :: i, ib_idx, n_target, n_placed, geom, seed, sweep, hash_size, alloc_stat
+        real(wp)              :: min_dist, rx, ry, rz, max_overlap
+        logical               :: reject
+        real(wp), allocatable :: placed(:,:), disp(:,:)
+        integer, allocatable  :: hash_head(:), chain_next(:), last_seen(:)
+
+        n_target = particle_cloud(cloud_idx)%num_particles
+        allocate (cloud_ibs(n_target), stat=alloc_stat)
+        if (alloc_stat /= 0) then
+            call s_mpi_abort("Error :: Ran out of CPU memory trying to allocate particle cloud IB array. " &
+                             & // "Current system resources cannot perform relaxation packing with the specified number of particles.")
+        end if
+        ib_idx = 0
+
+        ! Relax against a hair more than the required separation. A sweep stops with a residual overlap of up to
+        ! converged_overlap of this distance, and the margin is what keeps that residual from eating into the gap the case asked
+        ! for, so a relaxed bed clears 2*radius + min_spacing as strictly as a rejection-packed one does.
+        min_dist = (2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing)*(1._wp + converged_overlap)
+        geom = merge(2, 8, num_dims < 3)  ! circle for 2D, sphere for 3D
+
+        seed = particle_cloud(cloud_idx)%seed
+        if (seed == 0) seed = 1 + cloud_idx*1013904223
+
+        ! Hash table sized as in rejection packing: 4x overprovisioned for a ~25% load factor, minimum 16 buckets.
+        hash_size = max(16, 4*n_target)
+        allocate (placed(3, n_target), disp(3, n_target))
+        allocate (hash_head(hash_size), chain_next(n_target), last_seen(n_target))
+
+        ! Seed the bed by drawing centres from the same sampler rejection packing uses, but keeping every draw: overlaps are what
+        ! the relaxation is for, and starting from a uniform draw is what keeps the final bed disordered.
+        n_placed = 0
+        do while (n_placed < n_target)
+            call s_sample_cloud_candidate(cloud_idx, seed, rx, ry, rz, reject)
+            if (reject) cycle
+            n_placed = n_placed + 1
+            placed(1, n_placed) = rx
+            placed(2, n_placed) = ry
+            placed(3, n_placed) = rz
+        end do
+
+        do sweep = 1, max_sweeps
+            call s_relax_cloud_overlaps(n_target, placed, disp, hash_head, chain_next, last_seen, hash_size, min_dist, damping, &
+                                        & max_overlap)
+            do i = 1, n_target
+                call s_clamp_to_cloud_region(cloud_idx, placed(1, i), placed(2, i), placed(3, i))
+            end do
+            if (max_overlap < converged_overlap*min_dist) exit
+        end do
+
+        if (max_overlap >= converged_overlap*min_dist) then
+            call s_mpi_abort("Error :: Particle cloud is too dense for relaxation packing; " &
+                             & // "reduce num_particles or void_fraction or min_spacing, or enlarge the cloud region")
+        end if
+
+        do i = 1, n_target
+            glbl_idx = glbl_idx + 1
+            call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, placed(1, i), placed(2, i), placed(3, i), cloud_ibs)
+        end do
+
+        deallocate (placed, disp, hash_head, chain_next, last_seen)
+
+        call s_reduce_particle_cloud_ibs(cloud_ibs, ib_idx)
+        num_cloud_ibs = ib_idx
+
+    end subroutine s_particle_cloud_relaxation_pack
+
+    !> One Jacobi relaxation sweep: rebuilds the spatial hash from the particles' current positions, sums the separating
+    !! displacement every overlapping pair asks for, and applies the damped total. Hands back the largest overlap it saw so the
+    !! caller can stop once the bed is clear. Only neighbours with a higher index contribute, which visits each pair exactly once
+    !! and keeps its two halves exactly antisymmetric. last_seen stamps the particles already paired with i this pass: distinct bins
+    !! can hash to one slot, so without it a colliding slot would be walked twice and its particles counted twice.
+    subroutine s_relax_cloud_overlaps(n_target, placed, disp, hash_head, chain_next, last_seen, hash_size, min_dist, damping, &
+                                      & max_overlap)
+
+        integer, intent(in)                     :: n_target, hash_size
+        real(wp), intent(inout), dimension(:,:) :: placed
+        real(wp), intent(out), dimension(:,:)   :: disp
+        integer, intent(out), dimension(:)      :: hash_head, chain_next, last_seen
+        real(wp), intent(in)                    :: min_dist, damping
+        real(wp), intent(out)                   :: max_overlap
+        integer                                 :: i, j, slot, bx, by, bz, dx_b, dy_b, dz_b, dz_lo, dz_hi
+        real(wp)                                :: dx, dy, dz, dist, overlap, push
+        real(wp), dimension(3)                  :: sep_dir
+
+        hash_head = -1
+        chain_next = -1
+        last_seen = 0
+        do i = 1, n_target
+            call s_get_cloud_bin(placed(1, i), placed(2, i), placed(3, i), min_dist, .false., 0._wp, 0._wp, 0._wp, 1, 1, 1, bx, &
+                                 & by, bz)
+            slot = f_bin_hash(bx, by, bz, hash_size)
+            chain_next(i) = hash_head(slot)
+            hash_head(slot) = i
+        end do
+
+        dz_lo = -1
+        dz_hi = 1
+        if (num_dims < 3) then
+            dz_lo = 0
+            dz_hi = 0
+        end if
+
+        disp = 0._wp
+        max_overlap = 0._wp
+
+        do i = 1, n_target
+            call s_get_cloud_bin(placed(1, i), placed(2, i), placed(3, i), min_dist, .false., 0._wp, 0._wp, 0._wp, 1, 1, 1, bx, &
+                                 & by, bz)
+            do dx_b = -1, 1
+                do dy_b = -1, 1
+                    do dz_b = dz_lo, dz_hi
+                        slot = f_bin_hash(bx + dx_b, by + dy_b, bz + dz_b, hash_size)
+                        j = hash_head(slot)
+                        do while (j > 0)
+                            if (j > i .and. last_seen(j) /= i) then
+                                last_seen(j) = i
+                                dx = placed(1, i) - placed(1, j)
+                                dy = placed(2, i) - placed(2, j)
+                                dz = 0._wp
+                                if (num_dims == 3) dz = placed(3, i) - placed(3, j)
+                                dist = sqrt(dx**2 + dy**2 + dz**2)
+                                if (dist < min_dist) then
+                                    overlap = min_dist - dist
+                                    max_overlap = max(max_overlap, overlap)
+                                    ! Coincident centres have no line of centres to separate along; x serves, and the pair still
+                                    ! resolves because i and j take opposite signs.
+                                    if (dist > sqrt(tiny(1._wp))) then
+                                        sep_dir = [dx, dy, dz]/dist
+                                    else
+                                        sep_dir = [1._wp, 0._wp, 0._wp]
+                                    end if
+                                    push = 0.5_wp*overlap
+                                    disp(:,i) = disp(:,i) + push*sep_dir
+                                    disp(:,j) = disp(:,j) - push*sep_dir
+                                end if
+                            end if
+                            j = chain_next(j)
+                        end do
+                    end do
+                end do
+            end do
+        end do
+
+        do i = 1, n_target
+            placed(:,i) = placed(:,i) + damping*disp(:,i)
+        end do
+
+    end subroutine s_relax_cloud_overlaps
+
+    !> Pushes a relaxed particle centre back inside its cloud region. The bounds are the ones s_sample_cloud_candidate draws from,
+    !! so a relaxed bed fills exactly the region a rejection-packed one would: box centres stay within the box, and shell centres
+    !! stay between shell_inner_radius + radius and shell_outer_radius - radius, one particle radius clear of the flat face. The
+    !! shell is clamped in the (axial, transverse) half-plane of its opening axis - the axial component is clamped first and then
+    !! held fixed while the transverse distance is clamped into the annulus band it leaves, so restoring the radius can never undo
+    !! the flat-face clearance.
+    subroutine s_clamp_to_cloud_region(cloud_idx, px, py, pz)
+
+        integer, intent(in)     :: cloud_idx
+        real(wp), intent(inout) :: px, py, pz
+        integer                 :: axis, t1, t2
+        real(wp)                :: r_inner, r_outer, axial, trans, trans_min, trans_max
+        real(wp), dimension(3)  :: pos, centroid, half_length
+
+        centroid = [particle_cloud(cloud_idx)%x_centroid, particle_cloud(cloud_idx)%y_centroid, &
+                                   & particle_cloud(cloud_idx)%z_centroid]
+        pos = [px, py, pz]
+
+        select case (particle_cloud(cloud_idx)%cloud_geometry)
+        case (1)  ! box
+            half_length = 0.5_wp*[particle_cloud(cloud_idx)%length_x, particle_cloud(cloud_idx)%length_y, &
+                                                 & particle_cloud(cloud_idx)%length_z]
+            pos(1:num_dims) = min(max(pos(1:num_dims), centroid(1:num_dims) - half_length(1:num_dims)), &
+                & centroid(1:num_dims) + half_length(1:num_dims))
+        case (2)  ! hemisphere shell
+            r_inner = particle_cloud(cloud_idx)%shell_inner_radius + particle_cloud(cloud_idx)%radius
+            r_outer = particle_cloud(cloud_idx)%shell_outer_radius - particle_cloud(cloud_idx)%radius
+
+            ! The axis the shell opens toward; 2D has no z-axis, so anything other than x opens toward y, matching the sampler.
+            axis = particle_cloud(cloud_idx)%shell_axis
+            if (num_dims < 3) then
+                if (axis /= 1) axis = 2
+                t1 = 3 - axis  ! the other in-plane axis
+                t2 = 3  ! 2D has no z-extent, so this contributes nothing to the transverse distance
+            else
+                t1 = 1 + mod(axis, 3)
+                t2 = 1 + mod(axis + 1, 3)
+            end if
+
+            axial = min(max(pos(axis) - centroid(axis), particle_cloud(cloud_idx)%radius), r_outer)
+            trans = sqrt((pos(t1) - centroid(t1))**2 + (pos(t2) - centroid(t2))**2)
+            trans_max = sqrt(max(0._wp, r_outer**2 - axial**2))
+            trans_min = sqrt(max(0._wp, r_inner**2 - axial**2))
+
+            pos(axis) = centroid(axis) + axial
+            if (trans > sqrt(tiny(1._wp))) then
+                pos(t1) = centroid(t1) + (pos(t1) - centroid(t1))*min(max(trans, trans_min), trans_max)/trans
+                pos(t2) = centroid(t2) + (pos(t2) - centroid(t2))*min(max(trans, trans_min), trans_max)/trans
+            else
+                ! On the axis with an inner radius to clear, there is no transverse direction to scale; t1 serves.
+                pos(t1) = centroid(t1) + trans_min
+                pos(t2) = centroid(t2)
+            end if
+        end select
+
+        px = pos(1)
+        py = pos(2)
+        if (num_dims == 3) pz = pos(3)
+
+    end subroutine s_clamp_to_cloud_region
 
     !> Writes a single placed particle into particle_cloud_ibs at the next free slot, advancing ib_idx. The caller decides whether
     !! this particle belongs in the array (neighborhood membership, for lattice packing, or unconditionally for rejection packing -

@@ -1,6 +1,8 @@
 import pytest
 
+from mfc.case import Case
 from mfc.case_validator import CaseConstraintError, CaseValidator
+from mfc.common import MFCException
 
 
 def _valid_cloud_params():
@@ -81,3 +83,62 @@ def test_hemi_shell_validator_applies_standoff_to_the_open_axis():
     # particle radius of clearance from x_domain%beg, not the full outer radius.
     params = {**_valid_cloud_params(), "particle_cloud(1)%shell_axis": 1, "particle_cloud(1)%x_centroid": -0.95}
     CaseValidator(params).validate("simulation")
+
+
+def test_void_fraction_resolves_to_a_box_particle_count():
+    # A 3D box of 1.0 x 1.0 x 1.0 filled to 20% by spheres of radius 0.1 holds
+    # 0.2 / ((4/3)*pi*0.1**3) = 47.7 -> 48 particles.
+    params = {k: v for k, v in _valid_cloud_params().items() if k != "particle_cloud(1)%num_particles"}
+    params.update(
+        {
+            "particle_cloud(1)%cloud_geometry": 1,
+            "particle_cloud(1)%length_x": 1.0,
+            "particle_cloud(1)%length_y": 1.0,
+            "particle_cloud(1)%length_z": 1.0,
+            "particle_cloud(1)%radius": 0.1,
+            "particle_cloud(1)%void_fraction": 0.2,
+        }
+    )
+    resolved = Case(params).get_parameters()
+    assert resolved["particle_cloud(1)%num_particles"] == 48
+    assert "particle_cloud(1)%void_fraction" not in resolved
+    CaseValidator(resolved).validate("simulation")
+
+
+def test_void_fraction_and_num_particles_together_are_rejected():
+    params = {**_valid_cloud_params(), "particle_cloud(1)%void_fraction": 0.2}
+    with pytest.raises(CaseConstraintError, match="not both"):
+        CaseValidator(Case(params).get_parameters()).validate("simulation")
+
+
+def test_neither_void_fraction_nor_num_particles_is_rejected():
+    params = {k: v for k, v in _valid_cloud_params().items() if k != "particle_cloud(1)%num_particles"}
+    with pytest.raises(CaseConstraintError, match="either num_particles or void_fraction"):
+        CaseValidator(params).validate("simulation")
+
+
+def test_void_fraction_outside_the_unit_interval_is_rejected():
+    params = {k: v for k, v in _valid_cloud_params().items() if k != "particle_cloud(1)%num_particles"}
+    params["particle_cloud(1)%void_fraction"] = 1.4
+    with pytest.raises(MFCException, match="must be between 0 and 1"):
+        Case(params)
+
+
+def test_void_fraction_uses_the_shell_volume_for_hemisphere_clouds():
+    # The 3D shell holds (2/3)*pi*(0.3**3 - 0.1**3) = 0.05445; filling 5% of it with spheres of
+    # radius 0.04 (volume 2.681e-4) takes 10.2 -> 10 particles.
+    params = {k: v for k, v in _valid_cloud_params().items() if k != "particle_cloud(1)%num_particles"}
+    params["particle_cloud(1)%void_fraction"] = 0.05
+    assert Case(params).get_parameters()["particle_cloud(1)%num_particles"] == 10
+
+
+def test_validator_accepts_relaxation_packing_on_a_shell():
+    # Relaxation handles both cloud geometries, unlike lattice packing.
+    params = {**_valid_cloud_params(), "particle_cloud(1)%packing_method": 3}
+    CaseValidator(params).validate("simulation")
+
+
+def test_validator_rejects_unknown_packing_method():
+    params = {**_valid_cloud_params(), "particle_cloud(1)%packing_method": 4}
+    with pytest.raises(CaseConstraintError, match="packing_method must be 1"):
+        CaseValidator(params).validate("simulation")

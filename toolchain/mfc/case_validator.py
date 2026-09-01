@@ -708,17 +708,18 @@ class CaseValidator:
             )
             self.prohibit(
                 packing_method is None,
-                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice)",
+                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice, 3 = relaxation)",
             )
             self.prohibit(
-                packing_method is not None and packing_method not in [1, 2],
-                f"particle_cloud({i})%packing_method must be 1 (rejection sampling) or 2 (lattice)",
+                packing_method is not None and packing_method not in [1, 2, 3],
+                f"particle_cloud({i})%packing_method must be 1 (rejection sampling), 2 (lattice), or 3 (relaxation)",
             )
             shell_outer_radius = self.get(f"particle_cloud({i})%shell_outer_radius", None)
             shell_inner_radius = self.get(f"particle_cloud({i})%shell_inner_radius", None)
             radius = self.get(f"particle_cloud({i})%radius", None)
             mass = self.get(f"particle_cloud({i})%mass", None)
             num_particles = self.get(f"particle_cloud({i})%num_particles", None)
+            void_fraction = self.get(f"particle_cloud({i})%void_fraction", None)
             periodic = self.get(f"particle_cloud({i})%periodic", 0)
             length_x = self.get(f"particle_cloud({i})%length_x", None)
             length_y = self.get(f"particle_cloud({i})%length_y", None)
@@ -750,13 +751,23 @@ class CaseValidator:
                 f"particle_cloud({i})%periodic requires positive box lengths in each active dimension",
             )
 
-            # radius, mass, and num_particles are required and positive for every cloud, independent of
+            # radius, mass, and a particle count are required and positive for every cloud, independent of
             # geometry. An unset radius reaches the sampler as dflt_real, which makes min_dist negative and
-            # corrupts both the spatial-hash bin index and the overlap test; an unset mass/num_particles is
-            # meaningless. The Fortran sampler cannot re-check these cheaply, so they belong here.
+            # corrupts both the spatial-hash bin index and the overlap test; an unset mass is meaningless. The
+            # count comes from num_particles or from void_fraction, which the case loader has already resolved
+            # into num_particles by here - seeing both means the case gave both. The Fortran sampler cannot
+            # re-check these cheaply, so they belong here.
             self.prohibit(
-                num_particles is None or (self._is_numeric(num_particles) and num_particles <= 0),
-                f"particle_cloud({i})%num_particles must be specified and > 0",
+                num_particles is None and void_fraction is None,
+                f"particle_cloud({i}) must specify either num_particles or void_fraction",
+            )
+            self.prohibit(
+                num_particles is not None and void_fraction is not None,
+                f"particle_cloud({i}) must specify num_particles or void_fraction, not both",
+            )
+            self.prohibit(
+                num_particles is not None and self._is_numeric(num_particles) and num_particles <= 0,
+                f"particle_cloud({i})%num_particles must be > 0",
             )
             self.prohibit(
                 radius is None or (self._is_numeric(radius) and radius <= 0),

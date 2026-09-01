@@ -19,6 +19,51 @@ def _suggest_similar_params(unknown_key: str, valid_keys: list, n: int = 3) -> l
     return difflib.get_close_matches(unknown_key, valid_keys, n=n, cutoff=0.6)
 
 
+def _cloud_region_measure(params: dict, i: int, num_dims: int) -> float:
+    """Area (2D) or volume (3D) of particle cloud i's region."""
+    if params.get(f"particle_cloud({i})%cloud_geometry", 1) == 2:
+        r_inner = float(params[f"particle_cloud({i})%shell_inner_radius"])
+        r_outer = float(params[f"particle_cloud({i})%shell_outer_radius"])
+        if num_dims < 3:
+            return 0.5 * math.pi * (r_outer**2 - r_inner**2)
+        return (2.0 / 3.0) * math.pi * (r_outer**3 - r_inner**3)
+
+    lengths = ["length_x", "length_y"] + (["length_z"] if num_dims == 3 else [])
+    return math.prod(float(params[f"particle_cloud({i})%{key}"]) for key in lengths)
+
+
+def _resolve_particle_cloud_counts(params: dict) -> None:
+    """Turn each ``particle_cloud(j)%void_fraction`` into a concrete ``num_particles``.
+
+    A cloud is specified either by how many particles it holds or by the fraction of its region
+    they occupy; the two are interchangeable once the region and particle sizes are known, so the
+    count is resolved here and every consumer downstream — validation, both namelists, restart —
+    only ever sees ``num_particles``. A cloud that already carries ``num_particles`` is left
+    untouched, void fraction included, so that case_validator can reject giving both.
+    """
+    from .params import REGISTRY
+
+    num_dims = 1 + min(1, int(params.get("n", 0))) + min(1, int(params.get("p", 0)))
+
+    for i in range(1, REGISTRY.families["particle_cloud"].max_index + 1):
+        key = f"particle_cloud({i})%void_fraction"
+        if key not in params or f"particle_cloud({i})%num_particles" in params:
+            continue
+
+        void_fraction = float(params.pop(key))
+        if not 0 < void_fraction < 1:
+            raise common.MFCException(f"{key} must be between 0 and 1, got {void_fraction}.")
+
+        try:
+            region = _cloud_region_measure(params, i, num_dims)
+            radius = float(params[f"particle_cloud({i})%radius"])
+        except KeyError as e:
+            raise common.MFCException(f"{key} needs particle_cloud({i})%{e.args[0].split('%')[-1]} to size the cloud.") from e
+
+        particle = math.pi * radius**2 if num_dims < 3 else (4.0 / 3.0) * math.pi * radius**3
+        params[f"particle_cloud({i})%num_particles"] = max(1, round(void_fraction * region / particle))
+
+
 QPVF_IDX_VARS = {
     "alpha_rho": "eqn_idx%cont%beg",
     "vel": "eqn_idx%mom%beg",
@@ -44,6 +89,7 @@ class Case:
         self.params = copy.deepcopy(params)
         for key, val in self.params.items():
             self.params[key] = self.__normalize_named_value(key, val)
+        _resolve_particle_cloud_counts(self.params)
 
     @staticmethod
     def __normalize_named_value(key: str, val):
