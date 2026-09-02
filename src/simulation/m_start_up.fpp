@@ -572,7 +572,8 @@ contains
         real(wp)                :: eta_sec
         real(wp)                :: dt_floor
         character(len=8)        :: lim_str   !< Time-step limiter tag, e.g. ' (ICFL)'
-        character(len=28)       :: acfl_str  !< Acoustic CFL and solve-iteration columns (projection method)
+        character(len=96)       :: acfl_str  !< Acoustic CFL, iteration and state-health columns (projection method)
+        character(len=48)       :: col_str   !< Scratch for building one column at a time
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
@@ -614,13 +615,22 @@ contains
                 eta_ss = mod(int(eta_sec), 60)
                 lim_str = ''
                 if (cfl_adap_dt) lim_str = ' (' // dt_limiter // ')'
+                ! Built through a separate buffer: an internal write may not read the
+                ! variable it is writing to, and the columns together outrun a short one
                 acfl_str = ''
-                if (proj_method .and. proj_acfl >= 0._wp) write (acfl_str, '(A, F7.2, A, I0)') ' ACFL ', min(proj_acfl, &
-                    & 9999.99_wp), ' itr ', proj_iters
-                if (proj_method .and. proj_nclamp > 0) write (acfl_str, '(A, A, I0)') trim(acfl_str), ' clamp ', proj_nclamp
+                if (proj_method .and. proj_acfl >= 0._wp) then
+                    write (col_str, '(A, F7.2, A, I0)') ' ACFL ', min(proj_acfl, 9999.99_wp), ' itr ', proj_iters
+                    acfl_str = trim(acfl_str) // trim(col_str)
+                end if
+                if (proj_method .and. proj_nclamp > 0) then
+                    write (col_str, '(A, I0)') ' clamp ', proj_nclamp
+                    acfl_str = trim(acfl_str) // trim(col_str)
+                end if
                 ! State-health columns are verbose diagnostics, so they follow run_time_info
-                if (proj_method .and. run_time_info .and. proj_rho_max > 0._wp) write (acfl_str, &
-                    & '(A, A, ES9.2, A, ES9.2)') trim(acfl_str), ' rhomx ', proj_rho_max, ' almn ', proj_alf_min
+                if (proj_method .and. run_time_info .and. proj_rho_max > 0._wp) then
+                    write (col_str, '(A, ES9.2, A, ES9.2)') ' rhomx ', proj_rho_max, ' almn ', proj_alf_min
+                    acfl_str = trim(acfl_str) // trim(col_str)
+                end if
                 print '(" [", I3, "%] t = ", ES11.4, " dt = ", ES11.4, A, A, " @ step ", I0, " t/step ", ES9.2, "s (avg ", ES9.2, "s) ETA ", I0, ":", I2.2, ":", I2.2)', &
                     & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, trim(lim_str), trim(acfl_str), t_step, wall_time, &
                     & wall_time_avg, eta_hh, eta_mm, eta_ss
