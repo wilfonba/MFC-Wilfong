@@ -15,8 +15,10 @@ module m_sim_helpers
     implicit none
 
     private; public :: s_compute_enthalpy, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names, &
-        & proj_acfl, proj_iters, proj_rho_max, proj_alf_min
+        & proj_acfl, proj_iters, proj_nclamp, proj_rho_max, proj_alf_min
 
+    !> Cells whose solved pressure hit the positivity floor last step, worst rank (projection method)
+    integer :: proj_nclamp = 0
     !> State health reported in the step line: density maximum and smallest volume fraction
     real(wp) :: proj_rho_max = -1._wp
     real(wp) :: proj_alf_min = 1._wp

@@ -617,6 +617,7 @@ contains
                 acfl_str = ''
                 if (proj_method .and. proj_acfl >= 0._wp) write (acfl_str, '(A, F7.2, A, I0)') ' ACFL ', min(proj_acfl, &
                     & 9999.99_wp), ' itr ', proj_iters
+                if (proj_method .and. proj_nclamp > 0) write (acfl_str, '(A, A, I0)') trim(acfl_str), ' clamp ', proj_nclamp
                 ! State-health columns are verbose diagnostics, so they follow run_time_info
                 if (proj_method .and. run_time_info .and. proj_rho_max > 0._wp) write (acfl_str, &
                     & '(A, A, ES9.2, A, ES9.2)') trim(acfl_str), ' rhomx ', proj_rho_max, ' almn ', proj_alf_min

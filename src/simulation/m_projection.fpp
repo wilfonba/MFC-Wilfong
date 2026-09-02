@@ -126,7 +126,7 @@ module m_projection
     use m_body_forces, only: s_compute_acceleration
     use m_surface_tension, only: s_compute_capillary_source_flux
     use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, Res_gs
-    use m_sim_helpers, only: proj_iters
+    use m_sim_helpers, only: proj_iters, proj_nclamp
 
     implicit none
 
@@ -635,6 +635,7 @@ contains
         real(wp) :: dpds, ke, gamma_mix, pi_inf_mix, qv_mix, mom_sq
         real(wp) :: zv, dv, mu_loc, mu_glb, sigma_ch, rho_ch, rho_prev, alpha_ch, beta_ch
         real(wp) :: tol_eff, pmax_loc, pmax_glb
+        real(wp) :: pinf_min, nclamp_loc, nclamp_glb
         integer :: i, j, k, l, iter, color
 
         ! Post-blend clamp and renormalization of the star state (matches the
@@ -644,7 +645,7 @@ contains
 
         if (proj_normalization) then
             call nvtxStartRange("TIMESTEP-PROJECTION-NORMALIZE")
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, a_sum]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, a_sum, pinf_min]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -652,8 +653,8 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
                             q_cons_vf(i)%sf(j, k, l) = max(q_cons_vf(i)%sf(j, k, l), real(sgm_eps, stp))
-                            q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l) = max(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), &
-                                      & real(sgm_eps, stp))
+                            q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l) = min(max(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, &
+                                      & l), real(sgm_eps, stp)), 1._stp)
                             a_sum = a_sum + real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
                         end do
                         $:GPU_LOOP(parallelism='[seq]')
@@ -661,6 +662,16 @@ contains
                             q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l) = real(real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, &
                                       & k, l), wp)/max(a_sum, sgm_eps), stp)
                         end do
+
+                        ! p + pi_inf must stay positive for every fluid present, so
+                        ! floor the stage pressure at the least stiff fluid's limit
+                        ! before it feeds the Wood mixture stiffness and the blend
+                        pinf_min = huge(1._wp)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            pinf_min = min(pinf_min, pi_infs(i)/(gammas(i) + 1._wp))
+                        end do
+                        pres_stage(j, k, l) = real(max(real(pres_stage(j, k, l), wp), -pinf_min*(1._wp - sgm_eps)), stp)
                     end do
                 end do
             end do
@@ -970,6 +981,46 @@ contains
             proj_iters = min(iter, proj_max_iters)
         else
             proj_iters = proj_iters + min(iter, proj_max_iters)
+        end if
+
+        ! Positivity of the solved pressure. The correction below turns p into the
+        ! stored total energy, so a cell left with p + pi_inf < 0 comes back from
+        ! the next cons->prim with an imaginary sound speed, which reaches the
+        ! time-step reduction as a garbage dt rather than as a located error. Floor
+        ! it and count the cells: a nonzero count means the solution is already
+        ! unphysical there, so the count is a diagnostic, not a cure
+        if (proj_normalization) then
+            call nvtxStartRange("TIMESTEP-PROJECTION-CLAMP")
+            nclamp_loc = 0._wp
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, pinf_min]', reduction='[[nclamp_loc]]', reductionOp='[+]')
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        pinf_min = huge(1._wp)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            pinf_min = min(pinf_min, pi_infs(i)/(gammas(i) + 1._wp))
+                        end do
+                        pinf_min = -pinf_min*(1._wp - sgm_eps)
+                        if (real(pres_proj(j, k, l), wp) < pinf_min) then
+                            pres_proj(j, k, l) = real(pinf_min, stp)
+                            nclamp_loc = nclamp_loc + 1._wp
+                        end if
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            call s_mpi_allreduce_max(nclamp_loc, nclamp_glb)
+            if (stage == 1 .or. proj_single_solve) then
+                proj_nclamp = int(nclamp_glb)
+            else
+                proj_nclamp = proj_nclamp + int(nclamp_glb)
+            end if
+            call nvtxEndRange
+            ! the correction reads ghost pressures, so refresh them after clamping
+            call nvtxStartRange("TIMESTEP-PROJECTION-COMM")
+            call s_populate_F_igr_buffers(bc_type, pres_proj_sf)
+            call nvtxEndRange
         end if
 
         ! Momentum correction with the face-averaged new pressure gradient,
