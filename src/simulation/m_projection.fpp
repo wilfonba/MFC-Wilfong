@@ -165,9 +165,6 @@ module m_projection
     !! solve is needed. Level 1 is the fine grid; mg_p(1) is unused (the fine solution lives in pres_proj with the standard halo
     !! machinery)
     !> @{
-    !> Volume fraction below which a phase is treated as absent, so its density is not reconstructed as alpha_rho/alpha (two
-    !! vanishing numbers)
-    real(wp), parameter                           :: alpha_ratio_min = 1.e-8_wp
     integer, parameter                            :: mg_max_levels = 12
     integer, parameter                            :: mg_nu_pre = 2  !< pre-smoothing sweeps
     integer, parameter                            :: mg_nu_post = 2  !< post-smoothing sweeps

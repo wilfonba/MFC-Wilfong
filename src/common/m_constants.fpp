@@ -7,13 +7,15 @@ module m_constants
 
     use m_precision_select
 
-    character, parameter :: dflt_char = ' '             !< Default string value
-    real(wp), parameter  :: dflt_real = -1.e6_wp        !< Default real value
-    real(wp), parameter  :: sgm_eps = 1.e-16_wp         !< Segmentation tolerance
-    real(wp), parameter  :: Chem_Tolerance = 1.e-16_wp  !< Speed of Sound Tolerance in Chemistry
-    real(wp), parameter  :: small_alf = 1.e-11_wp       !< Small alf tolerance
-    real(wp), parameter  :: pi = 3.141592653589793_wp   !< Pi
-    real(wp), parameter  :: verysmall = 1.e-12_wp       !< Very small number
+    character, parameter :: dflt_char = ' '       !< Default string value
+    real(wp), parameter  :: dflt_real = -1.e6_wp  !< Default real value
+    real(wp), parameter  :: sgm_eps = 1.e-16_wp   !< Segmentation tolerance
+    !> Volume fraction below which a phase is absent, so alpha_rho/alpha is two vanishing numbers rather than that phase's density
+    real(wp), parameter :: alpha_ratio_min = 1.e-8_wp
+    real(wp), parameter :: Chem_Tolerance = 1.e-16_wp  !< Speed of Sound Tolerance in Chemistry
+    real(wp), parameter :: small_alf = 1.e-11_wp       !< Small alf tolerance
+    real(wp), parameter :: pi = 3.141592653589793_wp   !< Pi
+    real(wp), parameter :: verysmall = 1.e-12_wp       !< Very small number
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
     integer, parameter  :: num_stcls_min = 5        !< Minimum # of stencils
