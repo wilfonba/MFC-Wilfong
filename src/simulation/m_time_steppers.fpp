@@ -730,19 +730,20 @@ contains
                     ! from any cell's partial densities), not the local mixture rho
                     rho_cap = rho
                     if (surface_tension) then
-                        ! Sum only over phases actually present: an absent phase has
-                        ! alpha_rho and alpha both vanishing, and clamping the
-                        ! denominator turns their ratio into a spurious density that
-                        ! drives the capillary time step to nonsense
                         rho_cap = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
                         do fl = 1, num_fluids
-                            if (real(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, l), wp) > alpha_ratio_min) then
-                                rho_cap = rho_cap + real(q_prim_vf(fl)%sf(j, k, l), &
-                                                         & wp)/min(real(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, l), wp), 1._wp)
-                            end if
+                            rho_cap = rho_cap + real(q_prim_vf(fl)%sf(j, k, l), &
+                                                     & wp)/min(max(real(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, l), wp), &
+                                                     & sgm_eps), 1._wp)
                         end do
-                        if (rho_cap <= 0._wp) rho_cap = rho
+                        ! Every phase density is at least its own volume-weighted
+                        ! share, so the sum cannot fall below the mixture density.
+                        ! Flooring there rules out a spurious capillary limit from
+                        ! partial densities and volume fractions gone inconsistent,
+                        ! without discarding a trace phase whose ratio is still its
+                        ! true density
+                        rho_cap = max(rho_cap, rho)
                     end if
 
                     if (proj_on) then
