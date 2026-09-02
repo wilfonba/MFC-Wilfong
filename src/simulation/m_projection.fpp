@@ -165,6 +165,9 @@ module m_projection
     !! solve is needed. Level 1 is the fine grid; mg_p(1) is unused (the fine solution lives in pres_proj with the standard halo
     !! machinery)
     !> @{
+    !> Volume fraction below which a phase is treated as absent, so its density is not reconstructed as alpha_rho/alpha (two
+    !! vanishing numbers)
+    real(wp), parameter                           :: alpha_ratio_min = 1.e-8_wp
     integer, parameter                            :: mg_max_levels = 12
     integer, parameter                            :: mg_nu_pre = 2  !< pre-smoothing sweeps
     integer, parameter                            :: mg_nu_post = 2  !< post-smoothing sweeps
@@ -418,8 +421,18 @@ contains
                                         ar_c = real(q_prim_vf(i)%sf(${SF(' + 1')}$), wp)
                                         a_c = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(${SF(' + 1')}$), wp)
                                     end if
-                                    ! Clamp so out-of-bounds cell alphas near sharpened interfaces cannot blow up the density ratio
-                                    flux_vf(i)%sf(${SF('')}$) = real(max(ar_c, 0._wp)/min(max(a_c, sgm_eps), 1._wp)*a_flux, stp)
+                                    ! The ratio is the upwind cell's phase density, which keeps the
+                                    ! partial-density flux consistent with the volume-fraction flux
+                                    ! where the phase is resolved. Where it is not, alpha_rho and alpha
+                                    ! both vanish and their ratio is meaningless: clamping only the
+                                    ! denominator turns a vanishing phase into an unbounded density and
+                                    ! injects it into the neighbour, so upwind the partial density
+                                    ! directly there instead
+                                    if (a_c > alpha_ratio_min) then
+                                        flux_vf(i)%sf(${SF('')}$) = real(max(ar_c, 0._wp)/min(a_c, 1._wp)*a_flux, stp)
+                                    else
+                                        flux_vf(i)%sf(${SF('')}$) = real(max(ar_c, 0._wp)*face_vel, stp)
+                                    end if
                                 else
                                     flux_vf(i)%sf(${SF('')}$) = real(F_mass, stp)
                                 end if
