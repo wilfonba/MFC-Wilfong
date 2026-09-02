@@ -32,10 +32,12 @@ module m_time_steppers
 
     implicit none
 
-    type(vector_field), allocatable, dimension(:)    :: q_cons_ts  !< Cell-average conservative variables at each time-stage (TS)
-    type(scalar_field), allocatable, dimension(:)    :: q_prim_vf  !< Cell-average primitive variables at the current time-stage
-    type(scalar_field), allocatable, dimension(:)    :: rhs_vf     !< Cell-average RHS variables at the current time-stage
-    type(integer_field), allocatable, dimension(:,:) :: bc_type    !< Boundary condition identifiers
+    type(vector_field), allocatable, dimension(:) :: q_cons_ts  !< Cell-average conservative variables at each time-stage (TS)
+    type(scalar_field), allocatable, dimension(:) :: q_prim_vf  !< Cell-average primitive variables at the current time-stage
+    real(wp) :: rho_ref = -1._wp  !< density maximum on the first adaptive step, the onset-watch reference
+    logical :: rho_warned = .false.  !< the divergence warning is reported once
+    type(scalar_field), allocatable, dimension(:) :: rhs_vf  !< Cell-average RHS variables at the current time-stage
+    type(integer_field), allocatable, dimension(:,:) :: bc_type  !< Boundary condition identifiers
     !> Cell-average primitive variables at consecutive TIMESTEPS
     type(vector_field), allocatable, dimension(:) :: q_prim_ts1, q_prim_ts2
     real(wp), allocatable, dimension(:,:,:,:,:)   :: rhs_pb
@@ -662,25 +664,27 @@ contains
             real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
         #:endif
-        real(wp)               :: vel_sum            !< Cell-avg. velocity sum
-        real(wp)               :: pres               !< Cell-avg. pressure
-        real(wp)               :: gamma              !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf             !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv                 !< Cell-avg. fluid reference energy
-        real(wp)               :: c                  !< Cell-avg. sound speed
-        real(wp)               :: H                  !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
-        real(wp), dimension(3) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary)
-        real(wp)               :: rho_cap            !< Phase-density sum for the capillary criterion
-        real(wp), dimension(3) :: max_dt_ac          !< Acoustic-CFL cell dt candidates (projection method)
+        real(wp)               :: vel_sum                 !< Cell-avg. velocity sum
+        real(wp)               :: pres                    !< Cell-avg. pressure
+        real(wp)               :: gamma                   !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf                  !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv                      !< Cell-avg. fluid reference energy
+        real(wp)               :: c                       !< Cell-avg. sound speed
+        real(wp)               :: H                       !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re                      !< Cell-avg. Reynolds numbers
+        real(wp), dimension(3) :: max_dt                  !< Cell dt candidates (inviscid, viscous, capillary)
+        real(wp)               :: rho_cap                 !< Phase-density sum for the capillary criterion
+        real(wp), dimension(3) :: max_dt_ac               !< Acoustic-CFL cell dt candidates (projection method)
         real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, coll_dt_local
-        real(wp)               :: acfl_dt_local      !< Acoustic inviscid dt candidate (projection method)
-        real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, collision cap, acoustic)
-        real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, collision cap, acoustic)
+        real(wp)               :: acfl_dt_local           !< Acoustic inviscid dt candidate (projection method)
+        real(wp)               :: rho_mx_loc, rho_mx_glb  !< density maximum, watched for the onset of a blow-up
+        real(wp)               :: alf_mn_loc              !< smallest volume fraction, reported with it
+        real(wp), dimension(5) :: dt_candidates_loc       !< Rank-local dt candidates (ICFL, VCFL, CCFL, collision cap, acoustic)
+        real(wp), dimension(5) :: dt_candidates_glb       !< Global dt candidates (ICFL, VCFL, CCFL, collision cap, acoustic)
         real(wp)               :: dt_prev
         logical                :: proj_on
-        integer                :: j, k, l            !< Generic loop iterators
-        integer                :: fl                 !< Fluid loop iterator
+        integer                :: j, k, l                 !< Generic loop iterators
+        integer                :: fl                      !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -693,9 +697,11 @@ contains
         ccfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         acfl_dt_local = huge(1.0_wp)
+        rho_mx_loc = 0._wp
+        alf_mn_loc = huge(1._wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt, &
                             & max_dt_ac, rho_cap]', firstprivate='[proj_on]', reduction='[[icfl_dt_local, vcfl_dt_local, &
-                            & ccfl_dt_local, acfl_dt_local]]', reductionOp='[min]')
+                            & ccfl_dt_local, acfl_dt_local, alf_mn_loc]], [[rho_mx_loc]]', reductionOp='[min, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -746,6 +752,11 @@ contains
                         call s_compute_dt_from_cfl(vel, c, max_dt, rho, rho_cap, Re, j, k, l)
                     end if
 
+                    rho_mx_loc = max(rho_mx_loc, rho)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do fl = 1, num_fluids
+                        alf_mn_loc = min(alf_mn_loc, real(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, l), wp))
+                    end do
                     icfl_dt_local = min(icfl_dt_local, max_dt(1))
                     vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
                     ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
@@ -799,9 +810,97 @@ contains
         ! Acoustic CFL of the chosen step, reported in the step output
         if (proj_on) proj_acfl = cfl_target*dt/max(dt_candidates_glb(5), sgm_eps)
 
+        ! Onset watch: the density maximum is bounded by the heaviest phase, so a
+        ! large excursion is the first visible sign of a blow-up and appears well
+        ! before the time step reacts to it. Report the step it first leaves the band
+        call s_mpi_allreduce_max(rho_mx_loc, rho_mx_glb)
+        call s_mpi_allreduce_min(alf_mn_loc, proj_alf_min)
+        proj_rho_max = rho_mx_glb
+        if (rho_ref <= 0._wp) rho_ref = rho_mx_glb
+        if (rho_mx_glb > 10._wp*rho_ref .and. .not. rho_warned) then
+            rho_warned = .true.
+            if (proc_rank == 0) print *, 'WARNING: density maximum', rho_mx_glb, 'exceeds 10x its initial value', rho_ref, &
+                & '- solution is diverging'
+        end if
+
+        ! A runaway time step is the symptom of a state that has already gone
+        ! bad somewhere. Every rank sees the same reduced candidates, so the test
+        ! is collective-safe, and the report only runs on the failing step
+        if (.not. (dt > 0._wp) .or. (dt_prev > 0._wp .and. dt < 1.e-2_wp*dt_prev)) then
+            call s_report_dt_failure(dt_candidates_glb)
+        end if
+
         $:GPU_UPDATE(device='[dt]')
 
     end subroutine s_compute_dt
+
+    !> Report what produced a runaway adaptive time step: which criterion set it, and the global extrema of the state behind it. The
+    !! phase-density ratios alpha_rho_k/alpha_k are included because they must equal the pure-phase densities in every cell, so a
+    !! spread in them localises a partial density and volume fraction that have gone mutually inconsistent
+    impure subroutine s_report_dt_failure(cands)
+
+        real(wp), dimension(5), intent(in) :: cands
+        real(wp)                           :: rho_mn, rho_mx, arho_mn, alf_mn, prs_mn, prs_mx, vmx, phs_mn, phs_mx
+        real(wp)                           :: rl, pl, vl, al, ar, ph
+        real(wp)                           :: g1, g2, g3, g4, g5, g6, g7, g8, g9
+        integer                            :: i, j, k, l
+
+        rho_mn = huge(1._wp); rho_mx = -huge(1._wp); arho_mn = huge(1._wp)
+        alf_mn = huge(1._wp); prs_mn = huge(1._wp); prs_mx = -huge(1._wp)
+        vmx = 0._wp; phs_mn = huge(1._wp); phs_mx = -huge(1._wp)
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rl, pl, vl, al, ar, ph]', reduction='[[rho_mn, arho_mn, alf_mn, &
+                            & prs_mn, phs_mn], [rho_mx, prs_mx, vmx, phs_mx]]', reductionOp='[min, max]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rl = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        ar = real(q_prim_vf(i)%sf(j, k, l), wp)
+                        al = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
+                        ph = ar/max(al, sgm_eps)
+                        rl = rl + ar
+                        arho_mn = min(arho_mn, ar)
+                        alf_mn = min(alf_mn, al)
+                        phs_mn = min(phs_mn, ph)
+                        phs_mx = max(phs_mx, ph)
+                    end do
+                    rho_mn = min(rho_mn, rl); rho_mx = max(rho_mx, rl)
+
+                    pl = real(q_prim_vf(eqn_idx%E)%sf(j, k, l), wp)
+                    prs_mn = min(prs_mn, pl); prs_mx = max(prs_mx, pl)
+
+                    vl = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_vels
+                        vl = vl + real(q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l), wp)**2
+                    end do
+                    vmx = max(vmx, sqrt(vl))
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call s_mpi_allreduce_min(rho_mn, g1); call s_mpi_allreduce_max(rho_mx, g2)
+        call s_mpi_allreduce_min(arho_mn, g3); call s_mpi_allreduce_min(alf_mn, g4)
+        call s_mpi_allreduce_min(prs_mn, g5); call s_mpi_allreduce_max(prs_mx, g6)
+        call s_mpi_allreduce_max(vmx, g7)
+        call s_mpi_allreduce_min(phs_mn, g8); call s_mpi_allreduce_max(phs_mx, g9)
+
+        if (proc_rank == 0) then
+            print *, 'Runaway time step. Criterion candidates (s):'
+            print *, '  ICFL', cands(1), ' VCFL', cands(2), ' CCFL', cands(3)
+            print *, '  COLL', cands(4), ' ACFL', cands(5)
+            print *, 'Global state extrema:'
+            print *, '  rho      min', g1, ' max', g2
+            print *, '  alpha_rho min', g3, '  alpha min', g4
+            print *, '  pressure min', g5, ' max', g6
+            print *, '  |vel|    max', g7
+            print *, '  alpha_rho_k/alpha_k  min', g8, ' max', g9
+        end if
+
+    end subroutine s_report_dt_failure
 
     !> Apply the body forces source term at each Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
