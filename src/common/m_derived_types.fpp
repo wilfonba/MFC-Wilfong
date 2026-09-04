@@ -371,6 +371,7 @@ module m_derived_types
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Center of the particle bed region
         real(wp) :: length_x, length_y, length_z  !< Dimensions of the particle bed region
         integer  :: num_particles  !< Number of particles to generate
+        real(wp) :: void_fraction  !< Fraction of the cloud region filled by particles; the case loader resolves it into num_particles
         real(wp) :: radius  !< Particle radius
         real(wp) :: mass  !< Particle mass
         real(wp) :: min_spacing  !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)

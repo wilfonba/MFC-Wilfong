@@ -227,6 +227,7 @@ contains
             particle_cloud(i)%length_y = dflt_real
             particle_cloud(i)%length_z = dflt_real
             particle_cloud(i)%num_particles = 0
+            particle_cloud(i)%void_fraction = dflt_real
             particle_cloud(i)%radius = dflt_real
             particle_cloud(i)%mass = dflt_real
             particle_cloud(i)%min_spacing = 0._wp

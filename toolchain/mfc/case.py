@@ -38,8 +38,12 @@ def _resolve_particle_cloud_counts(params: dict) -> None:
     A cloud is specified either by how many particles it holds or by the fraction of its region
     they occupy; the two are interchangeable once the region and particle sizes are known, so the
     count is resolved here and every consumer downstream — validation, both namelists, restart —
-    only ever sees ``num_particles``. A cloud that already carries ``num_particles`` is left
-    untouched, void fraction included, so that case_validator can reject giving both.
+    reads ``num_particles``. The void fraction is left in place and forwarded to the namelist too,
+    where it records what was asked for: Fortran carries the member precisely so that a value
+    reaching the namelist can never abort a run.
+
+    Giving both is rejected here rather than in case_validator, because resolution has to run
+    before validation and would otherwise have already made the two indistinguishable.
     """
     from .params import REGISTRY
 
@@ -47,10 +51,12 @@ def _resolve_particle_cloud_counts(params: dict) -> None:
 
     for i in range(1, REGISTRY.families["particle_cloud"].max_index + 1):
         key = f"particle_cloud({i})%void_fraction"
-        if key not in params or f"particle_cloud({i})%num_particles" in params:
+        if key not in params:
             continue
+        if f"particle_cloud({i})%num_particles" in params:
+            raise common.MFCException(f"particle_cloud({i}) must specify num_particles or void_fraction, not both.")
 
-        void_fraction = float(params.pop(key))
+        void_fraction = float(params[key])
         if not 0 < void_fraction < 1:
             raise common.MFCException(f"{key} must be between 0 and 1, got {void_fraction}.")
 

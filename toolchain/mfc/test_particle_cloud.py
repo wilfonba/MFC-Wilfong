@@ -101,14 +101,16 @@ def test_void_fraction_resolves_to_a_box_particle_count():
     )
     resolved = Case(params).get_parameters()
     assert resolved["particle_cloud(1)%num_particles"] == 48
-    assert "particle_cloud(1)%void_fraction" not in resolved
+    # The void fraction rides along into the namelist as a record of what was asked for; Fortran carries the
+    # member so that a value reaching simulation.inp can never abort the run.
+    assert resolved["particle_cloud(1)%void_fraction"] == 0.2
     CaseValidator(resolved).validate("simulation")
 
 
 def test_void_fraction_and_num_particles_together_are_rejected():
     params = {**_valid_cloud_params(), "particle_cloud(1)%void_fraction": 0.2}
-    with pytest.raises(CaseConstraintError, match="not both"):
-        CaseValidator(Case(params).get_parameters()).validate("simulation")
+    with pytest.raises(MFCException, match="not both"):
+        Case(params)
 
 
 def test_neither_void_fraction_nor_num_particles_is_rejected():
@@ -142,3 +144,14 @@ def test_validator_rejects_unknown_packing_method():
     params = {**_valid_cloud_params(), "particle_cloud(1)%packing_method": 4}
     with pytest.raises(CaseConstraintError, match="packing_method must be 1"):
         CaseValidator(params).validate("simulation")
+
+
+def test_void_fraction_reaches_the_simulation_namelist():
+    # A registered parameter that never reaches the namelist is a trap: Fortran aborts on an unrecognized
+    # namelist name ("Invalid line in simulation.inp"), so a resolver slip would kill the run rather than
+    # degrade. Both the void fraction and the count it resolved to must be forwarded.
+    params = {k: v for k, v in _valid_cloud_params().items() if k != "particle_cloud(1)%num_particles"}
+    params["particle_cloud(1)%void_fraction"] = 0.05
+    inp = Case(params).get_inp("simulation")
+    assert "particle_cloud(1)%void_fraction = 0.05" in inp
+    assert "particle_cloud(1)%num_particles = 10" in inp

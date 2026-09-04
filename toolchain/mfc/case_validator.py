@@ -755,15 +755,11 @@ class CaseValidator:
             # geometry. An unset radius reaches the sampler as dflt_real, which makes min_dist negative and
             # corrupts both the spatial-hash bin index and the overlap test; an unset mass is meaningless. The
             # count comes from num_particles or from void_fraction, which the case loader has already resolved
-            # into num_particles by here - seeing both means the case gave both. The Fortran sampler cannot
-            # re-check these cheaply, so they belong here.
+            # into num_particles by here (and rejects specifying both). The Fortran sampler cannot re-check
+            # these cheaply, so they belong here.
             self.prohibit(
                 num_particles is None and void_fraction is None,
                 f"particle_cloud({i}) must specify either num_particles or void_fraction",
-            )
-            self.prohibit(
-                num_particles is not None and void_fraction is not None,
-                f"particle_cloud({i}) must specify num_particles or void_fraction, not both",
             )
             self.prohibit(
                 num_particles is not None and self._is_numeric(num_particles) and num_particles <= 0,
