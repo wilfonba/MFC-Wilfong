@@ -550,6 +550,7 @@ module m_derived_types
         integer                    :: drag_model  !< Particle drag model
         logical                    :: pressure_force  !< Include pressure force translational motion
         logical                    :: gravity_force  !< Include gravity force in translational motion
+        logical                    :: added_mass_force  !< Include added mass force in translational motion
         logical                    :: kahan_summation  !< Use Kahan summation for void fraction accumulation (improves precision)
         character(LEN=pathlen_max) :: input_path  !< Path to lag_bubbles.dat
         real(wp)                   :: epsilonb  !< Standard deviation scaling for the gaussian function

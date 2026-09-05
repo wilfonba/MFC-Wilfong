@@ -600,6 +600,7 @@ contains
         lag_params%drag_model = dflt_int
         lag_params%pressure_force = .true.
         lag_params%gravity_force = .false.
+        lag_params%added_mass_force = .false.
         lag_params%kahan_summation = .true.
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real

@@ -149,7 +149,10 @@ PHYSICS_DOCS = {
     "check_bubbles_lagrange": {
         "title": "Euler-Lagrange Bubble Model",
         "category": "Bubble Physics",
-        "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. Kahan summation not compatible with --mixed precision.",
+        "explanation": (
+            "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. Kahan summation not compatible "
+            "with --mixed precision. added_mass_force requires vel_model = 2 and pressure_force = T."
+        ),
     },
     "check_reactive_burn": {
         "title": "Condensed-Phase Reactive Burn",
@@ -1629,6 +1632,8 @@ class CaseValidator:
         thermal = self.get("thermal")
         vel_model = self.get("lag_params%vel_model", 0)
         drag_model = self.get("lag_params%drag_model", 0)
+        pressure_force = self.get("lag_params%pressure_force", "T") == "T"
+        added_mass_force = self.get("lag_params%added_mass_force", "F") == "T"
         charNz = self.get("lag_params%charNz", 0)
         charWidth = self.get("lag_params%charwidth", 0)
         fd_order = self.get("fd_order", 0)
@@ -1641,7 +1646,8 @@ class CaseValidator:
         self.prohibit(thermal is not None and thermal != 3, "bubbles_lagrange requires thermal = 3")
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1, "cluster_type >= 2 requires smooth_type = 1")
         self.prohibit(vel_model < 0 or vel_model > 2, "lag_params%vel_model must be 0, 1, or 2")
-        self.prohibit(drag_model < 0 or drag_model > 3, "lag_params%drag_model must be 0, 1, 2, or 3")
+        self.prohibit(drag_model < 0 or drag_model > 4, "lag_params%drag_model must be 0, 1, 2, 3, or 4")
+        self.prohibit(added_mass_force and (vel_model != 2 or not pressure_force), "lag_params%added_mass_force requires lag_params%vel_model = 2 and lag_params%pressure_force = T")
         self.prohibit(charNz <= 0 and p == 0, "lag_params%charNz must be positive for 2D bubbles_lagrange")
         self.prohibit(charWidth <= 0 and p == 0, "lag_params%charwidth must be positive for 2D bubbles_lagrange")
         self.prohibit(fd_order == 0 and vel_model > 0, "Non-zero lag_params%vel_model requires fd_order to be set")

@@ -434,9 +434,8 @@ contains
                             end do
                         case (2)
                             do l = 1, num_dims
-                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_g, fmass_v, fRe, fRho, cell, l, &
-                                                             & q_prim_vf)
-                                aTemp(l) = f_bTemp/(fmass_g + fmass_v)
+                                f_bTemp = f_get_bubble_force(fPos, fR, fV, fVel, fmass_g, fmass_v, fRe, fRho, cell, l, q_prim_vf)
+                                aTemp(l) = f_bTemp/f_get_bubble_mass(fR, fmass_g, fmass_v, fRho)
                             end do
                             do l = 1, num_dims
                                 fVel(l) = fVel(l) + h*aTemp(l)

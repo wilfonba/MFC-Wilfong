@@ -634,6 +634,8 @@ contains
     end function f_interpolate_velocity
 
     !! Calculate the force on a bubble based on the pressure gradient, velocity, and drag model.
+    !! @param pos Bubble position
+    !! @param vel Bubble velocity
     !! @param mg Mass of the gas in the bubble
     !! @param mv Mass of the liquid in the bubble
     !! @param Re Reynolds number
@@ -641,27 +643,37 @@ contains
     function f_get_bubble_force(pos, rad, rdot, vel, mg, mv, Re, rho, cell, i, q_prim_vf) result(force)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in)                                :: pos, rad, rdot, mg, mv, Re, rho, vel
+        real(wp), dimension(3), intent(in)                  :: pos, vel
+        real(wp), intent(in)                                :: rad, rdot, mg, mv, Re, rho
         integer, dimension(3), intent(in)                   :: cell
         integer, intent(in)                                 :: i
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        real(wp)                                            :: dp, vol, force
-        real(wp)                                            :: v_rel
+        real(wp)                                            :: dp, vol, force, Re_b
+        real(wp), dimension(3)                              :: v_rel
+        integer                                             :: l
 
-        if (fd_order > 1) then
-            v_rel = vel - f_interpolate_velocity(pos, cell, i, q_prim_vf)
-        else
-            v_rel = vel - q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(cell(1), cell(2), cell(3))
-        end if
+        v_rel = 0._wp
+        do l = 1, num_dims
+            if (fd_order > 1) then
+                v_rel(l) = vel(l) - f_interpolate_velocity(pos(l), cell, l, q_prim_vf)
+            else
+                v_rel(l) = vel(l) - q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(cell(1), cell(2), cell(3))
+            end if
+        end do
 
         force = 0._wp
 
         if (lag_params%drag_model == 1) then  ! Free slip Stokes drag
-            force = force - (4._wp*pi*rad*v_rel)/Re
+            force = force - (4._wp*pi*rad*v_rel(i))/Re
         else if (lag_params%drag_model == 2) then  ! No slip Stokes drag
-            force = force - (6._wp*pi*rad*v_rel)/Re
+            force = force - (6._wp*pi*rad*v_rel(i))/Re
         else if (lag_params%drag_model == 3) then  ! Levich drag
-            force = force - (12._wp*pi*rad*v_rel)/Re
+            force = force - (12._wp*pi*rad*v_rel(i))/Re
+        else if (lag_params%drag_model == 4) then  ! Mei, Klausner & Lawrence (1994) finite-Re clean bubble
+            ! Free slip drag times C_D Re_b/16 = 1 + [8/Re_b + (1 + 3.315/sqrt(Re_b))/2]^-1 with bubble Reynolds
+            ! number Re_b = 2 rad |v_rel| rho Re; recovers free slip as Re_b -> 0 and Levich as Re_b -> infinity
+            Re_b = 2._wp*rad*rho*Re*sqrt(v_rel(1)**2._wp + v_rel(2)**2._wp + v_rel(3)**2._wp)
+            force = force - (4._wp*pi*rad*v_rel(i)/Re)*(1._wp + Re_b/(8._wp + 0.5_wp*Re_b + 1.6575_wp*sqrt(Re_b)))
         end if
 
         if (lag_pressure_force) then
@@ -676,6 +688,10 @@ contains
 
             vol = (4._wp/3._wp)*pi*(rad**3._wp)
             force = force - vol*dp
+
+            ! Added mass (rho vol/2) Du/Dt with the carrier acceleration Du/Dt = -grad(p)/rho + accel_bf from its
+            ! inviscid momentum balance; the -(rho vol/2) dv/dt part is carried by f_get_bubble_mass
+            if (lag_params%added_mass_force) force = force + 0.5_wp*vol*(rho*accel_bf(i) - dp)
         end if
 
         if (lag_params%gravity_force) then
@@ -683,5 +699,17 @@ contains
         end if
 
     end function f_get_bubble_force
+
+    !! Translational inertia of a bubble: gas and vapor mass plus, with added_mass_force, the liquid added mass rho vol/2
+    function f_get_bubble_mass(rad, mg, mv, rho) result(mass)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: rad, mg, mv, rho
+        real(wp)             :: mass
+
+        mass = mg + mv
+        if (lag_params%added_mass_force) mass = mass + 0.5_wp*rho*(4._wp/3._wp)*pi*(rad**3._wp)
+
+    end function f_get_bubble_mass
 
 end module m_bubbles_EL_kernels

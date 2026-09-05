@@ -529,14 +529,15 @@ Bubbles may also translate through the carrier flow. Let \f$\mathbf{x}_b\f$ be t
   \f[\frac{d\mathbf{x}_b}{dt} = \mathbf{u}_l(\mathbf{x}_b).\f]
 
 - **Newton's second law (`vel_model = 2`)** integrates the bubble momentum:
-  \f[m_b\,\frac{d\mathbf{u}_b}{dt} = \mathbf{F}_D + \mathbf{F}_p + \mathbf{F}_g, \qquad \frac{d\mathbf{x}_b}{dt} = \mathbf{u}_b,\f]
+  \f[m_b\,\frac{d\mathbf{u}_b}{dt} = \mathbf{F}_D + \mathbf{F}_p + \mathbf{F}_g + \mathbf{F}_A, \qquad \frac{d\mathbf{x}_b}{dt} = \mathbf{u}_b,\f]
   with bubble mass \f$m_b\f$ and forces acting on the slip velocity \f$\mathbf{u}_\text{rel} = \mathbf{u}_b - \mathbf{u}_l\f$:
 
 | Force | `case.py` control | Non-dimensional form |
 |---|---|---|
-| Drag \f$\mathbf{F}_D\f$ | `drag_model` | \f$-\,c_D\,\pi\,a\,\mathbf{u}_\text{rel} / \text{Re}\f$, with \f$c_D = 4\f$ free-slip (\cite Hadamard1911; \cite Rybczynski1911), \f$c_D = 6\f$ no-slip Stokes (\cite Stokes1851), \f$c_D = 12\f$ Levich (\cite Levich1962) |
+| Drag \f$\mathbf{F}_D\f$ | `drag_model` | \f$-\,c_D\,\pi\,a\,\mathbf{u}_\text{rel} / \text{Re}\f$, with \f$c_D = 4\f$ free-slip (\cite Hadamard1911; \cite Rybczynski1911), \f$c_D = 6\f$ no-slip Stokes (\cite Stokes1851), \f$c_D = 12\f$ Levich (\cite Levich1962), \f$c_D = 4\left[1 + \left(8/Re_b + \frac{1}{2}(1 + 3.315\,Re_b^{-1/2})\right)^{-1}\right]\f$ finite-\f$Re_b\f$ clean bubble (\cite Mei1994) with \f$Re_b = 2 a \rho |\mathbf{u}_\text{rel}| \text{Re}\f$ |
 | Pressure \f$\mathbf{F}_p\f$ | `pressure_force` | \f$-V_b\,\nabla p\f$, with bubble volume \f$V_b = \frac{4}{3}\pi a^3\f$ |
 | Gravity \f$\mathbf{F}_g\f$ | `gravity_force` | \f$m_b\,\mathbf{g}\f$, with \f$\mathbf{g}\f$ the body-force acceleration |
+| Added mass \f$\mathbf{F}_A\f$ | `added_mass_force` | \f$\frac{1}{2}\rho V_b\left(D\mathbf{u}_l/Dt - d\mathbf{u}_b/dt\right)\f$, with \f$D\mathbf{u}_l/Dt = -\nabla p/\rho + \mathbf{g}\f$ from the inviscid carrier momentum balance (\cite Auton1988); the \f$d\mathbf{u}_b/dt\f$ part is absorbed into the bubble inertia |
 
 Here \f$\text{Re}\f$ is the mixture Reynolds number — the same `fluid_pp%%Re(1)` that scales the viscous stress tensor (@ref sec-two-viscosities) — so the drag scales with the liquid viscosity. The three drag models increase in magnitude free-slip \f$<\f$ no-slip \f$<\f$ Levich; see \cite Magnaudet2000 for a review of these bubble-drag regimes.
 

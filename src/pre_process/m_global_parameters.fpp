@@ -219,6 +219,7 @@ contains
         lag_params%write_void_evol = .false.
         lag_params%pressure_force = .false.
         lag_params%gravity_force = .false.
+        lag_params%added_mass_force = .false.
         lag_params%nBubs_glb = dflt_int
         lag_params%vel_model = dflt_int
         lag_params%drag_model = dflt_int

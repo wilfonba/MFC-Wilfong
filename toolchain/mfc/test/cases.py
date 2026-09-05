@@ -2028,6 +2028,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             cases.append(define_case_d(stack, "", {}))
                             stack.pop()
                             stack.pop()
+                        if adap_dt == "F":
+                            stack.push("drag_model=4", {"lag_params%drag_model": 4, "fd_order": 2})
+                            stack.push("added_mass_force=T", {"lag_params%added_mass_force": "T"})
+                            cases.append(define_case_d(stack, "", {}))
+                            stack.pop()
+                            stack.pop()
                         stack.pop()
 
                     if len(dimInfo[0]) == 2 and couplingMethod == 1:

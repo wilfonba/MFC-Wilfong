@@ -514,6 +514,7 @@ PATTERNS = [
     (r"lag_params%drag_model", "Drag model for translational motion"),
     (r"lag_params%pressure_force", "Enable pressure force for Newton's 2nd law force model"),
     (r"lag_params%gravity_force", "Enable gravity force for Newton's 2nd law force model"),
+    (r"lag_params%added_mass_force", "Enable added mass force for Newton's 2nd law force model"),
     (r"lag_params%input_path", "Path to input file for Lagrangian bubbles"),
     (r"lag_params%kahan_summation", "Use Kahan summation for void fraction accumulation"),
     (r"lag_params%(\w+)", "Lagrangian tracking parameter: {0}"),

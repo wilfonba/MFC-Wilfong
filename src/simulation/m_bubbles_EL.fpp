@@ -697,9 +697,8 @@ contains
                             mtn_vel(k, l, 1) = mtn_dposdt(k, l, stage)
                         case (2)
                             mtn_dposdt(k, l, stage) = myVel(l)
-                            f_b = f_get_bubble_force(myPos(l), myR, myV, myVel(l), myMass_n, myMass_v, Re(1), myRho, cell, l, &
-                                                     & q_prim_vf)
-                            mtn_dveldt(k, l, stage) = f_b/(myMass_n + myMass_v)
+                            f_b = f_get_bubble_force(myPos, myR, myV, myVel, myMass_n, myMass_v, Re(1), myRho, cell, l, q_prim_vf)
+                            mtn_dveldt(k, l, stage) = f_b/f_get_bubble_mass(myR, myMass_n, myMass_v, myRho)
                         case default
                             mtn_dposdt(k, l, stage) = 0._wp
                             mtn_dveldt(k, l, stage) = 0._wp
