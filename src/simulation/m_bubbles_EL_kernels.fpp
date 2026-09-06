@@ -689,9 +689,17 @@ contains
             vol = (4._wp/3._wp)*pi*(rad**3._wp)
             force = force - vol*dp
 
-            ! Added mass (rho vol/2) Du/Dt with the carrier acceleration Du/Dt = -grad(p)/rho + accel_bf from its
-            ! inviscid momentum balance; the -(rho vol/2) dv/dt part is carried by f_get_bubble_mass
-            if (lag_params%added_mass_force) force = force + 0.5_wp*vol*(rho*accel_bf(i) - dp)
+            ! Added mass in momentum form for a bubble of changing volume (Magnaudet & Eames 2000):
+            !   F_A = -(rho/2) d/dt[vol (v - u)] + (rho vol/2) Du/Dt
+            !       = -(rho vol/2) dv/dt + (rho vol/2) Du/Dt - (rho/2) (d vol/dt) (v - u)
+            ! The -(rho vol/2) dv/dt part is carried by f_get_bubble_mass; the carrier acceleration
+            ! Du/Dt = -grad(p)/rho + accel_bf comes from its inviscid momentum balance; the volume-change term
+            ! uses d vol/dt = 4 pi rad^2 rdot. Without it a radially oscillating bubble whose slip velocity lags
+            ! the drive feels a spurious mean force (rho/2)<d vol/dt v_rel> over each cycle.
+            if (lag_params%added_mass_force) then
+                force = force + 0.5_wp*vol*(rho*accel_bf(i) - dp)
+                force = force - 0.5_wp*rho*(4._wp*pi*(rad**2._wp)*rdot)*v_rel(i)
+            end if
         end if
 
         if (lag_params%gravity_force) then

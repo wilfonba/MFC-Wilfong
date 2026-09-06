@@ -1,24 +1,24 @@
-This file was created on 2026-09-05 15:38:40.923046.
+This file was created on 2026-09-06 14:37:47.274324.
 
 mfc.sh:
 
-    Invocation: test --generate --only 1C8473B4 -j 1
+    Invocation: test --only 1C8473B4 --generate -j 1
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        22c2aae599cb129af1ce7af2dbd7aef6a3c9de0e on ELSims (dirty)
+    Git:        2c5608d9c1aa32ff0f56b7f134f92128c87e4256 on ELSims (dirty)
 
-syscheck:
+post_process:
 
     CMake Configuration:
     
         CMake v3.31.3 on Bens-MacBook-Air-6.local
     
-        C       : AppleClang v17.0.0.17000604 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -40,18 +40,18 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
         CMake v3.31.3 on Bens-MacBook-Air-6.local
     
-        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        C       : AppleClang v17.0.0.17000604 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -108,7 +108,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
@@ -117,10 +117,10 @@ pre_process:
         C       : AppleClang v17.0.0.17000604 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
