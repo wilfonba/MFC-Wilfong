@@ -662,7 +662,9 @@ contains
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (any(time_stepper == (/time_stepper_rk1, time_stepper_rk2, time_stepper_rk3/))) then
-            if (jfnk) then
+            if (stagger) then
+                call s_stagger_time_step(t_step, time_avg)
+            else if (jfnk) then
                 call s_jfnk_time_step(t_step, time_avg)
             else
                 call s_tvd_rk(t_step, time_avg, time_stepper)
@@ -1000,6 +1002,7 @@ contains
         if (stagger .and. run_time_info) then
             call s_staggered_self_test()
             call s_staggered_scalar_test()
+            call s_staggered_freestream_test()
         end if
 
     end subroutine s_initialize_modules

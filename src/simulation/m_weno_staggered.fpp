@@ -17,7 +17,8 @@
 !!
 !! Stencil reach: the left state at face j needs cells j-2 .. j+2 and the right state
 !! needs cells j-1 .. j+3, so faces -1 .. m require cells -3 .. m+3. That is why the
-!! staggered arrays carry three ghost layers.
+!! staggered arrays carry three ghost layers, and why the loop stops at face m: one
+!! further would read cell m+4, a single slot past the end.
 !> @brief WENO reconstruction of cell scalars onto staggered faces
 module m_weno_staggered
 
@@ -53,7 +54,7 @@ contains
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
                 do l = -1, p + 1
                     do k = -1, n + 1
-                        do j = -1, m + 1
+                        do j = -1, m
                             qfl(j, k, l) = f_weno5(qc(${M2}$), qc(${M1}$), qc(j, k, l), qc(${P1}$), qc(${P2}$))
                             qfr(j, k, l) = f_weno5(qc(${P3}$), qc(${P2}$), qc(${P1}$), qc(j, k, l), qc(${M1}$))
                         end do
