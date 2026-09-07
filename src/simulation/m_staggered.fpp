@@ -51,8 +51,8 @@ contains
     !! until the data files have been read
     impure subroutine s_initialize_staggered_module
 
-        @:ALLOCATE(uf(-2:m + 1, -2:n + 1, -2:p + 1, 1:num_dims))
-        @:ALLOCATE(rf(-2:m + 1, -2:n + 1, -2:p + 1, 1:num_dims))
+        @:ALLOCATE(uf(-3:m + 3, -3:n + 3, -3:p + 3, 1:num_dims))
+        @:ALLOCATE(rf(-3:m + 3, -3:n + 3, -3:p + 3, 1:num_dims))
 
     end subroutine s_initialize_staggered_module
 
@@ -60,8 +60,8 @@ contains
     !! control volume, where the average is what keeps the momentum sum telescoping
     subroutine s_cell_to_face(qc, qfd, d)
 
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1), intent(in)  :: qc
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1), intent(out) :: qfd
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3), intent(in)  :: qc
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3), intent(out) :: qfd
         integer, intent(in)                                          :: d
         integer                                                      :: j, k, l
 
@@ -84,8 +84,8 @@ contains
     !> Average the two faces bounding a cell back to the cell centre
     subroutine s_face_to_cell(qfd, qc, d)
 
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1), intent(in)  :: qfd
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1), intent(out) :: qc
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3), intent(in)  :: qfd
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3), intent(out) :: qc
         integer, intent(in)                                          :: d
         integer                                                      :: j, k, l
 
@@ -109,8 +109,8 @@ contains
     !! no odd-even decoupling to inherit
     subroutine s_face_divergence(ufin, dvg)
 
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1,1:num_dims), intent(in) :: ufin
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1), intent(out)           :: dvg
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3,1:num_dims), intent(in) :: ufin
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3), intent(out)           :: dvg
         integer                                                                :: j, k, l
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
@@ -135,8 +135,8 @@ contains
     !! adjoint of s_face_divergence
     subroutine s_cell_gradient(qc, gfd, d)
 
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1), intent(in)  :: qc
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1), intent(out) :: gfd
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3), intent(in)  :: qc
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3), intent(out) :: gfd
         integer, intent(in)                                          :: d
         integer                                                      :: j, k, l
 
@@ -161,8 +161,8 @@ contains
     !! the projection method's Helmholtz solve at high acoustic CFL where the harmonic one held to machine precision
     subroutine s_face_density(rhoc, rfd, d)
 
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1), intent(in)  :: rhoc
-        real(wp), dimension(-2:m + 1,-2:n + 1,-2:p + 1), intent(out) :: rfd
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3), intent(in)  :: rhoc
+        real(wp), dimension(-3:m + 3,-3:n + 3,-3:p + 3), intent(out) :: rfd
         integer, intent(in)                                          :: d
         integer                                                      :: j, k, l
 
@@ -206,10 +206,10 @@ contains
         real(wp)                                  :: lhs, rhs, vc, vfa, adj, lapmax, chkmin, expect, sc, qx, qy, qz
         integer                                   :: j, k, l, d
 
-        allocate (pc(-2:m + 1,-2:n + 1,-2:p + 1), lap(-2:m + 1,-2:n + 1,-2:p + 1))
-        allocate (chk(-2:m + 1,-2:n + 1,-2:p + 1))
-        allocate (gf(-2:m + 1,-2:n + 1,-2:p + 1,1:num_dims))
-        allocate (vf(-2:m + 1,-2:n + 1,-2:p + 1,1:num_dims))
+        allocate (pc(-3:m + 3,-3:n + 3,-3:p + 3), lap(-3:m + 3,-3:n + 3,-3:p + 3))
+        allocate (chk(-3:m + 3,-3:n + 3,-3:p + 3))
+        allocate (gf(-3:m + 3,-3:n + 3,-3:p + 3,1:num_dims))
+        allocate (vf(-3:m + 3,-3:n + 3,-3:p + 3,1:num_dims))
 
         ! Two unrelated fields with content down to the grid scale, so the identity is tested on something demanding rather than on
         ! a mode the operators happen to like. Both are exactly periodic in the index, which is what makes the summation by parts
@@ -218,9 +218,9 @@ contains
         qx = 2._wp*pi/real(m + 1, wp)
         qy = 2._wp*pi/real(n + 1, wp)
         qz = 2._wp*pi/real(p + 1, wp)
-        do l = -2, p + 1
-            do k = -2, n + 1
-                do j = -2, m + 1
+        do l = -3, p + 3
+            do k = -3, n + 3
+                do j = -3, m + 3
                     pc(j, k, l) = sin(3._wp*qx*j) + 0.3_wp*cos(7._wp*qx*j)
                     if (num_dims > 1) pc(j, k, l) = pc(j, k, l) + 0.7_wp*sin(2._wp*qy*k)
                     if (num_dims > 2) pc(j, k, l) = pc(j, k, l) + 0.5_wp*sin(qz*l)

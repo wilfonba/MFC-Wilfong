@@ -26,6 +26,7 @@ module m_start_up
     use m_data_output
     use m_jfnk
     use m_staggered
+    use m_rhs_staggered
     use m_time_steppers
     use m_qbmm
     use m_derived_variables
@@ -878,7 +879,10 @@ contains
 
         if (proj_method) call s_initialize_projection_module()
         if (jfnk) call s_initialize_jfnk_module()
-        if (stagger) call s_initialize_staggered_module()
+        if (stagger) then
+            call s_initialize_staggered_module()
+            call s_initialize_rhs_staggered_module()
+        end if
 
         if (surface_tension) call s_initialize_surface_tension_module()
 
@@ -993,7 +997,10 @@ contains
         if (hypoelasticity) call s_initialize_hypoelastic_module()
 
         ! Runs here rather than beside the allocation, because it reads dx/dy/dz
-        if (stagger .and. run_time_info) call s_staggered_self_test()
+        if (stagger .and. run_time_info) then
+            call s_staggered_self_test()
+            call s_staggered_scalar_test()
+        end if
 
     end subroutine s_initialize_modules
 
@@ -1155,7 +1162,10 @@ contains
         call s_finalize_data_output_module()
         if (proj_method) call s_finalize_projection_module()
         if (jfnk) call s_finalize_jfnk_module()
-        if (stagger) call s_finalize_staggered_module()
+        if (stagger) then
+            call s_finalize_staggered_module()
+            call s_finalize_rhs_staggered_module()
+        end if
         call s_finalize_rhs_module()
         if (igr) then
             call s_finalize_igr_module()
