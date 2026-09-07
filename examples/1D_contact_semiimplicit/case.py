@@ -3,14 +3,18 @@
 1D air/water contact discontinuity with the semi-implicit projection method.
 
 An exact-solution test for the projection method at a high density ratio with
-NO body force and NO surface tension, so that the density ratio is the only
-stressor.  A water slab sits in air at uniform pressure and uniform velocity;
-both phases are inviscid and nothing drives the flow, so the exact solution is
-that the initial profile translates at the imposed velocity forever, unchanged.
+no surface tension and no viscosity, so that few things stress it at once.  A
+water slab sits in air at uniform pressure and uniform velocity; both phases
+are inviscid, so the exact solution is that the initial profile translates
+unchanged, at a velocity that is constant unless a body force is requested.
 
   --velocity 0    stationary contact: an exact steady state, nothing may move
   --velocity U    the profile advects at U and must return to itself after
                   L/U of physical time (the domain is periodic)
+  --accel A       adds a spatially uniform body force, which accelerates both
+                  phases equally and so leaves the exact solution intact; with
+                  --osc-ratio and --osc-freq it oscillates, driving the velocity
+                  back through zero every half cycle
 
 Any drift in the phase densities, the pressure or the velocity is therefore
 error, and its size is the metric -- there is no judgement call about what the
@@ -39,6 +43,24 @@ parser.add_argument(
     "--explicit",
     action="store_true",
     help="run the explicit solver instead, as a control",
+)
+parser.add_argument(
+    "--accel",
+    type=float,
+    default=0.0,
+    help="background body-force acceleration [m/s^2]; 0 => no body force (default: %(default)s)",
+)
+parser.add_argument(
+    "--osc-ratio",
+    type=float,
+    default=0.0,
+    help="oscillatory acceleration amplitude as a multiple of --accel (default: %(default)s)",
+)
+parser.add_argument(
+    "--osc-freq",
+    type=float,
+    default=0.0,
+    help="angular frequency of the oscillatory acceleration [rad/s] (default: %(default)s)",
 )
 args, _ = parser.parse_known_args()
 
@@ -128,6 +150,24 @@ case = {
     "fluid_pp(2)%gamma": 1.0 / (gamma_a - 1.0),
     "fluid_pp(2)%pi_inf": gamma_a * p_inf_a / (gamma_a - 1.0),
 }
+
+if args.accel != 0.0:
+    # A body force that is uniform in space accelerates both phases equally, so
+    # in a periodic domain it drives no relative motion: the exact solution is
+    # still an unchanged density profile at uniform pressure, now translating at
+    # u(t) = u0 + a0*t - (k/w)*(cos(w*t) - 1).  The case therefore keeps its
+    # exact solution while adding the one ingredient the quiescent and
+    # uniformly-advecting settings lack, namely acceleration -- and with
+    # --osc-ratio the velocity is driven back through zero every half cycle
+    case.update(
+        {
+            "bf_x": "T",
+            "g_x": args.accel,
+            "k_x": args.accel * args.osc_ratio,
+            "w_x": args.osc_freq,
+            "p_x": 0.0,
+        }
+    )
 
 if not args.explicit:
     case.update(

@@ -23,7 +23,7 @@
     do i = 1, num_fluids
         rho_nb = rho_nb + real(q_cons_vf(i)%sf(j - 1, k, l), wp)
     end do
-    c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(dx(j - 1) + dx(j))*dx(j))
+    c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(dx(j - 1) + dx(j))*dx(j))
     offd = offd + c_f*real(${pfield}$ (j - 1, k, l), wp)
     diag = diag + c_f
     rho_nb = 0._wp
@@ -31,7 +31,7 @@
     do i = 1, num_fluids
         rho_nb = rho_nb + real(q_cons_vf(i)%sf(j + 1, k, l), wp)
     end do
-    c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(dx(j) + dx(j + 1))*dx(j))
+    c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(dx(j) + dx(j + 1))*dx(j))
     offd = offd + c_f*real(${pfield}$ (j + 1, k, l), wp)
     diag = diag + c_f
     if (num_dims > 1) then
@@ -40,7 +40,7 @@
         do i = 1, num_fluids
             rho_nb = rho_nb + real(q_cons_vf(i)%sf(j, k - 1, l), wp)
         end do
-        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(dy(k - 1) + dy(k))*dy(k))
+        c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(dy(k - 1) + dy(k))*dy(k))
         offd = offd + c_f*real(${pfield}$ (j, k - 1, l), wp)
         diag = diag + c_f
         rho_nb = 0._wp
@@ -48,7 +48,7 @@
         do i = 1, num_fluids
             rho_nb = rho_nb + real(q_cons_vf(i)%sf(j, k + 1, l), wp)
         end do
-        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(dy(k) + dy(k + 1))*dy(k))
+        c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(dy(k) + dy(k + 1))*dy(k))
         offd = offd + c_f*real(${pfield}$ (j, k + 1, l), wp)
         diag = diag + c_f
     end if
@@ -58,7 +58,7 @@
         do i = 1, num_fluids
             rho_nb = rho_nb + real(q_cons_vf(i)%sf(j, k, l - 1), wp)
         end do
-        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(dz(l - 1) + dz(l))*dz(l))
+        c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(dz(l - 1) + dz(l))*dz(l))
         offd = offd + c_f*real(${pfield}$ (j, k, l - 1), wp)
         diag = diag + c_f
         rho_nb = 0._wp
@@ -66,7 +66,7 @@
         do i = 1, num_fluids
             rho_nb = rho_nb + real(q_cons_vf(i)%sf(j, k, l + 1), wp)
         end do
-        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(dz(l) + dz(l + 1))*dz(l))
+        c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(dz(l) + dz(l + 1))*dz(l))
         offd = offd + c_f*real(${pfield}$ (j, k, l + 1), wp)
         diag = diag + c_f
     end if
@@ -81,30 +81,36 @@
     diag = 0._wp
     rho_c = real(mg_rho(${lv}$)%sf(j, k, l), wp)
     rho_nb = real(mg_rho(${lv}$)%sf(j - 1, k, l), wp)
-    c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dx(${lv}$, j - 1) + mg_dx(${lv}$, j))*mg_dx(${lv}$, j))
+    c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(mg_dx(${lv}$, j - 1) + mg_dx(${lv}$, &
+                 & j))*mg_dx(${lv}$, j))
     offd = offd + c_f*real(${pfield}$ (j - 1, k, l), wp)
     diag = diag + c_f
     rho_nb = real(mg_rho(${lv}$)%sf(j + 1, k, l), wp)
-    c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dx(${lv}$, j) + mg_dx(${lv}$, j + 1))*mg_dx(${lv}$, j))
+    c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(mg_dx(${lv}$, j) + mg_dx(${lv}$, &
+                 & j + 1))*mg_dx(${lv}$, j))
     offd = offd + c_f*real(${pfield}$ (j + 1, k, l), wp)
     diag = diag + c_f
     if (num_dims > 1) then
         rho_nb = real(mg_rho(${lv}$)%sf(j, k - 1, l), wp)
-        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dy(${lv}$, k - 1) + mg_dy(${lv}$, k))*mg_dy(${lv}$, k))
+        c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(mg_dy(${lv}$, k - 1) + mg_dy(${lv}$, &
+                     & k))*mg_dy(${lv}$, k))
         offd = offd + c_f*real(${pfield}$ (j, k - 1, l), wp)
         diag = diag + c_f
         rho_nb = real(mg_rho(${lv}$)%sf(j, k + 1, l), wp)
-        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dy(${lv}$, k) + mg_dy(${lv}$, k + 1))*mg_dy(${lv}$, k))
+        c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(mg_dy(${lv}$, k) + mg_dy(${lv}$, &
+                     & k + 1))*mg_dy(${lv}$, k))
         offd = offd + c_f*real(${pfield}$ (j, k + 1, l), wp)
         diag = diag + c_f
     end if
     if (num_dims > 2) then
         rho_nb = real(mg_rho(${lv}$)%sf(j, k, l - 1), wp)
-        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dz(${lv}$, l - 1) + mg_dz(${lv}$, l))*mg_dz(${lv}$, l))
+        c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(mg_dz(${lv}$, l - 1) + mg_dz(${lv}$, &
+                     & l))*mg_dz(${lv}$, l))
         offd = offd + c_f*real(${pfield}$ (j, k, l - 1), wp)
         diag = diag + c_f
         rho_nb = real(mg_rho(${lv}$)%sf(j, k, l + 1), wp)
-        c_f = 1._wp/(max(0.5_wp*(rho_c + rho_nb), sgm_eps)*0.5_wp*(mg_dz(${lv}$, l) + mg_dz(${lv}$, l + 1))*mg_dz(${lv}$, l))
+        c_f = 1._wp/(max(2._wp*rho_c*rho_nb/max(rho_c + rho_nb, sgm_eps), sgm_eps)*0.5_wp*(mg_dz(${lv}$, l) + mg_dz(${lv}$, &
+                     & l + 1))*mg_dz(${lv}$, l))
         offd = offd + c_f*real(${pfield}$ (j, k, l + 1), wp)
         diag = diag + c_f
     end if
@@ -630,6 +636,7 @@ contains
         real(wp) :: rho_c, rho_nb, u_m, u_p
         real(wp) :: coeff, c_f, offd, diag, p_new, res_loc, res_glb
         real(wp) :: dpds, ke, gamma_mix, pi_inf_mix, qv_mix, mom_sq
+        logical :: wall_lo_x, wall_hi_x, wall_lo_y, wall_hi_y, wall_lo_z, wall_hi_z
         real(wp) :: zv, dv, mu_loc, mu_glb, sigma_ch, rho_ch, rho_prev, alpha_ch, beta_ch
         real(wp) :: tol_eff, pmax_loc, pmax_glb
         real(wp) :: pinf_min, nclamp_loc, nclamp_glb
@@ -1023,18 +1030,63 @@ contains
         ! Momentum correction with the face-averaged new pressure gradient,
         ! then total energy rebuilt from the EOS with the new pressure
         call nvtxStartRange("TIMESTEP-PROJECTION-CORRECT")
+        ! Whether each edge is a physical boundary whose pressure ghost is filled by
+        ! extrapolation, as opposed to a periodic wrap or an MPI neighbour
+        #:for XYZ in ['x', 'y', 'z']
+            wall_lo_${XYZ}$ = (bc_${XYZ}$%beg < 0 .and. bc_${XYZ}$%beg /= BC_PERIODIC)
+            wall_hi_${XYZ}$ = (bc_${XYZ}$%end < 0 .and. bc_${XYZ}$%end /= BC_PERIODIC)
+        #:endfor
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, dpds, ke, gamma_mix, pi_inf_mix, qv_mix, mom_sq, rho_c]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    dpds = 0.5_wp*(real(pres_proj(j + 1, k, l), wp) - real(pres_proj(j - 1, k, l), wp))/dx(j)
+                    ! Next to a physical wall the pressure ghost is only an extrapolation,
+                    ! so the wide gradient reads a value carrying no information. Doing so
+                    ! makes the discrete equilibrium demand TWICE the correct gradient
+                    ! (0.5*(p1 - p0)/dx = rho*a instead of (p1 - p0)/dx = rho*a), which no
+                    ! body force can satisfy. The one-sided form is what the wide stencil
+                    ! returns for a LINEARLY extrapolated ghost, and needs no change to
+                    ! the operator's own boundary condition
+                    if (j == 0 .and. wall_lo_x) then
+                        dpds = (real(pres_proj(j + 1, k, l), wp) - real(pres_proj(j, k, l), wp))/dx(j)
+                    else if (j == m .and. wall_hi_x) then
+                        dpds = (real(pres_proj(j, k, l), wp) - real(pres_proj(j - 1, k, l), wp))/dx(j)
+                    else
+                        dpds = 0.5_wp*(real(pres_proj(j + 1, k, l), wp) - real(pres_proj(j - 1, k, l), wp))/dx(j)
+                    end if
                     q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l) = q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l) - real(dt*dpds, stp)
                     if (num_dims > 1) then
-                        dpds = 0.5_wp*(real(pres_proj(j, k + 1, l), wp) - real(pres_proj(j, k - 1, l), wp))/dy(k)
+                        ! Next to a physical wall the pressure ghost is only an extrapolation,
+                        ! so the wide gradient reads a value carrying no information. Doing so
+                        ! makes the discrete equilibrium demand TWICE the correct gradient
+                        ! (0.5*(p1 - p0)/dx = rho*a instead of (p1 - p0)/dx = rho*a), which no
+                        ! body force can satisfy. The one-sided form is what the wide stencil
+                        ! returns for a LINEARLY extrapolated ghost, and needs no change to
+                        ! the operator's own boundary condition
+                        if (k == 0 .and. wall_lo_y) then
+                            dpds = (real(pres_proj(j, k + 1, l), wp) - real(pres_proj(j, k, l), wp))/dy(k)
+                        else if (k == n .and. wall_hi_y) then
+                            dpds = (real(pres_proj(j, k, l), wp) - real(pres_proj(j, k - 1, l), wp))/dy(k)
+                        else
+                            dpds = 0.5_wp*(real(pres_proj(j, k + 1, l), wp) - real(pres_proj(j, k - 1, l), wp))/dy(k)
+                        end if
                         q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - real(dt*dpds, stp)
                     end if
                     if (num_dims > 2) then
-                        dpds = 0.5_wp*(real(pres_proj(j, k, l + 1), wp) - real(pres_proj(j, k, l - 1), wp))/dz(l)
+                        ! Next to a physical wall the pressure ghost is only an extrapolation,
+                        ! so the wide gradient reads a value carrying no information. Doing so
+                        ! makes the discrete equilibrium demand TWICE the correct gradient
+                        ! (0.5*(p1 - p0)/dx = rho*a instead of (p1 - p0)/dx = rho*a), which no
+                        ! body force can satisfy. The one-sided form is what the wide stencil
+                        ! returns for a LINEARLY extrapolated ghost, and needs no change to
+                        ! the operator's own boundary condition
+                        if (l == 0 .and. wall_lo_z) then
+                            dpds = (real(pres_proj(j, k, l + 1), wp) - real(pres_proj(j, k, l), wp))/dz(l)
+                        else if (l == p .and. wall_hi_z) then
+                            dpds = (real(pres_proj(j, k, l), wp) - real(pres_proj(j, k, l - 1), wp))/dz(l)
+                        else
+                            dpds = 0.5_wp*(real(pres_proj(j, k, l + 1), wp) - real(pres_proj(j, k, l - 1), wp))/dz(l)
+                        end if
                         q_cons_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) = q_cons_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) - real(dt*dpds, stp)
                     end if
 
