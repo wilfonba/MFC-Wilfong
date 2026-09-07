@@ -24,6 +24,7 @@ module m_start_up
     use m_rhs
     use m_chemistry
     use m_data_output
+    use m_jfnk
     use m_time_steppers
     use m_qbmm
     use m_derived_variables
@@ -659,7 +660,11 @@ contains
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (any(time_stepper == (/time_stepper_rk1, time_stepper_rk2, time_stepper_rk3/))) then
-            call s_tvd_rk(t_step, time_avg, time_stepper)
+            if (jfnk) then
+                call s_jfnk_time_step(t_step, time_avg)
+            else
+                call s_tvd_rk(t_step, time_avg, time_stepper)
+            end if
         end if
 
         ! Advance time after RK so source terms see current-step time
@@ -871,6 +876,7 @@ contains
         call s_initialize_rhs_module()
 
         if (proj_method) call s_initialize_projection_module()
+        if (jfnk) call s_initialize_jfnk_module()
 
         if (surface_tension) call s_initialize_surface_tension_module()
 
@@ -1143,6 +1149,7 @@ contains
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         if (proj_method) call s_finalize_projection_module()
+        if (jfnk) call s_finalize_jfnk_module()
         call s_finalize_rhs_module()
         if (igr) then
             call s_finalize_igr_module()

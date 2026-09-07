@@ -416,6 +416,13 @@ contains
         proj_check_iters = dflt_proj_check_iters
         proj_cfl_ac = dflt_real
 
+        jfnk = .false.
+        jfnk_newton_tol = dflt_jfnk_newton_tol
+        jfnk_krylov_tol = dflt_jfnk_krylov_tol
+        jfnk_max_newton = dflt_jfnk_max_newton
+        jfnk_krylov_dim = dflt_jfnk_krylov_dim
+        jfnk_max_restarts = dflt_jfnk_max_restarts
+
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
             wenoz = .false.

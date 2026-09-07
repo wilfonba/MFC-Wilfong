@@ -326,6 +326,9 @@ CONSTRAINTS = {
         "names": {"jacobi": 1, "gauss_seidel": 2, "chebyshev": 3, "multigrid": 4},
     },
     "proj_max_iters": {"min": 1},
+    "jfnk_max_newton": {"min": 1},
+    "jfnk_krylov_dim": {"min": 1},
+    "jfnk_max_restarts": {"min": 1},
     "proj_check_iters": {"min": 1},
     # Riemann solver
     "riemann_solver": {
@@ -776,6 +779,9 @@ def _load():
         "proj_iter_solver",
         "proj_max_iters",
         "proj_check_iters",
+        "jfnk_max_newton",
+        "jfnk_krylov_dim",
+        "jfnk_max_restarts",
     ]:
         _r(n, INT)
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
@@ -798,6 +804,8 @@ def _load():
         "proj_tol",
         "proj_tol_rel",
         "proj_cfl_ac",
+        "jfnk_newton_tol",
+        "jfnk_krylov_tol",
     ]:
         _r(n, REAL)
     for n in [
@@ -807,6 +815,7 @@ def _load():
         "cont_damage",
         "igr",
         "proj_method",
+        "jfnk",
         "proj_normalization",
         "proj_mg_single_halo",
         "proj_single_solve",
@@ -1444,6 +1453,12 @@ _nv(
     "proj_max_iters",
     "proj_check_iters",
     "proj_cfl_ac",
+    "jfnk",
+    "jfnk_newton_tol",
+    "jfnk_krylov_tol",
+    "jfnk_max_newton",
+    "jfnk_krylov_dim",
+    "jfnk_max_restarts",
     "igr_pres_lim",
     "nv_uvm_out_of_core",
     "nv_uvm_igr_temps_on_gpu",

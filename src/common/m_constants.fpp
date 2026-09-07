@@ -43,6 +43,11 @@ module m_constants
     real(wp), parameter :: dflt_alf_factor = 10._wp            !< scaling factor for IGR alpha
     real(wp), parameter :: dflt_proj_tol = 1.e-8_wp            !< convergence tolerance for projection pressure solve
     integer, parameter  :: dflt_proj_max_iters = 100           !< max iterations for projection pressure solve
+    real(wp), parameter :: dflt_jfnk_newton_tol = 1.e-6_wp     !< relative Newton tolerance for JFNK
+    real(wp), parameter :: dflt_jfnk_krylov_tol = 1.e-3_wp     !< relative GMRES tolerance for JFNK (inexact Newton)
+    integer, parameter  :: dflt_jfnk_max_newton = 10           !< max Newton iterations per JFNK step
+    integer, parameter  :: dflt_jfnk_krylov_dim = 20           !< GMRES restart dimension for JFNK
+    integer, parameter  :: dflt_jfnk_max_restarts = 4          !< max GMRES restarts per Newton step
     integer, parameter  :: dflt_proj_check_iters = 5           !< residual check interval for projection pressure solve
     integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
     !> color function gradient magnitude at which to apply the surface tension fluxes

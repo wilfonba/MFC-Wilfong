@@ -10,6 +10,7 @@ module m_time_steppers
 
     use m_derived_types
     use m_global_parameters
+    use m_jfnk, only: s_jfnk_step
     use m_rhs
     use m_chemistry
     use m_pressure_relaxation
@@ -626,6 +627,32 @@ contains
         end if
 
     end subroutine s_tvd_rk
+
+    !> Implicit time step by Jacobian-free Newton-Krylov. A thin wrapper that hands this module's state to the solver, which needs
+    !! nothing but the ability to evaluate the existing RHS on a trial state
+    impure subroutine s_jfnk_time_step(t_step, time_avg)
+
+        integer, intent(in)     :: t_step
+        real(wp), intent(inout) :: time_avg
+        real(wp)                :: start, finish
+
+        call cpu_time(start)
+        call nvtxStartRange("TIMESTEP")
+
+        call s_jfnk_step(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+
+        if (run_time_info) call s_write_run_time_information(q_prim_vf, t_step)
+
+        call nvtxEndRange
+        call cpu_time(finish)
+        wall_time = abs(finish - start)
+        if (t_step - t_step_start >= 2) then
+            wall_time_avg = (wall_time + (t_step - t_step_start - 2)*wall_time_avg)/(t_step - t_step_start - 1)
+        else
+            wall_time_avg = 0._wp
+        end if
+
+    end subroutine s_jfnk_time_step
 
     !> Bubble source part in Strang operator splitting scheme
     impure subroutine s_adaptive_dt_bubble(stage)

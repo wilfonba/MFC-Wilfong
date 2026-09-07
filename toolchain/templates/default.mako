@@ -56,7 +56,10 @@ if engine == 'batch':
                     srun --ntasks ${nodes*tasks_per_node}       \
                         "${target.get_install_binpath(case)}")
             elif [ "$binary" == "mpirun" ]; then
-                (set -x; ${profiler}     \
+                (set -x; \
+                % if target.name == 'simulation':
+                    ${profiler}     \
+                % endif
                     $binary -np ${nodes*tasks_per_node}            \
                             "${target.get_install_binpath(case)}")
             elif [ "$binary" == "mpiexec" ]; then

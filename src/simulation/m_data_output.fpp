@@ -292,7 +292,9 @@ contains
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')
-            else if (icfl_max_glb > 1._wp) then
+            else if (icfl_max_glb > 1._wp .and. .not. jfnk) then
+                ! An implicit step is not subject to the explicit CFL bound; exceeding
+                ! it is the entire point, so only the NaN guard above applies to JFNK
                 print *, 'icfl', icfl_max_glb
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting.')
             end if

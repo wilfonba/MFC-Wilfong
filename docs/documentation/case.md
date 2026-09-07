@@ -565,6 +565,12 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `proj_single_solve`        | Logical | Solve the projection pressure system only at the final RK stage; intermediate stages advance advectively with the stage-start pressure frozen (default F) |
 | `proj_max_iters`           | Integer | Maximum number of iterations for the projection pressure solve (default 100) |
 | `proj_check_iters`         | Integer | Interval, in iterations, between residual checks in the projection pressure solve (default 5) |
+| `jfnk`                     | Logical | Enable Jacobian-free Newton-Krylov implicit time stepping (backward Euler); mutually exclusive with `proj_method` (default F) |
+| `jfnk_newton_tol`          | Real    | Relative residual tolerance for the Newton iteration (default 1e-6) |
+| `jfnk_krylov_tol`          | Real    | Relative residual tolerance for the inner GMRES solve; a loose value gives an inexact Newton method (default 1e-3) |
+| `jfnk_max_newton`          | Integer | Maximum Newton iterations per time step (default 10) |
+| `jfnk_krylov_dim`          | Integer | GMRES restart dimension; this many Krylov vectors are held in memory (default 20) |
+| `jfnk_max_restarts`        | Integer | Maximum GMRES restarts per Newton step (default 4) |
 | `proj_cfl_ac`              | Real    | Maximum acoustic CFL cap on the projection time step; unset or non-positive disables the cap |
 
 - \* Options that work only with `model_eqns = 2`.
