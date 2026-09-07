@@ -227,10 +227,31 @@ contains
     !! in the off-diagonal blocks, and reshaping the spectrum without addressing it
     !! can make GMRES worse.
     !!
-    !! The slot is right-preconditioned and pluggable, so a physics-based M^-1 -- one
-    !! pressure-Helmholtz solve per application, reusing m_projection -- drops in
-    !! here. That is the operator that actually inverts the acoustic coupling, and
-    !! unlike its use as a scheme its inconsistency only costs Krylov iterations.
+    !! The physics-based alternative -- one pressure-Helmholtz solve per application,
+    !! the operator that inverts the acoustic coupling -- was then built and MEASURED
+    !! WORSE STILL, in a way worth recording because the reasoning that motivates it
+    !! is wrong. Writing z = tau*v and correcting it the way a projection does gives
+    !!     pp - rho*c^2*tau^2*div(rho^-1 grad pp) = z_E/gamma - rho*c^2*tau*div(z_mom/rho)
+    !! with z_mom -= tau*grad(pp) and z_E = gamma*pp. Damping that correction by a
+    !! factor w and sweeping it gives sin(J M^-1 v, v) errors of 0.003, 11.3, 33.9,
+    !! 67.8, 113.0 at w = 0, 0.1, 0.3, 0.6, 1 -- exactly linear, with no minimum. The
+    !! correction is therefore not a mistuned approximation that better coefficients
+    !! would rescue: J returns none of it. Adding the scheme's own upwind dissipation
+    !! diagonal, which at an acoustic CFL of 2 is twice as large as 1/tau and so the
+    !! biggest term in the momentum row, moves the error by under 10% across a
+    !! coefficient sweep of 0 to 4, so that is not the missing piece either.
+    !!
+    !! The reason is structural, and it is the same one that defeated the projection
+    !! method as a scheme (examples/1D_contact_semiimplicit/README.md). M^-1 makes the
+    !! momentum block 265 times larger than its input -- correct linear algebra, since
+    !! a pressure perturbation drives momentum -- so J has to annihilate that back down
+    !! to the input to 0.4% for the preconditioner to help. Its gradient and M's
+    !! gradient are different discrete operators, so it cannot. Any M built from the
+    !! continuous acoustic equations fails here for the same reason at any CFL where
+    !! the amplification is large. A useful M must be assembled from a discretization
+    !! that shares J's stencils -- a first-order version of the same flux -- not
+    !! derived from the PDEs; that is what the two-phase JFNK literature does, and it
+    !! is why those codes precondition on staggered grids where the triple is exact.
     subroutine s_build_precond(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -253,7 +274,7 @@ contains
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: rhs_pb, rhs_mv
         integer, intent(in) :: t_step
-        real(wp) :: rnorm0, rnorm, unorm, vnorm, eps_fd, hij, beta, tmp
+        real(wp) :: rnorm0, rnorm, unorm, vnorm, eps_fd, hij, beta, tmp, pcq
         integer :: newt, restart, jj, ii, idx, kd, nvar, stg
         integer :: nkry
         real(wp) :: acc, t_base
@@ -331,7 +352,7 @@ contains
             call s_build_precond(q_prim_vf)
             call s_dot(res_k, res_k, tmp); rnorm0 = sqrt(tmp)
 
-            nkry = 0
+            nkry = 0; pcq = 0._wp
             do newt = 1, jfnk_max_newton
                 call s_dot(res_k, res_k, tmp); rnorm = sqrt(tmp)
                 if (rnorm <= jfnk_newton_tol*max(rnorm0, sgm_eps)) exit
@@ -391,6 +412,20 @@ contains
                             kry(idx, jj + 1) = (kry(idx, jj + 1) - res_k(idx))/eps_fd
                         end do
                         $:END_GPU_PARALLEL_LOOP()
+
+                        ! Preconditioner health, as the sine of the angle between
+                        ! J*M^-1*v and v on the residual direction. A useful M^-1 leaves
+                        ! the two nearly parallel; a value approaching one means M^-1
+                        ! sends the residual somewhere J does not send it back from, so
+                        ! GMRES is being actively hindered. Being an angle it is scale
+                        ! free, so an M with the wrong units is not flattered, and it
+                        ! costs two dot products in the step where a bad M would
+                        ! otherwise only show up as a Krylov-count campaign
+                        if (jj == 1 .and. run_time_info) then
+                            call s_dot(kry(:,2), kry(:,2), tmp)
+                            call s_dot(kry(:,2), kry(:,1), hij)
+                            pcq = max(pcq, sqrt(max(1._wp - hij*hij/max(tmp, sgm_eps), 0._wp)))
+                        end if
 
                         ! modified Gram-Schmidt
                         do ii = 1, jj
@@ -463,6 +498,7 @@ contains
             end do
 
             if (proc_rank == 0 .and. run_time_info) then
+                print '(A, ES10.3)', '   jfnk precond sin(J M^-1 v, v) ', pcq
                 print '(A, I2, A, I3, A, I4, A, ES10.3, A, ES10.3)', '   jfnk stg ', stg, ' newton ', newt - 1, ' krylov ', nkry, &
                     & ' |R0| ', rnorm0, ' -> ', rnorm
             end if
