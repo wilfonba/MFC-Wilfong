@@ -572,6 +572,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `jfnk_max_newton`          | Integer | Maximum Newton iterations per time step (default 10) |
 | `jfnk_krylov_dim`          | Integer | GMRES restart dimension; this many Krylov vectors are held in memory (default 20) |
 | `jfnk_max_restarts`        | Integer | Maximum GMRES restarts per Newton step (default 4) |
+| `stagger`                  | Logical | Use the staggered (MAC) discretization: scalars at cell centres, velocity on faces (default F) |
 | `proj_cfl_ac`              | Real    | Maximum acoustic CFL cap on the projection time step; unset or non-positive disables the cap |
 
 - \* Options that work only with `model_eqns = 2`.
