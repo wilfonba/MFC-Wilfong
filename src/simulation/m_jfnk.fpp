@@ -216,6 +216,42 @@ contains
 
     end subroutine s_residual
 
+    !> Domain maxima of the mixture gamma times the sound speed, and of the sound speed alone. These set the acoustic scaling of the
+    !! energy unknown in s_jfnk_step
+    impure subroutine s_acoustic_scales(q_prim_vf, gcref, cref)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        real(wp), intent(out)                               :: gcref, cref
+        integer                                             :: i, j, k, l
+        real(wp)                                            :: r_s, blk, rc2, gmx, gcl, cl
+
+        gcl = 0._wp; cl = 0._wp
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, r_s, blk, rc2, gmx]', reduction='[[gcl], [cl]]', &
+                            & reductionOp='[max, max]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    r_s = 0._wp; rc2 = 0._wp; gmx = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        r_s = r_s + real(q_prim_vf(i)%sf(j, k, l), wp)
+                        blk = ((gammas(i) + 1._wp)*real(q_prim_vf(eqn_idx%E)%sf(j, k, l), wp) + pi_infs(i))/gammas(i)
+                        rc2 = rc2 + real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)/max(blk, sgm_eps)
+                        gmx = gmx + real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)*gammas(i)
+                    end do
+                    ! Wood's mixture rho*c^2, then c
+                    blk = sqrt(1._wp/(max(rc2, sgm_eps)*max(r_s, sgm_eps)))
+                    gcl = max(gcl, gmx*blk); cl = max(cl, blk)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call s_mpi_allreduce_max(gcl, gcref)
+        call s_mpi_allreduce_max(cl, cref)
+
+    end subroutine s_acoustic_scales
+
     !> Build the preconditioner M^-1, applied on the right inside GMRES.
     !!
     !! Currently the identity. A wave-speed diagonal, M^-1 = 1/(1/(dt*a_ii) +
@@ -278,19 +314,46 @@ contains
         integer :: newt, restart, jj, ii, idx, kd, nvar, stg
         integer :: nkry
         real(wp) :: acc, t_base
-        real(wp) :: vloc, vglb
+        real(wp) :: vloc, vglb, gcref, cref, rref, mref
 
         kd = jfnk_krylov_dim
 
         call nvtxStartRange("TIMESTEP-JFNK")
 
-        ! Per-variable scale D_i = max|u_i| over the domain. Without it the residual
-        ! is dominated entirely by the energy equation -- E ~ 8e8 for stiffened water
-        ! against alpha_rho ~ 1e3 -- so Newton and GMRES both converge on energy alone
-        ! and the rest of the system is invisible to them. Working with u/D and R/D
-        ! makes every equation contribute comparably
-        call s_pack(q_cons_vf, u_n)
+        t_base = mytime
         nvar = (m + 1)*(n + 1)*(p + 1)
+        call s_pack(q_cons_vf, u_n)
+
+        ! Reference evaluation at unit scale. It fills the primitive fields the acoustic
+        ! scaling below reads, and when stage one is explicit it is also that stage's
+        ! k_1 = RHS(u^n): with uacc = u^n the difference term vanishes and the residual
+        ! returns -RHS
+        $:GPU_PARALLEL_LOOP(private='[idx]')
+        do idx = 1, nloc
+            escal(idx) = 1._wp
+            uacc(idx) = u_n(idx)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        mytime = t_base + esd_c(1)*dt
+        $:GPU_UPDATE(device='[mytime]')
+        call s_residual(u_n, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+        call s_acoustic_scales(q_prim_vf, gcref, cref)
+
+        ! Per-variable scale D_i. Some scaling is essential: without it the residual is
+        ! dominated entirely by the energy equation -- E ~ 8e8 for stiffened water
+        ! against alpha_rho ~ 1e3 -- so Newton and GMRES converge on energy alone.
+        !
+        ! But max|E| is the wrong scale for the energy, because E is dominated by the
+        ! pi_inf offset, a constant that no perturbation ever sees. What the conditioning
+        ! depends on is the acoustic block, whose two off-diagonal couplings are equal
+        ! only when D_E/D_mom = gamma_mix*c. Scaling by max|E| leaves that ratio 347
+        ! times too large on the 833:1 air/water gate, so the two couplings differ by a
+        ! factor 1.2e5 even though their product is correctly the square of the acoustic
+        ! CFL: the scaled Jacobian is made non-normal by the choice of units alone.
+        ! Setting the ratio instead takes the Krylov count per step from 551/235/696/511
+        ! and divergence at step five, to 64/99/84/101/75/78, at an acoustic CFL of 2.
+        ! Momentum is floored at Mach 1e-3 so a quiescent start stays finite
+        rref = 0._wp; mref = 0._wp
         do ii = 1, sys_size
             vloc = 0._wp
             $:GPU_PARALLEL_LOOP(private='[idx]', reduction='[[vloc]]', reductionOp='[max]')
@@ -300,6 +363,9 @@ contains
             $:END_GPU_PARALLEL_LOOP()
             call s_mpi_allreduce_max(vloc, vglb)
             vglb = max(vglb, sgm_eps)
+            if (ii <= eqn_idx%cont%end) rref = max(rref, vglb)
+            if (ii >= eqn_idx%mom%beg .and. ii < eqn_idx%E) mref = max(mref, vglb)
+            if (ii == eqn_idx%E) vglb = gcref*max(mref, 1.e-3_wp*rref*cref)
             $:GPU_PARALLEL_LOOP(private='[idx]')
             do idx = (ii - 1)*nvar + 1, ii*nvar
                 escal(idx) = vglb
@@ -307,30 +373,14 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end do
 
+        ! The reference residual was taken at unit scale, so bring it and the state into the scaled variables
         $:GPU_PARALLEL_LOOP(private='[idx]')
         do idx = 1, nloc
             u_n(idx) = u_n(idx)/escal(idx)
             u_k(idx) = u_n(idx)
+            kstg(idx, 1) = -res_k(idx)/escal(idx)
         end do
         $:END_GPU_PARALLEL_LOOP()
-
-        ! Explicit first stage: k_1 = RHS(u^n). Evaluated through the residual with
-        ! uacc = u^n, which returns -RHS since the difference term vanishes
-        if (esd_expl) then
-            mytime = t_base + esd_c(1)*dt
-            $:GPU_UPDATE(device='[mytime]')
-            $:GPU_PARALLEL_LOOP(private='[idx]')
-            do idx = 1, nloc
-                uacc(idx) = u_n(idx)
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-            call s_residual(u_n, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
-            $:GPU_PARALLEL_LOOP(private='[idx]')
-            do idx = 1, nloc
-                kstg(idx, 1) = -res_k(idx)
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
 
         do stg = merge(2, 1, esd_expl), esd_ns
             ! uacc = u^n + dt*sum_{j<stg} a(stg,j)*k_j, the known part of this stage
@@ -522,7 +572,12 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
         call s_unpack(pert, q_cons_vf)
-        mytime = t_base + dt
+        ! Restore the step-start time. t_base was previously never assigned, so this
+        ! left mytime undefined -- which m_start_up feeds into its t_stop clamp on dt,
+        ! silently corrupting the step size. The stage loop moves mytime to
+        ! t_base + c_i*dt for time-dependent sources, and s_time_step_cycle advances it
+        ! once afterwards, so it must be handed back unadvanced
+        mytime = t_base
         $:GPU_UPDATE(device='[mytime]')
         call nvtxEndRange
 
