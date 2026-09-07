@@ -49,7 +49,9 @@ module m_jfnk
     real(wp), allocatable, dimension(:)   :: escal  !< per-element variable scale
     real(wp), allocatable, dimension(:)   :: uacc   !< accumulated known state for the current stage
     real(wp), allocatable, dimension(:,:) :: kstg   !< stage RHS values k_j = RHS(u_j)
-    $:GPU_DECLARE(create='[u_n, u_k, res_k, res_p, pert, sol, kry, escal, uacc, kstg]')
+    real(wp), allocatable, dimension(:)   :: pcd    !< preconditioner diagonal M^-1
+    real(wp), allocatable, dimension(:)   :: zvec   !< M^-1 applied to a Krylov vector
+    $:GPU_DECLARE(create='[u_n, u_k, res_k, res_p, pert, sol, kry, escal, uacc, kstg, pcd, zvec]')
 
     !> Dense GMRES workspace, small and kept on the host
     real(wp), allocatable, dimension(:,:) :: hess  !< Hessenberg matrix
@@ -106,6 +108,8 @@ contains
         @:ALLOCATE(kry(1:nloc, 1:kd + 1))
         @:ALLOCATE(escal(1:nloc))
         @:ALLOCATE(uacc(1:nloc))
+        @:ALLOCATE(pcd(1:nloc))
+        @:ALLOCATE(zvec(1:nloc))
         @:ALLOCATE(kstg(1:nloc, 1:4))
 
         allocate (hess(1:kd + 1,1:kd), gcos(1:kd + 1), gsin(1:kd + 1), gvec(1:kd + 1), yvec(1:kd))
@@ -212,6 +216,34 @@ contains
 
     end subroutine s_residual
 
+    !> Build the preconditioner M^-1, applied on the right inside GMRES.
+    !!
+    !! Currently the identity. A wave-speed diagonal, M^-1 = 1/(1/(dt*a_ii) +
+    !! (|u| + c)/dx), was implemented and MEASURED WORSE: at ACFL 2 it took the
+    !! Newton residual from 1e-5 down to only 1.09 while tripling the Krylov count
+    !! (84-210 -> 558-570), and it turned the ACFL 5 case from converging into NaN.
+    !! That is consistent with the theory -- a diagonal scaling does not touch the
+    !! ACFL-dependent conditioning, which comes from the elliptic acoustic coupling
+    !! in the off-diagonal blocks, and reshaping the spectrum without addressing it
+    !! can make GMRES worse.
+    !!
+    !! The slot is right-preconditioned and pluggable, so a physics-based M^-1 -- one
+    !! pressure-Helmholtz solve per application, reusing m_projection -- drops in
+    !! here. That is the operator that actually inverts the acoustic coupling, and
+    !! unlike its use as a scheme its inconsistency only costs Krylov iterations.
+    subroutine s_build_precond(q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        integer                                             :: idx
+
+        $:GPU_PARALLEL_LOOP(private='[idx]')
+        do idx = 1, nloc
+            pcd(idx) = 1._wp
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_build_precond
+
     !> One implicit time step
     impure subroutine s_jfnk_step(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
@@ -296,6 +328,7 @@ contains
             end do
 
             call s_residual(u_k, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+            call s_build_precond(q_prim_vf)
             call s_dot(res_k, res_k, tmp); rnorm0 = sqrt(tmp)
 
             nkry = 0
@@ -333,12 +366,22 @@ contains
                         ! Matrix-free directional derivative. The step is scaled by the
                         ! state norm so it stays well above round-off but small enough that
                         ! the difference quotient is still a derivative
-                        call s_dot(kry(:,jj), kry(:,jj), tmp); vnorm = sqrt(tmp)
+                        ! Right preconditioning: the Arnoldi direction is M^-1 v, so
+                        ! GMRES builds a Krylov space for J*M^-1 and the update is
+                        ! recovered with one more application of M^-1. The outer Newton
+                        ! iteration still sees the true discrete system, so M only has to
+                        ! be approximately right -- a poor M costs iterations, not accuracy
+                        $:GPU_PARALLEL_LOOP(private='[idx]')
+                        do idx = 1, nloc
+                            zvec(idx) = pcd(idx)*kry(idx, jj)
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                        call s_dot(zvec, zvec, tmp); vnorm = sqrt(tmp)
                         eps_fd = sqrt((1._wp + unorm)*epsilon(1._wp))/max(vnorm, sgm_eps)
 
                         $:GPU_PARALLEL_LOOP(private='[idx]')
                         do idx = 1, nloc
-                            pert(idx) = u_k(idx) + eps_fd*kry(idx, jj)
+                            pert(idx) = u_k(idx) + eps_fd*zvec(idx)
                         end do
                         $:END_GPU_PARALLEL_LOOP()
                         call s_residual(pert, kry(:,jj + 1), q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, &
@@ -401,7 +444,7 @@ contains
                         hij = yvec(ii)
                         $:GPU_PARALLEL_LOOP(private='[idx]')
                         do idx = 1, nloc
-                            sol(idx) = sol(idx) + hij*kry(idx, ii)
+                            sol(idx) = sol(idx) + hij*pcd(idx)*kry(idx, ii)
                         end do
                         $:END_GPU_PARALLEL_LOOP()
                     end do
@@ -451,7 +494,7 @@ contains
 
     impure subroutine s_finalize_jfnk_module
 
-        @:DEALLOCATE(u_n, u_k, res_k, res_p, pert, sol, kry, escal, uacc, kstg)
+        @:DEALLOCATE(u_n, u_k, res_k, res_p, pert, sol, kry, escal, uacc, kstg, pcd, zvec)
         deallocate (hess, gcos, gsin, gvec, yvec)
 
     end subroutine s_finalize_jfnk_module
