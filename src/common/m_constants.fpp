@@ -45,6 +45,7 @@ module m_constants
     integer, parameter  :: dflt_proj_max_iters = 100           !< max iterations for projection pressure solve
     real(wp), parameter :: dflt_jfnk_newton_tol = 1.e-6_wp     !< relative Newton tolerance for JFNK
     real(wp), parameter :: dflt_jfnk_krylov_tol = 1.e-3_wp     !< relative GMRES tolerance for JFNK (inexact Newton)
+    integer, parameter  :: dflt_jfnk_order = 1                 !< temporal order for JFNK (1 = backward Euler)
     integer, parameter  :: dflt_jfnk_max_newton = 10           !< max Newton iterations per JFNK step
     integer, parameter  :: dflt_jfnk_krylov_dim = 20           !< GMRES restart dimension for JFNK
     integer, parameter  :: dflt_jfnk_max_restarts = 4          !< max GMRES restarts per Newton step

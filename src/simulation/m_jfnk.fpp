@@ -47,26 +47,66 @@ module m_jfnk
     real(wp), allocatable, dimension(:)   :: sol    !< Newton update
     real(wp), allocatable, dimension(:,:) :: kry    !< Krylov basis, (nloc, dim+1)
     real(wp), allocatable, dimension(:)   :: escal  !< per-element variable scale
-    $:GPU_DECLARE(create='[u_n, u_k, res_k, res_p, pert, sol, kry, escal]')
+    real(wp), allocatable, dimension(:)   :: uacc   !< accumulated known state for the current stage
+    real(wp), allocatable, dimension(:,:) :: kstg   !< stage RHS values k_j = RHS(u_j)
+    $:GPU_DECLARE(create='[u_n, u_k, res_k, res_p, pert, sol, kry, escal, uacc, kstg]')
 
     !> Dense GMRES workspace, small and kept on the host
     real(wp), allocatable, dimension(:,:) :: hess  !< Hessenberg matrix
     real(wp), allocatable, dimension(:)   :: gcos, gsin, gvec, yvec
     integer                               :: nloc  !< local packed length: sys_size*(m+1)*(n+1)*(p+1)
 
+    !> ESDIRK tableau. Both higher-order options are one-step methods with an explicit first stage and a single repeated diagonal
+    !! entry, so no solution history is stored and one preconditioner serves every stage
+    real(wp), dimension(4, 4) :: esd_a     !< Butcher A
+    real(wp), dimension(4)    :: esd_c     !< Butcher c (stage times)
+    real(wp)                  :: esd_aii   !< repeated diagonal, used by the residual
+    integer                   :: esd_ns    !< number of stages
+    logical                   :: esd_expl  !< whether stage 1 is explicit
+
 contains
 
     !> Allocate the flat vectors and the dense GMRES workspace
     impure subroutine s_initialize_jfnk_module
 
-        integer :: kd
+        integer  :: kd
+        real(wp) :: gam
 
         nloc = sys_size*(m + 1)*(n + 1)*(p + 1)
         kd = jfnk_krylov_dim
 
+        esd_a = 0._wp
+        if (jfnk_order == 2) then
+            ! ESDIRK2, three stages, L-stable and stiffly accurate. Also known as
+            ! TR-BDF2 and as Kennedy & Carpenter ARK2(2)3L[2]SA -- despite the
+            ! former name it is a one-step Runge-Kutta method, not a multistep one
+            gam = 1._wp - 0.5_wp*sqrt(2._wp)
+            esd_ns = 3; esd_expl = .true.; esd_aii = gam
+            esd_c(1) = 0._wp; esd_c(2) = 2._wp*gam; esd_c(3) = 1._wp
+            esd_a(2, 1) = gam; esd_a(2, 2) = gam
+            esd_a(3, 1) = 0.25_wp*sqrt(2._wp); esd_a(3, 2) = 0.25_wp*sqrt(2._wp); esd_a(3, 3) = gam
+        else if (jfnk_order == 3) then
+            ! ESDIRK3, Kennedy & Carpenter ARK3(2)4L[2]SA, four stages, L-stable and
+            ! stiffly accurate; gam is the root of x^3 - 3x^2 + 3x/2 - 1/6
+            gam = 0.435866521508459_wp
+            esd_ns = 4; esd_expl = .true.; esd_aii = gam
+            esd_c(1) = 0._wp; esd_c(2) = 2._wp*gam; esd_c(3) = 0.6_wp; esd_c(4) = 1._wp
+            esd_a(2, 1) = gam; esd_a(2, 2) = gam
+            esd_a(3, 1) = 0.2576482460664272_wp; esd_a(3, 2) = -0.09351476757488625_wp; esd_a(3, 3) = gam
+            esd_a(4, 1) = 0.1876410243467238_wp; esd_a(4, 2) = -0.5952974735769549_wp
+            esd_a(4, 3) = 0.9717899277217721_wp; esd_a(4, 4) = gam
+        else
+            ! backward Euler as a one-stage, fully implicit tableau
+            esd_ns = 1; esd_expl = .false.; esd_aii = 1._wp
+            esd_c(1) = 1._wp
+            esd_a(1, 1) = 1._wp
+        end if
+
         @:ALLOCATE(u_n(1:nloc), u_k(1:nloc), res_k(1:nloc), res_p(1:nloc), pert(1:nloc), sol(1:nloc))
         @:ALLOCATE(kry(1:nloc, 1:kd + 1))
         @:ALLOCATE(escal(1:nloc))
+        @:ALLOCATE(uacc(1:nloc))
+        @:ALLOCATE(kstg(1:nloc, 1:4))
 
         allocate (hess(1:kd + 1,1:kd), gcos(1:kd + 1), gsin(1:kd + 1), gvec(1:kd + 1), yvec(1:kd))
 
@@ -166,7 +206,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[idx]')
         do idx = 1, nloc
-            rvec(idx) = (uvec(idx) - u_n(idx))/dt - rvec(idx)/escal(idx)
+            rvec(idx) = (uvec(idx) - uacc(idx))/(dt*esd_aii) - rvec(idx)/escal(idx)
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -182,7 +222,8 @@ contains
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: rhs_pb, rhs_mv
         integer, intent(in) :: t_step
         real(wp) :: rnorm0, rnorm, unorm, vnorm, eps_fd, hij, beta, tmp
-        integer :: newt, restart, jj, ii, idx, kd, nvar
+        integer :: newt, restart, jj, ii, idx, kd, nvar, stg
+        real(wp) :: acc, t_base
         real(wp) :: vloc, vglb
 
         kd = jfnk_krylov_dim
@@ -195,6 +236,7 @@ contains
         ! ACFL >~ 10 (see the header). Scaling by the per-variable maximum was tried
         ! and made ACFL 1 WORSE (drift 1.68 against 9.8e-12 unscaled), so it is left
         ! inert here rather than shipped wrong; getting it right is the next task
+        t_base = mytime - dt
         call s_pack(q_cons_vf, u_n)
         nvar = (m + 1)*(n + 1)*(p + 1)
         vloc = 0._wp; vglb = 0._wp
@@ -211,140 +253,189 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        call s_residual(u_k, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
-        call s_dot(res_k, res_k, tmp); rnorm0 = sqrt(tmp)
-
-        do newt = 1, jfnk_max_newton
-            call s_dot(res_k, res_k, tmp); rnorm = sqrt(tmp)
-            if (rnorm <= jfnk_newton_tol*max(rnorm0, sgm_eps)) exit
-
-            call s_dot(u_k, u_k, tmp); unorm = sqrt(tmp)
-
-            ! GMRES on J*sol = -res_k, restarted
+        ! Explicit first stage: k_1 = RHS(u^n). Evaluated through the residual with
+        ! uacc = u^n, which returns -RHS since the difference term vanishes
+        if (esd_expl) then
+            mytime = t_base + esd_c(1)*dt
+            $:GPU_UPDATE(device='[mytime]')
             $:GPU_PARALLEL_LOOP(private='[idx]')
             do idx = 1, nloc
-                sol(idx) = 0._wp
+                uacc(idx) = u_n(idx)
             end do
             $:END_GPU_PARALLEL_LOOP()
+            call s_residual(u_n, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+            $:GPU_PARALLEL_LOOP(private='[idx]')
+            do idx = 1, nloc
+                kstg(idx, 1) = -res_k(idx)
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
-            do restart = 1, jfnk_max_restarts
-                ! initial Krylov direction is the current linear residual, which for a zero start is simply -R
+        do stg = merge(2, 1, esd_expl), esd_ns
+            ! uacc = u^n + dt*sum_{j<stg} a(stg,j)*k_j, the known part of this stage
+            $:GPU_PARALLEL_LOOP(private='[idx]')
+            do idx = 1, nloc
+                uacc(idx) = u_n(idx)
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            do ii = 1, stg - 1
+                acc = dt*esd_a(stg, ii)
                 $:GPU_PARALLEL_LOOP(private='[idx]')
                 do idx = 1, nloc
-                    kry(idx, 1) = -res_k(idx)
+                    uacc(idx) = uacc(idx) + acc*kstg(idx, ii)
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-                call s_dot(kry(:,1), kry(:,1), tmp); beta = sqrt(tmp)
-                if (beta <= sgm_eps) exit
+            end do
+
+            call s_residual(u_k, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+            call s_dot(res_k, res_k, tmp); rnorm0 = sqrt(tmp)
+
+            do newt = 1, jfnk_max_newton
+                call s_dot(res_k, res_k, tmp); rnorm = sqrt(tmp)
+                if (rnorm <= jfnk_newton_tol*max(rnorm0, sgm_eps)) exit
+
+                call s_dot(u_k, u_k, tmp); unorm = sqrt(tmp)
+
+                ! GMRES on J*sol = -res_k, restarted
                 $:GPU_PARALLEL_LOOP(private='[idx]')
                 do idx = 1, nloc
-                    kry(idx, 1) = kry(idx, 1)/beta
+                    sol(idx) = 0._wp
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                hess = 0._wp; gvec = 0._wp; gvec(1) = beta
-
-                do jj = 1, kd
-                    ! Matrix-free directional derivative. The step is scaled by the
-                    ! state norm so it stays well above round-off but small enough that
-                    ! the difference quotient is still a derivative
-                    call s_dot(kry(:,jj), kry(:,jj), tmp); vnorm = sqrt(tmp)
-                    eps_fd = sqrt((1._wp + unorm)*epsilon(1._wp))/max(vnorm, sgm_eps)
-
+                do restart = 1, jfnk_max_restarts
+                    ! initial Krylov direction is the current linear residual, which for a zero start is simply -R
                     $:GPU_PARALLEL_LOOP(private='[idx]')
                     do idx = 1, nloc
-                        pert(idx) = u_k(idx) + eps_fd*kry(idx, jj)
+                        kry(idx, 1) = -res_k(idx)
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    call s_residual(pert, kry(:,jj + 1), q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, &
-                                    & rhs_mv, t_step)
+                    call s_dot(kry(:,1), kry(:,1), tmp); beta = sqrt(tmp)
+                    if (beta <= sgm_eps) exit
                     $:GPU_PARALLEL_LOOP(private='[idx]')
                     do idx = 1, nloc
-                        kry(idx, jj + 1) = (kry(idx, jj + 1) - res_k(idx))/eps_fd
+                        kry(idx, 1) = kry(idx, 1)/beta
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    ! modified Gram-Schmidt
+                    hess = 0._wp; gvec = 0._wp; gvec(1) = beta
+
+                    do jj = 1, kd
+                        ! Matrix-free directional derivative. The step is scaled by the
+                        ! state norm so it stays well above round-off but small enough that
+                        ! the difference quotient is still a derivative
+                        call s_dot(kry(:,jj), kry(:,jj), tmp); vnorm = sqrt(tmp)
+                        eps_fd = sqrt((1._wp + unorm)*epsilon(1._wp))/max(vnorm, sgm_eps)
+
+                        $:GPU_PARALLEL_LOOP(private='[idx]')
+                        do idx = 1, nloc
+                            pert(idx) = u_k(idx) + eps_fd*kry(idx, jj)
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                        call s_residual(pert, kry(:,jj + 1), q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, &
+                                        & rhs_mv, t_step)
+                        $:GPU_PARALLEL_LOOP(private='[idx]')
+                        do idx = 1, nloc
+                            kry(idx, jj + 1) = (kry(idx, jj + 1) - res_k(idx))/eps_fd
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+
+                        ! modified Gram-Schmidt
+                        do ii = 1, jj
+                            call s_dot(kry(:,jj + 1), kry(:,ii), hij)
+                            hess(ii, jj) = hij
+                            $:GPU_PARALLEL_LOOP(private='[idx]')
+                            do idx = 1, nloc
+                                kry(idx, jj + 1) = kry(idx, jj + 1) - hij*kry(idx, ii)
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end do
+                        call s_dot(kry(:,jj + 1), kry(:,jj + 1), tmp)
+                        hess(jj + 1, jj) = sqrt(tmp)
+                        if (hess(jj + 1, jj) > sgm_eps) then
+                            $:GPU_PARALLEL_LOOP(private='[idx]')
+                            do idx = 1, nloc
+                                kry(idx, jj + 1) = kry(idx, jj + 1)/hess(jj + 1, jj)
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
+
+                        ! apply previous Givens rotations, then eliminate the subdiagonal
+                        do ii = 1, jj - 1
+                            tmp = gcos(ii)*hess(ii, jj) + gsin(ii)*hess(ii + 1, jj)
+                            hess(ii + 1, jj) = -gsin(ii)*hess(ii, jj) + gcos(ii)*hess(ii + 1, jj)
+                            hess(ii, jj) = tmp
+                        end do
+                        tmp = sqrt(hess(jj, jj)**2 + hess(jj + 1, jj)**2)
+                        if (tmp <= sgm_eps) tmp = sgm_eps
+                        gcos(jj) = hess(jj, jj)/tmp
+                        gsin(jj) = hess(jj + 1, jj)/tmp
+                        hess(jj, jj) = tmp
+                        hess(jj + 1, jj) = 0._wp
+                        gvec(jj + 1) = -gsin(jj)*gvec(jj)
+                        gvec(jj) = gcos(jj)*gvec(jj)
+
+                        if (abs(gvec(jj + 1)) <= jfnk_krylov_tol*beta) exit
+                    end do
+                    jj = min(jj, kd)
+
+                    ! back-substitute and form the update
+                    do ii = jj, 1, -1
+                        yvec(ii) = gvec(ii)
+                        do idx = ii + 1, jj
+                            yvec(ii) = yvec(ii) - hess(ii, idx)*yvec(idx)
+                        end do
+                        yvec(ii) = yvec(ii)/sign(max(abs(hess(ii, ii)), sgm_eps), hess(ii, ii))
+                    end do
                     do ii = 1, jj
-                        call s_dot(kry(:,jj + 1), kry(:,ii), hij)
-                        hess(ii, jj) = hij
+                        hij = yvec(ii)
                         $:GPU_PARALLEL_LOOP(private='[idx]')
                         do idx = 1, nloc
-                            kry(idx, jj + 1) = kry(idx, jj + 1) - hij*kry(idx, ii)
+                            sol(idx) = sol(idx) + hij*kry(idx, ii)
                         end do
                         $:END_GPU_PARALLEL_LOOP()
                     end do
-                    call s_dot(kry(:,jj + 1), kry(:,jj + 1), tmp)
-                    hess(jj + 1, jj) = sqrt(tmp)
-                    if (hess(jj + 1, jj) > sgm_eps) then
-                        $:GPU_PARALLEL_LOOP(private='[idx]')
-                        do idx = 1, nloc
-                            kry(idx, jj + 1) = kry(idx, jj + 1)/hess(jj + 1, jj)
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-
-                    ! apply previous Givens rotations, then eliminate the subdiagonal
-                    do ii = 1, jj - 1
-                        tmp = gcos(ii)*hess(ii, jj) + gsin(ii)*hess(ii + 1, jj)
-                        hess(ii + 1, jj) = -gsin(ii)*hess(ii, jj) + gcos(ii)*hess(ii + 1, jj)
-                        hess(ii, jj) = tmp
-                    end do
-                    tmp = sqrt(hess(jj, jj)**2 + hess(jj + 1, jj)**2)
-                    if (tmp <= sgm_eps) tmp = sgm_eps
-                    gcos(jj) = hess(jj, jj)/tmp
-                    gsin(jj) = hess(jj + 1, jj)/tmp
-                    hess(jj, jj) = tmp
-                    hess(jj + 1, jj) = 0._wp
-                    gvec(jj + 1) = -gsin(jj)*gvec(jj)
-                    gvec(jj) = gcos(jj)*gvec(jj)
 
                     if (abs(gvec(jj + 1)) <= jfnk_krylov_tol*beta) exit
                 end do
-                jj = min(jj, kd)
 
-                ! back-substitute and form the update
-                do ii = jj, 1, -1
-                    yvec(ii) = gvec(ii)
-                    do idx = ii + 1, jj
-                        yvec(ii) = yvec(ii) - hess(ii, idx)*yvec(idx)
-                    end do
-                    yvec(ii) = yvec(ii)/sign(max(abs(hess(ii, ii)), sgm_eps), hess(ii, ii))
+                ! Newton update, then a fresh residual
+                $:GPU_PARALLEL_LOOP(private='[idx]')
+                do idx = 1, nloc
+                    u_k(idx) = u_k(idx) + sol(idx)
                 end do
-                do ii = 1, jj
-                    hij = yvec(ii)
-                    $:GPU_PARALLEL_LOOP(private='[idx]')
-                    do idx = 1, nloc
-                        sol(idx) = sol(idx) + hij*kry(idx, ii)
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end do
-
-                if (abs(gvec(jj + 1)) <= jfnk_krylov_tol*beta) exit
+                $:END_GPU_PARALLEL_LOOP()
+                call s_residual(u_k, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
             end do
 
-            ! Newton update, then a fresh residual
+            ! The converged stage satisfies (u_stg - uacc)/(dt*a_ii) = RHS(u_stg), so
+            ! k_stg comes straight from the stage relation and costs no extra
+            ! residual evaluation
+            acc = 1._wp/(dt*esd_aii)
             $:GPU_PARALLEL_LOOP(private='[idx]')
             do idx = 1, nloc
-                u_k(idx) = u_k(idx) + sol(idx)
+                kstg(idx, stg) = (u_k(idx) - uacc(idx))*acc
             end do
             $:END_GPU_PARALLEL_LOOP()
-            call s_residual(u_k, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
         end do
 
+        ! Both tableaux are stiffly accurate (b equals the last row of A), so the
+        ! final stage IS the new state and no separate update is needed
         $:GPU_PARALLEL_LOOP(private='[idx]')
         do idx = 1, nloc
             pert(idx) = u_k(idx)*escal(idx)
         end do
         $:END_GPU_PARALLEL_LOOP()
         call s_unpack(pert, q_cons_vf)
+        mytime = t_base + dt
+        $:GPU_UPDATE(device='[mytime]')
         call nvtxEndRange
 
     end subroutine s_jfnk_step
 
     impure subroutine s_finalize_jfnk_module
 
-        @:DEALLOCATE(u_n, u_k, res_k, res_p, pert, sol, kry, escal)
+        @:DEALLOCATE(u_n, u_k, res_k, res_p, pert, sol, kry, escal, uacc, kstg)
         deallocate (hess, gcos, gsin, gvec, yvec)
 
     end subroutine s_finalize_jfnk_module

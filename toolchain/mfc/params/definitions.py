@@ -320,6 +320,11 @@ CONSTRAINTS = {
         "names": {"rk1": 1, "rk2": 2, "rk3": 3},
     },
     # Semi-implicit pressure projection
+    "jfnk_order": {
+        "choices": [1, 2, 3],
+        "value_labels": {1: "backward Euler", 2: "ESDIRK2", 3: "ESDIRK3"},
+        "names": {"backward_euler": 1, "esdirk2": 2, "esdirk3": 3},
+    },
     "proj_iter_solver": {
         "choices": [1, 2, 3, 4],
         "value_labels": {1: "Jacobi", 2: "red-black Gauss-Seidel", 3: "Chebyshev-accelerated Jacobi", 4: "geometric multigrid"},
@@ -779,6 +784,7 @@ def _load():
         "proj_iter_solver",
         "proj_max_iters",
         "proj_check_iters",
+        "jfnk_order",
         "jfnk_max_newton",
         "jfnk_krylov_dim",
         "jfnk_max_restarts",
@@ -1454,6 +1460,7 @@ _nv(
     "proj_check_iters",
     "proj_cfl_ac",
     "jfnk",
+    "jfnk_order",
     "jfnk_newton_tol",
     "jfnk_krylov_tol",
     "jfnk_max_newton",

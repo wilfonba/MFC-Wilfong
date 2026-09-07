@@ -208,6 +208,7 @@ DESCRIPTIONS = {
     "igr_iter_solver": "IGR iterative solver type",
     "proj_method": "Enable semi-implicit pressure projection method",
     "jfnk": "Enable Jacobian-free Newton-Krylov implicit time stepping",
+    "jfnk_order": "Temporal order for JFNK [1] backward Euler [2] ESDIRK2 [3] ESDIRK3",
     "jfnk_newton_tol": "Relative residual tolerance for the Newton iteration",
     "jfnk_krylov_tol": "Relative residual tolerance for the inner GMRES solve",
     "jfnk_max_newton": "Maximum Newton iterations per time step",

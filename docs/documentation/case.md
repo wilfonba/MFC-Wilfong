@@ -566,6 +566,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `proj_max_iters`           | Integer | Maximum number of iterations for the projection pressure solve (default 100) |
 | `proj_check_iters`         | Integer | Interval, in iterations, between residual checks in the projection pressure solve (default 5) |
 | `jfnk`                     | Logical | Enable Jacobian-free Newton-Krylov implicit time stepping (backward Euler); mutually exclusive with `proj_method` (default F) |
+| `jfnk_order`               | Integer | Temporal order for JFNK [1] backward Euler [2] ESDIRK2 [3] ESDIRK3; 2 and 3 are one-step ESDIRK tableaux, so no solution history is stored (default 1) |
 | `jfnk_newton_tol`          | Real    | Relative residual tolerance for the Newton iteration (default 1e-6) |
 | `jfnk_krylov_tol`          | Real    | Relative residual tolerance for the inner GMRES solve; a loose value gives an inexact Newton method (default 1e-3) |
 | `jfnk_max_newton`          | Integer | Maximum Newton iterations per time step (default 10) |

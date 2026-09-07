@@ -417,6 +417,7 @@ contains
         proj_cfl_ac = dflt_real
 
         jfnk = .false.
+        jfnk_order = dflt_jfnk_order
         jfnk_newton_tol = dflt_jfnk_newton_tol
         jfnk_krylov_tol = dflt_jfnk_krylov_tol
         jfnk_max_newton = dflt_jfnk_max_newton
