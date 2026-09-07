@@ -223,6 +223,7 @@ contains
         integer, intent(in) :: t_step
         real(wp) :: rnorm0, rnorm, unorm, vnorm, eps_fd, hij, beta, tmp
         integer :: newt, restart, jj, ii, idx, kd, nvar, stg
+        integer :: nkry
         real(wp) :: acc, t_base
         real(wp) :: vloc, vglb
 
@@ -230,21 +231,28 @@ contains
 
         call nvtxStartRange("TIMESTEP-JFNK")
 
-        ! Per-variable scaling hook. The conservative variables span alpha_rho ~ 1e3
-        ! to E ~ 8e8 for stiffened water, so an unscaled norm and finite-difference
-        ! step are set entirely by the energy -- this is why the solver diverges for
-        ! ACFL >~ 10 (see the header). Scaling by the per-variable maximum was tried
-        ! and made ACFL 1 WORSE (drift 1.68 against 9.8e-12 unscaled), so it is left
-        ! inert here rather than shipped wrong; getting it right is the next task
-        t_base = mytime - dt
+        ! Per-variable scale D_i = max|u_i| over the domain. Without it the residual
+        ! is dominated entirely by the energy equation -- E ~ 8e8 for stiffened water
+        ! against alpha_rho ~ 1e3 -- so Newton and GMRES both converge on energy alone
+        ! and the rest of the system is invisible to them. Working with u/D and R/D
+        ! makes every equation contribute comparably
         call s_pack(q_cons_vf, u_n)
         nvar = (m + 1)*(n + 1)*(p + 1)
-        vloc = 0._wp; vglb = 0._wp
-        $:GPU_PARALLEL_LOOP(private='[idx]')
-        do idx = 1, nloc
-            escal(idx) = 1._wp
+        do ii = 1, sys_size
+            vloc = 0._wp
+            $:GPU_PARALLEL_LOOP(private='[idx]', reduction='[[vloc]]', reductionOp='[max]')
+            do idx = (ii - 1)*nvar + 1, ii*nvar
+                vloc = max(vloc, abs(u_n(idx)))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            call s_mpi_allreduce_max(vloc, vglb)
+            vglb = max(vglb, sgm_eps)
+            $:GPU_PARALLEL_LOOP(private='[idx]')
+            do idx = (ii - 1)*nvar + 1, ii*nvar
+                escal(idx) = vglb
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end do
-        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_PARALLEL_LOOP(private='[idx]')
         do idx = 1, nloc
@@ -290,6 +298,7 @@ contains
             call s_residual(u_k, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
             call s_dot(res_k, res_k, tmp); rnorm0 = sqrt(tmp)
 
+            nkry = 0
             do newt = 1, jfnk_max_newton
                 call s_dot(res_k, res_k, tmp); rnorm = sqrt(tmp)
                 if (rnorm <= jfnk_newton_tol*max(rnorm0, sgm_eps)) exit
@@ -375,6 +384,7 @@ contains
                         gvec(jj + 1) = -gsin(jj)*gvec(jj)
                         gvec(jj) = gcos(jj)*gvec(jj)
 
+                        nkry = nkry + 1
                         if (abs(gvec(jj + 1)) <= jfnk_krylov_tol*beta) exit
                     end do
                     jj = min(jj, kd)
@@ -396,6 +406,7 @@ contains
                         $:END_GPU_PARALLEL_LOOP()
                     end do
 
+                    nkry = nkry + 1
                     if (abs(gvec(jj + 1)) <= jfnk_krylov_tol*beta) exit
                 end do
 
@@ -407,6 +418,11 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
                 call s_residual(u_k, res_k, q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
             end do
+
+            if (proc_rank == 0 .and. run_time_info) then
+                print '(A, I2, A, I3, A, I4, A, ES10.3, A, ES10.3)', '   jfnk stg ', stg, ' newton ', newt - 1, ' krylov ', nkry, &
+                    & ' |R0| ', rnorm0, ' -> ', rnorm
+            end if
 
             ! The converged stage satisfies (u_stg - uacc)/(dt*a_ii) = RHS(u_stg), so
             ! k_stg comes straight from the stage relation and costs no extra
