@@ -1,0 +1,108 @@
+diff --git a/src/simulation/m_rhs_staggered.fpp b/src/simulation/m_rhs_staggered.fpp
+index d6d83ade..353fd0d8 100644
+--- a/src/simulation/m_rhs_staggered.fpp
++++ b/src/simulation/m_rhs_staggered.fpp
+@@ -39,12 +39,13 @@ module m_rhs_staggered
+     real(wp), allocatable, dimension(:,:,:,:) :: qs        !< cell state, one slot per equation
+     real(wp), allocatable, dimension(:,:,:)   :: um        !< FACE momentum, the primary velocity unknown
+     real(wp), allocatable, dimension(:,:,:)   :: pcl, rcl  !< cell pressure and mixture density
++    real(wp), allocatable, dimension(:,:,:)   :: zcl       !< cell acoustic impedance rho*c
+     real(wp), allocatable, dimension(:,:,:,:) :: kq, qsv   !< RK stage slope and stage state, cells
+     real(wp), allocatable, dimension(:,:,:)   :: ku, umv   !< RK stage slope and stage state, faces
+     real(wp), allocatable, dimension(:,:,:)   :: tmpa, tmpb
+     real(wp), allocatable, dimension(:,:,:,:) :: fst       !< upwind face state of each cell variable
+     real(wp), allocatable, dimension(:,:,:)   :: mfl       !< total mass flux per face, shared with the momentum control volume
+-    $:GPU_DECLARE(create='[qs, um, pcl, rcl, kq, qsv, ku, umv, tmpa, tmpb, mfl, fst]')
++    $:GPU_DECLARE(create='[qs, um, pcl, rcl, zcl, kq, qsv, ku, umv, tmpa, tmpb, mfl, fst]')
+ 
+ contains
+ 
+@@ -61,6 +62,7 @@ contains
+         @:ALLOCATE(ku(-3:m + 3, -3:n + 3, -3:p + 3))
+         @:ALLOCATE(pcl(-3:m + 3, -3:n + 3, -3:p + 3))
+         @:ALLOCATE(rcl(-3:m + 3, -3:n + 3, -3:p + 3))
++        @:ALLOCATE(zcl(-3:m + 3, -3:n + 3, -3:p + 3))
+         @:ALLOCATE(tmpa(-3:m + 3, -3:n + 3, -3:p + 3))
+         @:ALLOCATE(tmpb(-3:m + 3, -3:n + 3, -3:p + 3))
+         @:ALLOCATE(mfl(-3:m + 3, -3:n + 3, -3:p + 3))
+@@ -406,7 +408,7 @@ contains
+     subroutine s_staggered_primitives
+ 
+         integer  :: i, j, k, l
+-        real(wp) :: gm, pf, qv, ke, ulo, uhi, rlo, rhi
++        real(wp) :: gm, pf, qv, ke, ulo, uhi, rlo, rhi, r0, blk
+ 
+         ! rho first, on its own. Writing it and reading its neighbour in one loop is a
+         ! race, and the clamps that made that look safe were also hiding a read past the
+@@ -454,6 +456,26 @@ contains
+         ! filled rather than leaving the stencil to read uninitialised memory
+         call s_staggered_bc_cell(pcl)
+ 
++        ! Acoustic impedance rho*c from Wood's mixture speed, in its own pass so the
++        ! pressure it reads is complete and wrapped. Every quotient is floored: the bulk
++        ! modulus goes negative where the solved pressure does, and a volume fraction can
++        ! undershoot zero, either of which would otherwise reach the sqrt
++        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, blk, r0]')
++        do l = -3, p + 3
++            do k = -3, n + 3
++                do j = -3, m + 3
++                    r0 = 0._wp
++                    $:GPU_LOOP(parallelism='[seq]')
++                    do i = 1, num_fluids
++                        blk = ((gammas(i) + 1._wp)*pcl(j, k, l) + pi_infs(i))/gammas(i)
++                        r0 = r0 + max(qs(j, k, l, eqn_idx%adv%beg + i - 1), 0._wp)/max(blk, sgm_eps)
++                    end do
++                    zcl(j, k, l) = sqrt(max(rcl(j, k, l), sgm_eps)/max(r0, sgm_eps))
++                end do
++            end do
++        end do
++        $:END_GPU_PARALLEL_LOOP()
++
+     end subroutine s_staggered_primitives
+ 
+     !> Ghost fill for a single cell-indexed quantity
+@@ -491,16 +513,32 @@ contains
+ 
+         call s_staggered_primitives
+ 
+-        ! face velocity from the face momentum and the interpolated density
+-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
++        ! Face velocity with the Godunov acoustic correction u* = u - dp/(2Z), and p*
++        ! at the cells for the momentum control volume. Both vanish identically when p
++        ! and u are uniform, so every invariant stays exact -- and both nonetheless
++        ! DESTABILIZE the run, individually and together. See docs/staggered_handoff.md
++        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, uc]')
+         do l = -3, p + 2
+             do k = -3, n + 2
+                 do j = -3, m + 2
+-                    tmpa(j, k, l) = um(j, k, l)/max(0.5_wp*(rcl(j, k, l) + rcl(j + 1, k, l)), sgm_eps)
++                    uc = 0.5_wp*(zcl(j, k, l) + zcl(j + 1, k, l))
++                    tmpa(j, k, l) = um(j, k, l)/max(0.5_wp*(rcl(j, k, l) + rcl(j + 1, k, l)), sgm_eps) - (pcl(j + 1, k, &
++                         & l) - pcl(j, k, l))/(2._wp*max(uc, sgm_eps))
++                end do
++            end do
++        end do
++        $:END_GPU_PARALLEL_LOOP()
++
++        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
++        do l = -2, p + 2
++            do k = -2, n + 2
++                do j = -2, m + 2
++                    pcl(j, k, l) = pcl(j, k, l) - 0.5_wp*zcl(j, k, l)*(tmpa(j, k, l) - tmpa(j - 1, k, l))
+                 end do
+             end do
+         end do
+         $:END_GPU_PARALLEL_LOOP()
++        call s_staggered_bc_cell(pcl)
+ 
+         ! div(u), needed by the volume-fraction equation
+         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+@@ -860,7 +898,7 @@ contains
+ 
+     impure subroutine s_finalize_rhs_staggered_module
+ 
+-        @:DEALLOCATE(qfl, qfr, flx, qs, qsv, kq, um, umv, ku, pcl, rcl, tmpa, tmpb, mfl, fst)
++        @:DEALLOCATE(qfl, qfr, flx, qs, qsv, kq, um, umv, ku, pcl, rcl, tmpa, tmpb, mfl, fst, zcl)
+ 
+     end subroutine s_finalize_rhs_staggered_module
+ 

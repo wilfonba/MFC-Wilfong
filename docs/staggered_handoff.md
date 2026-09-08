@@ -127,8 +127,9 @@ Best current hypothesis: `u*` also becomes the momentum *advection* velocity, in
 formulations apply the pressure-diffusion to the mass flux while treating the momentum
 advection velocity separately; that distinction was not made here.
 
-Attempt saved at `/fastscratch/bwilfong3/stag_acoustic_dissipation_attempt.fpp`. It builds
-and passes every invariant — it just is not stable.
+The attempt is committed as `docs/staggered_acoustic_dissipation.patch`; apply it with
+`git apply docs/staggered_acoustic_dissipation.patch`. It builds and passes every
+invariant — it just is not stable.
 
 ### Suggested next steps, in order
 
@@ -160,17 +161,17 @@ periodicity requires air.
 
 ## Running it
 
-Add `"stagger": "T"` to a 1D case, alongside `run_time_info: "T"` so the tests print.
-The gate case is `examples/1D_contact_semiimplicit/case.py`; add the flag to the dict it
-prints, then:
+`examples/1D_contact_staggered/case.py` is the gate: the same 833:1 air/water contact the
+projection method uses, with `stagger` and `run_time_info` set.
 
 ```bash
-./mfc.sh run <case>.py -n 1 -t pre_process simulation -- --acfl 0.5 --velocity 5
+./mfc.sh run examples/1D_contact_staggered/case.py -n 1 -- --acfl 0.05 --velocity 5
 ```
 
-The three tests print at startup; the run then advances with the staggered stepper.
-A worthwhile small task is committing a proper `examples/1D_contact_staggered/case.py`
-rather than hand-editing the projection one.
+The three tests print at startup, before the first step, and are the reason to run this
+case at all today; the run then advances with the staggered stepper and will diverge.
+`--explicit` switches to the collocated solver as a control, and `--acfl` sets the step as
+a multiple of the acoustic limit in water.
 
 ## Traps
 

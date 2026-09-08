@@ -2887,6 +2887,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # the transverse momentum drifts past the 1e-3 Example tolerance across compilers
                 # (nvhpc passes; Intel and CCE disagree by ~2e-3 absolute). No single golden is portable.
                 "2D_hybrid_slab",
+                # Skipped for a different reason than everything above it: not portability
+                # but incompleteness. The staggered (MAC) discretization is under development
+                # and its explicit time integration diverges -- its three operator and
+                # interface acceptance tests pass and print at startup, which is what the case
+                # is for today. Remove this entry once the scheme is stable and generate a
+                # golden then; see docs/staggered_handoff.md.
+                "1D_contact_staggered",
             ]
             if path in casesToSkip:
                 continue
