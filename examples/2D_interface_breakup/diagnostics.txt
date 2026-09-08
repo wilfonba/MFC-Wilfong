@@ -1,0 +1,61 @@
+2D interface perturbation diagnostics
+----------------------------------------
+  eta_rms_target     0.001875
+  eta_rms_realized   0.001875
+  eta_mean           3.34296e-19
+  eta_max            0.00465928
+  eta_min            -0.00459019
+  slope_rms          0.116339
+  lambda_dom         0.0909091
+  lambda_min         0.0625
+  lambda_max         1
+  lambda_int         0.113089
+  n_modes            31
+
+case parameters
+----------------------------------------
+  At                 0.997603
+  We(lambda_min)     0.311
+  We_H(legacy)       500.242
+  c_gw(lambda_min)   0.0997356
+  lambda_min         0.0625
+  Re_water           46716.2
+  Re_gas             2.59534e+06
+  H_SI[m]            0.0605929
+  lambda_min_SI[m]   0.00378706
+  U_SI[m/s]          0.770984
+  t_SI[s]            0.0785917
+  p_SI[Pa]           594.417
+  rho_H(water)       1
+  rho_L(gas)         0.0012
+  sigma              0.00199903
+  water_pi_inf_mode  physical
+  pi_inf_water(code) 577036
+  pi_inf_water_physical(code) 577036
+  softening_factor   1
+  p_ref              205
+  c_water            1879.55
+  c_gas              489.047
+  Mach_water         0.000532042
+  Mach_gas           0.00204479
+  dt_est             4.15657e-07
+  n_steps_est        1.88953e+06
+  lambda_dom/H       0.0909091
+  cells/shortest-wave 32
+  total cells        1.04858e+06
+  Nx                 1024
+  Ny                 1024
+  g_y                -1
+  k_y                40
+  w_y                40
+  p_y                0
+  g_y[m/s^2]         -9.81
+  k_y[m/s^2]         392.4
+  w_y[rad/s]         508.96
+  f_y[Hz]            81.0035
+  T_osc[s]           0.0123451
+  T_osc              0.15708
+  n_periods          5
+  t_stop             0.785398
+  t_save             0.0015708
+  frames_per_period  100

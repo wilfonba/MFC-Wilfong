@@ -60,7 +60,7 @@ case = {
     "format": "silo",
     "precision": "double",
     "prim_vars_wrt": "T",
-    "parallel_io": "F",
+    "parallel_io": "T",
     "proj_method": "T",
     "proj_iter_solver": 1,
     "proj_tol": 1.0e-8,
