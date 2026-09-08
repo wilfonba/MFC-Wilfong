@@ -762,9 +762,12 @@ contains
 
         u0 = 5._wp; p0 = 1.e5_wp
 
-        do l = -3, p + 3
-            do k = -3, n + 3
-                do j = -3, m + 3
+        ! Interior only, then let the boundary conditions fill the ghosts. Writing the
+        ! profile straight into the ghost layers puts water where periodicity requires
+        ! air, and the state is inconsistent at the seam before the solver has run
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
                     if (j < (m + 1)/2) then
                         al = 1._wp
                     else
@@ -783,14 +786,15 @@ contains
                         qv = qv + qvs(2)*qs(j, k, l, 2)
                     end if
                     qs(j, k, l, eqn_idx%E) = gm*p0 + pf + qv + 0.5_wp*r0*u0*u0
-                    um(j, k, l) = 0._wp
                 end do
             end do
         end do
+        call s_staggered_bc_cells
+
         ! face momentum from the face density, so the face velocity is exactly u0
-        do l = -3, p + 3
-            do k = -3, n + 3
-                do j = -3, m + 2
+        do l = 0, p
+            do k = 0, n
+                do j = -1, m
                     r0 = 0._wp
                     do i = 1, num_fluids
                         r0 = r0 + 0.5_wp*(qs(j, k, l, i) + qs(j + 1, k, l, i))
