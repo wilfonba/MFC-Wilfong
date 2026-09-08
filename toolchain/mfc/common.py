@@ -1,10 +1,13 @@
+import collections
 import logging
 import os
 import shutil
 import subprocess
+import sys
 import typing
 from os.path import abspath, dirname, join, normpath, realpath
 
+import rich.markup
 import yaml
 
 from .printer import cons
@@ -90,6 +93,47 @@ def file_read(filepath: str):
         raise MFCException(f'Failed to read from "{filepath}": {exc}') from exc
 
 
+def console_safe(text: str) -> str:
+    """Escape captured text so Rich renders it verbatim.
+
+    The console prints with markup enabled, and compiler/MPI output is full of
+    square brackets: absolute paths inside diagnostics, and "[host:pid]" rank
+    prefixes. Rich reads those as markup tags -- it raises MarkupError on an
+    unmatched closing tag like "[/lustre/...]" and silently swallows "[node1:1]".
+    Either way the diagnostic is destroyed at the moment it matters most.
+    """
+    return rich.markup.escape(text)
+
+
+def log_tail(filepath: str, max_lines: int = 60) -> str:
+    """Return the end of a log file, ready to print into CI output.
+
+    A failure that only prints the *path* to its log is undebuggable in CI: the
+    file sits on a cluster or inside a container that no artifact upload
+    collects. Benchmark cases dying with "exit code 143" and post_process
+    failures pointing at out_post.txt were both diagnosable only by someone with
+    a shell on the machine, minutes before the workspace was cleaned.
+
+    Never raises: this runs on a path that is already failing, and the absence
+    of the log is itself worth reporting.
+    """
+    header = f"--- last {max_lines} lines of {filepath} ---"
+
+    try:
+        # A bounded deque, not f.read(): solver and benchmark logs reach tens of
+        # MB, and this runs on a path that is already failing. Memory stays
+        # proportional to max_lines rather than to the file.
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            lines = [line.rstrip("\n") for line in collections.deque(f, maxlen=max_lines)]
+    except OSError as exc:
+        return f"{header}\n(could not be read: {exc})"
+
+    if not lines:
+        return f"{header}\n(the log is empty -- the process likely died before writing anything)"
+
+    return "\n".join([header, *lines])
+
+
 def file_load_yaml(filepath: str):
     try:
         with open(filepath, "r") as f:
@@ -129,16 +173,35 @@ def delete_directory(dirpath: str) -> None:
         shutil.rmtree(dirpath)
 
 
-def get_program_output(arguments: typing.List[str] = None, cwd=None):
-    with subprocess.Popen([str(_) for _ in arguments] or [], cwd=cwd, stdout=subprocess.PIPE) as proc:
+def get_program_output(arguments: typing.List[str] = None, cwd=None, merge_stderr: bool = False):
+    """Run a command and return (stdout, returncode).
+
+    merge_stderr folds stderr into the captured output. Off by default because
+    callers that parse stdout must not start seeing stderr mixed in; on for
+    diagnostics, where tools like h5dump report the actual reason on stderr and
+    capturing only stdout leaves nothing to show.
+    """
+    stderr = subprocess.STDOUT if merge_stderr else None
+    with subprocess.Popen([str(_) for _ in arguments] or [], cwd=cwd, stdout=subprocess.PIPE, stderr=stderr) as proc:
         return (proc.communicate()[0].decode(), proc.returncode)
 
 
 def get_py_program_output(filepath: str, arguments: typing.List[str] = None):
+    """Run a case file and capture its stdout.
+
+    sys.executable, not a bare "python3": a case file imports the same optional deps the
+    toolchain venv provides (cantera, pyrometheus, scipy, ...), so it must run under the
+    interpreter the toolchain itself is running under. Nearly every entry point activates
+    the venv first, which makes PATH's python3 the venv's -- but a caller that invokes
+    build/venv/bin/python3 DIRECTLY does not, and then case files silently ran under the
+    system interpreter instead. That is what made coverage-health.yml report 16 chemistry
+    cases as unloadable with ModuleNotFoundError: No module named 'cantera', in a job whose
+    venv had cantera installed.
+    """
     dirpath = os.path.abspath(os.path.dirname(filepath))
     filename = os.path.basename(filepath)
 
-    return get_program_output(["python3", filename] + arguments, cwd=dirpath)
+    return get_program_output([sys.executable, filename] + arguments, cwd=dirpath)
 
 
 def isspace(s: str) -> bool:

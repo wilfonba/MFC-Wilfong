@@ -12,6 +12,7 @@ module m_time_steppers
     use m_global_parameters
     use m_rhs
     use m_chemistry
+    use m_reactive_burn, only: s_reactive_burn_substep
     use m_pressure_relaxation
     use m_data_output
     use m_bubbles_EE
@@ -589,6 +590,14 @@ contains
             call nvtxEndRange
         end if
 
+        ! Operator-split condensed-phase burn: integrate the progress variable per cell after the flow
+        ! update, with sub-stepping, instead of adding the source to the flow RHS (rburn%substeps > 0).
+        if (reactive_burn .and. rburn%substeps > 0) then
+            call nvtxStartRange("BURN-SUBSTEP")
+            call s_reactive_burn_substep(q_cons_ts(1)%vf, dt, idwint)
+            call nvtxEndRange
+        end if
+
         if (ib) then
             if (moving_immersed_boundary_flag) then
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
@@ -645,11 +654,11 @@ contains
         real(wp) :: rho  !< Cell-avg. density
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: vel    !< Cell-avg. velocity
-            real(wp), dimension(3) :: alpha  !< Cell-avg. volume fraction
+            real(wp), dimension(3) :: vel               !< Cell-avg. velocity
+            real(wp), dimension(3) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
         #:else
-            real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
-            real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
+            real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
+            real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
         #:endif
         real(wp)               :: vel_sum  !< Cell-avg. velocity sum
         real(wp)               :: pres     !< Cell-avg. pressure
@@ -657,7 +666,6 @@ contains
         real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
         real(wp)               :: qv       !< Cell-avg. fluid reference energy
         real(wp)               :: c        !< Cell-avg. sound speed
-        real(wp)               :: H        !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
         real(wp)               :: max_dt
         real(wp)               :: dt_local
@@ -669,19 +677,21 @@ contains
         end if
 
         dt_local = huge(1.0_wp)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt]', &
-                            & reduction='[[dt_local]]', reductionOp='[min]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
+                            & max_dt]', reduction='[[dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     if (igr) then
-                        call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                        call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
+                                                  & qv, j, k, l)
                     else
-                        call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                        call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, &
+                                                  & k, l)
                     end if
 
                     ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp

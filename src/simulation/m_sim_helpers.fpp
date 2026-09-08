@@ -5,7 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
+!> @brief Simulation helper routines for cell state, CFL calculation, and stability checks
 module m_sim_helpers
 
     use m_derived_types
@@ -14,7 +14,7 @@ module m_sim_helpers
 
     implicit none
 
-    private; public :: s_compute_enthalpy, s_compute_stability_from_dt, s_compute_dt_from_cfl
+    private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl
 
 contains
 
@@ -41,57 +41,29 @@ contains
 
     end function f_compute_filtered_dtheta
 
-    !> Computes inviscid CFL terms for multi-dimensional cases (2D/3D only)
-    function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
+    !> Computes the mixture coefficients, velocity and pressure of one cell
+    subroutine s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(num_vels), intent(in) :: vel
-        real(wp), intent(in)                      :: c
-        integer, intent(in)                       :: j, k, l
-        real(wp)                                  :: cfl_terms
-        real(wp)                                  :: fltr_dtheta
-
-        fltr_dtheta = f_compute_filtered_dtheta(k, l)
-
-        if (p > 0) then
-            ! 3D
-            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                if (grid_geometry == 3) then
-                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
-                else
-                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
-                end if
-            #:endif
-        else
-            ! 2D
-            cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
-        end if
-
-    end function f_compute_multidim_cfl_terms
-
-    !> Computes enthalpy
-    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
-
-        $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', cray_inline=True)
+        $:GPU_ROUTINE(function_name='s_compute_cell_state',parallelism='[seq]', cray_inline=True)
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), intent(inout), dimension(3) :: alpha
+            real(wp), intent(inout), dimension(3) :: alpha, alpha_rho
             real(wp), intent(inout), dimension(3) :: vel
         #:else
-            real(wp), intent(inout), dimension(num_fluids) :: alpha
+            real(wp), intent(inout), dimension(num_fluids) :: alpha, alpha_rho
             real(wp), intent(inout), dimension(num_vels)   :: vel
         #:endif
-        real(wp), intent(inout)               :: rho, gamma, pi_inf, vel_sum, H, pres
+        real(wp), intent(inout)               :: rho, gamma, pi_inf, vel_sum, pres
         real(wp), intent(out)                 :: qv
         integer, intent(in)                   :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho, Gs
+            real(wp), dimension(3) :: Gs
         #:else
-            real(wp), dimension(num_fluids) :: alpha_rho, Gs
+            real(wp), dimension(num_fluids) :: Gs
         #:endif
-        real(wp) :: E, G_local
+        real(wp) :: G_local
         integer  :: i
 
         call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
@@ -121,16 +93,12 @@ contains
         end do
 
         if (igr) then
-            E = q_prim_vf(eqn_idx%E)%sf(j, k, l)
-            pres = (E - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
+            pres = (q_prim_vf(eqn_idx%E)%sf(j, k, l) - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
         else
             pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
-            E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
         end if
 
-        H = (E + pres)/rho
-
-    end subroutine s_compute_enthalpy
+    end subroutine s_compute_cell_state
 
     !> Computes stability criterion for a specified dt
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc, ccfl)
@@ -145,8 +113,21 @@ contains
         real(wp)                                  :: fltr_dtheta
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then
-            icfl = dt/f_compute_multidim_cfl_terms(vel, c, j, k, l)
+        ! The multi-dimensional CFL terms are written out here rather than
+        ! obtained from a shared helper procedure: NVHPC 25.5's fort2 segfaults
+        ! when a routine containing a call to that helper is cross-file inlined
+        ! by -Minline (the IPO setup in cmake/MFCTargets.cmake).
+        if (p > 0) then
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                    icfl = dt/min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
+                else
+                    icfl = dt/min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
+                end if
+            #:endif
+        else if (n > 0) then
+            icfl = dt/min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
         else
             icfl = (dt/dx(j))*(abs(vel(1)) + c)
         end if
@@ -206,8 +187,21 @@ contains
         real(wp)                                  :: fltr_dtheta
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then
-            max_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
+        ! The multi-dimensional CFL terms are written out here rather than
+        ! obtained from a shared helper procedure: NVHPC 25.5's fort2 segfaults
+        ! when a routine containing a call to that helper is cross-file inlined
+        ! by -Minline (the IPO setup in cmake/MFCTargets.cmake).
+        if (p > 0) then
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                    max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
+                else
+                    max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
+                end if
+            #:endif
+        else if (n > 0) then
+            max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
         else
             max_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
         end if

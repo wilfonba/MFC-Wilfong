@@ -202,6 +202,28 @@ contains
 
         ! Fluids physical parameters (post-specific; G = dflt_real differs from pre/sim)
         do i = 1, num_fluids_max
+            fluid_pp(i)%eos = eos_stiffened_gas
+            fluid_pp(i)%mg_rho0 = dflt_real
+            fluid_pp(i)%mg_c0 = dflt_real
+            fluid_pp(i)%mg_s = dflt_real
+            fluid_pp(i)%mg_gruneisen = dflt_real
+            fluid_pp(i)%mg_gruneisen_a = 0._wp
+            fluid_pp(i)%mg_t0 = 0._wp
+            fluid_pp(i)%mg_s2 = 0._wp
+            fluid_pp(i)%mg_s3 = 0._wp
+            fluid_pp(i)%jwl_a = dflt_real
+            fluid_pp(i)%jwl_b = dflt_real
+            fluid_pp(i)%jwl_r1 = dflt_real
+            fluid_pp(i)%jwl_r2 = dflt_real
+            fluid_pp(i)%jwl_omega = dflt_real
+            fluid_pp(i)%jwl_rho0 = dflt_real
+            fluid_pp(i)%jwl_t0 = 0._wp
+            fluid_pp(i)%vinet_k0 = dflt_real
+            fluid_pp(i)%vinet_k0p = dflt_real
+            fluid_pp(i)%vinet_rho0 = dflt_real
+            fluid_pp(i)%vinet_gruneisen = dflt_real
+            fluid_pp(i)%vinet_gruneisen_a = 0._wp
+            fluid_pp(i)%vinet_t0 = 0._wp
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
             fluid_pp(i)%cv = 0._wp
@@ -216,6 +238,23 @@ contains
             fluid_pp(i)%mu_min = dflt_real
             fluid_pp(i)%mu_max = dflt_real
             fluid_pp(i)%mu_bulk = dflt_real
+        end do
+
+        num_particle_clouds = 0
+        do i = 1, num_particle_clouds_max
+            particle_cloud(i)%x_centroid = 0._wp
+            particle_cloud(i)%y_centroid = 0._wp
+            particle_cloud(i)%z_centroid = 0._wp
+            particle_cloud(i)%length_x = dflt_real
+            particle_cloud(i)%length_y = dflt_real
+            particle_cloud(i)%length_z = dflt_real
+            particle_cloud(i)%num_particles = 0
+            particle_cloud(i)%radius = dflt_real
+            particle_cloud(i)%mass = dflt_real
+            particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%moving_ibm = 0
+            particle_cloud(i)%seed = 0
+            particle_cloud(i)%packing_method = dflt_int
         end do
 
         ! Subgrid bubble parameters (bub_pp struct + scalar companions; bub_pp%R0ref is set in common
@@ -265,6 +304,7 @@ contains
         prim_vars_wrt = .false.
         cons_vars_wrt = .false.
         c_wrt = .false.
+        T_wrt = .false.
         omega_wrt = .false.
         qm_wrt = .false.
         liutex_wrt = .false.
@@ -321,6 +361,13 @@ contains
         ! Declared for the common conversion kernel but not a post_process input, so it is neither
         ! defaulted on non-root ranks nor broadcast. Post-process never carries viscous stresses.
         viscous = .false.
+
+        ! Particle clouds expand into individual IB patches at simulation startup, so num_ibs as read
+        ! from the case file counts only the namelist patches. Match the global count the simulation
+        ! arrives at (s_reduce_ib_patch_array) so the IB state records can be read back.
+        do i = 1, num_particle_clouds
+            num_ibs = num_ibs + particle_cloud(i)%num_particles
+        end do
 
         ! Gamma/Pi_inf: force num_fluids=1 (post_process-specific side effect of the gamma-law model)
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1

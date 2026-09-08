@@ -409,6 +409,7 @@ contains
         integer, dimension(num_procs)                   :: meshtypes
         integer                                         :: i
         integer                                         :: ierr
+        integer                                         :: extents_size
 
         if (format == format_silo) then
             ! For multidimensional data sets, the spatial extents of all of the grid(s) handled by the local processor(s) are
@@ -441,7 +442,8 @@ contains
 
                 err = DBSET2DSTRLEN(len(meshnames(1)))
                 err = DBMKOPTLIST(2, out%optlist)
-                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, size(out%spatial_extents, 1))
+                extents_size = size(out%spatial_extents, 1)
+                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, extents_size)
                 err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%spatial_extents)
                 err = DBPUTMMESH(out%dbroot, 'rectilinear_grid', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, &
                                  & out%optlist, ierr)
@@ -549,6 +551,7 @@ contains
         integer, dimension(num_procs)                   :: vartypes
         integer                                         :: i, j, k
         integer                                         :: ierr
+        integer                                         :: extents_size
 
         if (format == format_silo) then
             ! Determining the extents of the flow variable on each local process and gathering all this information on root process
@@ -567,7 +570,8 @@ contains
 
                 err = DBSET2DSTRLEN(len(varnames(1)))
                 err = DBMKOPTLIST(2, out%optlist)
-                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, 2)
+                extents_size = size(out%data_extents, 1)
+                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, extents_size)
                 err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%data_extents)
                 err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), num_procs, varnames, len_trim(varnames), vartypes, &
                                 & out%optlist, ierr)
@@ -1238,10 +1242,10 @@ contains
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf, q_cons_vf
-        real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
-        real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H, qv
+        real(wp) :: Elk, Egk, Elp, Egint, Eg_phase, Vb, Vl, pres_av, Et
+        real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, qv, MaxMa, MaxMa_glb, maxvel, c, Ma
         real(wp), dimension(num_vels) :: vel
-        real(wp), dimension(num_fluids) :: adv
+        real(wp), dimension(num_fluids) :: adv, alpha_rho
         integer :: i, j, k, l, s  !< looping indices
 
         Egk = 0._wp
@@ -1262,14 +1266,8 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    pres = 0._wp
                     dV = dx(i)*dy(j)*dz(k)
-                    rho = 0._wp
-                    gamma = 0._wp
-                    pi_inf = 0._wp
-                    qv = 0._wp
                     pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
-                    Egint = Egint + q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*(gammas(2)*pres)*dV
                     do s = 1, num_vels
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
                         Egk = Egk + 0.5_wp*q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
@@ -1278,17 +1276,17 @@ contains
                             maxvel = abs(vel(s))
                         end if
                     end do
-                    do l = 1, eqn_idx%adv%end - eqn_idx%E
+                    do l = 1, num_fluids
                         adv(l) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)
-                        gamma = gamma + adv(l)*gammas(l)
-                        pi_inf = pi_inf + adv(l)*pi_infs(l)
-                        rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
-                        qv = qv + adv(l)*q_prim_vf(l)%sf(i, j, k)*qvs(l)
+                        alpha_rho(l) = q_prim_vf(l)%sf(i, j, k)
                     end do
 
-                    H = ((gamma + 1._wp)*pres + pi_inf + qv)/rho
+                    call s_phase_internal_energy(pres, adv(2), alpha_rho(2), 2, Eg_phase)
+                    Egint = Egint + Eg_phase*dV
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, 0._wp, 0._wp, c, qv)
+                    call s_compute_mixture_coefficients(alpha_rho, adv, rho, gamma, pi_inf, qv)
+
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c, alpha_rho)
 
                     Ma = maxvel/c
                     if (Ma > MaxMa .and. (adv(1) > (1.0_wp - 1.0e-10_wp))) then

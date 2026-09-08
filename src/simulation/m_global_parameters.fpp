@@ -16,7 +16,6 @@ module m_global_parameters
     use m_helper_basic
     ! Shared state: generated_decls, generated_case_opt_decls, sys_size, eqn_idx, chemistry, shear_*
     use m_global_parameters_common
-    ! $:USE_GPU_MODULE()
 
     implicit none
 
@@ -86,7 +85,6 @@ module m_global_parameters
     logical                :: bodyForces
     real(wp), dimension(3) :: accel_bf
     $:GPU_DECLARE(create='[accel_bf]')
-    ! $:GPU_DECLARE(create='[k_x,w_x,p_x,g_x,k_y,w_y,p_y,g_y,k_z,w_z,p_z,g_z]')
 
     !> Source fields for the spatially supported body force. `spatial_bf` and
     !> `bf_spatial_support` are auto-generated in generated_decls.fpp.
@@ -123,7 +121,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
     $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
     $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
-    $:GPU_DECLARE(create='[ib_bc_x%beg, ib_bc_y%beg, ib_bc_z%beg]')
+    $:GPU_DECLARE(create='[ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end, ib_bc_z%beg, ib_bc_z%end]')
 #elif defined(MFC_OpenMP)
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
     $:GPU_DECLARE(create='[ib_bc_x, ib_bc_y, ib_bc_z]')
@@ -214,7 +212,7 @@ module m_global_parameters
     !> @}
     $:GPU_DECLARE(create='[fd_coeff_x, fd_coeff_y, fd_coeff_z]')
 
-    ! probe, integral: auto-generated in generated_decls.fpp
+    ! probe: auto-generated in generated_decls.fpp
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
@@ -447,6 +445,28 @@ contains
 
         ! Fluids physical parameters (sim-specific; Re(:) and G=0._wp differ from post)
         do i = 1, num_fluids_max
+            fluid_pp(i)%eos = eos_stiffened_gas
+            fluid_pp(i)%mg_rho0 = dflt_real
+            fluid_pp(i)%mg_c0 = dflt_real
+            fluid_pp(i)%mg_s = dflt_real
+            fluid_pp(i)%mg_gruneisen = dflt_real
+            fluid_pp(i)%mg_gruneisen_a = 0._wp
+            fluid_pp(i)%mg_t0 = 0._wp
+            fluid_pp(i)%mg_s2 = 0._wp
+            fluid_pp(i)%mg_s3 = 0._wp
+            fluid_pp(i)%jwl_a = dflt_real
+            fluid_pp(i)%jwl_b = dflt_real
+            fluid_pp(i)%jwl_r1 = dflt_real
+            fluid_pp(i)%jwl_r2 = dflt_real
+            fluid_pp(i)%jwl_omega = dflt_real
+            fluid_pp(i)%jwl_rho0 = dflt_real
+            fluid_pp(i)%jwl_t0 = 0._wp
+            fluid_pp(i)%vinet_k0 = dflt_real
+            fluid_pp(i)%vinet_k0p = dflt_real
+            fluid_pp(i)%vinet_rho0 = dflt_real
+            fluid_pp(i)%vinet_gruneisen = dflt_real
+            fluid_pp(i)%vinet_gruneisen_a = 0._wp
+            fluid_pp(i)%vinet_t0 = 0._wp
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
             fluid_pp(i)%cv = 0._wp
@@ -488,7 +508,7 @@ contains
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
         ! Immersed Boundaries (sim-specific extras)
-        ib_neighborhood_radius = 1
+        ib_neighborhood_radius = 0
         collision_model = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
@@ -573,23 +593,12 @@ contains
 
         fd_order = dflt_int
         probe_wrt = .false.
-        integral_wrt = .false.
         num_probes = dflt_int
-        num_integrals = dflt_int
 
         do i = 1, num_probes_max
             probe(i)%x = dflt_real
             probe(i)%y = dflt_real
             probe(i)%z = dflt_real
-        end do
-
-        do i = 1, num_probes_max
-            integral(i)%xmin = dflt_real
-            integral(i)%xmax = dflt_real
-            integral(i)%ymin = dflt_real
-            integral(i)%ymax = dflt_real
-            integral(i)%zmin = dflt_real
-            integral(i)%zmax = dflt_real
         end do
 
         ! GRCBC flags
@@ -652,9 +661,13 @@ contains
             particle_cloud(i)%radius = dflt_real
             particle_cloud(i)%mass = dflt_real
             particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%shell_inner_radius = dflt_real
+            particle_cloud(i)%shell_outer_radius = dflt_real
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
+            particle_cloud(i)%cloud_geometry = 1
             particle_cloud(i)%packing_method = dflt_int
+            particle_cloud(i)%periodic = 0
         end do
 
         do i = 1, num_ib_patches_max_namelist

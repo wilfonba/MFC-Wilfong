@@ -7,7 +7,7 @@ from mfc import common
 
 from ..state import ARG
 from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
-from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_sod_l1
+from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
 
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
@@ -125,6 +125,40 @@ def add_convergence_cases(cases):
                 )
             )
 
+    cases.append(
+        define_convergence_case(
+            "Convergence -> Mie-Gruneisen -> acoustic speed",
+            spec=ConvergenceSpec(runner=run_mg_wave_speed, case_path="examples/1D_mg_acoustic/case.py", extra_args=["--a", "0.5"], expected_order=0.0, tol=1.0e-3, resolutions=[100, 200, 400]),
+        )
+    )
+    cases.append(
+        define_convergence_case(
+            "Convergence -> JWL -> isentropic release",
+            spec=ConvergenceSpec(runner=run_isentropic_release, case_path="examples/1D_isentropic_release/case.py", expected_order=0.0, tol=1.0e-3, resolutions=[200, 400, 800]),
+        )
+    )
+    cases.append(
+        define_convergence_case(
+            "Convergence -> Vinet -> isentropic release",
+            spec=ConvergenceSpec(
+                runner=run_isentropic_release, case_path="examples/1D_isentropic_release/case.py", extra_args=["--eos", "vinet"], expected_order=0.0, tol=5.0e-3, resolutions=[200, 400, 800]
+            ),
+        )
+    )
+    cases.append(
+        define_convergence_case(
+            "Convergence -> Mie-Gruneisen -> Hugoniot -> cubic",
+            spec=ConvergenceSpec(
+                runner=run_mg_hugoniot, case_path="examples/1D_mg_impact/case.py", extra_args=["--s2", "0.3", "--s3", "0.05"], expected_order=0.0, tol=0.005, amps=[0.2, 0.5, 1.0, 1.2]
+            ),
+        )
+    )
+    cases.append(
+        define_convergence_case(
+            "Convergence -> Mie-Gruneisen -> Hugoniot",
+            spec=ConvergenceSpec(runner=run_mg_hugoniot, case_path="examples/1D_mg_impact/case.py", expected_order=0.0, tol=0.005, amps=[0.2, 0.5, 1.0, 1.5]),
+        )
+    )
     for label, extra_args, expected, tol, min_N in _CONVERGENCE_SOD_SCHEMES:
         resolutions = [N for N in _RES_SOD_DEFAULT if min_N is None or N >= min_N]
         cases.append(
@@ -530,6 +564,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 stack.pop()
             stack.pop()
 
+    def alter_eos():
+        # BASE_CFG's fluid is already an ideal gas, so this re-selection must not change a single digit.
+        cases.append(define_case_d(stack, "eos=ideal_gas", {"fluid_pp(1)%eos": "ideal_gas"}))
+
     def alter_riemann_solvers(num_fluids):
         for riemann_solver in [1, 5, 2]:
             stack.push(f"riemann_solver={riemann_solver}", {"riemann_solver": riemann_solver})
@@ -539,6 +577,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if riemann_solver in (1, 2):
                 cases.append(define_case_d(stack, "avg_state=1", {"avg_state": 1}))
                 cases.append(define_case_d(stack, "wave_speeds=2", {"wave_speeds": 2}))
+
+                # The averaged state is only read by the pressure-based wave speeds, so neither
+                # case above reaches the Roe average: one computes it and discards it, the other
+                # takes the arithmetic branch. Combining them is the only coverage it gets.
+                if num_fluids == 1:
+                    stack.push("avg_state=1", {"avg_state": 1})
+                    cases.append(define_case_d(stack, "wave_speeds=2", {"wave_speeds": 2}))
+                    stack.pop()
 
                 if riemann_solver == 2:
                     cases.append(define_case_d(stack, "model_eqns=3", {"model_eqns": 3}))
@@ -562,7 +608,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, f"{trace_prefix} -> u-interface -> alt_soundspeed", {"riemann_solver": 1, "hll_u_interface": "T", "alt_soundspeed": "T", **(u_interface_mods or {})}))
 
     def alter_low_Mach_correction():
-        stack.push("", {"fluid_pp(1)%gamma": 0.16, "fluid_pp(1)%pi_inf": 3515.0, "dt": 1e-7})
+        stack.push("", {"fluid_pp(1)%gamma": 0.16, "fluid_pp(1)%eos": "stiffened_gas", "fluid_pp(1)%pi_inf": 3515.0, "dt": 1e-7})
 
         stack.push("riemann_solver=1", {"riemann_solver": 1})
         cases.append(define_case_d(stack, "low_Mach=1", {"low_Mach": 1}))
@@ -649,7 +695,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "",
                     {
                         "fluid_pp(2)%gamma": 2.5,
-                        "fluid_pp(2)%pi_inf": 0.0,
+                        "fluid_pp(2)%eos": "ideal_gas",
                         "patch_icpp(1)%alpha_rho(1)": 0.81,
                         "patch_icpp(1)%alpha(1)": 0.9,
                         "patch_icpp(1)%alpha_rho(2)": 0.19,
@@ -664,6 +710,145 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(3)%alpha(2)": 0.8,
                     },
                 )
+                if dimInfo[0] == ["x"]:
+                    # Fluid 1 on its own reference curve beside an ideal gas, so one kernel carries both EOS paths.
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen",
+                            {
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=jwl",
+                            {
+                                "fluid_pp(1)%eos": "jwl",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%jwl_a": 6.0,
+                                "fluid_pp(1)%jwl_b": 0.15,
+                                "fluid_pp(1)%jwl_r1": 4.0,
+                                "fluid_pp(1)%jwl_r2": 1.0,
+                                "fluid_pp(1)%jwl_omega": 0.3,
+                                "fluid_pp(1)%jwl_rho0": 0.9,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen -> alt_soundspeed=T",
+                            {
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                                "alt_soundspeed": "T",
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=vinet",
+                            {
+                                "fluid_pp(1)%eos": "vinet",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%vinet_k0": 2.0,
+                                "fluid_pp(1)%vinet_k0p": 4.0,
+                                "fluid_pp(1)%vinet_rho0": 0.9,
+                                "fluid_pp(1)%vinet_gruneisen": 0.3,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen -> cubic Hugoniot",
+                            {
+                                "patch_icpp(1)%alpha_rho(1)": 0.891,
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                                "fluid_pp(1)%mg_s2": 0.2,
+                                "fluid_pp(1)%mg_s3": 0.05,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen -> model_eqns=3",
+                            {
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                                "fluid_pp(1)%mg_gruneisen_a": 0.5,
+                                "model_eqns": 3,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=jwl -> model_eqns=3",
+                            {
+                                "fluid_pp(1)%eos": "jwl",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%jwl_a": 6.0,
+                                "fluid_pp(1)%jwl_b": 0.15,
+                                "fluid_pp(1)%jwl_r1": 4.0,
+                                "fluid_pp(1)%jwl_r2": 1.0,
+                                "fluid_pp(1)%jwl_omega": 0.3,
+                                "fluid_pp(1)%jwl_rho0": 0.9,
+                                "model_eqns": 3,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen -> bc=-5",
+                            {
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                                "bc_x%beg": -5,
+                                "bc_x%end": -5,
+                                "probe_wrt": "T",
+                                "fd_order": 1,
+                                "num_probes": 1,
+                                "probe(1)%x": 0.5,
+                            },
+                        )
+                    )
 
                 if len(dimInfo[0]) > 1:
                     alter_capillary()
@@ -674,6 +859,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cbc_mods = {"bc_y%end": -6} if len(dimInfo[0]) == 2 else None
                 add_hll_u_interface_cases("riemann_solver=1", cbc_mods)
             alter_low_Mach_correction()
+            if num_fluids == 1:
+                alter_eos()
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
                 alter_igr()
@@ -803,7 +990,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "bc_y%beg": -2,
                 "cyl_coord": "T",
                 "fluid_pp(2)%gamma": 2.5,
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "patch_icpp(1)%alpha_rho(1)": 0.81,
                 "patch_icpp(1)%alpha(1)": 0.9,
                 "patch_icpp(1)%alpha_rho(2)": 0.19,
@@ -881,7 +1068,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(1)%vel(1)": 0.0,
                 "num_fluids": 2,
                 "fluid_pp(2)%gamma": 2.5,
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "patch_icpp(1)%alpha_rho(1)": 0.81,
                 "patch_icpp(1)%alpha(1)": 0.9,
                 "patch_icpp(1)%alpha_rho(2)": 0.19,
@@ -1021,6 +1208,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, f"Circle{suffix}", {"patch_ib(1)%geometry": 2, "n": 49}))
+                if slip and six_eqn_model:
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            f"Circle{suffix} -> model_eqns=3 -> eos=mie_gruneisen",
+                            {
+                                "patch_ib(1)%geometry": 2,
+                                "model_eqns": 3,
+                                "n": 49,
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%pi_inf": None,
+                                "fluid_pp(1)%mg_rho0": 1.0,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.0,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                            },
+                        )
+                    )
                 if six_eqn_model:
                     cases.append(
                         define_case_d(
@@ -1058,6 +1264,98 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(3)%vel(1)": 0.001,
                         "patch_ib(1)%slip": "F",
                         "n": 49,
+                    },
+                )
+            )
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Hemisphere Shell",
+                    {
+                        "ib": "T",
+                        "num_ibs": 0,
+                        "num_particle_clouds": 1,
+                        "fd_order": 2,
+                        "ib_state_wrt": "T",
+                        "n": 49,
+                        "particle_cloud(1)%cloud_geometry": 2,
+                        "particle_cloud(1)%packing_method": 1,
+                        "particle_cloud(1)%x_centroid": 0.5,
+                        "particle_cloud(1)%y_centroid": 0.1,
+                        "particle_cloud(1)%num_particles": 4,
+                        "particle_cloud(1)%radius": 0.02,
+                        "particle_cloud(1)%mass": 1.0,
+                        "particle_cloud(1)%min_spacing": 0.005,
+                        "particle_cloud(1)%shell_inner_radius": 0.1,
+                        "particle_cloud(1)%shell_outer_radius": 0.3,
+                        "particle_cloud(1)%moving_ibm": 0,
+                        "particle_cloud(1)%seed": 12345,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                )
+            )
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Box",
+                    {
+                        "ib": "T",
+                        "num_ibs": 0,
+                        "num_particle_clouds": 1,
+                        "fd_order": 2,
+                        "ib_state_wrt": "T",
+                        "n": 49,
+                        "particle_cloud(1)%cloud_geometry": 1,
+                        "particle_cloud(1)%packing_method": 1,
+                        "particle_cloud(1)%x_centroid": 0.5,
+                        "particle_cloud(1)%y_centroid": 0.5,
+                        "particle_cloud(1)%length_x": 0.6,
+                        "particle_cloud(1)%length_y": 0.6,
+                        "particle_cloud(1)%num_particles": 50,
+                        "particle_cloud(1)%radius": 0.02,
+                        "particle_cloud(1)%mass": 1.0,
+                        "particle_cloud(1)%min_spacing": 0.005,
+                        "particle_cloud(1)%moving_ibm": 0,
+                        "particle_cloud(1)%seed": 12345,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                )
+            )
+
+        if len(dimInfo[0]) == 3 and not viscous:
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Hemisphere Shell",
+                    {
+                        "ib": "T",
+                        "num_ibs": 0,
+                        "num_particle_clouds": 1,
+                        "fd_order": 2,
+                        "ib_state_wrt": "T",
+                        "m": 29,
+                        "n": 29,
+                        "p": 29,
+                        "particle_cloud(1)%cloud_geometry": 2,
+                        "particle_cloud(1)%packing_method": 1,
+                        "particle_cloud(1)%x_centroid": 0.5,
+                        "particle_cloud(1)%y_centroid": 0.5,
+                        "particle_cloud(1)%z_centroid": 0.1,
+                        "particle_cloud(1)%num_particles": 4,
+                        "particle_cloud(1)%radius": 0.06,
+                        "particle_cloud(1)%mass": 1.0,
+                        "particle_cloud(1)%min_spacing": 0.005,
+                        "particle_cloud(1)%shell_inner_radius": 0.1,
+                        "particle_cloud(1)%shell_outer_radius": 0.35,
+                        "particle_cloud(1)%moving_ibm": 0,
+                        "particle_cloud(1)%seed": 12345,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
                     },
                 )
             )
@@ -1167,6 +1465,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 {
                     "nb": 3,
                     "fluid_pp(1)%gamma": 0.16,
+                    "fluid_pp(1)%eos": "stiffened_gas",
                     "fluid_pp(1)%pi_inf": 3515.0,
                     "bub_pp%R0ref": 1.0,
                     "bub_pp%p0ref": 1.0,
@@ -1200,6 +1499,29 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 },
             )
 
+            # Two-fluid bubbly: the void fraction is the last advection slot, so the mixture rule must
+            # sum the material slots only. Nothing else in the suite runs bubbles_euler with
+            # num_fluids > 1, which is why summing the void went unnoticed (MFlowCode/MFC#1762 review).
+            if len(dimInfo[0]) == 1:
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "2 Fluid(s)",
+                        {
+                            "num_fluids": 2,
+                            "fluid_pp(2)%gamma": 2.5,
+                            "fluid_pp(2)%eos": "stiffened_gas",
+                            "fluid_pp(2)%pi_inf": 0.0,
+                            "patch_icpp(1)%alpha_rho(2)": 1e-08,
+                            "patch_icpp(2)%alpha_rho(2)": 1e-08,
+                            "patch_icpp(3)%alpha_rho(2)": 1e-08,
+                            "patch_icpp(1)%alpha(2)": 4e-02,
+                            "patch_icpp(2)%alpha(2)": 4e-02,
+                            "patch_icpp(3)%alpha(2)": 4e-02,
+                        },
+                    )
+                )
+
             stack.push("", {"acoustic_source": "T"})
 
             if len(dimInfo[0]) >= 2:
@@ -1229,7 +1551,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "adap_dt=T", {"adap_dt": "T"}))
             stack.pop()
 
-            stack.push("", {"fluid_pp(1)%pi_inf": 351.5})
+            stack.push("", {"fluid_pp(1)%eos": "stiffened_gas", "fluid_pp(1)%pi_inf": 351.5})
             cases.append(define_case_d(stack, "artificial_Ma", {"pi_fac": 0.1}))
 
             stack.pop()
@@ -1271,6 +1593,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "riemann_solver": 1,
                     "fd_order": 4,
                     "fluid_pp(1)%gamma": 0.3,
+                    "fluid_pp(1)%eos": "stiffened_gas",
                     "fluid_pp(1)%pi_inf": 7.8e05,
                     "patch_icpp(1)%pres": 1.0e06,
                     "patch_icpp(1)%alpha_rho(1)": 1000.0e00,
@@ -1290,6 +1613,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "",
                     {
                         "fluid_pp(2)%gamma": 0.3,
+                        "fluid_pp(2)%eos": "stiffened_gas",
                         "fluid_pp(2)%pi_inf": 7.8e05,
                         "patch_icpp(1)%alpha_rho(1)": 900.0e00,
                         "patch_icpp(1)%alpha(1)": 0.9,
@@ -1320,6 +1644,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
 
+            if num_fluids == 2 and len(dimInfo[0]) == 2:
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "eos=mie_gruneisen",
+                        {
+                            "fluid_pp(1)%eos": "mie_gruneisen",
+                            "fluid_pp(1)%gamma": None,
+                            "fluid_pp(1)%pi_inf": None,
+                            "fluid_pp(1)%mg_rho0": 1000.0,
+                            "fluid_pp(1)%mg_c0": 1500.0,
+                            "fluid_pp(1)%mg_s": 2.0,
+                            "fluid_pp(1)%mg_gruneisen": 0.5,
+                        },
+                    )
+                )
             if len(dimInfo[0]) == 3:
                 stack.push(
                     "",
@@ -1337,6 +1677,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
 
             cases.append(define_case_d(stack, "", {}))
+
+            if len(dimInfo[0]) == 2 and num_fluids == 1:
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "probe -> nonuniform stress",
+                        {
+                            "probe_wrt": "T",
+                            "num_probes": 1,
+                            "probe(1)%x": 0.5,
+                            "probe(1)%y": 0.5,
+                            "patch_icpp(1)%tau_e(1)": 1.0e04,
+                            "patch_icpp(1)%tau_e(2)": 5.0e03,
+                            "patch_icpp(1)%tau_e(3)": 2.0e03,
+                            "patch_icpp(2)%tau_e(1)": -1.0e04,
+                            "patch_icpp(2)%tau_e(2)": 3.0e03,
+                            "patch_icpp(2)%tau_e(3)": -2.0e03,
+                        },
+                    )
+                )
 
             reflective_params = {"bc_x%beg": -2, "bc_x%end": -2, "bc_y%beg": -2, "bc_y%end": -2}
             if len(dimInfo[0]) == 3:
@@ -1531,7 +1891,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "weno_avg": "T",
                         "wenoz": "T",
                         "fluid_pp(1)%gamma": 2.5,
-                        "fluid_pp(1)%pi_inf": 0.0,
+                        "fluid_pp(1)%eos": "ideal_gas",
                         "fluid_pp(1)%Re(1)": 1.6881644098979287,
                         "viscous": "T",
                         "patch_icpp(1)%geometry": 9,
@@ -1595,12 +1955,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "num_fluids": num_fluids,
                             "riemann_solver": 2,
                             "fluid_pp(1)%gamma": 0.7409,
+                            "fluid_pp(1)%eos": "stiffened_gas",
                             "fluid_pp(1)%pi_inf": 1.7409e09,
                             "fluid_pp(1)%cv": 1816,
                             "fluid_pp(1)%qv": -1167000,
                             "fluid_pp(1)%qvp": 0.0,
                             "fluid_pp(2)%gamma": 2.3266,
-                            "fluid_pp(2)%pi_inf": 0.0e00,
+                            "fluid_pp(2)%eos": "ideal_gas",
                             "fluid_pp(2)%cv": 1040,
                             "fluid_pp(2)%qv": 2030000,
                             "fluid_pp(2)%qvp": -23400,
@@ -1627,7 +1988,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "",
                             {
                                 "fluid_pp(3)%gamma": 2.4870,
-                                "fluid_pp(3)%pi_inf": 0.0e00,
+                                "fluid_pp(3)%eos": "ideal_gas",
                                 "fluid_pp(3)%cv": 717.5,
                                 "fluid_pp(3)%qv": 0.0e00,
                                 "fluid_pp(3)%qvp": 0.0,
@@ -1694,6 +2055,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 {
                     "nb": 1,
                     "fluid_pp(1)%gamma": 0.16,
+                    "fluid_pp(1)%eos": "stiffened_gas",
                     "fluid_pp(1)%pi_inf": 3515.0,
                     "bub_pp%R0ref": 1.0,
                     "bub_pp%p0ref": 1.0,
@@ -1774,9 +2136,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "lag_params%heatTransfer_model": "T",
                             "lag_params%massTransfer_model": "T",
                             "fluid_pp(1)%gamma": 0.16,
+                            "fluid_pp(1)%eos": "stiffened_gas",
                             "fluid_pp(1)%pi_inf": 3515.0,
                             "fluid_pp(2)%gamma": 2.5,
-                            "fluid_pp(2)%pi_inf": 0.0,
+                            "fluid_pp(2)%eos": "ideal_gas",
                             "patch_icpp(1)%alpha_rho(1)": 0.96,
                             "patch_icpp(1)%alpha(1)": 4e-02,
                             "patch_icpp(1)%alpha_rho(2)": 0.0,
@@ -2021,9 +2384,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         _fl_p = 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00)
         _fluids = {
             "fluid_pp(1)%gamma": _fl_g,
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": _fl_p,
             "fluid_pp(1)%G": 0.0,
             "fluid_pp(2)%gamma": _fl_g,
+            "fluid_pp(2)%eos": "stiffened_gas",
             "fluid_pp(2)%pi_inf": _fl_p,
             "fluid_pp(2)%G": 1e7,
         }
@@ -2211,9 +2576,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                     # The shear-stress rows of this case stay near zero, so the absolute
                     # tolerance is the binding comparison there and compiler/backend roundoff
-                    # can exceed the suite default. override_tol is case-wide.
-                    is_axisym_hlld_no_alt_soundspeed = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace in {"HLLD", "HLLD -> ADC"} and alt_soundspeed == "F"
-                    tol = 1e-5 if is_axisym_hlld_no_alt_soundspeed else None
+                    # can exceed the suite default. This holds for both alt_soundspeed
+                    # variants -- nvhpc 25.5 drifts the alt_soundspeed=T rows to ~1.4e-6, past
+                    # the 1e-6 band. override_tol is case-wide.
+                    is_axisym_hlld = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace in {"HLLD", "HLLD -> ADC"}
+                    tol = 1e-5 if is_axisym_hlld else None
 
                     trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
                     cases.append(
@@ -2231,6 +2598,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "num_fluids": 3,
             "alt_soundspeed": "F",
             "fluid_pp(3)%gamma": _fl_g,
+            "fluid_pp(3)%eos": "stiffened_gas",
             "fluid_pp(3)%pi_inf": _fl_p,
             "fluid_pp(3)%G": 5e6,
             "patch_icpp(1)%alpha_rho(1)": 600.0,
@@ -2311,10 +2679,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "m": nx - 1,
             "dt": 0.2 * dx / c_outer,
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
-            "fluid_pp(1)%pi_inf": 0.0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%G": G_solid,
             "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
-            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%eos": "ideal_gas",
             "fluid_pp(2)%G": 0.0,
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
@@ -2382,10 +2750,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "m": nx - 1,
                 "dt": 0.2 * dx / c_outer,
                 "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
-                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "fluid_pp(1)%G": G,
                 "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "fluid_pp(2)%G": G,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.5,
@@ -2456,10 +2824,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "bc_y%end": -3,
                 "dt": 2.0e-3,
                 "fluid_pp(1)%gamma": 2.5,
-                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "fluid_pp(1)%G": G,
                 "fluid_pp(2)%gamma": 2.5,
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "fluid_pp(2)%G": G,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.5,
@@ -2533,10 +2901,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "bc_x%beg": -6,
                 "bc_x%end": -6,
                 "fluid_pp(1)%gamma": 1.0 / (4.4 - 1.0),
+                "fluid_pp(1)%eos": "stiffened_gas",
                 "fluid_pp(1)%pi_inf": 4.4 * 6.0e8 / (4.4 - 1.0),
                 "fluid_pp(1)%G": 0.0,
                 "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "fluid_pp(2)%G": 0.0,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.5,
@@ -2614,10 +2983,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "bc_y%end": -2,
             "num_patches": 1,
             "fluid_pp(1)%gamma": 1.0 / (4.4 - 1.0),
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": 4.4 * 6.0e8 / (4.4 - 1.0),
             "fluid_pp(1)%G": 1.0e6,
             "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
-            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%eos": "ideal_gas",
             "fluid_pp(2)%G": 1.0e6,
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
@@ -2717,6 +3087,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_advection_convergence",
                 "3D_advection_convergence",
                 "2D_hypo_shear_contact",  # exercised by the convergence suite
+                "1D_mg_acoustic",  # exercised by the convergence suite
+                "1D_mg_impact",  # exercised by the convergence suite
+                "1D_isentropic_release",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
                 "3D_IGR_TaylorGreenVortex_nvidia",
@@ -2841,6 +3214,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # The reacting Roe sound speed - the chemistry average state, c_sum_Yi_Phi, and the
+        # c = sqrt(c_c - (gamma - 1)*(vel_sum - H)) branch of s_compute_speed_of_sound_avg - is
+        # reached only with avg_state = 1 AND wave_speeds = 2. Every other chemistry case sets
+        # wave_speeds = 1, so none of it had coverage. Both solvers: HLLC used to pass a literal 0
+        # here and take the frozen branch instead, which is why the gap went unseen (#1774).
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Inert Shocktube -> Reacting Roe Average",
+                "examples/1D_inert_shocktube/case.py",
+                mods={**common_mods, "riemann_solver": 1, "avg_state": 1, "wave_speeds": 2, "weno_order": 3, "mapped_weno": "F", "mp_weno": "F"},
+                override_tol=10 ** (-10),
+            )
+        )
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Inert Shocktube -> Reacting Roe Average -> HLLC",
+                "examples/1D_inert_shocktube/case.py",
+                mods={**common_mods, "riemann_solver": 2, "avg_state": 1, "wave_speeds": 2, "weno_order": 3, "mapped_weno": "F", "mp_weno": "F"},
+                override_tol=10 ** (-10),
+            )
+        )
+
         # 1D -> Chemistry -> Flamelet: temporarily removed from the suite. The stiff flamelet
         # integration is the most FP-sensitive chemistry case; on the Frontier CCE OpenMP-offload
         # backend it diverges from the single-reference golden by ~1e-9 (rel) -- compiler
@@ -2908,7 +3303,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "cantera_file": "h2o2.yaml",
                 "viscous": "T",
                 "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
-                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "fluid_pp(1)%Re(1)": 100000,
                 "patch_icpp(1)%geometry": 1,
                 "patch_icpp(1)%hcid": 191,
@@ -2961,7 +3356,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "cantera_file": "h2o2.yaml",
                 "viscous": "T",
                 "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
-                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "fluid_pp(1)%Re(1)": 100000,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%hcid": 291,
@@ -3014,7 +3409,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(1)%pres": 1.01325e5,
                 "patch_icpp(1)%alpha(1)": 1,
                 "fluid_pp(1)%gamma": 1.0e00 / (1.9326e00 - 1.0e00),
-                "fluid_pp(1)%pi_inf": 0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "cantera_file": "h2o2.yaml",
                 "t_step_start": 0,
                 "t_step_stop": 50,
@@ -3068,9 +3463,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "rburn%pref": 2.0e9,
                 "rburn%n": 1.0,
                 "fluid_pp(1)%gamma": 1.0e00 / (3.0e00 - 1.0e00),
+                "fluid_pp(1)%eos": "stiffened_gas",
                 "fluid_pp(1)%pi_inf": 9.0e8,
                 "fluid_pp(1)%qv": 4.0e6,
                 "fluid_pp(2)%gamma": 1.0e00 / (3.0e00 - 1.0e00),
+                "fluid_pp(2)%eos": "stiffened_gas",
                 "fluid_pp(2)%pi_inf": 9.0e8,
                 "fluid_pp(2)%qv": 0.0,
                 "patch_icpp(1)%geometry": 1,
@@ -3092,6 +3489,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # A Mie-Gruneisen reactant burning to JWL products: the two families share qv as the energy zero, and the
+        # Arrhenius factor reads the reactant temperature from its own reference curve.
+        mg_to_jwl = {
+            "fluid_pp(1)%eos": "mie_gruneisen",
+            "fluid_pp(1)%gamma": None,
+            "fluid_pp(1)%pi_inf": None,
+            "fluid_pp(1)%mg_rho0": 1900.0,
+            "fluid_pp(1)%mg_c0": 2500.0,
+            "fluid_pp(1)%mg_s": 1.5,
+            "fluid_pp(1)%mg_gruneisen": 1.0,
+            "fluid_pp(2)%eos": "jwl",
+            "fluid_pp(2)%gamma": None,
+            "fluid_pp(2)%pi_inf": None,
+            "fluid_pp(2)%jwl_a": 3.0e10,
+            "fluid_pp(2)%jwl_b": 2.0e9,
+            "fluid_pp(2)%jwl_r1": 4.15,
+            "fluid_pp(2)%jwl_r2": 0.95,
+            "fluid_pp(2)%jwl_omega": 0.3,
+            "fluid_pp(2)%jwl_rho0": 1900.0,
+            "fluid_pp(1)%mg_t0": 300.0,
+            "fluid_pp(2)%jwl_t0": 300.0,
+        }
         # Same burn on the 6-equation model (model_eqns=3): the reactant->product qv release
         # must manifest through the qv-consistent phasic-pressure relaxation. Guards that the
         # 5-eq source term is correct on the 6-eq model and that the qv threading holds up.
@@ -3103,6 +3522,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # factor is O(0.4) at the IC temperature -- exercises the branch instead of leaving it ~1.
         stack.push("Arrhenius", {"rburn%ta": 500.0, "fluid_pp(1)%cv": 1500.0, "fluid_pp(2)%cv": 1500.0})
         cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "eos=mie_gruneisen -> jwl", mg_to_jwl))
+        stack.pop()
+        # Operator-split burn (rburn%substeps > 0): the source is integrated per cell after the flow
+        # update rather than entering the flow RHS, so the reaction time scale is decoupled from the
+        # acoustic CFL. Nothing else reaches s_reactive_burn_substep. Run on 2 ranks because substeps
+        # is the one integer among the rburn members: a broadcast emitted with the real kind leaves
+        # rank 1 sub-stepping a garbage count, which a single-rank golden cannot see.
+        stack.push("substeps", {"rburn%substeps": 10})
+        cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
         # Same burn on 2 MPI ranks: the rburn parameters must be broadcast to non-root ranks, or
         # rank 1's half of the domain burns with the sentinel default and diverges. The single-rank
@@ -3222,6 +3650,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "polytropic": "T",
                 "bubble_model": 2,
                 "fluid_pp(1)%gamma": 0.16,
+                "fluid_pp(1)%eos": "stiffened_gas",
                 "fluid_pp(1)%pi_inf": 3515.0,
                 "bub_pp%R0ref": 1.0,
                 "bub_pp%p0ref": 1.0,
@@ -3281,6 +3710,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "riemann_solver": 1,
                 "fd_order": 4,
                 "fluid_pp(1)%gamma": 0.3,
+                "fluid_pp(1)%eos": "stiffened_gas",
                 "fluid_pp(1)%pi_inf": 7.8e05,
                 "fluid_pp(1)%G": 1.0e05,
                 "patch_icpp(1)%pres": 1.0e06,
@@ -3477,7 +3907,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "num_patches": 2,
                 "num_fluids": 2,
                 "fluid_pp(2)%gamma": 2.5,
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 # Patch 1: fluid 1 background rectangle; length covers stretched extent (~1.39).
                 # vel(1)=0.5 provides advection so MTHINC reconstruction affects the solution.
                 "patch_icpp(1)%geometry": 3,

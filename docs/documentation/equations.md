@@ -419,7 +419,7 @@ Additional geometric source terms appear with \f$1/r\f$ factors in the continuit
 
 **Modified mixture pressure:**
 
-\f[p = (1 - \alpha)\,p_l + \alpha\left(\frac{R^3\,p_{bw}}{\bar{R}^3} - \frac{\rho\,R^3\,\dot{R}^2}{\bar{R}^3}\right)\f]
+\f[p = (1 - \alpha)\,p_l + \alpha\left(\frac{R^3\,p_{bw}}{\bar{R}^3} + \frac{\rho\,R^3\,\dot{R}^2}{\bar{R}^3}\right)\f]
 
 **Modified stiffened gas for the liquid phase:**
 
@@ -644,7 +644,7 @@ Reaction mechanisms are code-generated via Pyrometheus (\cite Cisneros26), which
 
 ## 10. Surface Tension (`surface_tension = .true.`) (\cite Schmidmayer17; \cite Wilfong26 Sec. 4.1.8)
 
-**Source:** `src/simulation/m_surface_tension.fpp`, `src/simulation/include/inline_capillary.fpp`
+**Source:** `src/simulation/m_surface_tension.fpp`
 
 **Color function advection:**
 

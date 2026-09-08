@@ -1,6 +1,8 @@
 import itertools
+import math
 import os
 import shutil
+import struct
 import sys
 import threading
 import time
@@ -13,7 +15,14 @@ from rich.panel import Panel
 
 from .. import common, sched
 from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
-from ..common import MFCException, does_command_exist, format_list_to_string, get_program_output
+from ..common import MFCException, console_safe, does_command_exist, format_list_to_string, get_program_output, log_tail
+from ..gpu_diagnostics import (
+    GPU_FAULT_MARKER,
+    fault_diagnostic_env,
+    is_gpu_memory_fault,
+    rocm_debug_agent_path,
+    summarize_rocm_debug_agent,
+)
 from ..packer import packer
 from ..packer import tol as packtol
 from ..printer import cons
@@ -26,6 +35,7 @@ nPASS = 0
 nSKIP = 0
 current_test_number = 0
 total_test_count = 0
+nRESCUED = 0  # cases that failed and were recovered by a retry (#1798)
 errors = []
 failed_tests = []  # Track failed test details for summary
 test_start_time = None  # Track overall test duration
@@ -46,6 +56,112 @@ abort_tests = threading.Event()
 
 class TestTimeoutError(MFCException):
     pass
+
+
+# ib_state_*.dat record layout, written by s_write_serial_ib_state / s_write_parallel_ib_state in
+# src/simulation/m_data_output.fpp: NFIELDS_PER_IB reals per IB, with x/y/z_centroid at fields 17:19.
+_NFIELDS_PER_IB = 20
+_CENTROID_SLICE = slice(16, 19)
+
+
+def _read_ib_state_records(filepath: str, single: bool):
+    if not os.path.isfile(filepath):
+        raise MFCException(f"Expected IB state file does not exist: {filepath}")
+
+    # ib_buf is real(wp) written with mpi_p, so the on-disk field width follows the build's working
+    # precision. wp is single only under --single (--mixed keeps wp double, narrowing only stp), so this
+    # keys off the build flag alone, not the case's `precision` (which selects database output format).
+    field_size = 4 if single else 8
+    fmt = "<" + ("f" if single else "d") * _NFIELDS_PER_IB
+    record_size = _NFIELDS_PER_IB * field_size
+
+    with open(filepath, "rb") as state_file:
+        data = state_file.read()
+
+    if len(data) % record_size != 0:
+        raise MFCException(f"IB state file size is not a multiple of one IB record: {filepath}")
+
+    return [struct.unpack(fmt, data[offset : offset + record_size]) for offset in range(0, len(data), record_size)]
+
+
+def _assert_particle_cloud_non_overlap(case: TestCase, cloud_idx: int, records, start: int, count: int, tol: float):
+    radius = case.params[f"particle_cloud({cloud_idx})%radius"]
+    min_spacing = case.params.get(f"particle_cloud({cloud_idx})%min_spacing", 0.0)
+    min_dist = 2.0 * radius + min_spacing
+
+    for i in range(start, start + count):
+        xi, yi, zi = records[i][_CENTROID_SLICE]
+        for j in range(i + 1, start + count):
+            xj, yj, zj = records[j][_CENTROID_SLICE]
+            dist = math.sqrt((xi - xj) ** 2 + (yi - yj) ** 2 + (zi - zj) ** 2)
+            if dist < min_dist - tol:
+                raise MFCException(f"particle_cloud({cloud_idx}) particles overlap in ib_state_0.dat")
+
+
+def _assert_particle_cloud_ib_state(case: TestCase):
+    num_particle_clouds = case.params.get("num_particle_clouds", 0) or 0
+    if num_particle_clouds <= 0 or case.params.get("ib_state_wrt", "F") != "T":
+        return
+    # file_per_process writes a different path and record layout (per-rank files with leading
+    # num_local_ibs / gbl_patch_id integers); this reader only handles the single-file layout.
+    if case.params.get("file_per_process", "F") == "T":
+        return
+
+    single = ARG("single")
+    # Single precision carries ~1e-7 absolute error at O(1) coordinates, four orders past a 1e-12 slack, so
+    # scale the geometric tolerance with the working precision to avoid spurious single/CI failures.
+    tol = 1.0e-6 if single else 1.0e-12
+    records = _read_ib_state_records(os.path.join(case.get_dirpath(), "restart_data", "ib_state_0.dat"), single)
+    start = case.params.get("num_ibs", 0) or 0
+    num_dims = 3 if (case.params.get("p", 0) or 0) > 0 else 2 if (case.params.get("n", 0) or 0) > 0 else 1
+
+    for cloud_idx in range(1, num_particle_clouds + 1):
+        geometry = case.params.get(f"particle_cloud({cloud_idx})%cloud_geometry", 1)
+        packing_method = case.params.get(f"particle_cloud({cloud_idx})%packing_method", 1)
+        count = case.params.get(f"particle_cloud({cloud_idx})%num_particles", 0) or 0
+        radius = case.params[f"particle_cloud({cloud_idx})%radius"]
+        records_end = start + count
+        if records_end > len(records):
+            raise MFCException(f"particle_cloud({cloud_idx}) expected {count} IB state records, found {len(records) - start}")
+
+        # Box containment only holds for rejection sampling; lattice packing can place sites past the
+        # requested region (issue #1730), so the bounds assertion is gated on packing_method == 1.
+        if geometry == 1 and packing_method == 1:
+            xc = case.params[f"particle_cloud({cloud_idx})%x_centroid"]
+            yc = case.params.get(f"particle_cloud({cloud_idx})%y_centroid", 0.0)
+            zc = case.params.get(f"particle_cloud({cloud_idx})%z_centroid", 0.0)
+            lx = case.params[f"particle_cloud({cloud_idx})%length_x"]
+            ly = case.params.get(f"particle_cloud({cloud_idx})%length_y", 0.0)
+            lz = case.params.get(f"particle_cloud({cloud_idx})%length_z", 0.0)
+            bounds = [(xc - lx / 2.0, xc + lx / 2.0), (yc - ly / 2.0, yc + ly / 2.0), (zc - lz / 2.0, zc + lz / 2.0)]
+            for record in records[start:records_end]:
+                for axis, coord in enumerate(record[_CENTROID_SLICE]):
+                    if axis >= num_dims:
+                        continue
+                    lo, hi = bounds[axis]
+                    if coord < lo - tol or coord > hi + tol:
+                        raise MFCException(f"particle_cloud({cloud_idx}) box particle lies outside its cloud bounds in ib_state_0.dat")
+        elif geometry == 2:
+            xc = case.params[f"particle_cloud({cloud_idx})%x_centroid"]
+            yc = case.params.get(f"particle_cloud({cloud_idx})%y_centroid", 0.0)
+            zc = case.params.get(f"particle_cloud({cloud_idx})%z_centroid", 0.0)
+            r_inner = case.params[f"particle_cloud({cloud_idx})%shell_inner_radius"] + radius
+            r_outer = case.params[f"particle_cloud({cloud_idx})%shell_outer_radius"] - radius
+            for record in records[start:records_end]:
+                x, y, z = record[_CENTROID_SLICE]
+                if num_dims < 3:
+                    radial_dist = math.sqrt((x - xc) ** 2 + (y - yc) ** 2)
+                    plane_coord = y - yc
+                else:
+                    radial_dist = math.sqrt((x - xc) ** 2 + (y - yc) ** 2 + (z - zc) ** 2)
+                    plane_coord = z - zc
+                if radial_dist < r_inner - tol or radial_dist > r_outer + tol:
+                    raise MFCException(f"particle_cloud({cloud_idx}) shell particle violates radial clearance in ib_state_0.dat")
+                if plane_coord < radius - tol:
+                    raise MFCException(f"particle_cloud({cloud_idx}) shell particle violates flat-plane clearance in ib_state_0.dat")
+
+        _assert_particle_cloud_non_overlap(case, cloud_idx, records, start, count, tol)
+        start = records_end
 
 
 def _filter_only(cases, skipped_cases):
@@ -326,7 +442,7 @@ def test():
     seconds = total_duration % 60
 
     # Build the summary report
-    _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases)
+    _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases, nRESCUED)
 
     # Write failed UUIDs to file for CI retry logic
     if failed_tests:
@@ -339,7 +455,7 @@ def test():
     sys.exit(nFAIL)
 
 
-def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, seconds: float, failed_test_list: list, _skipped_cases: list):
+def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, seconds: float, failed_test_list: list, _skipped_cases: list, rescued: int = 0):
     """Print a comprehensive test summary report."""
     total = passed + failed + skipped
 
@@ -366,6 +482,12 @@ def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, se
         f"  [bold green]{passed:4d}[/bold green] passed",
         f"  [bold red]{failed:4d}[/bold red] failed",
         f"  [bold yellow]{skipped:4d}[/bold yellow] skipped",
+    ]
+    if rescued:
+        # How often a retry actually earned its cost. See #1798: without this the
+        # only measurable retry outcomes were the ones that failed anyway.
+        summary_lines.append(f"  [yellow]{rescued:4d}[/yellow] recovered by a retry")
+    summary_lines += [
         f"  [dim]{'─' * 12}[/dim]",
         f"  [bold]{total:4d}[/bold] total",
         "",
@@ -411,10 +533,35 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
             raise MFCException("h5dump couldn't be found.")
         h5dump = shutil.which("h5dump")
 
-    output, err = get_program_output([h5dump, silo_filepath])
+    # merge_stderr: h5dump reports the actual reason on stderr, so capturing
+    # only stdout would leave the failure path with nothing to show.
+    output, err = get_program_output([h5dump, silo_filepath], merge_stderr=True)
 
     if err != 0:
-        raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+        # h5dump's own message and the post_process log are the only evidence of
+        # why the file could not be read, and both were being discarded: the
+        # failure reached CI as a bare path to a file on a machine nobody can
+        # reach. Whether the silo file is absent or merely unreadable is the
+        # first thing worth knowing.
+        # Never let describing the file replace the failure being reported: a
+        # broken symlink or an unreadable mount would raise OSError here and
+        # swallow the h5dump diagnostic entirely.
+        try:
+            exists = f"{os.path.getsize(silo_filepath)} bytes" if os.path.exists(silo_filepath) else "missing"
+        except OSError as size_exc:
+            exists = f"size unknown: {size_exc}"
+        # console_safe over the whole message: main.py renders this with Rich
+        # markup enabled, and the h5dump output and post_process log are full of
+        # bracketed paths. Unescaped, a MarkupError would be raised from inside
+        # the very handler meant to report this failure.
+        raise MFCException(
+            console_safe(
+                f"Test {case}: Failed to run h5dump on {silo_filepath} ({exists}).\n"
+                f"h5dump said: {output.strip() or '(no output)'}\n"
+                f"{log_tail(out_filepath)}\n"
+                f"Case dictionary: {case.get_filepath()}."
+            )
+        )
 
     if "nan," in output:
         raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
@@ -480,7 +627,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         # Check timeout before starting
         if timeout_flag.is_set():
             raise TestTimeoutError("Test case exceeded 1 hour timeout")
-        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices, env=fault_diagnostic_env(dict(os.environ)))
 
         # Check timeout after simulation
         if timeout_flag.is_set():
@@ -491,8 +638,36 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         common.file_write(out_filepath, cmd.stdout)
 
         if cmd.returncode != 0:
-            cons.print(cmd.stdout)
+            # The debug agent emits ~14k lines per fault, nearly all of it the
+            # same disassembly and register dump repeated per wave. Print the
+            # summary when there is one; the full capture is in out_pre_sim.txt.
+            agent_summary = summarize_rocm_debug_agent(cmd.stdout)
+            if agent_summary:
+                cons.print(console_safe(agent_summary))
+                cons.print(f"    full offload report: {out_filepath}")
+            else:
+                cons.print(cmd.stdout)
+                # Falling back is silent by nature: the raw output is printed
+                # and nothing says the summary was expected. That is exactly how
+                # a ROCm 6.3.1-only parser sat on the AFAR lane returning
+                # nothing for 65,210 lines of real 7.2.0 output. If the agent is
+                # reachable and this is a GPU fault, a missing summary means the
+                # agent did not load or its format moved again -- say so.
+                if is_gpu_memory_fault(cmd.stdout) and rocm_debug_agent_path() is not None:
+                    cons.print(
+                        "    [yellow]warning[/yellow]: the ROCm debug agent is available and this is a GPU "
+                        "memory fault, but no agent report was recognised -- the agent did not load, the run "
+                        "was killed before it finished writing (a report is tens of thousands of lines), or "
+                        "its output format has changed and summarize_rocm_debug_agent needs updating."
+                    )
+            # Marked so classify_error buckets it as a GPU memory fault rather
+            # than a generic execution failure; the diagnostics that make it
+            # actionable are already in the output above.
+            if is_gpu_memory_fault(cmd.stdout):
+                raise MFCException(f"Test {case}: Failed to execute MFC {GPU_FAULT_MARKER}.")
             raise MFCException(f"Test {case}: Failed to execute MFC.")
+
+        _assert_particle_cloud_ib_state(case)
 
         pack, err = packer.pack(case.get_dirpath())
         if err is not None:
@@ -534,7 +709,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if timeout_flag.is_set():
                 raise TestTimeoutError("Test case exceeded 1 hour timeout")
 
-            restart_result = case.run_restart([PRE_PROCESS, SIMULATION], devices)
+            restart_result = case.run_restart([PRE_PROCESS, SIMULATION], devices, env=fault_diagnostic_env(dict(os.environ)))
 
             if timeout_flag.is_set():
                 raise TestTimeoutError("Test case exceeded 1 hour timeout")
@@ -594,8 +769,53 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         timeout_timer.cancel()  # Cancel timeout timer
 
 
+def classify_error(exc: Exception) -> str:
+    """Bucket a test failure into the categories the retry policy turns on.
+
+    Whether a retry is worth its cost depends on the class: a tolerance mismatch
+    re-runs the same binary over the same input and can only reach the same
+    comparison, whereas an execution failure may be a transient launcher or node
+    problem. Counting rescues without the class cannot tell those apart, which
+    is what #1798 needs to distinguish.
+    """
+    text = str(exc).lower()
+
+    if "tolerance" in text or "golden" in text or "mismatch" in text:
+        return "tolerance mismatch"
+    if "timeout" in text:
+        return "timeout"
+    if "nan" in text:
+        return "NaN detected"
+    # Before the generic branch: a GPU fault's message also contains "failed to
+    # execute", and it is the one execution failure a retry provably cannot fix.
+    if is_gpu_memory_fault(text):
+        return "GPU memory fault"
+    if "failed to execute" in text:
+        return "execution failed"
+
+    return ""
+
+
+def should_retry(attempt: int, max_attempts: int, aborting: bool) -> bool:
+    """Whether a failed case gets another attempt.
+
+    Retries here are expensive and, as far as can be measured, rarely help:
+    bench.py's equivalent rescued 0 of 235 retried cases, and every recorded
+    failed test in a two-week sample shows the full attempt count. See #1798.
+
+    `aborting` is the part that was missing. The suite-wide abort fires when the
+    failure rate says the environment itself is broken -- a dead GPU, a bad node
+    -- and in that state every remaining attempt is guaranteed to fail. Retrying
+    through an abort turns the fail-fast into a slow one.
+    """
+    if aborting:
+        return False
+
+    return attempt < max_attempts
+
+
 def handle_case(case: TestCase, devices: typing.Set[int]):
-    global nFAIL, nPASS, nSKIP  # noqa: PLW0603
+    global nFAIL, nPASS, nSKIP, nRESCUED  # noqa: PLW0603
     global errors, failed_tests  # noqa: PLW0603
 
     # Check if we should abort before processing this case
@@ -603,6 +823,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
         return  # Exit gracefully if abort was requested
 
     nAttempts = 0
+    last_error = None
     if ARG("single"):
         max_attempts = max(ARG("max_attempts"), 3)
     else:
@@ -617,8 +838,19 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
                 nSKIP += 1
             else:
                 nPASS += 1
+                if nAttempts > 1:
+                    # A rescue: the case failed and a retry recovered it. Nothing
+                    # recorded this before, so a pass on attempt 3 was
+                    # indistinguishable from a pass on attempt 1 -- which is why
+                    # the value of retrying could never be measured. See #1798.
+                    # The class matters as much as the count: retrying is worth
+                    # very different things for a tolerance mismatch than for an
+                    # execution failure.
+                    nRESCUED += 1
+                    cons.print(f"    [yellow]recovered on attempt {nAttempts}[/yellow] ({classify_error(last_error) or 'unclassified'}): {case.trace}")
         except Exception as exc:
-            if nAttempts < max_attempts:
+            last_error = exc
+            if should_retry(nAttempts, max_attempts, abort_tests.is_set()):
                 continue
             nFAIL += 1
 
@@ -644,16 +876,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             cons.print()
 
             # Track failed test details for summary
-            error_type = ""
-            exc_lower = str(exc).lower()
-            if "tolerance" in exc_lower or "golden" in exc_lower or "mismatch" in exc_lower:
-                error_type = "tolerance mismatch"
-            elif "timeout" in exc_lower:
-                error_type = "timeout"
-            elif "nan" in exc_lower:
-                error_type = "NaN detected"
-            elif "failed to execute" in exc_lower:
-                error_type = "execution failed"
+            error_type = classify_error(exc)
 
             failed_tests.append({"trace": case.trace, "uuid": case.get_uuid(), "error_type": error_type, "attempts": nAttempts})
 

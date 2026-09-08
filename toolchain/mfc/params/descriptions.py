@@ -118,7 +118,6 @@ DESCRIPTIONS = {
     "prim_vars_wrt": "Write primitive variables",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",
-    "integral_wrt": "Write integral data",
     "parallel_io": "Enable parallel I/O",
     "file_per_process": "Write separate file per MPI process",
     "format": "Output format",
@@ -132,6 +131,7 @@ DESCRIPTIONS = {
     "alpha_wrt": "Write volume fraction field",
     "alpha_rho_wrt": "Write partial density field",
     "c_wrt": "Write sound speed field",
+    "T_wrt": "Write each fluid's temperature (needs cv > 0)",
     "omega_wrt": "Write vorticity field",
     "cf_wrt": "Write color function field",
     # Immersed boundaries
@@ -144,9 +144,8 @@ DESCRIPTIONS = {
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",
-    # Probes and integrals
+    # Probes
     "num_probes": "Number of probe points",
-    "num_integrals": "Number of integral regions",
     # MPI/GPU
     "rdma_mpi": "Enable RDMA for MPI communication (GPUs)",
     # Misc
@@ -343,6 +342,7 @@ PATTERNS = [
     (r"patch_icpp\((\d+)\)%modal_use_exp_form", "Use exp form for 2D modal patch {0}"),
     (r"patch_icpp\((\d+)\)%sph_har_coeff\((\d+),(-?\d+)\)", "Spherical harmonic coeff (l={1}, m={2}) for patch {0}"),
     # fluid_pp patterns
+    (r"fluid_pp\((\d+)\)%eos", "Equation of state selector for fluid {0}"),
     (r"fluid_pp\((\d+)\)%gamma", "Specific heat ratio for fluid {0}"),
     (r"fluid_pp\((\d+)\)%pi_inf", "Stiffness pressure for fluid {0}"),
     (r"fluid_pp\((\d+)\)%G", "Shear modulus for fluid {0}"),
@@ -435,13 +435,6 @@ PATTERNS = [
     (r"probe\((\d+)\)%x", "X-coordinate of probe {0}"),
     (r"probe\((\d+)\)%y", "Y-coordinate of probe {0}"),
     (r"probe\((\d+)\)%z", "Z-coordinate of probe {0}"),
-    # integral patterns
-    (r"integral\((\d+)\)%xmin", "X-min of integral region {0}"),
-    (r"integral\((\d+)\)%xmax", "X-max of integral region {0}"),
-    (r"integral\((\d+)\)%ymin", "Y-min of integral region {0}"),
-    (r"integral\((\d+)\)%ymax", "Y-max of integral region {0}"),
-    (r"integral\((\d+)\)%zmin", "Z-min of integral region {0}"),
-    (r"integral\((\d+)\)%zmax", "Z-max of integral region {0}"),
     # bub_pp patterns
     (r"bub_pp%R0ref", "Reference bubble radius"),
     (r"bub_pp%p0ref", "Reference pressure for bubbles"),
@@ -708,7 +701,7 @@ FEATURE_DESCRIPTIONS = {
     "grid": "Computational grid and domain",
     "bc": "Boundary conditions",
     "riemann": "Riemann solver settings",
-    "probes": "Probe points and integral regions",
+    "probes": "Probe points",
     "surface_tension": "Surface tension and interface",
     "relativity": "Special relativity",
 }

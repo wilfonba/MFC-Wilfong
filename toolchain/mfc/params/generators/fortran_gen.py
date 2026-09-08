@@ -265,6 +265,10 @@ def generate_constants_fpp() -> str:
         names = CONSTRAINTS[param].get("names")
         if not names:
             continue
+        # Compound keys (fluid_pp(1)%eos) do not form valid Fortran identifiers, so their
+        # constants are hand-written in m_constants.fpp and guarded by test_eos_selector.py.
+        if "%" in param or "(" in param:
+            continue
         for name, value in sorted(names.items(), key=lambda kv: kv[1]):
             lines.append(f"integer, parameter :: {param}_{name} = {value}")
     return "\n".join(lines) + "\n"
@@ -281,8 +285,9 @@ CASE_OPT_EXTRA_LINES = [
     ("muscl_polyn", "integer", "Degree of the MUSCL polynomials"),
     ("weno_num_stencils", "integer", "Number of stencils for WENO reconstruction"),
     ("wenojs", "logical", "WENO-JS (default)"),
+    ("any_state_dependent_eos", "logical", "Some fluid's coefficients vary with density"),
 ]
-COMMON_CASE_OPT_EXTRA_NAMES = {"num_dims", "num_vels", "weno_polyn", "muscl_polyn"}
+COMMON_CASE_OPT_EXTRA_NAMES = {"num_dims", "num_vels", "weno_polyn", "muscl_polyn", "any_state_dependent_eos"}
 
 _CASE_OPT_DECL_COL = 24  # '::' alignment for case-opt declarations
 
@@ -551,12 +556,13 @@ def _emit_chem_params(lines: List[str]) -> None:
 def _emit_rburn(lines: List[str]) -> None:
     """Emit the rburn member broadcast block (sim-only, under reactive_burn guard).
 
-    All rburn members are REAL, so they broadcast with mpi_p (extend the type split if other kinds appear).
+    Members are REAL apart from the integer sub-step count, so the kind comes from the registry.
     """
     rburn_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("rburn%"))
     lines.append("        if (reactive_burn) then")
     for mem in rburn_members:
-        lines.append(f"            call MPI_BCAST(rburn%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+        kind = _mpi_type_for(REGISTRY.all_params[f"rburn%{mem}"].param_type)
+        lines.append(f"            call MPI_BCAST(rburn%{mem}, 1, {kind}, 0, MPI_COMM_WORLD, ierr)")
     lines.append("        end if")
 
 

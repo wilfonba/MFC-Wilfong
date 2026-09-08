@@ -276,7 +276,7 @@ contains
                     if (adv_src_mode == adv_src_mode_vel_iface) then
                         ! u-interface: flux_src(adv%beg) holds one shared face-normal velocity. Pointer-alias adv%beg+1:adv%end to
                         ! the same memory so loops over adv%beg:adv%end can keep fluid indexing while still reading one value. This
-                        ! saves (num_fluids - 1) 3D field allocations.
+                        ! saves (num_fluids - 1) 3D field allocations
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(eqn_idx%adv%beg)%sf
                             $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
@@ -541,8 +541,6 @@ contains
                 @:ACC_SETUP_SFs(rhs_hatR_vf(i))
             end do
         end if
-
-        call s_initialize_pressure_relaxation_module
 
         ! Spatial body force source arrays - sized to include ghost cells so the
         ! same indexing as q_*_vf is valid; iteration is restricted to interior
@@ -849,6 +847,13 @@ contains
             call nvtxEndRange
         end if
 
+        ! ptil is a probe-output diagnostic only, so evaluate it only when probes are on.
+        ! This sits outside the source-term branch above so that the qbmm and adap_dt
+        ! paths, which skip that branch, still get a filled ptil.
+        if (bubbles_euler .and. probe_wrt) then
+            call s_compute_ptilde(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size))
+        end if
+
         if (bubbles_lagrange) then
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
@@ -871,7 +876,9 @@ contains
             call nvtxEndRange
         end if
 
-        if (reactive_burn) then
+        ! With rburn%substeps > 0 the burn is integrated by operator splitting after the flow
+        ! update (s_reactive_burn_substep), not added to the flow RHS here.
+        if (reactive_burn .and. rburn%substeps == 0) then
             call nvtxStartRange("RHS-REACTIVE-BURN")
             call s_compute_reactive_burn(rhs_vf, q_cons_qp%vf, q_prim_qp%vf, idwint)
             call nvtxEndRange
@@ -1058,7 +1065,7 @@ contains
         integer :: i_fluid_loop
         real(wp) :: inv_ds, flux_face1, flux_face2
         real(wp) :: advected_qty_val, pressure_val, velocity_val
-        real(wp) :: G1_eff, G2_eff
+        real(wp) :: G1_eff, G2_eff, pres_K, alpha_K, alpha_rho_K, blkmod_K
 
         G1_eff = 0._wp
         G2_eff = 0._wp
@@ -1068,14 +1075,21 @@ contains
         end if
 
         if (alt_soundspeed) then
-            $:GPU_PARALLEL_LOOP(private='[k_loop, l_loop, q_loop]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k_loop, l_loop, q_loop, pres_K, alpha_K, alpha_rho_K, blkmod_K]', collapse=3)
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
-                        blkmod1(k_loop, l_loop, q_loop) = ((gammas(1) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop) + pi_infs(1))/gammas(1) + (4._wp/3._wp)*G1_eff
-                        blkmod2(k_loop, l_loop, q_loop) = ((gammas(2) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop) + pi_infs(2))/gammas(2) + (4._wp/3._wp)*G2_eff
+                        ! Scalars in, scalar out: an element of a device-resident array passed by reference to a
+                        ! device routine is read or written at the wrong address on Cray OpenACC.
+                        pres_K = q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop)
+                        alpha_K = q_prim_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop)
+                        alpha_rho_K = q_prim_vf%vf(eqn_idx%cont%beg)%sf(k_loop, l_loop, q_loop)
+                        call s_phase_bulk_modulus(pres_K, alpha_K, alpha_rho_K, 1, blkmod_K)
+                        blkmod1(k_loop, l_loop, q_loop) = blkmod_K + (4._wp/3._wp)*G1_eff
+                        alpha_K = q_prim_vf%vf(eqn_idx%adv%end)%sf(k_loop, l_loop, q_loop)
+                        alpha_rho_K = q_prim_vf%vf(eqn_idx%cont%end)%sf(k_loop, l_loop, q_loop)
+                        call s_phase_bulk_modulus(pres_K, alpha_K, alpha_rho_K, 2, blkmod_K)
+                        blkmod2(k_loop, l_loop, q_loop) = blkmod_K + (4._wp/3._wp)*G2_eff
                         alpha1(k_loop, l_loop, q_loop) = q_cons_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop)
 
                         if (bubbles_euler) then
@@ -2100,8 +2114,6 @@ contains
     impure subroutine s_finalize_rhs_module
 
         integer :: i, j, l
-
-        call s_finalize_pressure_relaxation_module
 
         if (.not. igr) then
             do j = eqn_idx%cont%beg, eqn_idx%cont%end

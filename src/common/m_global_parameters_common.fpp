@@ -15,8 +15,8 @@ module m_global_parameters_common
 
     use m_derived_types
     use m_thermochem, only: num_species
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, recon_type_weno, recon_type_muscl, name_len, &
-        & dflt_int, dflt_real
+    use m_constants, only: num_fluids_max, model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, recon_type_weno, &
+        & recon_type_muscl, name_len, dflt_int, dflt_real, eos_stiffened_gas, eos_ideal_gas
 
     implicit none
 
@@ -50,8 +50,20 @@ module m_global_parameters_common
     !> @name Material properties derived from fluid_pp
     !> @{ One declaration is shared by all executables and initialized by m_variables_conversion after the case parameters have been
     !! read.
-    real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
+    !> gammas is the stored form 1/(gamma - 1), not the ratio of specific heats; isentrope_n and isentrope_B are the same EOS
+    !! written as p + B = const*rho**n.
+    real(wp), allocatable, dimension(:) :: gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
+    $:GPU_DECLARE(create='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps]')
+    !> Per-fluid EOS selector and Mie-Gruneisen reference curve, resolved once at init like the arrays above
+    integer, allocatable, dimension(:) :: eoss
+    !> Per-fluid EOS coefficients, whatever the family; see type eos_coefficients.
+    type(eos_coefficients), dimension(num_fluids_max) :: eos_coeffs
+    !> any_state_dependent_eos is declared with the case-optimization block above: a parameter when the case is baked in, so the
+    !! compiler drops the whole state-dependent chain from kernels that never need it.
+    $:GPU_DECLARE(create='[eoss, eos_coeffs]')
+    #:if not MFC_CASE_OPTIMIZATION
+        $:GPU_DECLARE(create='[any_state_dependent_eos]')
+    #:endif
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity
@@ -200,7 +212,9 @@ contains
                 ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
                 sys_size = eqn_idx%stress%end
 
-                ! shear stress index is 2 for 2D and 2,4,5 for 3D
+                ! shear stress index is 2 for 2D and 2,4,5 for 3D. Readers test the whole array
+                ! rather than the first shear_num entries, so unused slots must not be garbage.
+                shear_indices = 0
                 if (num_dims == 1) then
                     shear_num = 0
                 else if (num_dims == 2) then
@@ -335,6 +349,7 @@ contains
         rburn%pref = dflt_real
         rburn%n = dflt_real
         rburn%ta = 0._wp
+        rburn%substeps = 0
 
         ! Case-optimization params: under case-opt these are compile-time constants in sim (skip assignment); in pre/post
         ! MFC_CASE_OPTIMIZATION is always False so the block always executes there.

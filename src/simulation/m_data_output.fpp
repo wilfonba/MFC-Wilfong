@@ -153,15 +153,6 @@ contains
             end if
         end do
 
-        if (integral_wrt) then
-            do i = 1, num_integrals
-                write (file_path, '(A,I0,A)') '/D/integral', i, '_prim.dat'
-                file_path = trim(case_dir) // trim(file_path)
-
-                open (i + 70, FILE=trim(file_path), form='formatted', POSITION='append', STATUS='unknown')
-            end do
-        end if
-
     end subroutine s_open_probe_files
 
     !> Write stability criteria extrema to the run-time information file at the given time step
@@ -172,42 +163,56 @@ contains
         real(wp)                                            :: rho  !< Cell-avg. density
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha  !< Cell-avg. volume fraction
-            real(wp), dimension(3) :: vel    !< Cell-avg. velocity
+            real(wp), dimension(3) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
+            real(wp), dimension(3) :: vel               !< Cell-avg. velocity
         #:else
-            real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
-            real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
+            real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
+            real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
         #:endif
-        real(wp)               :: vel_sum                     !< Cell-avg. velocity sum
-        real(wp)               :: pres                        !< Cell-avg. pressure
-        real(wp)               :: gamma                       !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf                      !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv                          !< Cell-avg. internal energy reference value
-        real(wp)               :: c                           !< Cell-avg. sound speed
-        real(wp)               :: H                           !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re                          !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum                                    !< Cell-avg. velocity sum
+        real(wp)               :: pres                                       !< Cell-avg. pressure
+        real(wp)               :: gamma                                      !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf                                     !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv                                         !< Cell-avg. internal energy reference value
+        real(wp)               :: c                                          !< Cell-avg. sound speed
+        real(wp), dimension(2) :: Re                                         !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
-        real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
-        real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
-        real(wp)               :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
-        real(wp)               :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
+        real(wp)               :: icfl_max_loc, icfl_max_glb                 !< ICFL stability extrema on local and global grids
+        real(wp)               :: vcfl_max_loc, vcfl_max_glb                 !< VCFL stability extrema on local and global grids
+        real(wp)               :: ccfl_max_loc, ccfl_max_glb                 !< CCFL stability extrema on local and global grids
+        real(wp)               :: Rc_min_loc, Rc_min_glb                     !< Rc stability extrema on local and global grids
         real(wp)               :: icfl, vcfl, ccfl, Rc
-        integer                :: fl                          !< Fluid loop iterator
+        real(wp)               :: mu_frac, mu_frac_max_loc, mu_frac_max_glb  !< Compression as a fraction of the EOS limit
+        integer                :: fl                                         !< Fluid loop iterator
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
         ccfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
+        mu_frac_max_loc = 0._wp
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
-                            & vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
-                            & reductionOp='[max, min]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
+                            & icfl, vcfl, Rc, ccfl, fl, mu_frac]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc, &
+                            & mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+
+                    ! How close each Mie-Gruneisen phase is to the compression its Hugoniot fit can represent.
+                    ! Past 1 there is no shock state to find and the reference curve is fiction, so it is reduced
+                    ! out of the kernel and turned into an abort on the host -- s_mpi_abort cannot be called here.
+                    if (any_state_dependent_eos) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do fl = 1, num_fluids
+                            if (eoss(fl) == eos_mie_gruneisen) then
+                                mu_frac = (alpha_rho(fl)/max(alpha(fl), sgm_eps)/eos_coeffs(fl)%rho0 - 1._wp)/eos_coeffs(fl)%mu_max
+                                mu_frac_max_loc = max(mu_frac_max_loc, mu_frac)
+                            end if
+                        end do
+                    end if
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp
@@ -244,6 +249,9 @@ contains
             if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
+        mu_frac_max_glb = mu_frac_max_loc
+        if (num_procs > 1) call s_mpi_allreduce_max(mu_frac_max_loc, mu_frac_max_glb)
+
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
 
         if (surface_tension) then
@@ -271,6 +279,11 @@ contains
             end if
 
             write (3, *)  ! new line
+
+            if (mu_frac_max_glb > 1._wp) then
+                print *, 'compression as a fraction of the Hugoniot fit limit', mu_frac_max_glb
+                call s_mpi_abort('A Mie-Gruneisen phase is compressed past what its Hugoniot fit represents. Exiting.')
+            end if
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')
@@ -313,7 +326,6 @@ contains
         logical :: file_exist                               !< Logical used to check existence of current time-step directory
         character(LEN=15) :: FMT
         integer :: i, j, k, l, r
-        real(wp) :: gamma, lit_gamma, pi_inf, qv            !< Temporary EOS params
 
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step
@@ -386,11 +398,6 @@ contains
         if (ib) then
             call s_write_serial_ib_data(t_step)
         end if
-
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
-        pi_inf = pi_infs(1)
-        qv = qvs(1)
 
         if (precision == precision_single) then
             FMT = "(2F30.3)"
@@ -717,7 +724,7 @@ contains
                 call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
-            call DelayFileAccess(proc_rank)
+            call s_delay_file_access(proc_rank)
 
             call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
 
@@ -902,6 +909,10 @@ contains
 
         write (file_loc, '(A)') 'ib.dat'
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+
+        call s_mpi_barrier()
+        call s_delay_file_access(proc_rank)
+
         call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
         var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
@@ -961,7 +972,7 @@ contains
                 call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
-            call DelayFileAccess(proc_rank)
+            call s_delay_file_access(proc_rank)
 
             write (file_loc, '(A,I0,A,i7.7,A)') 'ib_state_', t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
@@ -1138,7 +1149,7 @@ contains
         real(wp)                        :: ptot
         real(wp)                        :: alf
         real(wp)                        :: alfgr
-        real(wp), dimension(num_fluids) :: alpha
+        real(wp), dimension(num_fluids) :: alpha, alpha_rho
         real(wp)                        :: gamma
         real(wp)                        :: pi_inf
         real(wp)                        :: qv
@@ -1158,9 +1169,6 @@ contains
         integer                         :: i, j, k, l, s, d  !< Generic loop iterator
         real(wp)                        :: nondim_time       !< Non-dimensional time
         real(wp)                        :: tmp               !< Temporary variable to store quantity for mpi_allreduce
-        integer                         :: npts              !< Number of included integral points
-        real(wp)                        :: rad, thickness    !< For integral quantities
-        logical                         :: trigger           !< For integral quantities
         real(wp)                        :: rhoYks(1:num_species)
 
         T = dflt_T_guess
@@ -1230,6 +1238,7 @@ contains
                     end do
                     do s = 1, num_fluids
                         alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k, l)
+                        alpha_rho(s) = q_cons_vf(eqn_idx%cont%beg + s - 1)%sf(j - 2, k, l)
                     end do
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
@@ -1242,8 +1251,7 @@ contains
 
                         call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
-                                                & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k, l), &
-                                                & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k, l), G_local)
+                                                & f_hypoelastic_energy(q_cons_vf, j - 2, k, l, rho, G_local))
                     else
                         call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1299,8 +1307,8 @@ contains
                     end if
 
                     ! Compute mixture sound Speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, &
-                                                  & 0._wp, c, qv)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+                    if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1335,6 +1343,7 @@ contains
                         end do
                         do s = 1, num_fluids
                             alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l)
+                            alpha_rho(s) = q_cons_vf(eqn_idx%cont%beg + s - 1)%sf(j - 2, k - 2, l)
                         end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
@@ -1347,8 +1356,7 @@ contains
 
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                                    & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l), &
-                                                    & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l), G_local)
+                                                    & f_hypoelastic_energy(q_cons_vf, j - 2, k - 2, l, rho, G_local))
                         else
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1382,8 +1390,8 @@ contains
                             Rdot(:) = nRdot(:)/nbub
                         end if
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
-                                                      & 0._wp, 0._wp, c, qv)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+                        if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
                     end if
                 end if
             else
@@ -1417,6 +1425,7 @@ contains
                             end do
                             do s = 1, num_fluids
                                 alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l - 2)
+                                alpha_rho(s) = q_cons_vf(eqn_idx%cont%beg + s - 1)%sf(j - 2, k - 2, l - 2)
                             end do
 
                             dyn_p = 0.5_wp*rho*dot_product(vel, vel)
@@ -1435,18 +1444,23 @@ contains
 
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
-                                                        & rho, qv, rhoYks, pres, T, q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, &
-                                                        & k - 2, l - 2), q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), &
-                                                        & G_local)
+                                                        & rho, qv, rhoYks, pres, T, f_hypoelastic_energy(q_cons_vf, j - 2, k - 2, &
+                                                        & l - 2, rho, G_local))
                             else
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
                                                         & rho, qv, rhoYks, pres, T)
                             end if
 
+                            if (hypoelasticity) then
+                                do s = 1, 6
+                                    tau_e(s) = q_cons_vf(eqn_idx%stress%beg + s - 1)%sf(j - 2, k - 2, l - 2)/rho
+                                end do
+                            end if
+
                             ! Compute mixture sound speed
-                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
-                                                          & 0._wp, 0._wp, c, qv)
+                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+                            if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1511,6 +1525,8 @@ contains
                                & 0, 0), q_cons_vf(4)%sf(j - 2, 0, 0), q_cons_vf(5)%sf(j - 2, 0, 0), q_cons_vf(6)%sf(j - 2, 0, 0), &
                                & q_cons_vf(7)%sf(j - 2, 0, 0), q_cons_vf(8)%sf(j - 2, 0, 0), q_cons_vf(9)%sf(j - 2, 0, 0), &
                                & q_cons_vf(10)%sf(j - 2, 0, 0), nbub, R(1), Rdot(1)
+                    else if (hypoelasticity) then
+                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8)') nondim_time, rho, vel(1), pres, tau_e(1)
                     else
                         write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') nondim_time, rho, vel(1), pres
                     end if
@@ -1531,132 +1547,18 @@ contains
                     end if
                 else
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                        write (i + 30, &
-                               & '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8,F24.8,F24.8,' // 'F24.8)') &
-                               & nondim_time, rho, vel(1), vel(2), vel(3), pres, gamma, pi_inf, qv, c, accel
+                        if (hypoelasticity) then
+                            write (i + 30, '(6X,F12.6,16F24.8)') nondim_time, rho, vel(1), vel(2), vel(3), pres, gamma, pi_inf, &
+                                   & qv, c, accel, tau_e(1), tau_e(2), tau_e(3), tau_e(4), tau_e(5), tau_e(6)
+                        else
+                            write (i + 30, &
+                                   & '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8,F24.8,F24.8,' // 'F24.8)') &
+                                   & nondim_time, rho, vel(1), vel(2), vel(3), pres, gamma, pi_inf, qv, c, accel
+                        end if
                     #:endif
                 end if
             end if
         end do
-
-        if (integral_wrt .and. bubbles_euler) then
-            if (n == 0) then
-                do i = 1, num_integrals
-                    int_pres = 0._wp
-                    max_pres = 0._wp
-                    k = 0; l = 0
-                    npts = 0
-                    do j = 1, m
-                        pres = 0._wp
-                        do s = 1, num_vels
-                            vel(s) = 0._wp
-                        end do
-                        rho = 0._wp
-                        pres = 0._wp
-                        gamma = 0._wp
-                        pi_inf = 0._wp
-                        qv = 0._wp
-
-                        if ((integral(i)%xmin <= x_cb(j)) .and. (integral(i)%xmax >= x_cb(j))) then
-                            npts = npts + 1
-                            call s_convert_to_mixture_variables(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
-                            do s = 1, num_vels
-                                vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j, k, l)/rho
-                            end do
-
-                            pres = ((q_cons_vf(eqn_idx%E)%sf(j, k, l) - 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                    & l)**2._wp)/rho)/(1._wp - q_cons_vf(eqn_idx%alf)%sf(j, k, l)) - pi_inf - qv)/gamma
-                            int_pres = int_pres + (pres - 1._wp)**2._wp
-                        end if
-                    end do
-                    int_pres = sqrt(int_pres/(1._wp*npts))
-
-                    if (num_procs > 1) then
-                        tmp = int_pres
-                        call s_mpi_allreduce_sum(tmp, int_pres)
-                    end if
-
-                    if (proc_rank == 0) then
-                        if (bubbles_euler .and. (num_fluids <= 2)) then
-                            write (i + 70, '(6x,f12.6,f24.8)') nondim_time, int_pres
-                        end if
-                    end if
-                end do
-            else if (p == 0) then
-                if (num_integrals /= 3) then
-                    call s_mpi_abort('Incorrect number of integrals')
-                end if
-
-                rad = integral(1)%xmax
-                thickness = integral(1)%xmin
-
-                do i = 1, num_integrals
-                    int_pres = 0._wp
-                    max_pres = 0._wp
-                    l = 0
-                    npts = 0
-                    do j = 1, m
-                        do k = 1, n
-                            trigger = .false.
-                            if (i == 1) then
-                                ! inner portion
-                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) < (rad - 0.5_wp*thickness)) trigger = .true.
-                            else if (i == 2) then
-                                ! net region
-                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad - 0.5_wp*thickness) .and. sqrt(x_cb(j)**2._wp &
-                                    & + y_cb(k)**2._wp) < (rad + 0.5_wp*thickness)) trigger = .true.
-                            else if (i == 3) then
-                                ! everything else
-                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad + 0.5_wp*thickness)) trigger = .true.
-                            end if
-
-                            pres = 0._wp
-                            do s = 1, num_vels
-                                vel(s) = 0._wp
-                            end do
-                            rho = 0._wp
-                            pres = 0._wp
-                            gamma = 0._wp
-                            pi_inf = 0._wp
-                            qv = 0._wp
-
-                            if (trigger) then
-                                npts = npts + 1
-                                call s_convert_to_mixture_variables(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
-                                do s = 1, num_vels
-                                    vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j, k, l)/rho
-                                end do
-
-                                pres = ((q_cons_vf(eqn_idx%E)%sf(j, k, l) - 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                        & l)**2._wp)/rho)/(1._wp - q_cons_vf(eqn_idx%alf)%sf(j, k, l)) - pi_inf - qv)/gamma
-                                int_pres = int_pres + abs(pres - 1._wp)
-                                max_pres = max(max_pres, abs(pres - 1._wp))
-                            end if
-                        end do
-                    end do
-
-                    if (npts > 0) then
-                        int_pres = int_pres/(1._wp*npts)
-                    else
-                        int_pres = 0._wp
-                    end if
-
-                    if (num_procs > 1) then
-                        tmp = int_pres
-                        call s_mpi_allreduce_sum(tmp, int_pres)
-
-                        tmp = max_pres
-                        call s_mpi_allreduce_max(tmp, max_pres)
-                    end if
-
-                    if (proc_rank == 0) then
-                        if (bubbles_euler .and. (num_fluids <= 2)) then
-                            write (i + 70, '(6x,f12.6,f24.8,f24.8)') nondim_time, int_pres, max_pres
-                        end if
-                    end if
-                end do
-            end if
-        end if
 
     end subroutine s_write_probe_files
 

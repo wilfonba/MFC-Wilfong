@@ -216,13 +216,23 @@ def select_tests(cases, coverage_map, changed_files):
     return to_run, skipped, f"selected {len(to_run)}/{len(cases)} by coverage overlap"
 
 
-def _git(args, cwd, timeout=60):
-    return subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False)
+def _env_without_git():
+    """The environment minus the repository variables git exports to hooks.
+
+    Git hands GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE to a pre-commit hook, and neither cwd nor
+    `git -C` overrides them, so every call below would otherwise act on the committing repository
+    (the main checkout, when the commit is made from a worktree). Everything else stays.
+    """
+    return {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
+
+
+def run_git(args, cwd, timeout=60):
+    return subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False, env=_env_without_git())
 
 
 def _merge_base(cwd, branch):
     for ref in (branch, f"origin/{branch}"):
-        r = _git(["merge-base", ref, "HEAD"], cwd)
+        r = run_git(["merge-base", ref, "HEAD"], cwd)
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip()
     return None
@@ -246,12 +256,12 @@ def get_changed_files(root_dir, compare_branch="master", explicit: Optional[str]
     try:
         base = _merge_base(root_dir, compare_branch)
         if base is None:
-            _git(["fetch", "origin", f"{compare_branch}:{compare_branch}", "--depth=1"], root_dir, 120)
-            _git(["fetch", "--deepen=200"], root_dir, 120)
+            run_git(["fetch", "origin", f"{compare_branch}:{compare_branch}", "--depth=1"], root_dir, 120)
+            run_git(["fetch", "--deepen=200"], root_dir, 120)
             base = _merge_base(root_dir, compare_branch)
         if base is None:
             return None
-        diff = _git(["diff", base, "HEAD", "--name-only", "--no-color"], root_dir)
+        diff = run_git(["diff", base, "HEAD", "--name-only", "--no-color"], root_dir)
         if diff.returncode != 0:
             return None
         return {f for f in diff.stdout.splitlines() if f.strip()}
@@ -269,22 +279,27 @@ def format_summary(*, ran, total, reason, meta, now) -> str:
     return f"Coverage selection: ran {ran}/{total} tests · {age} · {reason}"
 
 
-def map_health(*, meta, current_keys, mapped_keys, now, max_age_days, min_fraction, built_after_last_change=None):
+def map_health(*, meta, current_keys, mapped_keys, now, max_age_days, min_fraction, verified_after_last_change=None):
     """Return (ok, message). Loud anti-rot check used by the health workflow.
 
-    `built_after_last_change` is the caller's git verdict on whether the map was built at
-    or after the most recent coverage-relevant commit: True (provably current), False
+    `verified_after_last_change` is the caller's git verdict on whether a refresh ran at or
+    after the most recent coverage-relevant commit: True (provably current), False
     (provably behind), or None (undeterminable -> fall back to the wall-clock rule).
     A map only decays when the sources or test list it was built from move, so wall-clock
     age is a poor proxy: it cries STALE over a quiet weekend and stays silent for 10 days
     after a refresh actually breaks.
+
+    It asks about the refresh RUN, not about the map's own _meta.git_sha, which advances
+    only when the rebuilt entries differ from the committed ones. A relevant commit whose
+    coverage is unchanged leaves a correct map with an old git_sha; reading that as
+    "stale" made this check fail permanently while the refresh was working fine.
     """
     if not meta or not meta.get("built_at"):
         return False, "Coverage map has no build metadata."
     age = (datetime.datetime.fromisoformat(now) - datetime.datetime.fromisoformat(meta["built_at"])).days
-    if built_after_last_change is False:
-        return False, "Coverage map is STALE: built before the most recent coverage-relevant commit. Refresh workflow may be broken."
-    if built_after_last_change is None and age > max_age_days:
+    if verified_after_last_change is False:
+        return False, "Coverage map is STALE: no successful refresh since the most recent coverage-relevant commit. Refresh workflow may be broken."
+    if verified_after_last_change is None and age > max_age_days:
         return False, f"Coverage map is STALE: {age}d old (max {max_age_days}d). Refresh workflow may be broken."
     if current_keys:
         frac = len(current_keys & mapped_keys) / len(current_keys)
