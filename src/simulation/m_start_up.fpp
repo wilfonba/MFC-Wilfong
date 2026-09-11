@@ -16,7 +16,6 @@ module m_start_up
     use m_weno
     use m_muscl
     use m_thinc
-    use m_cdi_sharpening
     use m_riemann_solvers
     use m_cbc
     use m_boundary_common
@@ -951,7 +950,6 @@ contains
             call s_initialize_riemann_solvers_module()
         end if
         if (int_comp == int_comp_thinc .or. int_comp == int_comp_mthinc) call s_initialize_thinc_module()
-        if (int_comp == int_comp_cdi .or. int_comp == int_comp_acdi) call s_initialize_cdi_sharpening_module()
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
 
@@ -1130,7 +1128,6 @@ contains
             end if
         end if
         if (int_comp == int_comp_thinc .or. int_comp == int_comp_mthinc) call s_finalize_thinc_module()
-        if (int_comp == int_comp_cdi .or. int_comp == int_comp_acdi) call s_finalize_cdi_sharpening_module()
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()

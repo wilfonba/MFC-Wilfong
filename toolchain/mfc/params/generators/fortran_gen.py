@@ -66,8 +66,6 @@ SIM_GPU_DECL_VARS = {
     "ib_coefficient_of_friction",
     "ic_beta",
     "ic_eps",
-    "ic_delta",
-    "ic_gamma",
     "igr",
     "igr_iter_solver",
     "igr_order",

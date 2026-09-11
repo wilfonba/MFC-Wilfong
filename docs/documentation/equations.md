@@ -845,18 +845,6 @@ where \f$a\f$ and \f$b\f$ are the left and right slope differences.
 
 where \f$A = \frac{\exp(\text{sign}(s)\,\beta\,(2C - 1))\,/\,\cosh(\beta) - 1}{\tanh(\beta)}\f$ and \f$\beta\f$ controls compression steepness.
 
-**Conservative diffuse-interface (CDI) sharpening** (`int_comp = 3`): instead of modifying the reconstruction, adds divergence-form regularization fluxes to the five-equation model that drive interfaces toward a fixed equilibrium thickness while conserving phase mass, mixture momentum, and total energy.
-The volume-fraction flux for phase \f$m\f$ uses the N-phase pairwise form
-
-\f[\mathbf{a}_m = \Gamma\left(\epsilon\,\nabla\alpha_m - \sum_{j \neq m}\alpha_m\,\alpha_j\,\hat{\mathbf{n}}_{mj}\right), \qquad \hat{\mathbf{n}}_{mj} = \frac{\nabla\alpha_{mj}}{|\nabla\alpha_{mj}|}, \qquad \alpha_{mj} = \frac{\alpha_m}{\alpha_m + \alpha_j},\f]
-
-with consistency fluxes \f$\rho_m \mathbf{a}_m\f$ in the phase continuity equations, \f$\mathbf{u} \sum_m \rho_m \mathbf{a}_m\f$ in the momentum equation, and \f$\sum_m \mathbf{a}_m (\frac{1}{2}\rho_m |\mathbf{u}|^2 + (\rho e)_m)\f$ in the energy equation, where the phase internal energy (not enthalpy) preserves pressure, temperature, and velocity equilibrium across interfaces.
-The interface thickness scale is \f$\epsilon = k\,\Delta x\f$ with \f$\Delta x\f$ the local face spacing and \f$k\f$ = `ic_delta` (default 1); the velocity scale \f$\Gamma\f$ is the global maximum velocity magnitude, or `ic_gamma` when set.
-The sharpening (anti-diffusion) term is suppressed at faces where the pairwise fraction zigzags in sign along the flux direction (an alternation gate targeting odd-even oscillations); gated faces keep the diffusion term, so under-resolved oscillations decay instead of being steepened, while isolated extrema such as small-droplet crests are still sharpened isotropically.
-With `int_comp = 4` (ACDI, following Jain, JCP 469 (2022) 111529), the sharpening normal and magnitude are evaluated from the signed-distance-like variable \f$\psi = \epsilon\,\ln(r/(1-r))\f$ of the pairwise fraction, whose gradient is well-conditioned across the whole interface; this reduces the grid-aligned shape distortion of features a few cells across that the standard CDI normal produces.
-With surface tension enabled, the color function is sharpened with the same two-phase CDI flux so that it remains co-located with the volume fraction; this term is purely kinematic (the color function carries no mass and does not enter the pressure inversion).
-References: Brill, Olson, and Bokman, JCP 542 (2025); Jain et al., JCP 475 (2023); Mirjalili and Mani, JCP 498 (2024).
-
 #### IGR Reconstruction
 
 5th-order or 3rd-order polynomial interpolation without WENO nonlinear weights, using Lax-Friedrichs numerical flux. Stencil coefficients:

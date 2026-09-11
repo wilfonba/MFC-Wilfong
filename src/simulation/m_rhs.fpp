@@ -15,7 +15,7 @@ module m_rhs
     use m_variables_conversion
     use m_weno
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_thinc, int_comp_mthinc, &
-        & int_comp_cdi, int_comp_acdi, recon_type_weno, recon_type_muscl
+        & recon_type_weno, recon_type_muscl
     use m_muscl
     use m_riemann_solvers
     use m_cbc
@@ -35,7 +35,6 @@ module m_rhs
     use m_reactive_burn
     use m_igr
     use m_thinc
-    use m_cdi_sharpening
     use m_pressure_relaxation
 
     implicit none
@@ -804,12 +803,6 @@ contains
             end if
         end if
         ! END: Dimensional Splitting Loop
-
-        if (int_comp == int_comp_cdi .or. int_comp == int_comp_acdi) then
-            call nvtxStartRange("RHS-CDI-SHARPENING")
-            call s_compute_cdi_sharpening_rhs(q_prim_qp%vf, rhs_vf)
-            call nvtxEndRange
-        end if
 
         ! RHS additions for hypoelasticity (interface-consistent path, after all sweeps)
         if (hypo_nc_mode == hypo_nc_mode_interface) then
