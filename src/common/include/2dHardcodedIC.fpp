@@ -41,6 +41,14 @@
     real(wp)                    :: yI, wblend, dxf, posf, fracf
     integer                     :: il, ipert, punit, pios
 
+    ! # 210 - as 209, plus a Floquet-consistent velocity field at t = 0, tabulated
+    ! in floquet_velocity.dat as  y  Re(u)  Im(u)  Re(v)  Im(v)  (loaded once).
+    logical, save               :: fvel_loaded = .false.
+    integer, save               :: fvel_n
+    real(wp), allocatable, save :: fvel_y(:), fvel_ur(:), fvel_ui(:), fvel_vr(:), fvel_vi(:)
+    real(wp)                    :: fv_ur, fv_ui, fv_vr, fv_vi, dyf, posg, fracg, kx_ph
+    integer                     :: ifv
+
     eps = 1.e-9_wp
 #:enddef
 
@@ -177,7 +185,7 @@
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, 0) = alpha_sf6
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = alpha_air
         end if
-    case (209)  ! 2D multimode RT / Faraday interface from external profile (2D_breakup)
+    case (209, 210)  ! 2D multimode RT / Faraday interface from external profile (2D_breakup)
         ! Single full-domain patch. Builds a tanh-smoothed two-fluid interface at
         ! y = y_int(x), where the absolute interface height y_int is read from
         ! "interface_profile.dat" (two columns: x  y_interface). Fluid 1 (heavy) sits
@@ -186,18 +194,32 @@
         !   %a(2) = rhoH   heavy-fluid material density (below)
         !   %a(3) = rhoL   light-fluid material density (above)
         !   %a(4) = delta  interface smoothing half-thickness
-        ! Only volume fractions, partial densities and the color function are set
-        ! here; pressure and velocity are left as assigned by the case file.
+        !
+        ! hcid 209 sets only volume fractions, partial densities and the color
+        ! function; pressure and velocity are left as assigned by the case file
+        ! (i.e. the fluid starts at rest).
+        !
+        ! hcid 210 additionally initializes the velocity with the linear Floquet
+        ! eigenmode, so the run starts ON the growing solution rather than from
+        ! rest (which is not a Floquet state and costs a startup transient). It
+        ! needs two further slots,
+        !   %a(5) = k      perturbation wavenumber
+        !   %a(6) = x0     x-origin for the phase
+        ! and reads "floquet_velocity.dat" with columns
+        !   y  Re(u_hat)  Im(u_hat)  Re(v_hat)  Im(v_hat),
+        ! the physical field being u(x,y) = Re{u_hat(y) e^{i k (x-x0)}} and likewise
+        ! for v. Because k is an integer number of wavelengths across the periodic
+        ! width, this initial field is exactly periodic in x.
         if (.not. pert_loaded) then
             open (newunit=punit, file='interface_profile.dat', status='old', action='read', iostat=pios)
-            if (pios /= 0) call s_mpi_abort("hcid 209: cannot open interface_profile.dat in the run directory")
+            if (pios /= 0) call s_mpi_abort("hcid 209/210: cannot open interface_profile.dat in the run directory")
             pert_n = 0
             do
                 read (punit, *, iostat=pios)
                 if (pios /= 0) exit
                 pert_n = pert_n + 1
             end do
-            if (pert_n < 2) call s_mpi_abort("hcid 209: interface_profile.dat needs >= 2 rows")
+            if (pert_n < 2) call s_mpi_abort("hcid 209/210: interface_profile.dat needs >= 2 rows")
             rewind (punit)
             allocate (pert_x(pert_n), pert_y(pert_n))
             do ipert = 1, pert_n
@@ -230,6 +252,45 @@
         q_prim_vf(eqn_idx%cont%end)%sf(i, j, 0) = (1._wp - alph)*rhoL
         if (surface_tension) then
             q_prim_vf(eqn_idx%c)%sf(i, j, 0) = wblend
+        end if
+
+        if (patch_icpp(patch_id)%hcid == 210) then
+            ! Floquet-consistent velocity field at t = 0 (see header above)
+            if (.not. fvel_loaded) then
+                open (newunit=punit, file='floquet_velocity.dat', status='old', action='read', iostat=pios)
+                if (pios /= 0) call s_mpi_abort("hcid 210: cannot open floquet_velocity.dat in the run directory")
+                fvel_n = 0
+                do
+                    read (punit, *, iostat=pios)
+                    if (pios /= 0) exit
+                    fvel_n = fvel_n + 1
+                end do
+                if (fvel_n < 2) call s_mpi_abort("hcid 210: floquet_velocity.dat needs >= 2 rows")
+                rewind (punit)
+                allocate (fvel_y(fvel_n), fvel_ur(fvel_n), fvel_ui(fvel_n), fvel_vr(fvel_n), fvel_vi(fvel_n))
+                do ifv = 1, fvel_n
+                    read (punit, *) fvel_y(ifv), fvel_ur(ifv), fvel_ui(ifv), fvel_vr(ifv), fvel_vi(ifv)
+                end do
+                close (punit)
+                fvel_loaded = .true.
+            end if
+
+            ! Linear interpolation of the eigenfunction at this cell's y
+            ! (the profile is written on a uniform y grid by the case file).
+            dyf = fvel_y(2) - fvel_y(1)
+            posg = (y_cc(j) - fvel_y(1))/dyf
+            ifv = floor(posg) + 1
+            ifv = max(1, min(fvel_n - 1, ifv))
+            fracg = (y_cc(j) - fvel_y(ifv))/dyf
+            fv_ur = fvel_ur(ifv) + fracg*(fvel_ur(ifv + 1) - fvel_ur(ifv))
+            fv_ui = fvel_ui(ifv) + fracg*(fvel_ui(ifv + 1) - fvel_ui(ifv))
+            fv_vr = fvel_vr(ifv) + fracg*(fvel_vr(ifv + 1) - fvel_vr(ifv))
+            fv_vi = fvel_vi(ifv) + fracg*(fvel_vi(ifv + 1) - fvel_vi(ifv))
+
+            ! u(x,y) = Re{ u_hat(y) e^{i k (x - x0)} } = Re(u_hat) cos - Im(u_hat) sin
+            kx_ph = patch_icpp(patch_id)%a(5)*(x_cc(i) - patch_icpp(patch_id)%a(6))
+            q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = fv_ur*cos(kx_ph) - fv_ui*sin(kx_ph)
+            q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, 0) = fv_vr*cos(kx_ph) - fv_vi*sin(kx_ph)
         end if
     case (250)  ! MHD Orszag-Tang vortex
         ! gamma = 5/3 rho = 25/(36*pi) p = 5/(12*pi) v = (-sin(2*pi*y), sin(2*pi*x), 0) B = (-sin(2*pi*y)/sqrt(4*pi),
