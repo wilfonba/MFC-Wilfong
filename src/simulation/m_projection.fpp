@@ -1142,9 +1142,9 @@ contains
         integer :: r, ierr
 
         allocate (crs_cnt(num_procs), crs_disp(num_procs), crs_sz(3, num_procs))
-        crs_sz(:,1) = [mg_nx(mg_nlev), mg_ny(mg_nlev), mg_nz(mg_nlev)]
+        crs_sz(:,proc_rank + 1) = [mg_nx(mg_nlev), mg_ny(mg_nlev), mg_nz(mg_nlev)]
 #ifdef MFC_MPI
-        call MPI_ALLGATHER(crs_sz(:,1), 3, MPI_INTEGER, crs_sz, 3, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+        call MPI_ALLGATHER(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, crs_sz, 3, MPI_INTEGER, MPI_COMM_WORLD, ierr)
 #endif
         crs_n = 0
         do r = 1, num_procs
