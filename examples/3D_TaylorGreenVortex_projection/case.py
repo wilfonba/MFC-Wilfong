@@ -20,7 +20,8 @@ import sys
 parser = argparse.ArgumentParser(description="3D Taylor-Green vortex, all-Mach pressure projection")
 parser.add_argument("--mach", type=float, default=0.01, help="Mach number U0/c, at most 0.1 (default: %(default)s)")
 parser.add_argument("--N", type=int, default=64, help="cells per direction (default: %(default)s)")
-parser.add_argument("--copies", type=int, default=1, help="periods of the vortex along x, for weak scaling (default: %(default)s)")
+for ax in "xyz":
+    parser.add_argument(f"--c{ax}", type=int, default=1, help=f"periods of the vortex along {ax}, for weak scaling (default: %(default)s)")
 parser.add_argument("--cfl", type=float, default=0.5, help="advective CFL, or acoustic with --explicit (default: %(default)s)")
 parser.add_argument("--tend", type=float, default=1.0, help="final time in convective times tC (default: %(default)s)")
 parser.add_argument("--steps", type=int, default=0, help="run this many steps instead of --tend (default: %(default)s)")
@@ -32,6 +33,9 @@ parser.add_argument("--low-mach", type=int, default=0, choices=[0, 1, 2], help="
 args, _ = parser.parse_known_args()
 if not 0.0 < args.mach <= 0.1:
     parser.error("--mach must be in (0, 0.1]: M = 0.1 is already the ideal gas")
+copies = {"x": args.cx, "y": args.cy, "z": args.cz}
+if min(copies.values()) < 1:
+    parser.error("--cx, --cy and --cz must be at least 1")
 
 L, Re, rho0, P0, gamma = 1.0, 1600.0, 1.0, 101325.0, 1.4
 U0 = 0.1 * math.sqrt(gamma * P0 / rho0)  # the velocity IC 380 sets
@@ -49,20 +53,20 @@ else:
     dt = args.tend * tC / Nt
 print(f"dt = {dt:.4e}  steps per tC = {tC / dt:.1f}  acoustic CFL = {dt * (U0 + c) / dx:.1f}  steps = {Nt}", file=sys.stderr)
 
+tiling = {}
+for (ax, cnt), ext in zip(copies.items(), "mnp"):
+    tiling[f"{ax}_domain%beg"] = -math.pi * L
+    tiling[f"{ax}_domain%end"] = (2 * cnt - 1) * math.pi * L
+    tiling[ext] = cnt * args.N - 1
+    tiling[f"patch_icpp(1)%{ax}_centroid"] = (cnt - 1) * math.pi * L
+    tiling[f"patch_icpp(1)%length_{ax}"] = 2 * math.pi * L * cnt
+
 print(
     json.dumps(
         {
             "run_time_info": "T" if args.info else "F",
             "rdma_mpi": "T" if args.rdma else "F",
-            "x_domain%beg": -math.pi * L,
-            "x_domain%end": (2 * args.copies - 1) * math.pi * L,
-            "y_domain%beg": -math.pi * L,
-            "y_domain%end": math.pi * L,
-            "z_domain%beg": -math.pi * L,
-            "z_domain%end": math.pi * L,
-            "m": args.copies * args.N - 1,
-            "n": args.N - 1,
-            "p": args.N - 1,
+            **tiling,
             "dt": dt,
             "t_step_start": 0,
             "t_step_stop": Nt,
@@ -91,12 +95,6 @@ print(
             "parallel_io": "T",
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%hcid": 380,
-            "patch_icpp(1)%x_centroid": (args.copies - 1) * math.pi * L,
-            "patch_icpp(1)%y_centroid": 0.0,
-            "patch_icpp(1)%z_centroid": 0.0,
-            "patch_icpp(1)%length_x": 2 * math.pi * L * args.copies,
-            "patch_icpp(1)%length_y": 2 * math.pi * L,
-            "patch_icpp(1)%length_z": 2 * math.pi * L,
             "patch_icpp(1)%vel(1)": 0.0,
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,

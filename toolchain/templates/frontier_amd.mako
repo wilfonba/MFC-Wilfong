@@ -53,6 +53,8 @@ ulimit -s unlimited
     % if engine == 'batch':
         # Broadcast binary to compute nodes
         sbcast --send-libs -pf ${target.get_install_binpath(case)} /mnt/bb/$USER/${target.name}
+        ## Offload image loads fail when every rank reads the fresh sbcast copy at once; read it once per node first
+        srun --nodes ${nodes} --ntasks-per-node 1 bash -c "cat /mnt/bb/$USER/${target.name} /mnt/bb/$USER/${target.name}_libs/* > /dev/null"
     % endif
 
     % if not mpi:

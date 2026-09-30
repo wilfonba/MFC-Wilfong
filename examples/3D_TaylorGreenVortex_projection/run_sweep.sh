@@ -108,8 +108,8 @@ fi
 if [[ $suite == weak ]]; then
     for N in $WEAK_NS; do
         for ng in $WEAK_NGPUS; do
-            for M in $WEAK_MACHS; do run projection "$N" "$ng" "$M" --copies "$ng" --steps "$STEPS" --saves 1; done
-            for M in $WEAK_EXPLICIT_MACHS; do run explicit "$N" "$ng" "$M" --copies "$ng" --steps "$STEPS" --saves 1; done
+            for M in $WEAK_MACHS; do run projection "$N" "$ng" "$M" --cx "$ng" --steps "$STEPS" --saves 1; done
+            for M in $WEAK_EXPLICIT_MACHS; do run explicit "$N" "$ng" "$M" --cx "$ng" --steps "$STEPS" --saves 1; done
         done
     done
 fi
