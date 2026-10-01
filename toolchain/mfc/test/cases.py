@@ -537,6 +537,30 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def alter_projection(dimInfo):
+        # The goldens hold the pressure solve the tests were made with: tight, and without the coarse-correction scale
+        stack.push("Projection", {"proj_method": "T", "proj_tol": 1e-10, "proj_mg_omega": 1.0})
+        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "Walls", get_bc_mods(-2, dimInfo)))
+        gravity = {**get_bc_mods(-2, dimInfo), "bf_x": "T", "g_x": -10.0, "k_x": 0.0, "w_x": 0.0, "p_x": 0.0}
+        cases.append(define_case_d(stack, "Gravity", gravity))
+        adap = {"cfl_adap_dt": "T", "cfl_target": 0.5, "n_start": 0, "t_save": 0.1, "t_stop": 0.1}
+        cases.append(define_case_d(stack, "cfl_adap_dt=T", {**adap, "proj_max_acfl": 5.0}))
+        cases.append(define_case_d(stack, ["Gravity", "cfl_adap_dt=T"], {**gravity, **adap}))
+        for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
+            cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
+        cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
+        if len(dimInfo[0]) == 2:
+            ibm = {"ib": "T", "num_ibs": 1, "fd_order": 2, "patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1, "patch_ib(1)%slip": "F"}
+            cases.append(define_case_d(stack, "IBM", {**get_bc_mods(-2, dimInfo), **ibm}))
+        if len(dimInfo[0]) > 1:
+            capillary = {"patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 0.1, "surface_tension": "T"}
+            cases.append(define_case_d(stack, "capillary=T", capillary))
+            cases.append(define_case_d(stack, ["capillary=T", "surface_tension_model=2"], {**capillary, "surface_tension_model": 2}))
+        if len(dimInfo[0]) > 1:
+            cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49} if len(dimInfo[0]) == 3 else {}, ppn=2))
+        stack.pop()
+
     def alter_igr():
         stack.push("IGR", {"igr": "T", "alf_factor": 10, "num_igr_iters": 10, "elliptic_smoothing": "T", "elliptic_smoothing_iters": 10, "num_igr_warm_start_iters": 10})
 
@@ -850,6 +874,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
+                alter_projection(dimInfo)
+
+            if len(dimInfo[0]) == 1 or (len(dimInfo[0]) > 1 and num_fluids == 2):
+                # Fourier conduction. The 2-fluid row covers the volume-fraction-weighted face
+                # conductivity, which a single-fluid case leaves untested. cv must be set: it
+                # defaults to zero, which a conducting fluid is not allowed to have. 2D/3D run on
+                # the base Cartesian grid (patches vary along y/z per get_dimensions), covering the
+                # Cartesian y-/z-direction flux-divergence branches in m_rhs.fpp that the
+                # axisymmetric/cylindrical Conduction cases below never reach.
+                conduction = {"dt": 1e-11}
+                for fluid, k_therm in zip(range(1, num_fluids + 1), [1.0e-3, 4.0e-3]):
+                    conduction[f"fluid_pp({fluid})%k_therm"] = k_therm
+                    conduction[f"fluid_pp({fluid})%cv"] = 1.0
+                stack.push("Conduction", conduction)
+                cases.append(define_case_d(stack, "", {}))
+                stack.pop()
 
             if num_fluids == 1:
                 stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "dt": 1e-11, "patch_icpp(1)%vel(1)": 1.0, "viscous": "T"})
@@ -904,6 +944,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                                     "num_ibs": 1,
                                     "fd_order": 2,
                                     "ib_state_wrt": "T",
+                                    "ib_force_wrt": "T",
                                     "patch_ib(1)%geometry": 3,
                                     "patch_ib(1)%x_centroid": 0.5,
                                     "patch_ib(1)%y_centroid": 0.5,
@@ -995,6 +1036,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
         add_hll_u_interface_cases("HLL")
 
+        # Fourier conduction on the cylindrical axis: covers s_compute_conduction_axis_source,
+        # which is the only cell the generic geometric source loop skips.
+        stack.push(
+            "Conduction",
+            {"fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-3, "fluid_pp(2)%cv": 1.0, "dt": 1e-11},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-11, "viscous": "T"})
 
         cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
@@ -1068,6 +1118,55 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
         cases.append(define_case_d(stack, "model_eqns=2", {"model_eqns": 2}))
+
+        # 3D cylindrical axis (bc_y%beg = -14) routes the ghost fill through s_axis, which crosses the
+        # axis with a half-turn azimuthal shift rather than a plain mirror. This is the only trace that
+        # covers the temperature halo on that path. The base patches vary in x only, which leaves the
+        # azimuthal flux identically zero and its (1/r**2) metric untested, so a theta-dependent
+        # patch is added here.
+        #
+        # The theta dependence is geometric, not analytic: an analytic patch expression would be
+        # codegen'd into a per-case case.fpp and cost this test its own full MFC compile (~1 h of
+        # device link on amdflang). s_icpp_cuboid converts (r, theta) to Cartesian before its box
+        # test when grid_geometry == 3, so a cuboid offset from the axis covers a theta-and-r
+        # dependent wedge (cart_y = r*sin(theta) in [0, 1], cart_z = r*cos(theta) in [-0.5, 0.5])
+        # using numeric parameters only. It is patch 4, laid over patches 1-3 rather than replacing
+        # one of them: the three base cylinders tile x, so re-cutting any of them leaves cells no
+        # patch ever writes, and an unassigned cell is a vacuum that trips the ICFL guard on step 1.
+        # alter_patch defaults to writing only unassigned cells, hence the explicit permissions.
+        stack.push(
+            "Conduction",
+            {
+                "fluid_pp(1)%k_therm": 1.0e-3,
+                "fluid_pp(1)%cv": 1.0,
+                "fluid_pp(2)%k_therm": 4.0e-3,
+                "fluid_pp(2)%cv": 1.0,
+                "dt": 1e-11,
+                "num_patches": 4,
+                "patch_icpp(4)%geometry": 9,
+                "patch_icpp(4)%x_centroid": 2.5,
+                "patch_icpp(4)%length_x": 3.0,
+                "patch_icpp(4)%y_centroid": 0.5,
+                "patch_icpp(4)%length_y": 1.0,
+                "patch_icpp(4)%z_centroid": 0.0,
+                "patch_icpp(4)%length_z": 1.0,
+                "patch_icpp(4)%alter_patch(1)": "T",
+                "patch_icpp(4)%alter_patch(2)": "T",
+                "patch_icpp(4)%alter_patch(3)": "T",
+                "patch_icpp(4)%pres": 0.5,
+                "patch_icpp(4)%alpha_rho(1)": 0.4,
+                "patch_icpp(4)%alpha(1)": 0.8,
+                "patch_icpp(4)%alpha_rho(2)": 0.05,
+                "patch_icpp(4)%alpha(2)": 0.2,
+                "patch_icpp(4)%vel(1)": 0.0,
+                "patch_icpp(4)%vel(2)": 0.0,
+                "patch_icpp(4)%vel(3)": 0.0,
+                "patch_icpp(4)%r0": 1,
+                "patch_icpp(4)%v0": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
 
         stack.push("cfl_adap_dt=T", {"cfl_adap_dt": "T", "cfl_target": 0.08, "t_save": 0.1, "n_start": 0, "t_stop": 0.1})
         cases.append(define_case_d(stack, "", {}))
@@ -1191,25 +1290,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, f"Circle{suffix}", {"patch_ib(1)%geometry": 2, "n": 49}))
-                if slip and six_eqn_model:
-                    cases.append(
-                        define_case_d(
-                            stack,
-                            f"Circle{suffix} -> model_eqns=3 -> eos=mie_gruneisen",
-                            {
-                                "patch_ib(1)%geometry": 2,
-                                "model_eqns": 3,
-                                "n": 49,
-                                "fluid_pp(1)%eos": "mie_gruneisen",
-                                "fluid_pp(1)%gamma": None,
-                                "fluid_pp(1)%pi_inf": None,
-                                "fluid_pp(1)%mg_rho0": 1.0,
-                                "fluid_pp(1)%mg_c0": 1.0,
-                                "fluid_pp(1)%mg_s": 1.0,
-                                "fluid_pp(1)%mg_gruneisen": 0.4,
-                            },
-                        )
-                    )
                 if six_eqn_model:
                     cases.append(
                         define_case_d(
@@ -1224,6 +1304,54 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
 
             stack.pop()
+
+        if len(dimInfo[0]) == 3 and not viscous:
+            # Prescribed immersed-boundary kinematics (patch_ib%kin_model = 2, the Eldredge pitch ramp). The body
+            # state is evaluated from the closed form at every Runge-Kutta stage, so this is sensitive to the
+            # kinematics, to the ghost-cell reconstruction that follows the moving body, and to the force path.
+            # The plate is four cells thick here, the minimum at which the body has an interior.
+            # theta0 and the pitch rate are a hundredth of the physical case's, keeping t_p = theta0/rate = 0.025
+            # and so the same ramp shape and the same a*t_p = 5 smoothing. At the physical amplitude the tip
+            # sweeps 1.5 cells over the 50 steps, cells cross the surface, and the step one crosses on is decided
+            # by a comparison that a sub-ulp shift flips: perturbing kin_smooth by 5e-13 then moves the step-50
+            # field by 5e-3 absolute, which is why no golden was portable. At this amplitude the same perturbation
+            # moves it by 2e-15. The test keeps its teeth through the no-slip wall velocity, which the kinematics
+            # set directly and which is an order above the free stream.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Prescribed Kinematics -> Pitch Ramp",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "patch_ib(1)%geometry": 9,
+                        "patch_ib(1)%x_centroid": 0.51,
+                        "patch_ib(1)%y_centroid": 0.51,
+                        "patch_ib(1)%z_centroid": 0.51,
+                        "patch_ib(1)%length_x": 0.4,
+                        "patch_ib(1)%length_y": 0.4,
+                        "patch_ib(1)%length_z": 0.16,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 1,
+                        "patch_ib(1)%kin_model": 2,
+                        "patch_ib(1)%kin_hinge(1)": 0.31,
+                        "patch_ib(1)%kin_hinge(2)": 0.51,
+                        "patch_ib(1)%kin_hinge(3)": 0.51,
+                        "patch_ib(1)%kin_offset(1)": 0.2,
+                        "patch_ib(1)%kin_offset(2)": 0.0,
+                        "patch_ib(1)%kin_offset(3)": 0.0,
+                        "patch_ib(1)%kin_theta0": 0.003,
+                        "patch_ib(1)%kin_theta_mean": 0.0,
+                        "patch_ib(1)%kin_pitch_rate": 0.12,
+                        "patch_ib(1)%kin_smooth": 200.0,
+                        "patch_ib(1)%kin_t0": 0.0,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                )
+            )
 
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
@@ -1260,6 +1388,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "num_particle_clouds": 1,
                         "fd_order": 2,
                         "ib_state_wrt": "T",
+                        "ib_force_wrt": "T",
                         "n": 49,
                         "particle_cloud(1)%cloud_geometry": 2,
                         "particle_cloud(1)%packing_method": 1,
@@ -1289,6 +1418,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "num_particle_clouds": 1,
                         "fd_order": 2,
                         "ib_state_wrt": "T",
+                        "ib_force_wrt": "T",
                         "n": 49,
                         "particle_cloud(1)%cloud_geometry": 1,
                         "particle_cloud(1)%packing_method": 1,
@@ -1309,6 +1439,38 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+            # Restart roundtrip regression: particle-cloud beds must survive a restart, not just namelist patch_ib patches -
+            # pre_process now generates them once and simulation reads that layout back on every start (fresh or restart).
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Box -> Restart",
+                    {
+                        "ib": "T",
+                        "num_ibs": 0,
+                        "num_particle_clouds": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "particle_cloud(1)%cloud_geometry": 1,
+                        "particle_cloud(1)%packing_method": 1,
+                        "particle_cloud(1)%x_centroid": 0.5,
+                        "particle_cloud(1)%y_centroid": 0.5,
+                        "particle_cloud(1)%length_x": 0.6,
+                        "particle_cloud(1)%length_y": 0.6,
+                        "particle_cloud(1)%num_particles": 4,
+                        "particle_cloud(1)%radius": 0.02,
+                        "particle_cloud(1)%mass": 1.0,
+                        "particle_cloud(1)%min_spacing": 0.005,
+                        "particle_cloud(1)%moving_ibm": 0,
+                        "particle_cloud(1)%seed": 12345,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                    restart_check=True,
+                )
+            )
+
         if len(dimInfo[0]) == 3 and not viscous:
             cases.append(
                 define_case_d(
@@ -1320,6 +1482,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "num_particle_clouds": 1,
                         "fd_order": 2,
                         "ib_state_wrt": "T",
+                        "ib_force_wrt": "T",
                         "m": 29,
                         "n": 29,
                         "p": 29,
@@ -1686,7 +1849,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 reflective_params.update({"bc_z%beg": -2, "bc_z%end": -2})
 
             if num_fluids == 1:
-                cases.append(define_case_d(stack, "cont_damage", {"cont_damage": "T", "tau_star": 0.0, "cont_damage_s": 2.0, "alpha_bar": 1e-4}))
+                # Tensile initial stress above ambient p + positive threshold keep the golden
+                # discriminating (regressions in driver, eigenvalues, carrier, or fluxes move D)
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "cont_damage",
+                        {"cont_damage": "T", "tau_star": 1.0e5, "cont_damage_s": 2.0, "alpha_bar": 3e-5, "patch_icpp(2)%tau_e(1)": 5.0e5},
+                    )
+                )
                 if len(dimInfo[0]) == 2:
                     cases.append(
                         define_case_d(
@@ -1695,18 +1866,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             {
                                 "riemann_solver": 2,
                                 "cont_damage": "T",
-                                "tau_star": 0.0,
+                                "tau_star": 1.0e5,
                                 "cont_damage_s": 2.0,
-                                "alpha_bar": 1e-4,
-                                "patch_icpp(1)%tau_e(1)": 100.0,
-                                "patch_icpp(1)%tau_e(2)": 25.0,
-                                "patch_icpp(1)%tau_e(3)": -100.0,
-                                "patch_icpp(2)%tau_e(1)": 200.0,
-                                "patch_icpp(2)%tau_e(2)": 50.0,
-                                "patch_icpp(2)%tau_e(3)": -200.0,
-                                "patch_icpp(3)%tau_e(1)": 300.0,
-                                "patch_icpp(3)%tau_e(2)": 75.0,
-                                "patch_icpp(3)%tau_e(3)": -300.0,
+                                "alpha_bar": 3e-5,
+                                "patch_icpp(1)%tau_e(1)": 5.0e5,
+                                "patch_icpp(1)%tau_e(2)": 1.25e5,
+                                "patch_icpp(1)%tau_e(3)": -5.0e5,
+                                "patch_icpp(2)%tau_e(1)": 1.0e6,
+                                "patch_icpp(2)%tau_e(2)": 2.5e5,
+                                "patch_icpp(2)%tau_e(3)": -1.0e6,
+                                "patch_icpp(3)%tau_e(1)": 1.5e6,
+                                "patch_icpp(3)%tau_e(2)": 3.75e5,
+                                "patch_icpp(3)%tau_e(3)": -1.5e6,
                             },
                         )
                     )
@@ -1714,6 +1885,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "bc=-2", reflective_params))
                 if len(dimInfo[0]) == 2:
                     cases.append(define_case_d(stack, "Axisymmetric", {**reflective_params, "cyl_coord": "T"}))
+
+            if num_fluids == 2 and len(dimInfo[0]) == 2:
+                # Covers the hoop-stress branch and the solid-partial-mass carrier with a
+                # non-damageable fluid present (all other damage tests are single-fluid, m_s = rho)
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "cont_damage -> Axisymmetric",
+                        {
+                            **reflective_params,
+                            "cyl_coord": "T",
+                            "cont_damage": "T",
+                            "tau_star": 1.0e5,
+                            "cont_damage_s": 2.0,
+                            "alpha_bar": 3e-5,
+                            "fluid_pp(2)%G": 0.0,
+                            "patch_icpp(2)%tau_e(4)": 5.0e5,
+                        },
+                    )
+                )
 
             stack.pop()
 
@@ -3038,10 +3229,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
-                # File-based IC (hcid=273/274) sized to the full grid; the Example
-                # suite's m/n cap breaks it. Covered by the Chemistry golden tests.
+                # Analytic hydrostatic ICs need their own build; the projection's gravity and IB are covered by the suite
+                "2D_dam_break",
+                "2D_dam_break_obstacle",
+                "2D_rising_bubble",
+                # hcid 209 reads interface_profile.dat, which case.py writes next to itself, not into the test directory
+                "2D_interface_breakup",
+                # File-based IC (hcid=273/274/371) sized to the full grid; the Example
+                # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
                 "2D_spatial_reacting_mixing_layer",
+                "3D_reacting_mixing_layer",
                 "2D_ibm_multiphase",
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
@@ -3075,6 +3273,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_isentropic_release",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
+                # An analytic initial condition (a patch_icpp expression) is codegen'd into a
+                # per-case case.fpp, so every such example costs its own full MFC compile --
+                # about an hour of device link on amdflang. No example that enters the suite may
+                # have one; the convergence and *_analytical examples above are skipped for the
+                # same reason. The conduction physics is covered by the Conduction suite cases,
+                # whose patches are all numeric.
+                "1D_conduction_convergence",
+                "2D_axisym_conduction_convergence",
+                "3D_cyl_azimuthal_conduction_convergence",
                 "3D_IGR_TaylorGreenVortex_nvidia",
                 "2D_backward_facing_step",
                 "2D_forward_facing_step",
@@ -3138,6 +3345,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # the transverse momentum drifts past the 1e-3 Example tolerance across compilers
                 # (nvhpc passes; Intel and CCE disagree by ~2e-3 absolute). No single golden is portable.
                 "2D_hybrid_slab",
+                # The Example suite caps the grid at 25 cells per direction, which puts this case's 5-percent-chord
+                # plate at a third of a cell: the body occupies no cells at all and the golden is a uniform field
+                # that no code change can perturb. The same kinematics are covered meaningfully by the
+                # "IBM -> Prescribed Kinematics -> Pitch Ramp" case below, whose plate is four cells thick.
+                "3D_ibm_pitchup_plate",
+                # A grid-resolution study; the Example suite's 25-cell cap removes the resolution it measures.
+                "2D_ibm_thin_plate_force",
+                # The bug it shows needs two consecutive runs in one directory; a single Example run cannot see it.
+                "2D_probe_rerun",
+                # Needs its 16 x 2 x 2 rank topology; the Example suite runs it on one rank and a shrunken grid.
+                "3D_ibm_neighborhood_radius",
             ]
             if path in casesToSkip:
                 continue
@@ -3148,6 +3366,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             def modify_example_case(case: dict):
                 case["parallel_io"] = "F"
+                case["file_per_process"] = "F"
                 if "t_step_stop" in case and case["t_step_stop"] >= 50:
                     case["t_step_start"] = 0
                     case["t_step_stop"] = 50
@@ -3239,6 +3458,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D -> Chemistry -> Reacting Mixing Layer",
                 "examples/2D_reacting_mixing_layer/case.py",
                 ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+                override_tol=10 ** (-6),
+            )
+        )
+
+        # --scale drives case.py's own grid, so the IC files it writes match the run grid.
+        # Anything that caps m/n/p afterwards (the Example sweep) leaves hcid=371 reading a
+        # corner of an oversized file, silently and without tripping its bounds check.
+        cases.append(
+            define_case_f(
+                "3D -> Chemistry -> Reacting Mixing Layer",
+                "examples/3D_reacting_mixing_layer/case.py",
+                ["--scale", "0.05"],  # 32^3; cold profile by default, see case.py
                 mods=common_mods,
                 override_tol=10 ** (-6),
             )

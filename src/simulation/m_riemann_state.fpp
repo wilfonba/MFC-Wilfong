@@ -228,7 +228,7 @@ contains
         !> Species enthalpies and heat capacities, evaluated by the caller. m_thermochem is called from the loop body rather than
         !! from here: CCE faults the GPU on that call one routine deeper.
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(10), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
+            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
         #:else
             real(wp), dimension(num_species), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
         #:endif
@@ -236,7 +236,7 @@ contains
         real(wp), intent(out) :: c_sum_Yi_Phi
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(10) :: Yi_avg, Phi_avg, h_avg_2
+            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Yi_avg, Phi_avg, h_avg_2
         #:else
             real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_avg_2
         #:endif
@@ -244,24 +244,26 @@ contains
 
         eps = 0.001_wp
 
-        h_avg_2 = (sqrt(rho_L)*h_iL + sqrt(rho_R)*h_iR)/(sqrt(rho_L) + sqrt(rho_R))
-        Yi_avg = (sqrt(rho_L)*Ys_L + sqrt(rho_R)*Ys_R)/(sqrt(rho_L) + sqrt(rho_R))
+        h_avg_2(1:num_species) = (sqrt(rho_L)*h_iL(1:num_species) + sqrt(rho_R)*h_iR(1:num_species))/(sqrt(rho_L) + sqrt(rho_R))
+        Yi_avg(1:num_species) = (sqrt(rho_L)*Ys_L(1:num_species) + sqrt(rho_R)*Ys_R(1:num_species))/(sqrt(rho_L) + sqrt(rho_R))
         T_avg = (sqrt(rho_L)*T_L + sqrt(rho_R)*T_R)/(sqrt(rho_L) + sqrt(rho_R))
 
         if (abs(T_L - T_R) < eps) then
             ! Case when T_L and T_R are very close
-            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*R_species(:))
-            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*R_species(:) - R_species(:)))
+            Cp_avg = sum(Yi_avg(1:num_species)*(0.5_wp*Cp_iL(1:num_species) + 0.5_wp*Cp_iR(1:num_species))*R_species(1:num_species))
+            Cv_avg = sum(Yi_avg(1:num_species)*((0.5_wp*Cp_iL(1:num_species) + 0.5_wp*Cp_iR(1:num_species)) &
+                         & *R_species(1:num_species) - R_species(1:num_species)))
         else
             ! Normal calculation when T_L and T_R are sufficiently different
-            Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
-            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - R_species(:)))
+            Cp_avg = sum(Yi_avg(1:num_species)*(h_iR(1:num_species) - h_iL(1:num_species))/(T_R - T_L))
+            Cv_avg = sum(Yi_avg(1:num_species)*((h_iR(1:num_species) - h_iL(1:num_species))/(T_R - T_L) - R_species(1:num_species)))
         end if
 
         gamma_avg = Cp_avg/Cv_avg
 
-        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*R_species(:)*T_avg
-        c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
+        Phi_avg(1:num_species) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(1:num_species)) &
+                & + gamma_avg*R_species(1:num_species)*T_avg
+        c_sum_Yi_Phi = sum(Yi_avg(1:num_species)*Phi_avg(1:num_species))
 
     end subroutine s_compute_chemistry_average_state
 
@@ -632,7 +634,7 @@ contains
         ! Reshaping Inputted Data in x-direction
 
         if (norm_dir == 1) then
-            if (viscous .or. (surface_tension)) then
+            if (viscous .or. surface_tension .or. heat_conduction) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do l = is3%beg, is3%end
@@ -678,7 +680,7 @@ contains
 
             ! Reshaping Inputted Data in y-direction
         else if (norm_dir == 2) then
-            if (viscous .or. (surface_tension)) then
+            if (viscous .or. surface_tension .or. heat_conduction) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do l = is3%beg, is3%end
@@ -724,7 +726,7 @@ contains
 
             ! Reshaping Inputted Data in z-direction
         else
-            if (viscous .or. (surface_tension)) then
+            if (viscous .or. surface_tension .or. heat_conduction) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do j = is1%beg, is1%end
@@ -1253,11 +1255,12 @@ contains
     end subroutine s_compute_interface_reynolds
 
     !> Accumulate the hypoelastic stress contribution to the energies of the left and right Riemann states: mix the shear modulus
-    !! over the fluids, scale it by the continuum damage state when damage is modeled, and add the elastic energy of each stress
-    !! component (doubled for the shear components) on each side whose mixture modulus is non-negligible. The elastic shear stresses
-    !! are loaded from the state buffers by the caller, which reuses them for the stress fluxes and elastic wave speeds. The G >
-    !! verysmall per-side gate is a deliberate maintainer ruling that replaces HLL's former hard-coded G > 1000 stability floor,
-    !! retiring its "TODO take out if statement if stable without".
+    !! over the fluids, add the elastic energy of each stress component (doubled for the shear components) on each side whose
+    !! mixture modulus is non-negligible, then scale the returned moduli by the continuum damage state when damage is modeled
+    !! (energy uses the undamaged modulus; the damaged moduli feed the callers' wave speeds). The elastic shear stresses are loaded
+    !! from the state buffers by the caller, which reuses them for the stress fluxes and elastic wave speeds. The G > verysmall
+    !! per-side gate is a deliberate maintainer ruling that replaces HLL's former hard-coded G > 1000 stability floor, retiring its
+    !! "TODO take out if statement if stable without".
     subroutine s_compute_hypoelastic_interface_energy(nf, alpha_L, alpha_R, damage_L, damage_R, tau_e_L, tau_e_R, G_L, G_R, E_L, &
         & E_R)
 
@@ -1279,11 +1282,7 @@ contains
             G_R = G_R + alpha_R(i)*Gs_rs(i)
         end do
 
-        if (cont_damage) then
-            G_L = G_L*max((1._wp - damage_L), 0._wp)
-            G_R = G_R*max((1._wp - damage_R), 0._wp)
-        end if
-
+        ! Elastic energy uses the undamaged modulus, so this loop precedes the damage scaling
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
             ! Elastic contribution to energy if G large enough
@@ -1302,6 +1301,12 @@ contains
                 end if
             end if
         end do
+
+        ! Damage scaling applies only to the returned moduli (used for wave speeds)
+        if (cont_damage) then
+            G_L = G_L*max((1._wp - damage_L), 0._wp)
+            G_R = G_R*max((1._wp - damage_R), 0._wp)
+        end if
 
     end subroutine s_compute_hypoelastic_interface_energy
 

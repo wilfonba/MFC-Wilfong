@@ -664,6 +664,46 @@ that defines the routine. Helpers added to `m_riemann_state.fpp` are automatical
 in scope for every solver module that `use`s it — no additional declare-target
 annotations are needed at call sites.
 
+## Module boundaries and NVHPC inlining
+
+**Moving a device helper into another file can silently cost ~25% on NVHPC.** NVHPC has no
+device LTO, so MFC's only cross-file inlining is the two-pass `-Mextract=lib:` / `-Minline=lib:`
+scheme in `cmake/MFCTargets.cmake`. That inliner **refuses any device routine that has a
+subroutine call anywhere in its call tree**, reporting:
+
+```
+subprogram not inlined -- missing prototype during crossing files: <name>
+```
+
+The refusal propagates: a caller of a refused routine is refused too. Measured on nvfortran
+25.11 (A100), the following hold for a routine that must inline across files:
+
+| in the routine's body | inlines across files? |
+|---|---|
+| arithmetic, branches on module logicals, module array reads, early `return` | yes |
+| a call to a scalar-returning function that is itself inlinable | yes (the callee need not be inlined) |
+| a call to a **subroutine** | **no** |
+| the routine *returns* a derived type or an array | **no** — never inlinable |
+
+There is no build-level escape: `-Mextract` always captures pre-inline source, so re-extracting
+in stages, compiling several files in one invocation, and `levels:`/`maxsize:`/`name:`/`except:`
+all fail, as does `-Mipa` (ignored in 25.x). Cray and AMD do their own whole-program IPA and are
+unaffected, and CPU builds do not care — so this shows up as an NVHPC-only benchmark regression
+while every other job stays green.
+
+**Symptom.** Grind time regresses on NVHPC alone, with unchanged source semantics. Confirm by
+comparing per-routine stack frames: `-Minfo=inline` and `-gpu=ptxinfo` are already on, so
+`Function properties for ...` lines jumping from ~8 bytes to 200–350 bytes with matching
+`spill stores`/`spill loads` is the fingerprint. Registers per thread going *down* while the
+kernel gets slower is the same story seen from `ncu`.
+
+**Rule of thumb.** Draw a module boundary where inlining already fails, not in the middle of a
+chain that currently inlines. Solver kernels never inlined `s_compute_mixture_coefficients` or
+`s_compute_speed_of_sound` even before `m_eos` existed, which makes that a free cut point; the
+phase chain those two call (`s_phase_coefficients` → `s_eos_coefficients` → `s_reference_curve`)
+must stay in the same file as them. This is why those four routines live in `src/common/m_eos.fpp`
+alongside the EOS operators even though mixture closure is not, strictly, an equation of state.
+
 ------------------------------------------------------------------------------------------
 
 # Debugging Tools and Tips for GPUs
@@ -863,6 +903,55 @@ while the host still registers it. The first launch aborts with
 
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
 hoist it into its own (module) subroutine with the locals passed as arguments.
+
+## Silent-Failure Traps {#silent-failure-traps}
+
+Every entry here was measured. They share a failure mode: the build stays green and the
+answer is wrong, or one backend diverges from all the others.
+
+- **Do not wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops.** `GPU_LOOP` emits empty
+  directives on Cray and AMD, so the loop runs serially with no diagnostic. Spatial loops
+  always use `GPU_PARALLEL_LOOP` / `END_GPU_PARALLEL_LOOP`.
+- **An array whose bound is a device global** (`dimension(num_fluids)`,
+  `dimension(num_species)`) may be passed to a device routine from a parallel-loop body,
+  but **not from inside another ``GPU_ROUTINE(parallelism='[seq]')``**. Cray OpenACC rejects
+  the second form with `ftn-7066 ... Global in accelerator routine without declare`, and
+  reports it at whatever line it gave up on: remove one trigger and the message walks
+  forward to the next call, so the reported line is not the cause. Only the plain lanes
+  fail, since `--case-optimization` turns those bounds into `parameter`s — a green case-opt
+  lane beside a failing plain one is the signature. Form such a call in the loop body and
+  pass scalars deeper. Neither `cray_inline`, nor a `num_fluids_max` bound, nor dropping
+  optional dummies avoids it; all three were tried.
+- **A device routine containing any `GPU_LOOP` must be called with scalars, never with an
+  array element.** On Cray OpenACC 19.0.0 through 21.0.2 at `-O2` (`-O0` and `-O1` are
+  correct, OpenMP offload is unaffected) the element is misaddressed: an `intent(in)`
+  element reads as garbage and an `intent(out)` element is never written. Every `routine`
+  level is affected, including a conforming `loop vector` inside `routine vector`. Either
+  ingredient alone is fine, which is why a call like `s_compute_pressure(q%%sf(j,k,l), ...)`
+  into a loop-free helper works. Copy elements into locals before the call and receive into
+  a local. Do not instead delete the `seq` directives: they are the idiom every device
+  routine here uses. See [#1815](https://github.com/MFlowCode/MFC/issues/1815).
+- **Call `m_thermochem` species routines from the kernel, not from inside a
+  `GPU_ROUTINE`.** Calling `get_species_*` from within a device routine gives Cray OpenMP a
+  runtime `Memory access fault by GPU node-N` on the first step while every other backend
+  runs. The build is clean and only a case that reaches the path shows it. Evaluate them at
+  the call site and pass the arrays in.
+- **nvfortran 23.11 and 24.1 segfault** (`fort2 TERMINATED by signal 11`) on a caller that
+  passes a `parameter` array from `m_thermochem`, such as `molecular_weights`, into a
+  declare-target routine. Read such arrays directly in the kernel, or pass a plain local
+  computed from them.
+- **The `USING_AMD` fypp guards are load-bearing, not a stale workaround.** They swap a
+  device-global array bound for a literal in `src/common/include/shared_parallel_macros.fpp`
+  and its 86 use sites. Setting `USING_AMD = False` and rebuilding amdflang `--gpu mp`
+  without case optimization compiles completely clean, then produces NaNs in CBC, the
+  `wave_speeds=2` Riemann path, immersed boundaries, surface tension, QBMM and viscous
+  cases, and MHD HLLD, while both Lagrange bubble cases complete with out-of-tolerance
+  answers. A compile-only check returns green, so any attempt to remove these must run the
+  tests rather than just build.
+- `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
+  `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
+
+------------------------------------------------------------------------------------------
 
 ## Compiler Documentation
 

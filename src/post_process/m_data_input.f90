@@ -104,11 +104,12 @@ contains
     !> Helper subroutine to read IB data files
     impure subroutine s_read_ib_data_files(file_loc_base, t_step)
 
-        character(len=*), intent(in)                :: file_loc_base
-        integer, intent(in), optional               :: t_step
-        character(LEN=len_trim(file_loc_base) + 20) :: file_loc
-        logical                                     :: file_exist
-        integer                                     :: ifile, ierr, data_size
+        character(len=*), intent(in)         :: file_loc_base
+        integer, intent(in), optional        :: t_step
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical                              :: file_exist
+        integer                              :: ifile, ierr, data_size
+        character(len=10)                    :: t_step_string
 
 #ifdef MFC_MPI
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -119,7 +120,11 @@ contains
 
         if (.not. ib) return
 
-        if (parallel_io) then
+        if (parallel_io .and. file_per_process) then
+            call s_int_to_str(t_step, t_step_string)
+            write (file_loc, '(A,I0,A,i7.7,A)') 'ib_markers_', t_step, '_', proc_rank, '.dat'
+            file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
+        else if (parallel_io) then
             write (file_loc, '(A)') trim(file_loc_base) // 'ib.dat'
         else
             write (file_loc, '(A)') trim(file_loc_base) // '/ib_data.dat'
@@ -127,7 +132,17 @@ contains
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
         if (file_exist) then
-            if (parallel_io) then
+            if (parallel_io .and. file_per_process) then
+#ifdef MFC_MPI
+                call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+                data_size = (m + 1)*(n + 1)*(p + 1)
+
+                call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, MPI_INTEGER, status, ierr)
+
+                call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+            else if (parallel_io) then
 #ifdef MFC_MPI
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
@@ -177,8 +192,9 @@ contains
             allocate (ib_markers%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             allocate (q_T_sf%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
+            q_T_sf%sf = 0._wp  ! Buffer population reads the interior before anything writes it
         end if
 
     end subroutine s_allocate_field_arrays
@@ -261,6 +277,8 @@ contains
         integer(kind=MPI_OFFSET_KIND)        :: offset
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist
+        integer(kind=8)                      :: file_bytes, bytes_needed
+        character(len=10)                    :: case_m_str, file_m_str
         character(len=10)                    :: t_step_string
         integer                              :: i
 
@@ -275,9 +293,24 @@ contains
         end if
 
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'x_cb.dat'
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        inquire (FILE=trim(file_loc), EXIST=file_exist, SIZE=file_bytes)
 
+        ! The grid file holds one cell boundary per value, so its size says which grid wrote the restart. Without
+        ! this check a case file whose resolution no longer matches the run reads past the end of every restart
+        ! file and post-processes silently, exiting 0 with NaN-filled output -- which is indistinguishable from
+        ! success until someone plots it. The strided read down_sample performs touches stride*(m_glb + 1) + 1
+        ! boundaries of a full-resolution file, so it needs more of the file, not less; only the un-strided read
+        ! pins the size exactly, since down-sampling three grids of different size can land on the same m_glb.
         if (file_exist) then
+            bytes_needed = (int(stride, 8)*int(m_glb + 1, 8) + 1_8)*int(storage_size(0._wp)/8, 8)
+            if (file_bytes < bytes_needed .or. (.not. down_sample .and. file_bytes /= bytes_needed)) then
+                call s_int_to_str(m_glb, case_m_str)
+                call s_int_to_str(int(file_bytes/int(storage_size(0._wp)/8, 8)) - 2, file_m_str)
+                call s_mpi_abort('Restart grid mismatch: this case has m = ' // trim(case_m_str) // ' but ' // trim(file_loc) &
+                                 & // ' was written with m = ' // trim(file_m_str) &
+                                 & // '. Post-processing must use the same grid as the run that wrote the ' &
+                                 & // 'restart files, or it reads past the end of every file and writes NaN.')
+            end if
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
@@ -528,7 +561,7 @@ contains
             deallocate (ib_markers%sf)
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             deallocate (q_T_sf%sf)
         end if
 

@@ -22,14 +22,14 @@ module m_constants
     integer, parameter  :: dflt_int = -100          !< Default integer value
     integer, parameter  :: fourier_rings = 5        !< Fourier filter ring limit
     integer, parameter  :: num_fluids_max = 10      !< Maximum number of fluids in the simulation
-    integer, parameter  :: num_probes_max = 10      !< Maximum number of flow probes in the simulation
+    integer, parameter  :: num_probes_max = 64      !< Maximum number of flow probes in the simulation
     integer, parameter  :: num_patches_max = 10     !< Maximum number of IC patches
     integer, parameter  :: num_ib_airfoils_max = 5  !< Maximum number of ib_airfoil instances
     integer, parameter  :: num_stl_models_max = 10
     !> Maximum number of immersed boundary patches (legacy, not used for patch_ib sizing)
     !> Fixed capacity of patch_ib (namelist patches + local particle bed subset after reduction)
-    integer, parameter  :: num_local_ibs_max = 2000            !< Maximum number of immersed boundary patches (patch_ib)
-    integer, parameter  :: num_ib_patches_max_namelist = 54000
+    integer, parameter  :: num_local_ibs_max = 8000            !< Maximum number of immersed boundary patches (patch_ib)
+    integer, parameter  :: num_ib_patches_max_namelist = 216000
     integer, parameter  :: num_particle_clouds_max = 10        !< Maximum number of particle bed patch specifications
     integer, parameter  :: num_bc_patches_max = 10             !< Maximum number of boundary condition patches
     integer, parameter  :: max_2d_fourier_modes = 10           !< Max Fourier mode index for 2D modal patch (geometry 13)
@@ -113,16 +113,12 @@ module m_constants
     integer, parameter :: BC_NO_SLIP_WALL = -16
     integer, parameter :: BC_DIRICHLET = -17
 
-    ! Synthetic turbulence array size limits
-    !> Equation of state per fluid. Values must match _EOS_NAMES in toolchain/mfc/params/definitions.py; compound registry keys
-    !! cannot be auto-generated, so these are hand-written.
-    integer, parameter :: eos_stiffened_gas = 1
-    integer, parameter :: eos_ideal_gas = 2
-    integer, parameter :: eos_mie_gruneisen = 3
-    integer, parameter :: eos_jwl = 4
-    integer, parameter :: eos_vinet = 5
+    !> Equation of state per fluid (eos_stiffened_gas, eos_ideal_gas, eos_mie_gruneisen, eos_jwl, eos_vinet) is generated from
+    !! EOS_FAMILIES in toolchain/mfc/params/eos_families.py; see generated_constants.fpp below.
     integer, parameter :: eos_rk4_steps = 8  !< fixed-step RK4 along a phasic isentrope or a reference temperature
     integer, parameter :: ode_isentrope = 1, ode_reference_temperature = 2  !< the two ODEs s_rk4 integrates
+
+    ! Synthetic turbulence array size limits
     integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
     integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence
 

@@ -1135,6 +1135,10 @@ contains
         viscous_stress_tensor = 0._wp
         velocity_gradient_tensor = 0._wp
 
+        ! s_compute_ib_forces centers this stencil up to fd_number cells outside the interior, so the coefficients are computed
+        ! that far beyond it too (s_compute_finite_difference_coefficients): every center read here has a real coefficient.
+        ! Clamping to the nearest interior cell instead would make a stretched-grid body's drag depend on the decomposition.
+
         ! compute the velocity gradient tensor with the same fd_order-respecting stencil as the stress-divergence outer derivative
         do l = 1, num_dims
             do r = -fd_number, fd_number

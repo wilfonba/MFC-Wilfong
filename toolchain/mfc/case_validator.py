@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Set
 from . import eos
 from .common import MFCException
 from .params.definitions import CONSTRAINTS
+from .params.eos_families import EOS_FAMILIES
 from .params.namelist_parser import get_fortran_constants
 from .state import CFG
 
@@ -32,6 +33,13 @@ DILUTE_VOID_FRACTION_MAX = 0.1
 # to auto-generate docs/documentation/physics_constraints.md.
 # See the contributing guide for how to add entries.
 PHYSICS_DOCS = {
+    "check_inflow_ramp": {
+        "title": "GRCBC Inflow Ramp",
+        "category": "Boundary Conditions",
+        "math": r"f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2",
+        "explanation": "A ramped inflow scales the inflow velocity from a fraction f_0 of its final value to "
+        "that value over a duration tau. It requires grcbc_in to act on, a non-negative duration, and f_0 in [0, 1].",
+    },
     # Thermodynamic Constraints
     "check_stiffened_eos": {
         "title": "Stiffened EOS Positivity",
@@ -201,6 +209,18 @@ PHYSICS_DOCS = {
         "math": r"\mathrm{Re}_1 > 0, \quad \mathrm{Re}_2 > 0",
         "explanation": "Reynolds numbers must be positive. Not supported with model_eqns = 1.",
     },
+    "check_heat_conduction": {
+        "title": "Fourier Heat Conduction",
+        "category": "Numerical Schemes",
+        "math": r"k_i \geq 0, \quad k = \sum_i \alpha_i k_i",
+        "explanation": (
+            "fluid_pp(i)%k_therm must be non-negative and, when positive, requires fluid_pp(i)%cv > 0 (the "
+            "thermal-equilibrium mixture temperature is undefined without it). Only the stiffened-gas and "
+            "ideal-gas equations of state are supported, and only model_eqns = 2 (5-equation) or 3 (6-equation): "
+            "the mixture conductivity is weighted by the volume fractions those models carry, which model_eqns = 1 "
+            "does not have. Not supported with igr or chemistry (which carries its own mixture-averaged conduction)."
+        ),
+    },
     # Feature Compatibility
     "check_mhd": {
         "title": "Magnetohydrodynamics (MHD)",
@@ -234,6 +254,17 @@ PHYSICS_DOCS = {
         "title": "Iterative Generalized Riemann (IGR)",
         "category": "Feature Compatibility",
         "explanation": ("Requires model_eqns = 2. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
+    },
+    "check_projection_simulation": {
+        "title": "All-Mach Pressure Projection",
+        "category": "Feature Compatibility",
+        "explanation": (
+            "Inviscid five-equation model (Allaire) on a Cartesian grid. Walls, periodic and extrapolation boundaries only; "
+            "the pressure solve replaces the Riemann solver, so physics that feeds it (spatial or synthetic forcing, bubbles, "
+            "elasticity, MHD, chemistry, moving IB) is not yet supported. Stationary IBs close the faces they touch to the solve. Uniform body forces (bf_x/y/z) enter the face predictor, "
+            "which keeps hydrostatic states at rest; viscosity (weno_Re_flux = F) is explicit; surface tension is either the "
+            "capillary stress tensor or, with surface_tension_model = 2, a well-balanced face CSF."
+        ),
     },
     "check_non_newtonian": {
         "title": "Non-Newtonian (Herschel-Bulkley) Viscosity",
@@ -272,7 +303,7 @@ PHYSICS_DOCS = {
     "check_ic_extrusion": {
         "title": "IC Extrusion File Parameters",
         "category": "IC Extrusion",
-        "explanation": "Extrusion hcids (170, 270, 271, 272, 370) read initial condition data from files. Both files_dir and file_extension must be set.",
+        "explanation": "Extrusion hcids (170, 270, 271, 272, 370, 371) read initial condition data from files. Both files_dir and file_extension must be set.",
     },
     # Post-Processing
     "check_vorticity": {
@@ -734,6 +765,19 @@ class CaseValidator:
         self.prohibit(ptgalpha_eps is not None and ptgalpha_eps <= 0, "ptgalpha_eps must be positive")
         self.prohibit(ptgalpha_eps is not None and ptgalpha_eps >= 1, "ptgalpha_eps must be less than 1")
 
+    def check_inflow_ramp(self):
+        """Checks constraints on the smooth start-up of a GRCBC inflow"""
+        for d in ("x", "y", "z"):
+            ramp = self.get(f"bc_{d}%vel_in_ramp", 0) or 0
+            frac0 = self.get(f"bc_{d}%vel_in_frac0", 0) or 0
+            self.prohibit(ramp < 0, f"bc_{d}%vel_in_ramp must be >= 0")
+            # a ramp needs an inflow to act on
+            self.prohibit(
+                ramp > 0 and self.get(f"bc_{d}%grcbc_in", "F") != "T",
+                f"bc_{d}%vel_in_ramp requires bc_{d}%grcbc_in",
+            )
+            self.prohibit(not 0 <= frac0 <= 1, f"bc_{d}%vel_in_frac0 must lie in [0, 1]")
+
     def check_ibm(self):
         """Checks constraints on Immersed Boundaries parameters"""
         ib = self.get("ib", "F") == "T"
@@ -759,6 +803,28 @@ class CaseValidator:
         )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
+        ib_force_wrt = self.get("ib_force_wrt", False)
+        self.prohibit(ib_force_wrt and not ib, "ib_force_wrt requires ib to be enabled")
+        ib_force_stride = self.get("ib_force_stride", 1)
+        self.prohibit(ib_force_stride < 1, "ib_force_stride must be >= 1")
+
+        p = self.get("p", 0)
+        for i in range(1, (num_ibs or 0) + 1):
+            kin_model = self.get(f"patch_ib({i})%kin_model", 0) or 0
+            self.prohibit(kin_model not in (0, 1, 2), f"patch_ib({i})%kin_model must be 0, 1 or 2")
+            self.prohibit(kin_model > 0 and self.get(f"patch_ib({i})%moving_ibm", 0) != 1, f"patch_ib({i})%kin_model requires moving_ibm = 1")
+            self.prohibit(kin_model > 0 and p <= 0, f"patch_ib({i})%kin_model requires a 3D case (p > 0)")
+            # Geometries 4, 5, 11 and 12 have their centroid replaced by the marked-cell centre of mass, with the
+            # difference kept in centroid_offset and re-applied when the patch is drawn. Prescribed kinematics write
+            # the centroid outright every stage, so the body would render centroid_offset away from the hinge.
+            self.prohibit(
+                kin_model > 0 and self.get(f"patch_ib({i})%geometry", 0) in (4, 5, 11, 12),
+                f"patch_ib({i})%kin_model is not supported for geometries 4, 5, 11 and 12, whose centroid is offset to the centre of mass",
+            )
+            self.prohibit(kin_model == 1 and (self.get(f"patch_ib({i})%kin_freq", 0) or 0) <= 0, f"patch_ib({i})%kin_freq must be > 0 when kin_model = 1")
+            self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_pitch_rate", 0) or 0) <= 0, f"patch_ib({i})%kin_pitch_rate must be > 0 when kin_model = 2")
+            self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_smooth", 0) or 0) <= 0, f"patch_ib({i})%kin_smooth must be > 0 when kin_model = 2")
+            self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_theta0", 0) or 0) <= 0, f"patch_ib({i})%kin_theta0 must be > 0 when kin_model = 2")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         for i in range(1, num_particle_clouds + 1):
@@ -854,6 +920,11 @@ class CaseValidator:
                 geometry == 2 and packing_method == 2,
                 f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
             )
+            shell_axis = self.get(f"particle_cloud({i})%shell_axis", 3)
+            self.prohibit(
+                geometry == 2 and shell_axis not in [1, 2, 3],
+                f"particle_cloud({i})%shell_axis must be 1 (x), 2 (y), or 3 (z)",
+            )
             if geometry == 2 and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
                 x_centroid = self.get(f"particle_cloud({i})%x_centroid", None)
                 y_centroid = self.get(f"particle_cloud({i})%y_centroid", None)
@@ -864,32 +935,34 @@ class CaseValidator:
                 y_end = self.get("y_domain%end", None)
                 z_beg = self.get("z_domain%beg", None)
                 z_end = self.get("z_domain%end", None)
+                # 2D has no z-axis; shell_axis values other than 1 (x) fall back to y, matching the
+                # fixed +y orientation used before shell_axis existed (see s_sample_cloud_candidate).
+                open_axis = shell_axis if (p > 0 or shell_axis == 1) else 2
 
-                if all(self._is_numeric(v) for v in [x_centroid, x_beg, x_end]):
-                    self.prohibit(
-                        x_centroid - shell_outer_radius < x_beg or x_centroid + shell_outer_radius > x_end,
-                        f"particle_cloud({i}) hemisphere shell x-extent must lie within x_domain",
-                    )
-                if n > 0 and all(self._is_numeric(v) for v in [y_centroid, y_beg, y_end, radius]):
-                    if p > 0:
+                axes = [
+                    (1, "x", x_centroid, x_beg, x_end),
+                    (2, "y", y_centroid, y_beg, y_end),
+                    (3, "z", z_centroid, z_beg, z_end),
+                ]
+                for axis_id, name, centroid, beg, end in axes:
+                    if axis_id == 2 and n == 0:
+                        continue
+                    if axis_id == 3 and p == 0:
+                        continue
+                    if not all(self._is_numeric(v) for v in [centroid, beg, end, radius]):
+                        continue
+                    if axis_id == open_axis:
+                        # the flat face sits at the centroid and the shell opens toward +axis; require
+                        # one particle radius of standoff so no particle surface sits on the domain wall.
                         self.prohibit(
-                            y_centroid - shell_outer_radius < y_beg or y_centroid + shell_outer_radius > y_end,
-                            f"particle_cloud({i}) hemisphere shell y-extent must lie within y_domain",
+                            centroid - radius < beg or centroid + shell_outer_radius > end,
+                            f"particle_cloud({i}) hemisphere shell must clear {name}_domain by one particle radius",
                         )
                     else:
-                        # 2D half-annulus opens toward +y from the flat face at y_centroid; require one
-                        # particle radius of standoff so no particle surface sits on the domain wall.
                         self.prohibit(
-                            y_centroid - radius < y_beg or y_centroid + shell_outer_radius > y_end,
-                            f"particle_cloud({i}) half-annulus must clear y_domain by one particle radius",
+                            centroid - shell_outer_radius < beg or centroid + shell_outer_radius > end,
+                            f"particle_cloud({i}) hemisphere shell {name}-extent must lie within {name}_domain",
                         )
-                if p > 0 and all(self._is_numeric(v) for v in [z_centroid, z_beg, z_end, radius]):
-                    # 3D hemisphere shell opens toward +z from the flat face at z_centroid; require one
-                    # particle radius of standoff so no particle surface sits on the domain wall.
-                    self.prohibit(
-                        z_centroid - radius < z_beg or z_centroid + shell_outer_radius > z_end,
-                        f"particle_cloud({i}) hemisphere shell must clear z_domain by one particle radius",
-                    )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
         num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)
@@ -960,20 +1033,27 @@ class CaseValidator:
             elif model_id is not None and model_id > 0:
                 self.prohibit(True, f"patch_icpp({i})%model_id is set but geometry ({geometry}) is not an STL model (21)")
 
-    def _check_initial_states_inside_eos(self, num_fluids, eos_names):
+    def _eos_coefficient_args(self, i, family):
+        """Fluid i's arguments to family.coefficients_fn, after rho, in registry order. An optional
+        parameter defaults to 0.0, matching the Fortran `case default`; a required one is passed
+        as-is so a missing value raises TypeError and the parameter rules report it."""
+        optional = {suffix for suffix, _math in family.optional}
+        args = []
+        for suffix in family.coefficients_args:
+            value = self.get(f"fluid_pp({i})%{family.prefix}_{suffix}")
+            args.append((value or 0.0) if suffix in optional else value)
+        return args
+
+    def _check_initial_states_inside_eos(self, num_fluids):
         """Every patch must start each state-dependent fluid where rho e > 0 and c^2 > 0; the solver has no clamp."""
         num_patches = self.get("num_patches", 0) or 0
+        families = {f.value: f for f in EOS_FAMILIES if f.state_dependent}
         for i in range(1, num_fluids + 1):
-            eos_ = self.get(f"fluid_pp({i})%eos")
-            g = lambda k: self.get(f"fluid_pp({i})%{k}")  # noqa: E731
-            if eos_ == eos_names["mie_gruneisen"]:
-                coefficients = lambda r: eos.eos_coefficients(r, g("mg_rho0"), g("mg_c0"), g("mg_s"), g("mg_gruneisen"), g("mg_gruneisen_a") or 0.0, g("mg_s2") or 0.0, g("mg_s3") or 0.0)  # noqa: E731
-            elif eos_ == eos_names["jwl"]:
-                coefficients = lambda r: eos.jwl_coefficients(r, g("jwl_rho0"), g("jwl_a"), g("jwl_b"), g("jwl_r1"), g("jwl_r2"), g("jwl_omega"))  # noqa: E731
-            elif eos_ == eos_names.get("vinet"):
-                coefficients = lambda r: eos.coefficients_from_curve(r, eos.vinet_reference(r, g("vinet_rho0"), g("vinet_k0"), g("vinet_k0p")), g("vinet_gruneisen"))  # noqa: E731
-            else:
+            family = families.get(self.get(f"fluid_pp({i})%eos"))
+            if family is None:
                 continue
+            fn = getattr(eos, family.coefficients_fn)
+            coefficients = lambda r, f=family, fn=fn: fn(r, *self._eos_coefficient_args(i, f))  # noqa: E731
             for j in range(1, num_patches + 1):
                 ar, a, p = (self.get(f"patch_icpp({j})%alpha_rho({i})"), self.get(f"patch_icpp({j})%alpha({i})"), self.get(f"patch_icpp({j})%pres"))
                 if not all(isinstance(x, (int, float)) for x in (ar, a, p)) or a <= 0:
@@ -999,13 +1079,10 @@ class CaseValidator:
             return
         eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
         eos_ideal_gas = eos_names["ideal_gas"]
-        # The state-dependent families: selector value -> (parameter prefix, its parameters)
-        families = {
-            eos_names["mie_gruneisen"]: ("mg", ("rho0", "c0", "s", "gruneisen")),
-            eos_names["jwl"]: ("jwl", ("a", "b", "r1", "r2", "omega", "rho0")),
-            eos_names["vinet"]: ("vinet", ("k0", "k0p", "rho0", "gruneisen")),
-        }
-        optional = {"mg": ("gruneisen_a", "t0", "s2", "s3"), "jwl": ("t0",), "vinet": ("gruneisen_a", "t0")}
+        # The state-dependent families: selector value -> (parameter prefix, its required parameters)
+        families = {f.value: (f.prefix, tuple(n for n, _ in f.required)) for f in EOS_FAMILIES if f.state_dependent}
+        optional = {f.prefix: tuple(n for n, _ in f.optional) for f in EOS_FAMILIES if f.state_dependent}
+        state_dependent_names = ", ".join(f.suffix for f in EOS_FAMILIES if f.state_dependent)
         bub_fac = 1 if self.get("bubbles_euler", "F") == "T" else 0
         state_dependent = {}
         for i in range(1, num_fluids + 1 + bub_fac):
@@ -1061,16 +1138,16 @@ class CaseValidator:
             if self.get("T_wrt", "F") == "T" or (i == 1 and self._is_numeric(rta) and rta > 0):
                 t0 = self.get(f"fluid_pp({i})%{prefix}_t0")
                 self.prohibit(t0 is None or t0 <= 0, f"the temperature of fluid {i} needs fluid_pp({i})%{prefix}_t0 > 0")
-        self._check_initial_states_inside_eos(num_fluids, eos_names)
+        self._check_initial_states_inside_eos(num_fluids)
         # The per-phase evaluation is wired through the 5-equation paths only; every feature below still
         # reads the stiffened-gas coefficients directly.
-        self.prohibit(self.get("model_eqns") not in (2, 3), "a state-dependent eos (mie_gruneisen, jwl, vinet) requires model_eqns = 2 or 3")
-        self.prohibit(self.get("riemann_solver") not in (1, 2, 5), "a state-dependent eos (mie_gruneisen, jwl, vinet) requires riemann_solver = 1, 2 or 5")
-        self.prohibit(self.get("wave_speeds") == 2, "a state-dependent eos (mie_gruneisen, jwl, vinet) requires wave_speeds = 1 (the PVRS estimate is stiffened-gas only)")
+        self.prohibit(self.get("model_eqns") not in (2, 3), f"a state-dependent eos ({state_dependent_names}) requires model_eqns = 2 or 3")
+        self.prohibit(self.get("riemann_solver") not in (1, 2, 5), f"a state-dependent eos ({state_dependent_names}) requires riemann_solver = 1, 2 or 5")
+        self.prohibit(self.get("wave_speeds") == 2, f"a state-dependent eos ({state_dependent_names}) requires wave_speeds = 1 (the PVRS estimate is stiffened-gas only)")
         for j in range(1, (self.get("num_patches") or 0) + 1):
             self.prohibit(self.get(f"patch_icpp({j})%hcid") in (202, 203), f"patch_icpp({j})%hcid = 202/203 read fluid_pp(1)%gamma, which a state-dependent eos does not set")
-        for flag in ("bubbles_euler", "bubbles_lagrange", "igr", "relativity", "mhd", "chemistry", "relax"):
-            self.prohibit(self.get(flag, "F") == "T", f"a state-dependent eos (mie_gruneisen, jwl, vinet) is not supported with {flag} = T")
+        for flag in ("bubbles_euler", "bubbles_lagrange", "igr", "relativity", "mhd", "chemistry", "relax", "ib"):
+            self.prohibit(self.get(flag, "F") == "T", f"a state-dependent eos ({state_dependent_names}) is not supported with {flag} = T")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
@@ -1117,6 +1194,13 @@ class CaseValidator:
         self.prohibit(sigma is not None and not surface_tension, "sigma is set but surface_tension is not enabled")
         self.prohibit(surface_tension and model_eqns not in [2, 3], "The surface tension model requires model_eqns = 2 or model_eqns = 3")
         self.prohibit(surface_tension and num_fluids != 2, "The surface tension model requires num_fluids = 2")
+        st_model = self.get("surface_tension_model")
+        self.prohibit(st_model is not None and not surface_tension, "surface_tension_model is set but surface_tension is not enabled")
+        self.prohibit(st_model is not None and st_model not in [1, 2], "surface_tension_model must be 1 (conservative) or 2 (well_balanced)")
+        self.prohibit(
+            st_model == 2 and self.get("proj_method", "F") != "T",
+            "surface_tension_model = 2 (well_balanced) balances the capillary force against the projection's face pressure gradient and requires proj_method",
+        )
 
     def check_mhd(self):
         """Checks constraints on MHD parameters"""
@@ -1401,6 +1485,56 @@ class CaseValidator:
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
 
+    def check_heat_conduction(self):
+        """Checks constraints on Fourier heat conduction parameters (fluid_pp(i)%k_therm)"""
+        num_fluids = self.get("num_fluids")
+        # If num_fluids is not set, check at least fluid 1 (for model_eqns=1)
+        if num_fluids is None:
+            num_fluids = 1
+        model_eqns = self.get("model_eqns")
+        eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
+        supported_eos = {eos_names["stiffened_gas"], eos_names["ideal_gas"]}
+
+        # heat_conduction is derived (any fluid_pp(i)%k_therm > 0), not a case-file parameter --
+        # mirrors m_global_parameters_common.fpp: heat_conduction = any(fluid_pp(:)%k_therm > 0._wp).
+        heat_conduction = False
+        for i in range(1, num_fluids + 1):
+            k_therm = self.get(f"fluid_pp({i})%k_therm")
+            if k_therm is None:
+                continue
+            self.prohibit(k_therm < 0, f"fluid_pp({i})%k_therm must be non-negative")
+            if k_therm > 0:
+                heat_conduction = True
+                cv = self.get(f"fluid_pp({i})%cv")
+                self.prohibit(
+                    cv is None or cv <= 0,
+                    f"fluid_pp({i})%cv must be positive when fluid_pp({i})%k_therm is set: the mixture temperature is undefined without it",
+                )
+                eos = self.get(f"fluid_pp({i})%eos")
+                effective_eos = eos if eos is not None else eos_names["stiffened_gas"]
+                self.prohibit(effective_eos not in supported_eos, "heat conduction supports only the stiffened-gas and ideal-gas equations of state")
+                # model_eqns = 1 (gamma law) stores gamma/pi_inf, not a volume fraction, in the slots
+                # that m_conduction.fpp reads as alpha_i; only model_eqns = 2 (5-eq) and 3 (6-eq) carry one.
+                self.prohibit(
+                    model_eqns not in (2, 3),
+                    f"heat conduction requires model_eqns = 2 (5-equation) or model_eqns = 3 (6-equation): fluid_pp({i})%k_therm is weighted by a volume fraction that model_eqns = 1 does not carry",
+                )
+
+        igr = self.get("igr", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
+        # Load-bearing, not cosmetic: q_T_sf%sf is allocated only inside "if (.not. igr)" in
+        # m_time_steppers.fpp but deallocated unconditionally, so heat_conduction + igr would
+        # deallocate an unallocated field.
+        self.prohibit(heat_conduction and igr, "heat conduction is not supported with igr")
+        # Load-bearing, not cosmetic: with chemistry, m_rhs.fpp allocates the energy flux_src slot
+        # under chemistry and chem_params%diffusion and not viscous, which conduction also allocates
+        # when heat_conduction is on -- the combination double-allocates and aborts in the allocator.
+        # Chemistry also carries its own mixture-averaged conduction, so the physics would double-count.
+        self.prohibit(
+            heat_conduction and chemistry,
+            "heat conduction is not supported with chemistry: the reacting path already carries mixture-averaged conduction through chem_params%diffusion",
+        )
+
     def check_non_newtonian(self):
         """Checks constraints on non-Newtonian (Herschel-Bulkley) parameters (simulation)"""
         num_fluids = self.get("num_fluids")
@@ -1478,6 +1612,54 @@ class CaseValidator:
         self.prohibit(riemann_solver == 4 and relativity, "HLLD is not available for RMHD (relativity)")
         self.prohibit(hyper_cleaning and not mhd, "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0, "Hyperbolic cleaning is not supported for 1D simulations")
+
+    def check_projection_simulation(self):
+        """Checks all-Mach pressure projection constraints"""
+        if self.get("proj_method", "F") != "T":
+            return
+
+        tol = self.get("proj_tol")
+        self.prohibit(tol is not None and tol <= 0, "proj_tol must be positive")
+        omega = self.get("proj_mg_omega")
+        self.prohibit(omega is not None and not 0 < omega < 2, "proj_mg_omega must be in (0, 2) for the preconditioner to stay SPD")
+        self.prohibit(self.get("model_eqns") != 2, "proj_method requires model_eqns = 2")
+        max_acfl = self.get("proj_max_acfl") or 0
+        self.prohibit(max_acfl < 0, "proj_max_acfl must be non-negative")
+        for i in range(1, (self.get("num_ibs") or 0) + 1):
+            self.prohibit(self.get(f"patch_ib({i})%moving_ibm", 0) != 0, "proj_method supports only stationary immersed boundaries")
+        cfl_dt = self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"
+        forced = any(self.get(f"bf_{d}", "F") == "T" for d in "xyz")
+        self.prohibit(
+            cfl_dt and max_acfl == 0 and not forced,
+            "proj_method with cfl_adap_dt/cfl_const_dt needs proj_max_acfl > 0 or a body force to bound dt for fluid at rest",
+        )
+        self.prohibit(self.get("cyl_coord", "F") == "T", "proj_method does not support cylindrical coordinates")
+        for flag in [
+            "igr",
+            "weno_Re_flux",
+            "bubbles_euler",
+            "bubbles_lagrange",
+            "hypoelasticity",
+            "hyperelasticity",
+            "mhd",
+            "chemistry",
+            "relax",
+            "alt_soundspeed",
+            "acoustic_source",
+            "mpp_lim",
+            "reactive_burn",
+            "cont_damage",
+            "bf_spatial_support",
+            "synthetic_turbulence",
+        ]:
+            self.prohibit(self.get(flag, "F") == "T", f"proj_method does not support {flag} = T")
+        for i in range(1, (self.get("num_fluids") or 1) + 1):
+            eos = self.get(f"fluid_pp({i})%eos")
+            self.prohibit(eos not in (None, 1, 2, "stiffened_gas", "ideal_gas"), f"proj_method supports only stiffened- and ideal-gas fluids (fluid_pp({i})%eos)")
+        for d in ["x", "y", "z"]:
+            for e in ["beg", "end"]:
+                bc = self.get(f"bc_{d}%{e}")
+                self.prohibit(bc is not None and bc not in [-1, -2, -3, -15, -16], f"proj_method does not support bc_{d}%{e} = {bc}")
 
     def check_igr_simulation(self):
         """Checks IGR constraints specific to simulation"""
@@ -1769,10 +1951,15 @@ class CaseValidator:
         alpha_bar = self.get("alpha_bar")
         model_eqns = self.get("model_eqns")
         alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
 
+        self.prohibit(not hypoelasticity, "cont_damage requires hypoelasticity = T")
         self.prohibit(tau_star is None, "tau_star must be specified for cont_damage")
         self.prohibit(cont_damage_s is None, "cont_damage_s must be specified for cont_damage")
         self.prohibit(alpha_bar is None, "alpha_bar must be specified for cont_damage")
+        self.prohibit(tau_star is not None and tau_star < 0, "tau_star must be nonnegative (tensile damage threshold)")
+        self.prohibit(cont_damage_s is not None and cont_damage_s <= 0, "cont_damage_s must be positive")
+        self.prohibit(alpha_bar is not None and alpha_bar < 0, "alpha_bar must be nonnegative")
         self.prohibit(model_eqns is not None and model_eqns != 2, "cont_damage requires model_eqns = 2")
         self.prohibit(alt_soundspeed, "Continuum damage does not support alt_soundspeed")
 
@@ -1788,11 +1975,44 @@ class CaseValidator:
             if grcbc_in:
                 # Check if EITHER beg OR end is set to -7
                 self.prohibit(bc_beg != -7 and bc_end != -7, f"Subsonic Inflow (grcbc_in) requires bc_{dir}%beg = -7 or bc_{dir}%end = -7")
+                # The relaxation drives the boundary towards a prescribed state, so that state has to be given in
+                # full. An unset component keeps its default sentinel and the boundary diverges over a few hundred
+                # steps rather than failing outright, which is a hard failure to read backwards from an ICFL abort.
+                num_fluids = self.get("num_fluids", 1)
+                # s_initialize_cbc_module copies vel_in(1..num_dims) and the kernel reads them through
+                # dir_idx, which is (2,1,3) for a y inflow and (3,1,2) for z -- so requiring only
+                # component 1 would leave the normal velocity of a y or z inflow unchecked.
+                num_dims = 3 if (self.get("p", 0) or 0) > 0 else (2 if (self.get("n", 0) or 0) > 0 else 1)
+                missing = [n for n in (f"bc_{dir}%pres_in",) if self.get(n) is None]
+                missing += [f"bc_{dir}%vel_in({d})" for d in range(1, num_dims + 1) if self.get(f"bc_{dir}%vel_in({d})") is None]
+                missing += [f"bc_{dir}%alpha_rho_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_rho_in({i})") is None]
+                missing += [f"bc_{dir}%alpha_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_in({i})") is None]
+                self.prohibit(len(missing) > 0, f"Subsonic Inflow (grcbc_in) needs the full inflow state; missing {', '.join(missing)}")
             if grcbc_out:
                 # Check if EITHER beg OR end is set to -8
                 self.prohibit(bc_beg != -8 and bc_end != -8, f"Subsonic Outflow (grcbc_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
+                # m_cbc.fpp relaxes the outflow toward this pressure. One branch serves the beg and end
+                # sides alike -- both write L(adv%end), and sign(1, cbc_loc) picks the side -- so this is
+                # required whichever side carries the -8:
+                #   L(adv%end) = c*(1 - Ma)*(pres - pres_out(dir))/Del_out(dir)
+                # Left unset it relaxes toward an undefined target, which is silent: the boundary cell simply
+                # walks away, and the run aborts on ICFL tens of steps later with nothing pointing at the BC.
+                self.prohibit(
+                    not self.is_set(f"bc_{dir}%pres_out"),
+                    f"bc_{dir}%pres_out must be specified when bc_{dir}%grcbc_out is enabled",
+                )
             if grcbc_vel_out:
                 self.prohibit(bc_beg != -8 and bc_end != -8, f"Subsonic Outflow Velocity (grcbc_vel_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
+                # Only the NORMAL component is read here:
+                #   L(adv%end) += rho*c^2*(1 - Ma)*(vel(dir_idx(1)) + vel_out(dir, dir_idx(1))*sign(1, cbc_loc))/Del_out(dir)
+                # and dir_idx(1) is 1 for x, 2 for y, 3 for z (m_cbc.fpp:942-948). The transverse components
+                # are read by grcbc_in's inflow branch, not by this one, so requiring them here would reject
+                # configurations that run correctly.
+                normal = {"x": 1, "y": 2, "z": 3}[dir]
+                self.prohibit(
+                    not self.is_set(f"bc_{dir}%vel_out({normal})"),
+                    f"bc_{dir}%vel_out({normal}) must be specified when bc_{dir}%grcbc_vel_out is enabled",
+                )
 
     def check_probe_output(self):
         """Checks probe output requirements (simulation)"""
@@ -1866,6 +2086,8 @@ class CaseValidator:
         file_per_process = self.get("file_per_process", "F") == "T"
         m = self.get("m", 0)
         n = self.get("n", 0)
+
+        self.prohibit(file_per_process and not parallel_io, "file_per_process requires parallel_io = T")
 
         if down_sample:
             self.prohibit(not parallel_io, "down sample requires parallel_io = T")
@@ -1990,6 +2212,12 @@ class CaseValidator:
             "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T",
         )
 
+        # Isothermal walls need a heat-conduction path to evaluate the wall flux: either the reacting
+        # mixture-averaged one, or Fourier conduction via fluid_pp(i)%k_therm.
+        num_fluids_iso = self.get("num_fluids") or 1
+        conducts = any((self.get(f"fluid_pp({i})%k_therm") or 0) > 0 for i in range(1, num_fluids_iso + 1))
+        has_heat_path = (chemistry and diffusion) or conducts
+
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
 
@@ -2000,8 +2228,12 @@ class CaseValidator:
             bc_end = self.get(f"bc_{dir}%end")
 
             if isothermal_in:
-                # Prohibit isothermal boundaries if chemistry or diffusion are disabled
-                self.prohibit(not chemistry or not diffusion, f"Isothermal In (bc_{dir}%isothermal_in) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction.")
+                # Prohibit isothermal boundaries without a heat-conduction path to evaluate the wall flux
+                self.prohibit(
+                    not has_heat_path,
+                    f"Isothermal In (bc_{dir}%isothermal_in) requires a heat-conduction path: either chemistry='T' with "
+                    "chem_params%diffusion='T', or Fourier conduction via fluid_pp(i)%k_therm > 0.",
+                )
 
                 # Prohibit if neither beg nor end is set to a valid wall condition
                 self.prohibit(bc_beg not in wall_bcs, f"Isothermal In (bc_{dir}%isothermal_in) requires a wall. Set bc_{dir}%beg to -15 (slip) or -16 (no-slip).")
@@ -2013,8 +2245,12 @@ class CaseValidator:
                     self.prohibit(tw_in <= 0.0, f"Wall temperature bc_{dir}%Twall_in must be strictly positive for thermodynamics (got {tw_in}).")
 
             if isothermal_out:
-                # Prohibit isothermal boundaries if chemistry or diffusion are disabled
-                self.prohibit(not chemistry or not diffusion, f"Isothermal Out (bc_{dir}%isothermal_out) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction.")
+                # Prohibit isothermal boundaries without a heat-conduction path to evaluate the wall flux
+                self.prohibit(
+                    not has_heat_path,
+                    f"Isothermal Out (bc_{dir}%isothermal_out) requires a heat-conduction path: either chemistry='T' with "
+                    "chem_params%diffusion='T', or Fourier conduction via fluid_pp(i)%k_therm > 0.",
+                )
 
                 # Prohibit if neither beg nor end is set to a valid wall condition
                 self.prohibit(bc_end not in wall_bcs, f"Isothermal Out (bc_{dir}%isothermal_out) requires a wall. Set bc_{dir}%end to -15 (slip) or -16 (no-slip).")
@@ -2041,8 +2277,8 @@ class CaseValidator:
         # differing only in qv; violating these silently corrupts the mass/energy balance.
         self.prohibit(self.get("num_fluids") != 2, "reactive_burn requires num_fluids = 2 (reactant then product) to be set")
         # A state-dependent family carries its own curve; the shared-EOS check is a stiffened-gas one.
-        names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
-        state_dependent = any(self.get(f"fluid_pp({k})%eos") in (names["mie_gruneisen"], names["jwl"], names["vinet"]) for k in (1, 2))
+        state_dependent_values = {f.value for f in EOS_FAMILIES if f.state_dependent}
+        state_dependent = any(self.get(f"fluid_pp({k})%eos") in state_dependent_values for k in (1, 2))
         for prop in () if state_dependent else ("gamma", "pi_inf"):
             v1 = self.get(f"fluid_pp(1)%{prop}")
             v2 = self.get(f"fluid_pp(2)%{prop}")
@@ -2211,6 +2447,20 @@ class CaseValidator:
 
             if geometry is None:
                 continue
+
+            # s_apply_boundary_patches dispatches by dimensionality: geometry 1 in 2D, 2 or 3 in 3D. A
+            # geometry that belongs to the other case falls through the dispatch, the patch is never applied,
+            # and the face silently keeps whatever bc_[xyz] gave it -- a nozzle cut into a wall simply stays a
+            # wall, with no warning and a jet that never starts.
+            p = self.get("p", 0) or 0
+            n = self.get("n", 0) or 0
+            if p > 0:
+                self.prohibit(geometry not in (2, 3), f"patch_bc({i})%geometry must be 2 (circle) or 3 (rectangle) in 3D; " f"geometry {geometry} is never applied")
+            elif n > 0:
+                self.prohibit(geometry != 1, f"patch_bc({i})%geometry must be 1 (line segment) in 2D; " f"geometry {geometry} is never applied")
+            else:
+                # 1D enters neither branch of the dispatch, so every geometry is ignored, not just a mismatched one.
+                self.prohibit(True, f"patch_bc({i})%geometry cannot be used in 1D; boundary-condition patches are only applied in 2D and 3D")
 
             # Line Segment BC (geometry = 1)
             if geometry == 1:
@@ -2772,7 +3022,7 @@ class CaseValidator:
 
     def check_ic_extrusion(self):
         """Checks that files_dir and file_extension are set for extrusion hcids."""
-        extrusion_hcids = {170, 270, 271, 272, 370}
+        extrusion_hcids = {170, 270, 271, 272, 370, 371}
         num_patches = self.get("num_patches", 0)
         if not self._is_numeric(num_patches) or num_patches <= 0:
             return
@@ -2807,6 +3057,7 @@ class CaseValidator:
         self.check_hypoelasticity()
         self.check_phase_change()
         self.check_ibm()
+        self.check_inflow_ramp()
         self.check_eos_selector()
         self.check_stiffened_eos()
         self.check_eos_parameter_sanity()
@@ -2830,9 +3081,11 @@ class CaseValidator:
         self.check_body_forces()
         self.check_synthetic_turbulence()
         self.check_viscosity()
+        self.check_heat_conduction()
         self.check_non_newtonian()
         self.check_mhd_simulation()
         self.check_igr_simulation()
+        self.check_projection_simulation()
         self.check_acoustic_source()
         self.check_adaptive_time_stepping()
         self.check_alt_soundspeed()

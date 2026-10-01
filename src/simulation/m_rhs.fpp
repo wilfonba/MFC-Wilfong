@@ -13,11 +13,14 @@ module m_rhs
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
+    use m_eos
     use m_weno
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_thinc, int_comp_mthinc, &
         & recon_type_weno, recon_type_muscl
     use m_muscl
     use m_riemann_solvers
+    use m_riemann_state, only: s_populate_riemann_states_variables_buffers, s_initialize_riemann_solver, &
+        & s_compute_viscous_source_flux, vel_src_rsx_vf, isx, isy, isz
     use m_cbc
     use m_bubbles_EE
     use m_bubbles_EL
@@ -32,8 +35,10 @@ module m_rhs
     use m_surface_tension
     use m_body_forces
     use m_chemistry
+    use m_conduction
     use m_reactive_burn
     use m_igr
+    use m_projection
     use m_thinc
     use m_pressure_relaxation
 
@@ -221,7 +226,7 @@ contains
                                    & idwbuff(3)%beg:idwbuff(3)%end))
                     end do
 
-                    if (viscous .or. surface_tension) then
+                    if (viscous .or. surface_tension .or. heat_conduction) then
                         do l = eqn_idx%mom%beg, eqn_idx%E
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
@@ -256,7 +261,7 @@ contains
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
                         end do
-                        if (chem_params%diffusion .and. .not. viscous) then
+                        if (chem_params%diffusion .and. .not. (viscous .or. surface_tension .or. heat_conduction)) then
                             @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                        & idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                         end if
@@ -346,7 +351,9 @@ contains
                 end do
             end if
 
-            if (viscous) then
+            ! The cylindrical axis source reads tau_Re_vf(mom%beg:E), so conduction needs it too,
+            ! but without the viscous gradient fields below.
+            if (viscous .or. heat_conduction) then
                 @:ALLOCATE(tau_Re_vf(1:sys_size))
                 do i = 1, num_dims
                     @:ALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
@@ -356,7 +363,9 @@ contains
                 @:ALLOCATE(tau_Re_vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(tau_Re_vf(eqn_idx%E))
+            end if
 
+            if (viscous) then
                 @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
                 @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:sys_size))
                 @:ALLOCATE(dq_prim_dz_qp(1)%vf(1:sys_size))
@@ -707,6 +716,12 @@ contains
                 if (.not. igr) then
                     call s_reconstruct_riemann_states(id)
 
+                    if (proj_method) then
+                        call s_projection_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf, bc_type)
+                        if (viscous .or. surface_tension) call s_projection_source_rhs(id, q_T_sf, rhs_vf)
+                        cycle
+                    end if
+
                     call s_compute_directional_rhs(id, rhs_vf, .false.)
 
                     ! RHS additions for hypoelasticity
@@ -723,11 +738,18 @@ contains
                         call nvtxEndRange
                     end if
 
+                    ! RHS for Fourier heat conduction
+                    if (heat_conduction) then
+                        call nvtxStartRange("RHS-CONDUCTION")
+                        call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, flux_src_n(id)%vf, irx, iry, irz)
+                        call nvtxEndRange
+                    end if
+
                     ! Viscous stress contribution to RHS
-                    if (viscous .or. surface_tension .or. chem_params%diffusion) then
+                    if (viscous .or. surface_tension .or. chem_params%diffusion .or. heat_conduction) then
                         call nvtxStartRange("RHS-ADD-PHYSICS")
-                        call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
-                                                              & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
+                        call s_compute_additional_physics_rhs(id, q_prim_qp%vf, q_T_sf, rhs_vf, flux_src_n(id)%vf, &
+                                                              & dq_prim_dx_qp(1)%vf, dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
                         call nvtxEndRange
                     end if
 
@@ -877,7 +899,7 @@ contains
             call nvtxEndRange
         end if
 
-        if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
+        if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, q_prim_qp%vf, rhs_vf)
 
         ! END: Additional physics and source terms
 
@@ -1015,16 +1037,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         logical, intent(in)                                    :: is_hat_L
 
-        ! Configuring Coordinate Direction Indexes
-
-        if (id == 1) then
-            irx%beg = -1; iry%beg = 0; irz%beg = 0
-        else if (id == 2) then
-            irx%beg = 0; iry%beg = -1; irz%beg = 0
-        else
-            irx%beg = 0; iry%beg = 0; irz%beg = -1
-        end if
-        irx%end = m; iry%end = n; irz%end = p
+        call s_set_face_bounds(id)
 
         ! Computing Riemann Solver Flux and Source Flux
         call nvtxStartRange("RHS-RIEMANN-SOLVER")
@@ -1043,6 +1056,51 @@ contains
         call nvtxEndRange
 
     end subroutine s_compute_directional_rhs
+
+    !> Face index ranges of sweep direction id: one extra face on the low side of that direction
+    subroutine s_set_face_bounds(id)
+
+        integer, intent(in) :: id
+
+        irx%beg = merge(-1, 0, id == 1); iry%beg = merge(-1, 0, id == 2); irz%beg = merge(-1, 0, id == 3)
+        irx%end = m; iry%end = n; irz%end = p
+
+    end subroutine s_set_face_bounds
+
+    !> Viscous and capillary contributions under the projection: the source fluxes a Riemann solve would build, from the face data
+    !! the projection supplies, differenced by the same routine as in the explicit path
+    subroutine s_projection_source_rhs(id, q_T_sf, rhs_vf)
+
+        integer, intent(in)                                    :: id
+        type(scalar_field), intent(in)                         :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+
+        call s_set_face_bounds(id)
+        call s_populate_riemann_states_variables_buffers(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, &
+            & dqR_prim_dz_n(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, id, irx, iry, irz)
+        call s_initialize_riemann_solver(flux_src_n(id)%vf, id)
+        call s_projection_face_props(id, qR_rsx_vf, qL_rsx_vf, flux_src_n(id)%vf)
+
+        if (viscous) then
+            call s_compute_viscous_source_flux(q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqR_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqR_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqR_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqL_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqL_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqL_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_n(id)%vf, &
+                                               & q_prim_qp%vf, id, irx, iry, irz)
+        end if
+        ! The well-balanced model applies surface tension on faces in the projection instead
+        if (surface_tension .and. surface_tension_model == surface_tension_model_conservative) then
+            call s_compute_capillary_source_flux(vel_src_rsx_vf, flux_src_n(id)%vf, id, isx, isy, isz)
+        end if
+
+        call s_compute_additional_physics_rhs(id, q_prim_qp%vf, q_T_sf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
+                                              & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
+
+    end subroutine s_projection_source_rhs
 
     !> Accumulate advection source contributions from a given coordinate direction into the RHS
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, is_hat_L)
@@ -1741,11 +1799,13 @@ contains
 
     end subroutine s_compute_advection_source_term
 
-    !> Add viscous, surface-tension, and species-diffusion source flux contributions to the RHS for a given direction
-    subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n_in, dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf)
+    !> Add viscous, surface-tension, species-diffusion, and heat-conduction source flux contributions to the RHS for a direction
+    subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, q_T_sf, rhs_vf, flux_src_n_in, dq_prim_dx_vf, dq_prim_dy_vf, &
+        & dq_prim_dz_vf)
 
         integer, intent(in)                                    :: idir
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), intent(in)                         :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: flux_src_n_in
         type(scalar_field), dimension(sys_size), intent(in)    :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
@@ -1766,12 +1826,12 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+            if ((surface_tension .or. viscous) .or. chem_params%diffusion .or. heat_conduction) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            if (surface_tension .or. viscous) then
+                            if (surface_tension .or. viscous .or. heat_conduction) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%mom%beg, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dx(j)*(flux_src_n_in(i)%sf(j - 1, k, &
@@ -1814,16 +1874,16 @@ contains
 
             if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
                 if (viscous) then
-                    if (p > 0) then
-                        call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, &
-                            & dq_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), dq_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                            & dq_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), tau_Re_vf, idwbuff(1), idwbuff(2), idwbuff(3))
-                    else
-                        call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, &
-                            & dq_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), dq_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                            & dq_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), tau_Re_vf, idwbuff(1), idwbuff(2), idwbuff(3))
-                    end if
+                    call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, dq_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                        & dq_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), dq_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                        & tau_Re_vf, idwbuff(1), idwbuff(2), idwbuff(3))
+                end if
 
+                if (heat_conduction) then
+                    call s_compute_conduction_axis_source(q_prim_vf, q_T_sf, tau_Re_vf, idwbuff(1), idwbuff(2), idwbuff(3))
+                end if
+
+                if (viscous .or. heat_conduction) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, l]', collapse=2)
                     do l = 0, p
                         do j = 0, m
@@ -1851,12 +1911,12 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             else
-                if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+                if ((surface_tension .or. viscous) .or. chem_params%diffusion .or. heat_conduction) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                if (surface_tension .or. viscous) then
+                                if (surface_tension .or. viscous .or. heat_conduction) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = eqn_idx%mom%beg, eqn_idx%E
                                         rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)*(flux_src_n_in(i)%sf(j, &
@@ -1900,7 +1960,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (viscous) then
+                    if (viscous .or. heat_conduction) then
                         $:GPU_PARALLEL_LOOP(private='[i, j, l]', collapse=2)
                         do l = 0, p
                             do j = 0, m
@@ -1943,12 +2003,12 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
+            if ((surface_tension .or. viscous) .or. chem_params%diffusion .or. heat_conduction) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            if (surface_tension .or. viscous) then
+                            if (surface_tension .or. viscous .or. heat_conduction) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%mom%beg, eqn_idx%E
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)*(flux_src_n_in(i)%sf(j, k, &
@@ -2186,13 +2246,16 @@ contains
                 if (weno_Re_flux) then
                     @:DEALLOCATE(dqL_rsx_vf, dqR_rsx_vf)
                 end if
+            end if
 
+            if (viscous .or. heat_conduction) then
                 do i = 1, num_dims
                     @:DEALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf)
                 end do
                 @:DEALLOCATE(tau_Re_vf(eqn_idx%E)%sf)
                 @:DEALLOCATE(tau_Re_vf)
             end if
+
             @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
             @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
         end if
@@ -2215,13 +2278,13 @@ contains
                         @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                     end do
 
-                    if (viscous) then
+                    if (viscous .or. surface_tension .or. heat_conduction) then
                         do l = eqn_idx%mom%beg, eqn_idx%E
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do
                     end if
 
-                    if (chem_params%diffusion .and. .not. viscous) then
+                    if (chem_params%diffusion .and. .not. (viscous .or. surface_tension .or. heat_conduction)) then
                         @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
                     end if
 

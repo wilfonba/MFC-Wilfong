@@ -21,7 +21,7 @@ module m_collisions
     implicit none
 
     private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module, &
-        & f_local_rank_owns_location, f_neighborhood_ranks_own_location, ib_gbl_idx_lookup
+        & f_neighborhood_ranks_own_location, ib_gbl_idx_lookup, collisions_active
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:)  :: collision_lookup
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
@@ -31,6 +31,9 @@ module m_collisions
 
     integer, dimension(:), allocatable :: ib_gbl_idx_lookup
     $:GPU_DECLARE(create='[ib_gbl_idx_lookup]')
+
+    !> true when any IB-IB or IB-wall contact was detected on this rank since the last adaptive-dt computation
+    logical :: collisions_active
 
 contains
 
@@ -47,6 +50,7 @@ contains
         @:ALLOCATE(wall_overlap_distances(num_local_ibs_max*27, 6))
 
         wall_overlap_distances = 0
+        collisions_active = .false.
         $:GPU_UPDATE(device='[wall_overlap_distances]')
         $:GPU_UPDATE(device='[ib_coefficient_of_friction]')
 
@@ -59,14 +63,18 @@ contains
         type(integer_field), intent(in)                :: ib_markers
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
         integer                                        :: num_considered_collisions
+        logical                                        :: any_wall_collision
 
         ! return if no collisions
 
         if (collision_model == 0) return
 
         ! get is distance used in the force calculation with each IB and each wall
-        call s_detect_wall_collisions()
+        call s_detect_wall_collisions(any_wall_collision)
         call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
+
+        ! accumulate across RK stages; consumed (and reset) by s_compute_dt once per time step
+        collisions_active = collisions_active .or. any_wall_collision .or. (num_considered_collisions > 0)
 
         select case (collision_model)
         case (1)  ! soft sphere model
@@ -83,7 +91,7 @@ contains
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
         integer :: i, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, l  ! iterators and patch IDs
         real(wp) :: overlap_distance
-        real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2
+        real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2, contact_point
         real(wp), dimension(3) :: normal_velocity, tangential_vector, normal_force, tangential_force, torque, radial_vector, &
              & rotation_velocity, vel1, vel2
         real(wp) :: k, eta, effective_mass  ! the spring stiffness and damping coefficient and mass of a specific interaction
@@ -94,7 +102,7 @@ contains
         $:GPU_PARALLEL_LOOP(private='[i, l, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, centroid_1, &
                             & centroid_2, normal_vector, overlap_distance, effective_mass, k, eta, normal_velocity, &
                             & tangential_vector, normal_force, tangential_force, torque, radial_vector, rotation_velocity, vel1, &
-                            & vel2]', copy='[forces, torques]')
+                            & vel2, contact_point]', copy='[forces, torques]')
         do i = 1, num_considered_collisions
             encoded_pid1 = collision_lookup(i, 3)
             encoded_pid2 = collision_lookup(i, 4)
@@ -120,7 +128,9 @@ contains
             overlap_distance = patch_ib(pid1)%radius + patch_ib(pid2)%radius - norm2(normal_vector)
             if (overlap_distance > 0._wp) then  ! if the two patches are close enough to collide
                 normal_vector = normal_vector/norm2(normal_vector)
-                if (f_local_rank_owns_location(centroid_1)) then
+                ! pid1 is a rank-local index, so owning the pair by its centroid drops or doubles pairs split across ranks
+                contact_point = centroid_1 + normal_vector*(patch_ib(pid1)%radius - 0.5_wp*overlap_distance)
+                if (f_local_rank_owns_location(contact_point, glb_bounds)) then
                     ! compute constants of the collision
                     effective_mass = 1.0_wp/((1.0_wp/patch_ib(pid1)%mass) + (1._wp/(patch_ib(pid2)%mass)))
                     k = spring_stiffness*effective_mass
@@ -199,7 +209,7 @@ contains
                 ! ensure the local rank owns that collision before proceeding
                 collision_location = [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, 0._wp]
                 if (num_dims == 3) collision_location(3) = patch_ib(patch_id)%z_centroid
-                if (f_local_rank_owns_location(collision_location)) then
+                if (f_local_rank_owns_location(collision_location, glb_bounds)) then
                     k = spring_stiffness*patch_ib(patch_id)%mass
                     eta = damping_parameter*patch_ib(patch_id)%mass
 
@@ -266,14 +276,16 @@ contains
                     do kk = k - z_bound, k + z_bound
                         neighbor_patch_id = ib_markers%sf(ii, jj, kk)
 
-                        ! If any neighbors are of a different/higher marker value, we consider it for possible collision
-                        if (gp_patch_id < neighbor_patch_id) then
+                        ! Any neighbor of a different patch is a candidate pair. Both patches record it: the rank that owns the
+                        ! contact point may hold interior ghost points of only one of them, so one-sided detection can leave
+                        ! that rank blind to a contact that sits within a cell of its boundary. The host pass below sorts the
+                        ! pair and drops duplicates.
+                        if (neighbor_patch_id /= 0 .and. neighbor_patch_id /= gp_patch_id) then
                             $:GPU_ATOMIC(atomic='capture')
                             num_raw = num_raw + 1
                             local_num_raw = num_raw
                             $:END_GPU_ATOMIC_CAPTURE()
 
-                            ! Store with smaller ID first for consistent ordering
                             raw_pairs(local_num_raw, 1) = gp_patch_id
                             raw_pairs(local_num_raw, 2) = neighbor_patch_id
                             exit neighbor_search
@@ -335,12 +347,14 @@ contains
     end subroutine s_detect_ib_collisions
 
     !> @brief uses boundary conditions and particle locations to check for wall conditions
-    subroutine s_detect_wall_collisions()
+    subroutine s_detect_wall_collisions(any_wall_collision)
 
-        integer  :: gp_idx, i, j, k, patch_id
-        real(wp) :: edge_location, overlap_distance
+        logical, intent(out) :: any_wall_collision
+        integer              :: gp_idx, i, j, k, patch_id
+        real(wp)             :: edge_location, overlap_distance, max_overlap
 
-        $:GPU_PARALLEL_LOOP(private='[patch_id, edge_location, overlap_distance]')
+        max_overlap = 0._wp
+        $:GPU_PARALLEL_LOOP(private='[patch_id, edge_location, overlap_distance]', reduction='[[max_overlap]]', reductionOp='[max]')
         do patch_id = 1, num_ibs
             #:for X, DIR, IDX in [('x', 1, 1), ('y', 2, 3), ('z', 3, 5)]
                 ! check if the boundaries are either of the two conditions we should compute collisions with
@@ -355,6 +369,7 @@ contains
                         overlap_distance = 0._wp
                     end if
                     wall_overlap_distances(patch_id, ${IDX}$) = overlap_distance
+                    max_overlap = max(max_overlap, overlap_distance)
                 end if
 
                 if (ib_bc_${X}$%end == BC_SLIP_WALL .or. ib_bc_${X}$%end == BC_NO_SLIP_WALL) then
@@ -365,47 +380,15 @@ contains
                         overlap_distance = 0._wp
                     end if
                     wall_overlap_distances(patch_id, ${IDX}$ + 1) = overlap_distance
+                    max_overlap = max(max_overlap, overlap_distance)
                 end if
             #:endfor
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        any_wall_collision = max_overlap > 0._wp
+
     end subroutine s_detect_wall_collisions
-
-    !> @brief function checks if this local MPI processor owns this specific collision
-    function f_local_rank_owns_location(location) result(owns_collision)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), dimension(3), intent(in) :: location
-        logical                            :: owns_collision
-        real(wp), dimension(3)             :: projected_location
-
-        owns_collision = .true.
-
-#ifdef MFC_MPI
-        if (num_procs > 1) then
-            projected_location(:) = location(:)
-
-            ! catch the edge case where th collision lies just outside the computational domain
-            #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
-                if (num_dims >= ${ID}$) then
-                    if (ib_bc_${X}$%beg /= BC_PERIODIC) then
-                        ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
-                        if (location(${ID}$) < glb_bounds(${ID}$)%beg) then
-                            projected_location(${ID}$) = glb_bounds(${ID}$)%beg
-                        else if (glb_bounds(${ID}$)%end < location(${ID}$)) then
-                            projected_location(${ID}$) = glb_bounds(${ID}$)%end - 1.0e-10_wp
-                        end if
-                    end if
-                    owns_collision = owns_collision .and. ${X}$_cb(-1) <= projected_location(${ID}$) &
-                        & .and. projected_location(${ID}$) < ${X}$_cb(${DIM}$)
-                end if
-            #:endfor
-        end if
-#endif
-
-    end function f_local_rank_owns_location
 
     !> @brief function checks if this local MPI processor owns this specific collision
     function f_neighborhood_ranks_own_location(location) result(owns_collision)

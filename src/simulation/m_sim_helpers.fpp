@@ -14,9 +14,40 @@ module m_sim_helpers
 
     implicit none
 
-    private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl
+    private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names
+
+    !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, TCFL, the collision cap, or the ramp limiter)
+    character(len=4)                          :: dt_limiter = 'none'
+    character(len=4), dimension(5), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'TCFL', 'COLL'/)
+
+    !> Volume fraction below which a phase counts as absent for the capillary time-step limit
+    real(wp), parameter :: capillary_alpha_min = 1.e-3_wp
 
 contains
+
+    !> Brackbill's capillary density (rho_1 + rho_2)/2 from the phase densities of an interface cell. Zero where a phase is absent,
+    !! so single-phase cells, which carry no capillary force, impose no capillary limit; the local mixture density would instead let
+    !! the lighter phase's cells set a far smaller step
+    function f_capillary_rho(alpha, alpha_rho) result(rho_c)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha, alpha_rho
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
+        #:endif
+        real(wp) :: rho_c
+        integer  :: i
+
+        rho_c = 0._wp
+        if (minval(alpha(1:num_fluids)) < capillary_alpha_min) return
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            rho_c = rho_c + alpha_rho(i)/alpha(i)
+        end do
+        rho_c = rho_c/real(num_fluids, wp)
+
+    end function f_capillary_rho
 
     !> Computes the modified dtheta for Fourier filtering in azimuthal direction
     function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
@@ -101,16 +132,23 @@ contains
     end subroutine s_compute_cell_state
 
     !> Computes stability criterion for a specified dt
-    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc, ccfl)
+    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in)                      :: c, rho
         real(wp), intent(inout)                   :: icfl
-        real(wp), intent(inout)                   :: vcfl, Rc, ccfl
+        real(wp), intent(inout)                   :: vcfl, Rc, ccfl, tcfl
         real(wp), dimension(2), intent(in)        :: Re_l
-        integer, intent(in)                       :: j, k, l
-        real(wp)                                  :: fltr_dtheta
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha, alpha_rho
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
+        #:endif
+        integer, intent(in) :: j, k, l
+        real(wp)            :: fltr_dtheta
+        real(wp)            :: k_mix, rho_cv, rho_c
+        integer             :: i
 
         ! Inviscid CFL calculation
         ! The multi-dimensional CFL terms are written out here rather than
@@ -156,35 +194,75 @@ contains
 
         ! Capillary CFL calculation
         if (surface_tension) then
+            ccfl = 0._wp
+            rho_c = f_capillary_rho(alpha, alpha_rho)
+            if (rho_c > 0._wp) then
+                if (p > 0) then
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                        if (grid_geometry == 3) then
+                            fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                            ccfl = dt*sqrt(2._wp*pi*sigma/(rho_c*min(dx(j), dy(k), fltr_dtheta)**3._wp))
+                        else
+                            ccfl = dt*sqrt(2._wp*pi*sigma/(rho_c*min(dx(j), dy(k), dz(l))**3._wp))
+                        end if
+                    #:endif
+                else if (n > 0) then
+                    ccfl = dt*sqrt(2._wp*pi*sigma/(rho_c*min(dx(j), dy(k))**3._wp))
+                else
+                    ccfl = dt*sqrt(2._wp*pi*sigma/(rho_c*dx(j)**3._wp))
+                end if
+            end if
+        end if
+
+        ! Thermal diffusion CFL
+        if (heat_conduction) then
+            k_mix = 0._wp
+            rho_cv = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                k_mix = k_mix + alpha(i)*fluid_k_therm(i)
+                rho_cv = rho_cv + alpha_rho(i)*cvs(i)
+            end do
+
             if (p > 0) then
-                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    if (grid_geometry == 3) then
-                        fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp))
-                    else
-                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), dz(l))**3._wp))
-                    end if
-                #:endif
+                if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                    tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k), fltr_dtheta)**2._wp)
+                else
+                    tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k), dz(l))**2._wp)
+                end if
             else if (n > 0) then
-                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k))**3._wp))
+                tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k))**2._wp)
             else
-                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*dx(j)**3._wp))
+                tcfl = dt*k_mix/(rho_cv*dx(j)**2._wp)
             end if
         end if
 
     end subroutine s_compute_stability_from_dt
 
-    !> Computes dt for a specified CFL number
-    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
+    !> Computes the candidate dts for a specified CFL number: max_dt(1) from the inviscid, max_dt(2) the viscous, max_dt(3) the
+    !! capillary, and max_dt(4) the thermal diffusion criterion (huge where the criterion is inactive)
+    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, alpha, alpha_rho, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in)                      :: c, rho
-        real(wp), intent(inout)                   :: max_dt
+        real(wp), dimension(4), intent(out)       :: max_dt
         real(wp), dimension(2), intent(in)        :: Re_l
-        integer, intent(in)                       :: j, k, l
-        real(wp)                                  :: vcfl_dt, ccfl_dt
-        real(wp)                                  :: fltr_dtheta
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha, alpha_rho
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
+        #:endif
+        integer, intent(in) :: j, k, l
+        real(wp)            :: vcfl_dt, ccfl_dt, tcfl_dt, rho_c
+        real(wp)            :: fltr_dtheta
+        real(wp)            :: k_mix, rho_cv
+        integer             :: i
+
+        max_dt(2) = huge(1._wp)
+        max_dt(3) = huge(1._wp)
+        max_dt(4) = huge(1._wp)
 
         ! Inviscid CFL calculation
         ! The multi-dimensional CFL terms are written out here rather than
@@ -195,15 +273,15 @@ contains
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
+                    max_dt(1) = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
                 else
-                    max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
+                    max_dt(1) = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
                 end if
             #:endif
         else if (n > 0) then
-            max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
+            max_dt(1) = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
         else
-            max_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
+            max_dt(1) = cfl_target*(dx(j)/(abs(vel(1)) + c))
         end if
 
         ! Viscous calculations
@@ -220,26 +298,55 @@ contains
             else
                 vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
-            max_dt = min(max_dt, vcfl_dt)
+            max_dt(2) = vcfl_dt
         end if
 
         ! Capillary CFL calculations
         if (surface_tension) then
-            if (p > 0) then
-                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    if (grid_geometry == 3) then
-                        fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp/(2._wp*pi*sigma))
-                    else
-                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), dz(l))**3._wp/(2._wp*pi*sigma))
-                    end if
-                #:endif
-            else if (n > 0) then
-                ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k))**3._wp/(2._wp*pi*sigma))
-            else
-                ccfl_dt = cfl_target*sqrt(rho*dx(j)**3._wp/(2._wp*pi*sigma))
+            ccfl_dt = huge(1._wp)
+            rho_c = f_capillary_rho(alpha, alpha_rho)
+            if (rho_c > 0._wp) then
+                if (p > 0) then
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                        if (grid_geometry == 3) then
+                            fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                            ccfl_dt = cfl_target*sqrt(rho_c*min(dx(j), dy(k), fltr_dtheta)**3._wp/(2._wp*pi*sigma))
+                        else
+                            ccfl_dt = cfl_target*sqrt(rho_c*min(dx(j), dy(k), dz(l))**3._wp/(2._wp*pi*sigma))
+                        end if
+                    #:endif
+                else if (n > 0) then
+                    ccfl_dt = cfl_target*sqrt(rho_c*min(dx(j), dy(k))**3._wp/(2._wp*pi*sigma))
+                else
+                    ccfl_dt = cfl_target*sqrt(rho_c*dx(j)**3._wp/(2._wp*pi*sigma))
+                end if
             end if
-            max_dt = min(max_dt, ccfl_dt)
+            max_dt(3) = ccfl_dt
+        end if
+
+        ! Thermal diffusion CFL: dt <= cfl * dx^2 * rho * cv / k
+        if (heat_conduction) then
+            k_mix = 0._wp
+            rho_cv = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                k_mix = k_mix + alpha(i)*fluid_k_therm(i)
+                rho_cv = rho_cv + alpha_rho(i)*cvs(i)
+            end do
+
+            if (p > 0) then
+                if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                    tcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)*rho_cv/max(k_mix, sgm_eps)
+                else
+                    tcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)*rho_cv/max(k_mix, sgm_eps)
+                end if
+            else if (n > 0) then
+                tcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)*rho_cv/max(k_mix, sgm_eps)
+            else
+                tcfl_dt = cfl_target*(dx(j)**2._wp)*rho_cv/max(k_mix, sgm_eps)
+            end if
+            max_dt(4) = tcfl_dt
         end if
 
     end subroutine s_compute_dt_from_cfl

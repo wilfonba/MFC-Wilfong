@@ -52,7 +52,8 @@ module m_global_parameters
     ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
     type(int_bounds_info) :: idwbuff(1:3)
     type(int_bounds_info) :: bc_x, bc_y, bc_z  !< Boundary conditions in the x-, y- and z-coordinate directions
-    type(bc_xyz_info)     :: bc                !< Combined BC storage (used by the shared beta-buffer routines; pre-process-local)
+    type(int_bounds_info) :: ib_bc_x, ib_bc_y, ib_bc_z  !< bc_x/y/z before decomposition overwrites them with MPI neighbor ranks
+    type(bc_xyz_info)     :: bc  !< Combined BC storage (used by the shared beta-buffer routines; pre-process-local)
     ! simplex_params: auto-generated in generated_decls.fpp
     ! shear_num/shear_indices/shear_BC_flip_*, bc: in m_global_parameters_common
     integer                           :: fd_order    !< Finite-difference order for CoM/probe derivative approximations
@@ -329,9 +330,9 @@ contains
 
         do i = 1, num_ib_patches_max_namelist
             patch_ib(i)%geometry = dflt_int
-            patch_ib(i)%x_centroid = dflt_real
-            patch_ib(i)%y_centroid = dflt_real
-            patch_ib(i)%z_centroid = dflt_real
+            patch_ib(i)%x_centroid = 0._wp
+            patch_ib(i)%y_centroid = 0._wp
+            patch_ib(i)%z_centroid = 0._wp
             patch_ib(i)%length_x = dflt_real
             patch_ib(i)%length_y = dflt_real
             patch_ib(i)%length_z = dflt_real
@@ -349,6 +350,18 @@ contains
             patch_ib(i)%vel(:) = 0._wp
             patch_ib(i)%angles(:) = 0._wp
             patch_ib(i)%angular_vel(:) = 0._wp
+            patch_ib(i)%kin_model = 0
+            patch_ib(i)%kin_hinge(:) = 0._wp
+            patch_ib(i)%kin_offset(:) = 0._wp
+            patch_ib(i)%kin_phi0 = 0._wp
+            patch_ib(i)%kin_theta0 = 0._wp
+            patch_ib(i)%kin_theta_mean = 0._wp
+            patch_ib(i)%kin_freq = 0._wp
+            patch_ib(i)%kin_phase = 0._wp
+            patch_ib(i)%kin_t0 = 0._wp
+            patch_ib(i)%kin_ramp = 0._wp
+            patch_ib(i)%kin_pitch_rate = 0._wp
+            patch_ib(i)%kin_smooth = 0._wp
             patch_ib(i)%mass = dflt_real
             patch_ib(i)%moment = dflt_real
             patch_ib(i)%centroid_offset(:) = 0._wp
@@ -359,6 +372,27 @@ contains
             patch_ib(i)%rotation_matrix(2, 2) = 1._wp
             patch_ib(i)%rotation_matrix(3, 3) = 1._wp
             patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
+        end do
+
+        num_particle_clouds = 0
+        do i = 1, num_particle_clouds_max
+            particle_cloud(i)%x_centroid = 0._wp
+            particle_cloud(i)%y_centroid = 0._wp
+            particle_cloud(i)%z_centroid = 0._wp
+            particle_cloud(i)%length_x = dflt_real
+            particle_cloud(i)%length_y = dflt_real
+            particle_cloud(i)%length_z = dflt_real
+            particle_cloud(i)%num_particles = 0
+            particle_cloud(i)%radius = dflt_real
+            particle_cloud(i)%mass = dflt_real
+            particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%shell_inner_radius = dflt_real
+            particle_cloud(i)%shell_outer_radius = dflt_real
+            particle_cloud(i)%moving_ibm = 0
+            particle_cloud(i)%seed = 0
+            particle_cloud(i)%cloud_geometry = 1
+            particle_cloud(i)%packing_method = dflt_int
+            particle_cloud(i)%periodic = 0
         end do
 
         do i = 1, num_ib_airfoils_max
@@ -413,6 +447,7 @@ contains
             fluid_pp(i)%cv = 0._wp
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
+            fluid_pp(i)%k_therm = 0._wp
             fluid_pp(i)%G = 0._wp
             fluid_pp(i)%non_newtonian = .false.
             fluid_pp(i)%K = dflt_real

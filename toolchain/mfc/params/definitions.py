@@ -7,6 +7,7 @@ Single file containing all ~3,300 parameter definitions using loops.
 import re
 from typing import Any, Dict
 
+from .eos_families import EOS_FAMILIES
 from .namelist_parser import get_fortran_constants
 from .registry import REGISTRY, IndexedFamily
 from .schema import ParamDef, ParamType
@@ -27,7 +28,7 @@ def _fc(name: str, default: int) -> int:
 
 
 NF = _fc("num_fluids_max", 10)  # fluid_pp
-NPR = _fc("num_probes_max", 10)  # probe, acoustic
+NPR = _fc("num_probes_max", 64)  # probe, acoustic
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
 NIB = _fc("num_ib_patches_max_namelist", 54000)  # patch_ib namelist array bound
@@ -69,6 +70,9 @@ CASE_OPT_PARAMS = {
 
 HINTS = {
     "bc": {
+        "vel_in_ramp": "Duration of the smooth start-up of the inflow velocity (0 = no ramp)",
+        "vel_in_t0": "Time at which the inflow velocity ramp begins",
+        "vel_in_frac0": "Fraction of the final inflow velocity held before the ramp",
         "grcbc_in": "Enables GRCBC subsonic inflow (bc type -7)",
         "grcbc_out": "Enables GRCBC subsonic outflow (bc type -8)",
         "grcbc_vel_out": "GRCBC velocity outlet (requires `grcbc_out`)",
@@ -124,6 +128,7 @@ TAG_DISPLAY_NAMES = {
     "grid": "Grid",
     "weno": "WENO",
     "viscosity": "Viscosity",
+    "heat_conduction": "Heat conduction",
     "hypoelasticity": "Hypoelasticity",
     "surface_tension": "Surface tension",
     "acoustic": "Acoustic",
@@ -173,7 +178,7 @@ def _lookup_hint(name):
 # Schema Validation for Constraints and Dependencies
 # Uses rapidfuzz for "did you mean?" suggestions when typos are detected
 
-_VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels", "names"}
+_VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels", "names", "fortran_prefix"}
 _VALID_DEPENDENCY_KEYS = {"when_true", "when_set", "when_value"}
 _VALID_CONDITION_KEYS = {"requires", "recommends", "requires_value"}
 
@@ -216,6 +221,11 @@ def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
             raise ValueError(f"names for '{param_name}' map two names to the same value")
         if "choices" in constraint and set(names.values()) != set(constraint["choices"]):
             raise ValueError(f"names for '{param_name}' must cover exactly its choices {constraint['choices']}")
+    if "fortran_prefix" in constraint:
+        if "names" not in constraint:
+            raise ValueError(f"Constraint 'fortran_prefix' for '{param_name}' requires 'names'")
+        if not isinstance(constraint["fortran_prefix"], str) or not re.match(r"^[a-z0-9][a-z0-9_]*$", constraint["fortran_prefix"]):
+            raise ValueError(f"Constraint 'fortran_prefix' for '{param_name}' must be a lowercase identifier")
 
 
 def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
@@ -308,6 +318,11 @@ CONSTRAINTS = {
         "value_labels": {0: "unlimited", 1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
         "names": {"unlimited": 0, "minmod": 1, "mc": 2, "van_albada": 3, "van_leer": 4, "superbee": 5},
     },
+    "surface_tension_model": {
+        "choices": [1, 2],
+        "value_labels": {1: "conservative", 2: "well-balanced"},
+        "names": {"conservative": 1, "well_balanced": 2},
+    },
     "int_comp": {
         "choices": [0, 1, 2],
         "value_labels": {0: "off", 1: "THINC", 2: "MTHINC"},
@@ -364,7 +379,11 @@ CONSTRAINTS = {
     "t_save": {"min": 0},
     "t_step_save": {"min": 1},
     "t_step_print": {"min": 1},
+    "proj_max_iters": {"min": 1},
+    "proj_mg_sweeps": {"min": 1},
     "cfl_target": {"min": 0},
+    "collision_temporal_resolution": {"min": 1},
+    "ramp_ratio": {"min": 1},
     # WENO
     "weno_eps": {"min": 0},
     # MUSCL
@@ -431,6 +450,16 @@ DEPENDENCIES = {
     "collision_model": {
         "when_set": {
             "requires": ["ib", "coefficient_of_restitution", "collision_time"],
+        }
+    },
+    "collision_temporal_resolution": {
+        "when_set": {
+            "requires": ["collision_model", "cfl_adap_dt"],
+        }
+    },
+    "ramp_ratio": {
+        "when_set": {
+            "requires": ["cfl_adap_dt"],
         }
     },
     "acoustic_source": {
@@ -591,7 +620,7 @@ def _load():
         _r(n, INT, {"time"})
     _r("dt", REAL, {"time"}, math=r"\f$\Delta t\f$")
     _r("cfl_target", REAL, {"time"}, math=r"\f$\mathrm{CFL}\f$")
-    for n in ["adap_dt_tol", "t_stop", "t_save"]:
+    for n in ["adap_dt_tol", "t_stop", "t_save", "ramp_ratio"]:
         _r(n, REAL, {"time"})
     for n in ["cfl_adap_dt", "cfl_const_dt", "cfl_dt", "adap_dt"]:
         _r(n, LOG, {"time"})
@@ -643,6 +672,7 @@ def _load():
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
     _r("surface_tension", LOG, {"surface_tension"})
+    _r("surface_tension_model", INT, {"surface_tension"})
 
     # Chemistry
     _r("cantera_file", STR, {"chemistry"})
@@ -665,6 +695,7 @@ def _load():
     _r("ib_neighborhood_radius", INT, {"ib"})
     _r("ib", LOG, {"ib"})
     _r("collision_model", INT, {"ib"})
+    _r("collision_temporal_resolution", INT, {"ib"})
     _r("coefficient_of_restitution", REAL, {"ib"})
     _r("collision_time", REAL, {"ib"})
     _r("ib_coefficient_of_friction", REAL, {"ib"})
@@ -677,7 +708,8 @@ def _load():
     # Output
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt"]:
+    _r("ib_force_stride", INT, {"output", "ib"})
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt"]:
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",
@@ -754,12 +786,17 @@ def _load():
         "igr_iter_solver",
         "nv_uvm_igr_temps_on_gpu",
         "flux_lim",
+        "proj_max_iters",
+        "proj_mg_sweeps",
     ]:
         _r(n, INT)
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
+    _r("proj_tol", REAL)
+    _r("proj_max_acfl", REAL)
+    _r("proj_mg_omega", REAL)
     for n in [
         "mixlayer_vel_coef",
         "mixlayer_perturb_k0",
@@ -781,6 +818,7 @@ def _load():
         "adv_n",
         "cont_damage",
         "igr",
+        "proj_method",
         "down_sample",
         "old_grid",
         "old_ic",
@@ -897,9 +935,10 @@ def _load():
             for mm in range(-ll, ll + 1):
                 _r(f"{px}sph_har_coeff({ll},{mm})", REAL)
 
-    # Values must match the hand-written eos_* constants in src/common/m_constants.fpp.
-    _EOS_NAMES = {"stiffened_gas": 1, "ideal_gas": 2, "mie_gruneisen": 3, "jwl": 4, "vinet": 5}
-    _EOS_VALUE_LABELS = {1: "stiffened-gas", 2: "ideal-gas", 3: "Mie-Gruneisen", 4: "JWL", 5: "Vinet"}
+    # Derived from EOS_FAMILIES (eos_families.py), which must match the eos_* constants in src/common/m_constants.fpp.
+    _EOS_NAMES = {f.suffix: f.value for f in EOS_FAMILIES}
+    _EOS_VALUE_LABELS = {f.value: f.label for f in EOS_FAMILIES}
+    _EOS_CHOICES = sorted(f.value for f in EOS_FAMILIES)
 
     # fluid_pp (10 fluids)
     # Members present in physical_parameters: gamma, pi_inf, Re, cv, qv, qvp, G.
@@ -907,43 +946,19 @@ def _load():
     # by upstream #1085/#1093 — they must NOT be registered (namelist read would crash).
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
-        CONSTRAINTS[f"fluid_pp({f})%eos"] = {"choices": [1, 2, 3, 4, 5], "value_labels": _EOS_VALUE_LABELS, "names": _EOS_NAMES}
+        CONSTRAINTS[f"fluid_pp({f})%eos"] = {"choices": _EOS_CHOICES, "value_labels": _EOS_VALUE_LABELS, "names": _EOS_NAMES, "fortran_prefix": "eos"}
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
         _r(f"{px}eos", INT, math=r"\f$\mathrm{EOS}_k\f$")
-        for a, sym in [
-            ("mg_rho0", r"\f$\rho_{0,k}\f$"),
-            ("mg_c0", r"\f$c_{0,k}\f$"),
-            ("mg_s", r"\f$s_k\f$"),
-            ("mg_gruneisen", r"\f$\Gamma_{G,k}\f$"),
-            ("mg_gruneisen_a", r"\f$a_k\f$"),
-            ("mg_t0", r"\f$T_{0,k}\f$"),
-            ("mg_s2", r"\f$s_{2,k}\f$"),
-            ("mg_s3", r"\f$s_{3,k}\f$"),
-        ]:
-            _r(f"{px}{a}", REAL, math=sym)
-        for a, sym in [
-            ("jwl_a", r"\f$A_k\f$"),
-            ("jwl_b", r"\f$B_k\f$"),
-            ("jwl_r1", r"\f$R_{1,k}\f$"),
-            ("jwl_r2", r"\f$R_{2,k}\f$"),
-            ("jwl_omega", r"\f$\omega_k\f$"),
-            ("jwl_rho0", r"\f$\rho_{0,k}\f$"),
-            ("jwl_t0", r"\f$T_{0,k}\f$"),
-        ]:
-            _r(f"{px}{a}", REAL, math=sym)
-        for a, sym in [
-            ("vinet_k0", r"\f$K_{0,k}\f$"),
-            ("vinet_k0p", r"\f$K'_{0,k}\f$"),
-            ("vinet_rho0", r"\f$\rho_{0,k}\f$"),
-            ("vinet_gruneisen", r"\f$\Gamma_{G,k}\f$"),
-            ("vinet_gruneisen_a", r"\f$a_k\f$"),
-            ("vinet_t0", r"\f$T_{0,k}\f$"),
-        ]:
-            _r(f"{px}{a}", REAL, math=sym)
+        for fam in EOS_FAMILIES:
+            if fam.prefix is None:
+                continue
+            for suffix, sym in fam.required + fam.optional:
+                _r(f"{px}{fam.prefix}_{suffix}", REAL, math=sym)
         _r(f"{px}G", REAL, {"hypoelasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
+        _r(f"{px}k_therm", REAL, {"heat_conduction"}, math=r"\f$k_k\f$")
         _r(f"{px}non_newtonian", LOG, {"viscosity"}, math=r"\mathrm{non\text{-}Newtonian}_k")
         _r(f"{px}K", REAL, {"viscosity"}, math=r"K_k")
         _r(f"{px}nn", REAL, {"viscosity"}, math=r"n_k")
@@ -995,6 +1010,13 @@ def _load():
     for j in range(1, 4):
         _ib_attrs[f"vel({j})"] = (A_REAL, _ib_tags)
         _ib_attrs[f"angular_vel({j})"] = (A_REAL, _ib_tags)
+    # prescribed kinematics, evaluated at run time so one binary serves every parameter value
+    _ib_attrs["kin_model"] = (INT, _ib_tags)
+    for j in range(1, 4):
+        _ib_attrs[f"kin_hinge({j})"] = (REAL, _ib_tags)
+        _ib_attrs[f"kin_offset({j})"] = (REAL, _ib_tags)
+    for a in ["kin_phi0", "kin_theta0", "kin_theta_mean", "kin_freq", "kin_phase", "kin_t0", "kin_ramp", "kin_pitch_rate", "kin_smooth"]:
+        _ib_attrs[a] = (REAL, _ib_tags)
     REGISTRY.register_family(
         IndexedFamily(
             base_name="patch_ib",
@@ -1049,6 +1071,7 @@ def _load():
     _pb_attrs["moving_ibm"] = (INT, _pb_tags)
     _pb_attrs["seed"] = (INT, _pb_tags)
     _pb_attrs["cloud_geometry"] = (INT, _pb_tags)
+    _pb_attrs["shell_axis"] = (INT, _pb_tags)
     _pb_attrs["packing_method"] = (INT, _pb_tags)
     _pb_attrs["periodic"] = (INT, _pb_tags)
     REGISTRY.register_family(
@@ -1097,7 +1120,7 @@ def _load():
     # Extended BC
     for d in ["x", "y", "z"]:
         px = f"bc_{d}%"
-        for a in ["vb1", "vb2", "vb3", "ve1", "ve2", "ve3", "pres_in", "pres_out"]:
+        for a in ["vb1", "vb2", "vb3", "ve1", "ve2", "ve3", "pres_in", "pres_out", "vel_in_ramp", "vel_in_t0", "vel_in_frac0"]:
             _r(f"{px}{a}", REAL, {"bc"})
         for a in ["grcbc_in", "grcbc_out", "grcbc_vel_out"]:
             _r(f"{px}{a}", LOG, {"bc"})
@@ -1343,9 +1366,14 @@ _nv(
     "prim_vars_wrt",
     "fd_order",
     "ib_state_wrt",
+    "ib_force_wrt",
+    "ib_force_stride",
     "avg_state",
     "alt_soundspeed",
     "mixture_err",
+)
+_nv(
+    _ALL,
     "num_particle_clouds",
     "particle_cloud",
 )
@@ -1426,6 +1454,8 @@ _nv(
     "turb_pos",
     "synth_L",
     "collision_model",
+    "collision_temporal_resolution",
+    "ramp_ratio",
     "coefficient_of_restitution",
     "collision_time",
     "ib_coefficient_of_friction",
@@ -1444,6 +1474,13 @@ _nv(
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
     "riemann_solver",
+    "proj_method",
+    "proj_tol",
+    "proj_max_iters",
+    "proj_max_acfl",
+    "proj_mg_omega",
+    "proj_mg_sweeps",
+    "surface_tension_model",
 )
 _nv(
     _PRE,

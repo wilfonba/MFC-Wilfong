@@ -87,7 +87,7 @@ between them is narrow.
 mfc.sh (env bootstrap, venv, module loading, lock)
   └─ toolchain/mfc/build.py (config slugs, cmake invocation)
        └─ CMakeLists.txt + cmake/{GPU,Fypp,ParamsCodegen,MFCTargets}.cmake
-            └─ toolchain/mfc/params/generators/cmake_gen.py (writes 15 generated .fpp includes)
+            └─ toolchain/mfc/params/generators/cmake_gen.py (writes 18 generated .fpp includes)
 ```
 
 **`mfc.sh` → `build.py`.**  `mfc.sh` is a thin shell wrapper that activates the Python
@@ -100,8 +100,8 @@ mode, debug, chemistry, MPI.  Staging and install trees are namespaced by slug u
 **CMake layer.**  `cmake/Fypp.cmake` defines `HANDLE_SOURCES`, which sets up one
 `add_custom_command` per `.fpp` file to run Fypp at build time.  `cmake/ParamsCodegen.cmake`
 registers a single ninja-tracked `add_custom_command` (DEPENDS all `params/*.py`) that
-invokes `cmake_gen.py` and writes the 15 generated includes under
-`build/include/<target>/`.  There is no configure-time generation: all 15 files are build
+invokes `cmake_gen.py` and writes the 18 generated includes under
+`build/include/<target>/`.  There is no configure-time generation: all 18 files are build
 outputs, so changing any `params/*.py` triggers only a targeted rebuild, not a full
 reconfigure.
 
@@ -175,6 +175,9 @@ Both human reviewers and AI code reviewers reference this section.
 
 - MFC uses **non-unity lower bounds** (e.g., `idwbuff(1)%%beg:idwbuff(1)%%end` with negative ghost-cell indices). Always verify loop bounds match array declarations.
 - **Riemann solver indexing:** Left states at `j`, right states at `j+1`. Off-by-one here corrupts fluxes.
+- **Grid extents:** `m`, `n`, `p` are cell counts in x, y, z (1D sets `n = p = 0`, 2D sets `p = 0`). The interior is `0:m`, the ghost region `-buff_size:m+buff_size`, and cell boundaries run `x_cb(-1-buff_size:m+buff_size)`. Bounds are carried in `idwint(1:3)` (interior) and `idwbuff(1:3)` (with ghosts).
+- **`buff_size` is not a single formula.** It is set per reconstruction scheme in `s_configure_coordinate_bounds` (`src/common/m_helper_basic.fpp`) and floored higher for Lagrange bubbles and immersed boundaries. Read that routine rather than assuming a value.
+- **Never hard-code an equation index.** They live in the `eqn_idx` struct (`eqn_idx_info` in `src/common/m_derived_types.fpp`, populated by `s_initialize_eqn_idx` in `src/common/m_global_parameters_common.fpp`): `%%cont`, `%%mom`, `%%E`, `%%adv`, plus the optional ranges `%%bub`, `%%stress`, `%%species`, and `%%B`. Index positions depend on `model_eqns` and on which features are enabled, so changing either moves every index.
 
 ### Precision and Type Safety
 
@@ -211,6 +214,14 @@ Both human reviewers and AI code reviewers reference this section.
 - Validation in `case_validator.py` must cover new interdependencies.
 - CLI schema in `toolchain/mfc/cli/commands.py` must match argument parsing.
 - Check subprocess calls for shell injection risks and missing error handling.
+
+### Parameter Plumbing
+
+- **Derived-type parameters are not auto-broadcast.** `generated_bcast.fpp` covers namelist *scalars* only. Each derived type (`chem_params`, `lag_params`, `rburn`) needs a hand-written `_emit_<name>` in `toolchain/mfc/params/generators/fortran_gen.py` plus its call site in that generator's simulation branch, and, if it is read on device, an explicit ``$:GPU_UPDATE(device='[name]')`` in both the target's `m_global_parameters.fpp` and `src/simulation/m_start_up.fpp` — `GPU_DECLARE` alone does not make it device-resident. Regrouping existing scalars into a derived type silently drops their broadcast, leaving every non-root rank holding the `dflt_real` sentinel. Single-rank golden files cannot catch this, so pair such a change with a `ppn=2` test and confirm it fails without the emitter.
+- **A `patch_ib` member that immersed-boundary ghost-point code reads must also be set for particle-cloud IBs in `s_assign_particle_cloud_ib_defaults`** (`src/simulation/m_start_up.fpp`). Pre-process writes only position, kinematics and radius to the IB state file; simulation builds every other property there, writing into a reused `patch_ib` slot. Anything it leaves unset keeps whatever that slot held, which may be a namelist patch's value or uninitialized memory, and shows up only where that memory is not already zero-filled. A platform-only NaN is the signature of this class: a garbage `v_blow` once failed an AMD lane with `ICFL is NaN` while every NVIDIA lane and all local runs passed.
+- **Runtime checks go where they run.** Shared constraints belong in `src/common/m_checker_common.fpp`, simulation-only ones in `src/simulation/m_checker.fpp`, and pre- and post-process ones in their own `m_checker.fpp`. Those two `s_check_inputs` are currently empty; that is still the correct home for their checks, not `m_checker_common`.
+- **Analytic initial conditions are compiled into the binary** and their expressions are AST-validated at case load, so syntax errors and unknown variables surface immediately and by name. Each IC variable maps to an `eqn_idx` expression in `QPVF_IDX_VARS` (`toolchain/mfc/case.py`); adding a patch-settable conserved variable means updating that map and the Fortran `eqn_idx` builder together, because a mismatch is a silent wrong index.
+- **Under `--case-optimization` the baked-in constants are dropped from the namelist**, so changing one requires a rebuild rather than a case-file edit.
 
 ### Compiler Portability
 
@@ -455,11 +466,17 @@ If an array is allocated inside an `if` block, its deallocation must follow the 
 
 ### How to Add an Equation of State
 
-Every stiffened-gas expression lives in `src/common/m_variables_conversion.fpp`. Adding a second EOS
-means supplying these, not grepping for `gammas`:
+The equation-of-state operators live in `src/common/m_eos.fpp`, together with the mixture closure
+rules that combine them (`s_compute_mixture_coefficients`, `s_compute_speed_of_sound` and their
+`_dt`/`_avg` variants). The closure rules are not themselves equations of state, but they must stay
+in the same file as the phase chain they call: on NVHPC that call only inlines within one file, and
+separating them costs about a quarter of the grind time with no effect on the other backends. See
+the module-boundary section of @ref gpuParallelization before moving anything out of `m_eos.fpp`.
+Adding a second EOS means supplying these, not grepping for `gammas`:
 
 | Operator | Gives |
 |---|---|
+| `s_reference_curve` | the reference curve \f$p_{ref}, e_{ref}\f$ and \f$\Gamma_G\f$ of a state-dependent family - one `case` per family, and nothing else |
 | `s_compute_mixture_coefficients` / `_dt` | mixture \f$\Gamma, \Pi_\infty, q_v\f$ from the phase fractions, and their time derivative |
 | `f_pressure` / `s_compute_energy` | \f$p(e)\f$ and \f$E(p)\f$ |
 | `f_bulk_modulus` | \f$K(p)\f$ - every sound speed in MFC is \f$K/\rho\f$, differing only in how phases are mixed |
@@ -477,6 +494,35 @@ The coefficients arrive in two parameterizations of the same EOS: `gammas`/`pi_i
 forms the user supplies (see @ref sec-stored-forms), and `isentrope_n`/`isentrope_B` are the same EOS
 as \f$p + B = \textrm{const}\,\rho^n\f$, derived once at start-up. Convert with the `f_isentrope_*`
 operators rather than open-coding either relation.
+
+Both are resolved once in `s_initialize_eos_module`. A state-dependent family skips this and computes
+its coefficients per cell from `s_reference_curve` instead.
+
+**Adding a family** - a new state-dependent parameter set alongside Mie-Gruneisen, JWL and Vinet -
+starts at `toolchain/mfc/params/eos_families.py`: one `EosFamily` entry.
+
+From that entry, these are generated and need no hand edit: the Fortran `eos_*` constants, the
+`physical_parameters` parameter registration in `definitions.py`, the validator's per-family
+required/optional parameter sets and its initial-state coefficient call, both the
+`f_is_state_dependent` and `f_has_isentropic_reference` family tests, both layers of
+`s_initialize_eos_module`, and the `any_state_dependent_eos` case-optimization flag.
+
+Three things stay hand-written alongside the entry, each checked against the registry by a test
+that fails on disagreement: the `case` body in `s_reference_curve` (the per-family mathematics),
+the mirror function in `toolchain/mfc/eos.py`, and the family's fields on `physical_parameters` in
+`src/common/m_derived_types.fpp`. Those four edits are the whole job in the normal case.
+
+Two further edits are possible and are guarded by the compiler rather than by a test - they fail
+loudly at build with a clear error, not silently at runtime:
+
+- `m_eos.fpp`'s `use m_constants, only: ...` list must name the new `eos_<suffix>` constant. The
+  generated family predicates reference it, so omitting it fails to compile.
+- the `eos_coefficients` type in `src/common/m_derived_types.fpp` needs a new field only if the
+  family stores a coefficient the existing ones do not provide. The generated assignment in
+  `s_initialize_eos_module` fails to compile if the field is missing.
+
+One caveat: `f_has_isentropic_reference`'s `gruneisen_a == 0._wp` conjunct is a runtime test, not a
+family property, and stays hand-written in `m_eos.fpp`.
 
 ### How to Add a Test Case
 

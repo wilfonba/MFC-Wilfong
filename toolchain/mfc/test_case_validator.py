@@ -529,3 +529,107 @@ class TestVinetSelector(ConstraintTestCase):
         self.assertRejects({**BASE, **self.VINET, "fluid_pp(1)%mg_s2": 0.1}, "fluid_pp(1)%mg_* are only read when")
         for k in ("gamma", "pi_inf"):
             self.assertRejects({**BASE, **self.VINET, f"fluid_pp(1)%{k}": 1.0}, f"fluid_pp(1)%{k} is not read with eos = 'vinet'")
+
+    def test_variable_gruneisen_is_read_by_the_initial_state_check(self):
+        """vinet_gruneisen_a must reach _check_initial_states_inside_eos, not just eos.vinet_coefficients.
+
+        At rho = rho0 (mu = 0, as test_accepts_and_requires uses) gruneisen_a has no effect by
+        construction, so that test cannot catch a dropped gruneisen_a in the validator's dispatch.
+        Here mu = 0.2 != 0 and the Gamma_G = gruneisen0 + gruneisen_a*mu term flips the verdict:
+        with gruneisen_a wired in this state is accepted; with it dropped (gruneisen_a treated as 0,
+        the pre-fix behaviour) rho e goes negative and the case is rejected.
+        """
+        case = {**BASE, **self.VINET, "patch_icpp(1)%alpha_rho(1)": 1.2 * self.VINET["fluid_pp(1)%vinet_rho0"], "fluid_pp(1)%vinet_gruneisen_a": -20.0}
+        self.assertAccepts(case)
+
+
+class TestGrcbcOutflowTargets(ConstraintTestCase):
+    """grcbc_out and grcbc_vel_out relax toward targets that must actually be given.
+
+    m_cbc.fpp computes L(adv%end) = c*(1 - Ma)*(pres - pres_out(dir))/Del_out(dir), on the beg and
+    end sides alike, and adds only the NORMAL velocity, vel_out(dir, dir_idx(1)), where dir_idx(1)
+    is 1 for x, 2 for y and 3 for z. Left unset, the relaxation pulls toward an undefined target and
+    the boundary cell walks away: the failure surfaces tens of steps later as an ICFL abort with
+    nothing naming the BC.
+    """
+
+    # grcbc_in is deliberately off: it is an independent switch that now demands the full inflow state
+    # (#1854), and these tests exercise the outflow branch alone. A -7 boundary without grcbc_in is a
+    # plain subsonic inflow, which is all the fixture needs on the far side.
+    OUT = {"bc_x%beg": -7, "bc_x%end": -8, "bc_x%grcbc_out": "T"}
+
+    def test_grcbc_out_requires_pres_out(self):
+        self.assertRejects({**BASE_2D, **self.OUT}, "bc_x%pres_out must be specified")
+        self.assertAccepts({**BASE_2D, **self.OUT, "bc_x%pres_out": 1.0})
+
+    def test_grcbc_vel_out_requires_the_normal_component(self):
+        p = {**BASE_2D, **self.OUT, "bc_x%pres_out": 1.0, "bc_x%grcbc_vel_out": "T"}
+        self.assertRejects(p, "bc_x%vel_out(1) must be specified")
+        self.assertAccepts({**p, "bc_x%vel_out(1)": 1.0})
+
+    def test_transverse_components_are_not_required(self):
+        """vel_out(2) is transverse at an x boundary; only grcbc_in's branch reads it, so demanding
+        it here would reject a case that runs correctly."""
+        p = {**BASE_2D, **self.OUT, "bc_x%pres_out": 1.0, "bc_x%grcbc_vel_out": "T", "bc_x%vel_out(1)": 1.0}
+        self.assertAccepts(p)
+        self.assertAccepts(
+            {**p, "p": 50, "bc_z%beg": -1, "bc_z%end": -1, "z_domain%beg": 0.0, "z_domain%end": 1.0, "patch_icpp(1)%z_centroid": 0.5, "patch_icpp(1)%length_z": 1.0, "patch_icpp(1)%vel(3)": 0.0}
+        )
+
+    def test_the_required_component_follows_the_direction(self):
+        """dir_idx(1) is 2 at a y boundary, so it is vel_out(2) that must be given, not vel_out(1)."""
+        y = {**BASE_2D, "bc_y%beg": -7, "bc_y%end": -8, "bc_y%grcbc_out": "T", "bc_y%pres_out": 1.0, "bc_y%grcbc_vel_out": "T"}
+        self.assertRejects(y, "bc_y%vel_out(2) must be specified")
+        self.assertAccepts({**y, "bc_y%vel_out(2)": 0.0})
+
+
+class TestHeatConduction(ConstraintTestCase):
+    """Fourier heat conduction input rules. MFC is run through ./mfc.sh, so these live only here --
+    there is no Fortran-side duplicate. fluid_pp(i)%k_therm must be non-negative, a positive value
+    needs cv > 0, a supported EOS and model_eqns 2 or 3, and heat_conduction (derived as any
+    k_therm > 0, not itself a case parameter) is incompatible with igr and with chemistry."""
+
+    GOOD = {**BASE, "fluid_pp(1)%k_therm": 1.0, "fluid_pp(1)%cv": 1.0}
+
+    def test_rejects_negative_k_therm(self):
+        self.assertRejects({**BASE, "fluid_pp(1)%k_therm": -1.0}, "fluid_pp(1)%k_therm must be non-negative")
+
+    def test_accepts_zero_k_therm_without_cv(self):
+        """k_therm = 0 is the default (heat conduction off); it must not demand cv."""
+        self.assertAccepts({**BASE, "fluid_pp(1)%k_therm": 0.0})
+
+    def test_rejects_missing_cv(self):
+        self.assertRejects({**BASE, "fluid_pp(1)%k_therm": 1.0}, "fluid_pp(1)%cv must be positive when fluid_pp(1)%k_therm is set")
+
+    def test_rejects_zero_cv(self):
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%cv": 0.0}, "fluid_pp(1)%cv must be positive when fluid_pp(1)%k_therm is set")
+
+    def test_rejects_mie_gruneisen_eos(self):
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%eos": 3}, "heat conduction supports only the stiffened-gas and ideal-gas equations of state")
+
+    def test_accepts_ideal_gas_eos(self):
+        self.assertAccepts({**self.GOOD, "fluid_pp(1)%eos": 2, "fluid_pp(1)%pi_inf": None})
+
+    def test_rejects_gamma_law(self):
+        self.assertRejects({**self.GOOD, "model_eqns": 1}, "heat conduction requires model_eqns = 2 (5-equation) or model_eqns = 3 (6-equation)")
+
+    def test_rejects_with_igr(self):
+        self.assertRejects({**self.GOOD, "igr": "T"}, "heat conduction is not supported with igr")
+
+    def test_rejects_with_chemistry(self):
+        self.assertRejects({**CHEMISTRY, "fluid_pp(1)%k_therm": 1.0, "fluid_pp(1)%cv": 1.0}, "heat conduction is not supported with chemistry")
+
+    def test_accepts_valid_configuration(self):
+        self.assertAccepts(self.GOOD)
+
+    def test_accepts_isothermal_wall_with_conduction(self):
+        """Isothermal walls need a heat-conduction path; Fourier conduction is one, so this must not
+        demand chemistry. Regression for a gate that made the wall flux unreachable via ./mfc.sh."""
+        self.assertAccepts({**self.GOOD, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0})
+
+    def test_rejects_isothermal_wall_without_any_heat_path(self):
+        """No conduction and no chemistry means there is nothing to evaluate the wall flux with."""
+        self.assertRejects(
+            {**BASE, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0},
+            "requires a heat-conduction path",
+        )

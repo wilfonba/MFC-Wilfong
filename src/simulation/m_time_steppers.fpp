@@ -14,10 +14,12 @@ module m_time_steppers
     use m_chemistry
     use m_reactive_burn, only: s_reactive_burn_substep
     use m_pressure_relaxation
+    use m_hypoelastic, only: s_enforce_cont_damage_bounds
     use m_data_output
     use m_bubbles_EE
     use m_bubbles_EL
     use m_ibm
+    use m_collisions, only: collisions_active
     use m_mpi_proxy
     use m_boundary_common
     use m_helper
@@ -26,6 +28,7 @@ module m_time_steppers
     use m_nvtx
     use m_thermochem, only: num_species
     use m_body_forces
+    use m_projection, only: s_projection_apply
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
@@ -44,6 +47,10 @@ module m_time_steppers
     integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
+    !> The projection's first adaptive step is acoustic-limited: from rest nothing bounds the pressure-driven accelerations
+    logical, private :: proj_dt_seeded = .false.
+    !> Growth cap for the projection's adaptive step when ramp_ratio is unset
+    real(wp), parameter, private :: proj_ramp_default = 1.1_wp
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
 
@@ -290,7 +297,9 @@ contains
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
+            end if
 
+            if (chemistry .or. heat_conduction) then
                 @:ALLOCATE(q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_T_sf)
             end if
@@ -458,6 +467,10 @@ contains
 
         do s = 1, nstage
             call system_clock(stage_t0)
+            ! mytime is read on the device by the GRCBC inflow ramp, so it has to be current before the RHS that
+            ! reads it, not after. Its GPU_DECLARE only creates device storage and never copies the host value, so
+            ! without this the first RHS of a run reads uninitialised memory and later stages read a stale time.
+            $:GPU_UPDATE(device='[mytime]')
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                & t_step, s)
 
@@ -475,6 +488,8 @@ contains
                     call s_time_step_cycling(t_step)
                     call s_compute_derived_variables(t_step, q_cons_ts(1)%vf, q_prim_ts1, q_prim_ts2)
                 end if
+
+                if (ib_state_wrt) call s_write_ib_force_history(t_step)
 
                 if (cfl_dt) then
                     if (mytime >= t_stop) return
@@ -530,8 +545,11 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            $:GPU_UPDATE(device='[mytime]')
-            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
+            if (proj_method) call s_projection_apply(q_cons_ts(1)%vf, bc_type, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf, rk_coef(s, 1), &
+                & rk_coef(s, 2), rk_coef(s, 3), rk_coef(s, 4), s)
+
+            if (bodyForces .and. .not. proj_method) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
+                & 3)*dt/rk_coef(s, 4))
 
             if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
                 & 3)*dt/rk_coef(s, 4))
@@ -557,6 +575,8 @@ contains
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
                 end if
             end if
+
+            if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
@@ -656,64 +676,128 @@ contains
             real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
         #:endif
-        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
-        real(wp)               :: pres     !< Cell-avg. pressure
-        real(wp)               :: gamma    !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv       !< Cell-avg. fluid reference energy
-        real(wp)               :: c        !< Cell-avg. sound speed
-        real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
-        real(wp)               :: max_dt
-        real(wp)               :: dt_local
-        integer                :: j, k, l  !< Generic loop iterators
-        integer                :: fl       !< Fluid loop iterator
+        real(wp)               :: vel_sum            !< Cell-avg. velocity sum
+        real(wp)               :: pres               !< Cell-avg. pressure
+        real(wp)               :: gamma              !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf             !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv                 !< Cell-avg. fluid reference energy
+        real(wp)               :: c                  !< Cell-avg. sound speed
+        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
+        real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
+        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
+        real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
+        real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
+        real(wp)               :: dt_prev
+        real(wp)               :: ramp               !< Growth cap on dt, the projection's default when ramp_ratio is unset
+        logical                :: proj_ac            !< The projection's seeding step: keep the acoustic limit
+        real(wp)               :: amax, hmin         !< Projection body-force bound and smallest cell width
+        logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
+        integer                :: j, k, l            !< Generic loop iterators
+        integer                :: fl                 !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
-        dt_local = huge(1.0_wp)
+        dt_prev = dt
+        proj_ac = proj_method .and. cfl_adap_dt .and. .not. proj_dt_seeded
+        icfl_dt_local = huge(1.0_wp)
+        vcfl_dt_local = huge(1.0_wp)
+        ccfl_dt_local = huge(1.0_wp)
+        tcfl_dt_local = huge(1.0_wp)
+        coll_dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt]', reduction='[[dt_local]]', reductionOp='[min]')
+                            & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
+                            & tcfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    if (igr) then
-                        call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
-                                                  & qv, j, k, l)
-                    else
-                        call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, &
-                                                  & k, l)
+                    ! Cells inside an immersed boundary hold ghost-derived, non-physical state and must not set the global dt.
+                    is_fluid_cell = .true.
+                    if (ib) is_fluid_cell = (ib_markers%sf(j, k, l) == 0)
+
+                    if (is_fluid_cell) then
+                        if (igr) then
+                            call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, &
+                                                      & vel_sum, qv, j, k, l)
+                        else
+                            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
+                                                      & qv, j, k, l)
+                        end if
+
+                        ! Compute mixture sound speed; the projection solves the acoustics implicitly, so only the flow limits dt,
+                        ! up to an optional cap of proj_max_acfl times the acoustic step
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+                        if (proj_method .and. .not. proj_ac) c = merge(c/proj_max_acfl, 0._wp, proj_max_acfl > 0._wp)
+
+                        if (any_non_newtonian) then
+                            Re(1) = 0._wp
+                            do fl = 1, num_fluids
+                                if (is_non_newtonian(fl)) then
+                                    Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                                else
+                                    Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                                end if
+                            end do
+                            Re(1) = 1._wp/max(Re(1), sgm_eps)
+                        end if
+
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
+
+                        icfl_dt_local = min(icfl_dt_local, max_dt(1))
+                        vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
+                        ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
+                        tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
                     end if
-
-                    ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
-
-                    if (any_non_newtonian) then
-                        Re(1) = 0._wp
-                        do fl = 1, num_fluids
-                            if (is_non_newtonian(fl)) then
-                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
-                            else
-                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
-                            end if
-                        end do
-                        Re(1) = 1._wp/max(Re(1), sgm_eps)
-                    end if
-
-                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
-
-                    dt_local = min(dt_local, max_dt)
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (num_procs == 1) then
-            dt = dt_local
-        else
-            call s_mpi_allreduce_min(dt_local, dt)
+        ! Under the projection a body force, not the sound speed, bounds dt for fluid starting from rest: a parcel accelerated
+        ! over one step then moves at most cfl_target cells
+        if (proj_method .and. bodyForces) then
+            amax = 0._wp
+            #:for XYZ in ['x', 'y', 'z']
+                if (bf_${XYZ}$) amax = amax + (abs(g_${XYZ}$) + abs(k_${XYZ}$))**2
+            #:endfor
+            hmin = minval(dx(0:m))
+            if (n > 0) hmin = min(hmin, minval(dy(0:n)))
+            if (p > 0) hmin = min(hmin, minval(dz(0:p)))
+            if (amax > 0._wp) icfl_dt_local = min(icfl_dt_local, cfl_target*sqrt(hmin/sqrt(amax)))
         end if
+
+        ! restrict the time step so an ongoing collision spans at least collision_temporal_resolution time steps; the collision
+        ! flag is rank-local, so the cap enters as a candidate before the global elementwise min propagates it to all ranks
+        if (collision_model > 0 .and. collision_temporal_resolution > 0) then
+            if (collisions_active) coll_dt_local = collision_time/real(collision_temporal_resolution, wp)
+            collisions_active = .false.
+        end if
+
+        dt_candidates_loc(1) = icfl_dt_local
+        dt_candidates_loc(2) = vcfl_dt_local
+        dt_candidates_loc(3) = ccfl_dt_local
+        dt_candidates_loc(4) = tcfl_dt_local
+        dt_candidates_loc(5) = coll_dt_local
+
+        if (num_procs == 1) then
+            dt_candidates_glb = dt_candidates_loc
+        else
+            call s_mpi_allreduce_min_vec(dt_candidates_loc, dt_candidates_glb)
+        end if
+
+        dt = minval(dt_candidates_glb)
+        dt_limiter = dt_limiter_names(minloc(dt_candidates_glb, dim=1))
+
+        ! limit how much the time step can grow relative to the previous step; the projection, which starts acoustic-limited,
+        ! always ramps up to its advective step
+        ramp = ramp_ratio
+        if (proj_method .and. cfl_adap_dt .and. ramp <= 0._wp) ramp = proj_ramp_default
+        if (ramp > 0._wp .and. dt_prev > 0._wp .and. .not. proj_ac .and. ramp*dt_prev < dt) then
+            dt = ramp*dt_prev
+            dt_limiter = 'RAMP'
+        end if
+        proj_dt_seeded = proj_dt_seeded .or. proj_ac
 
         $:GPU_UPDATE(device='[dt]')
 
@@ -780,12 +864,16 @@ contains
         integer, intent(in) :: s
         integer             :: i
         integer             :: gbl_id  ! used for analytic ib patch motion
+        real(wp)            :: t_stage  ! time of the state produced by RK stage s (used by prescribed kinematics)
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s]')
+        t_stage = mytime + dt
+        if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
+
+        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s, t_stage]')
         do i = 1, num_ibs
             if (s == 1) then
                 patch_ib(i)%step_vel = patch_ib(i)%vel
@@ -798,7 +886,9 @@ contains
 
             ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
             ! velocity-dependent collision damping forces are evaluated on the GPU.
-            if (patch_ib(i)%moving_ibm > 0) then
+            if (patch_ib(i)%moving_ibm > 0 .and. patch_ib(i)%kin_model > 0) then
+                call s_prescribed_kinematics(i, t_stage)
+            else if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
                          & 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
@@ -1028,7 +1118,7 @@ contains
             call s_close_run_time_information_file()
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             @:DEALLOCATE(q_T_sf%sf)
         end if
         @:DEALLOCATE(pb_ts(1)%sf)

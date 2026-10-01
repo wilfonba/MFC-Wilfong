@@ -186,14 +186,6 @@
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = alpha_air
         end if
     case (209, 210)  ! 2D multimode RT / Faraday interface from external profile (2D_breakup)
-        ! Single full-domain patch. Builds a tanh-smoothed two-fluid interface at
-        ! y = y_int(x), where the absolute interface height y_int is read from
-        ! "interface_profile.dat" (two columns: x  y_interface). Fluid 1 (heavy) sits
-        ! below the interface, fluid 2 (light) above. Parameters come from the patch
-        ! %a() slots set by the case file:
-        !   %a(2) = rhoH   heavy-fluid material density (below)
-        !   %a(3) = rhoL   light-fluid material density (above)
-        !   %a(4) = delta  interface smoothing half-thickness
         !
         ! hcid 209 sets only volume fractions, partial densities and the color
         ! function; pressure and velocity are left as assigned by the case file
@@ -230,7 +222,6 @@
         end if
 
         ! Linear interpolation of the interface height at this cell's x
-        ! (the profile is written on a uniform x grid by perturbation.py).
         dxf = pert_x(2) - pert_x(1)
         posf = (x_cc(i) - pert_x(1))/dxf
         il = floor(posf) + 1

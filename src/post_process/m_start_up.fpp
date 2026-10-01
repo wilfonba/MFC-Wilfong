@@ -17,6 +17,7 @@ module m_start_up
     use m_boundary_common
     use m_boundary_io
     use m_variables_conversion
+    use m_eos
     use m_data_input
     use m_data_output
     use m_derived_variables
@@ -138,18 +139,18 @@ contains
                 eta_hh = int(eta_sec)/3600
                 eta_mm = mod(int(eta_sec), 3600)/60
                 eta_ss = mod(int(eta_sec), 60)
-                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, " ETA (HH:MM:SS)  = ", I0, ":", I2.2, ":", I2.2)', &
-                    & int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), t_step, n_save, wall_time_avg, wall_time, eta_hh, &
+                print '(" [", I3, "%] Saving ", I0, " of ", I0, " t/step ", ES9.2, "s (avg ", ES9.2, "s) ETA ", I0, ":", I2.2, ":", I2.2)', &
+                    & int(ceiling(100._wp*(real(t_step - n_start)/(n_save)))), t_step, n_save, wall_time, wall_time_avg, eta_hh, &
                     & eta_mm, eta_ss
             else
                 eta_sec = wall_time_avg*real((t_step_stop - t_step)/t_step_save, wp)
                 eta_hh = int(eta_sec)/3600
                 eta_mm = mod(int(eta_sec), 3600)/60
                 eta_ss = mod(int(eta_sec), 60)
-                print '(" [", I3, "%]  Saving ", I8, " of ", I0, " @ t_step = ", I8, " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
+                print '(" [", I3, "%] Saving ", I0, " of ", I0, " (t_step ", I0, ") t/step ", ES9.2, "s (avg ", ES9.2, "s) ETA ", I0, ":", I2.2, ":", I2.2)', &
                     & int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                    & (t_step - t_step_start)/t_step_save + 1, (t_step_stop - t_step_start)/t_step_save + 1, t_step, &
-                    & wall_time_avg, wall_time, eta_hh, eta_mm, eta_ss
+                    & (t_step - t_step_start)/t_step_save + 1, (t_step_stop - t_step_start)/t_step_save + 1, t_step, wall_time, &
+                    & wall_time_avg, eta_hh, eta_mm, eta_ss
             end if
         end if
 
@@ -458,7 +459,7 @@ contains
 
         if (cont_damage) then
             write (varname, '(A)') 'damage_state'
-            call s_write_field(varname, t_step, q_cons_vf(eqn_idx%damage), x_beg, x_end, y_beg, y_end, z_beg, z_end)
+            call s_write_field(varname, t_step, q_prim_vf(eqn_idx%damage), x_beg, x_end, y_beg, y_end, z_beg, z_end)
         end if
 
         if (hyper_cleaning) then
@@ -792,6 +793,7 @@ contains
             call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.true., use_rdma_transport_in=.false.)
         end if
         call s_initialize_boundary_common_module()
+        call s_initialize_eos_module()
         call s_initialize_variables_conversion_module(store_mixture_fields=.true., lagrange_beta_index=beta_idx)
         call s_initialize_data_input_module()
         call s_initialize_derived_variables_module()
@@ -952,6 +954,12 @@ contains
         end if
 
         call s_mpi_bcast_user_inputs()
+
+        ! Save original BCs before decomposition overwrites them with MPI neighbor ranks
+        ib_bc_x = bc_x
+        ib_bc_y = bc_y
+        ib_bc_z = bc_z
+
         call s_initialize_parallel_io()
         output_offsets = (/offset_x, offset_y, offset_z/)
         call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=format == format_silo, adjust_local_domains=.false., &
@@ -996,6 +1004,7 @@ contains
         call s_finalize_derived_variables_module()
         call s_finalize_data_input_module()
         call s_finalize_variables_conversion_module()
+        call s_finalize_eos_module()
         if (num_procs > 1) then
             call s_finalize_mpi_proxy_module()
             call s_finalize_mpi_common_module()
