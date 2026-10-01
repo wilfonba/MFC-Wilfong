@@ -248,14 +248,15 @@ if [ "$u_c" '==' 'famd' ]; then
     export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn"
     export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -L${OLCF_AFAR_ROOT}/lib/llvm/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
     export CRAY_HIP_INC="-I${OLCF_AFAR_ROOT}/include/hip"
+    # GTL: libmpi_amd only weakly references mpix_gtl_*, so without it MPI_Init
+    # jumps to NULL when MPICH_GPU_SUPPORT_ENABLED=1
     export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
                         ${CRAY_PMI_POST_LINK_OPTS} \
-                        -lmpifort_amd -lmpi_amd -lmpi -lpmi -lpmi2"
+                        ${PE_MPICH_GTL_DIR_amd_gfx90a} \
+                        -lmpifort_amd -lmpi_amd -lmpi -lpmi -lpmi2 ${PE_MPICH_GTL_LIBS_amd_gfx90a}"
     export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CRAY_LD_LIBRARY_PATH}"
     export CMAKE_PREFIX_PATH="${OLCF_AFAR_ROOT}:${CMAKE_PREFIX_PATH}"
     export FC="${OLCF_AFAR_ROOT}/bin/amdflang"
-
-    unset MPICH_GPU_SUPPORT_ENABLED
 fi
 
 # AMD HPCFund: AFAR LLVM Flang (amdflang) + system GNU-built OpenMPI, gfx90a.

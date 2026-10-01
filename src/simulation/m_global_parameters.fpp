@@ -410,6 +410,10 @@ contains
         proj_max_acfl = 0._wp
         proj_mg_omega = 1.8_wp
         proj_mg_sweeps = 2
+        proj_mg_kcycle = -1
+        proj_mg_k_ranks = 1024    ! Frontier, 300^3 cells per rank
+        proj_mg_bottom = -1
+        proj_mg_cg_ranks = 8192   ! Frontier, 300^3 cells per rank
         surface_tension_model = surface_tension_model_conservative
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor

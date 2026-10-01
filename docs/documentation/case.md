@@ -97,6 +97,7 @@ There are multiple sets of parameters that must be specified in the python input
 
 Items 8, 9, 10, 11 and 12 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, initial velocity field setup, phase change, artificial Mach number respectively.
 Definition of the parameters is described in the following subsections.
+Choosing the projection method's pressure-solve parameters is covered in [Projection method iterative solve tuning](#sec-projection-solve-tuning).
 
 Enumerated parameters accept named values as well as integer codes: `"riemann_solver": "hllc"`
 is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's table entry
@@ -588,6 +589,10 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `proj_max_iters`           | Integer | Maximum iterations of the projection pressure solve (default 100) |
 | `proj_mg_omega`            | Real    | Multigrid coarse-grid correction scale in the pressure solve for Poisson-like (low-Mach) levels, in (0, 2); each level eases it toward 1 as compressibility dominates (default 1.8) |
 | `proj_mg_sweeps`           | Integer | Symmetric red-black smoothing sweeps per multigrid level in the pressure solve (default 2) |
+| `proj_mg_kcycle`           | Integer | Multigrid levels between Krylov (K-cycle) coarse corrections in the pressure solve: every that many levels the coarse problem gets two flexible-CG steps instead of one cycle, which keeps iteration counts from growing with the grid. 0 for plain V-cycles; -1 chooses by rank count (V-cycles below `proj_mg_k_ranks`, 2 at or above it) (default -1). See [Projection method iterative solve tuning](#sec-projection-solve-tuning) |
+| `proj_mg_k_ranks`          | Integer | With `proj_mg_kcycle = -1`, the rank count at and above which K-cycles (every 2 levels) replace V-cycles (default 1024, measured on OLCF Frontier) |
+| `proj_mg_bottom`           | Integer | Pressure-solve multigrid bottom solve, the problem left at one cell per rank, gathered to every rank: [1] exact (dense factorization up to 128 cells, else CG) [2] one V-cycle that coarsens it further; -1 chooses by rank count (exact up to `proj_mg_cg_ranks`, V-cycle above) (default -1) |
+| `proj_mg_cg_ranks`         | Integer | With `proj_mg_bottom = -1`, the largest rank count solved exactly; past it the cost of an exact bottom solve, which every rank repeats, outgrows the iterations it saves (default 8192, measured on OLCF Frontier) |
 | `proj_max_acfl`            | Real    | With `cfl_adap_dt` or `cfl_const_dt`, caps the projection time step at this multiple of the explicit acoustic one (default 0: advective limit only). With `cfl_adap_dt` the first step is acoustic-limited and `dt` then grows by at most `ramp_ratio` (default 1.1 here) per step |
 
 - \* Options that work only with `model_eqns = 2`.
@@ -1543,6 +1548,67 @@ The above variables are used for all simulations.
 | hypoelastic variables     | N/A |
 
 The above variables correspond to optional physics.
+
+## Appendix: Projection method iterative solve tuning {#sec-projection-solve-tuning}
+
+With `proj_method = 'T'`, every Runge-Kutta stage solves a Helmholtz-type equation for the pressure.
+This solve usually dominates the cost of a time step, and its parameters trade cost per iteration against the number of iterations.
+The defaults suit most cases; this appendix explains what each parameter does and how to choose values for a new machine or an unusual problem.
+
+### How the solve works
+
+The pressure equation is solved by flexible conjugate gradients (CG) to a residual reduction of `proj_tol`, for at most `proj_max_iters` iterations.
+Each iteration is preconditioned by geometric multigrid:
+
+- **Levels.** Each level halves the grid in every direction (an odd size folds its last cell into the last coarse cell), and the coarse operators come from summing the fine ones, so coefficient jumps are kept exactly.
+  Coarsening stops once each rank holds one cell, or earlier if the whole problem has at most 128 cells.
+- **Smoothing.** Each level runs `proj_mg_sweeps` red-black Gauss-Seidel sweeps before and after its coarse correction.
+  The coarse correction is scaled up by as much as `proj_mg_omega` on low-Mach (Poisson-like) levels, to make up for the simple averaging between levels.
+- **Bottom solve.** The problem left at one cell per rank is gathered to every rank and solved there (`proj_mg_bottom`).
+  An exact solve gives the fewest iterations, but every rank repeats it, so its cost grows with the rank count.
+  The V-cycle alternative keeps coarsening that gathered problem (2x2x2 blocks of ranks per level) and costs much less at large rank counts, for a few more iterations.
+- **Cycle type.** A V-cycle visits every level once.
+  Its iteration count rises as the hierarchy gets deeper, that is, as the global grid grows.
+  A K-cycle (`proj_mg_kcycle > 0`) instead gives the coarse problem two flexible-CG steps, each preconditioned by one cycle, on every `proj_mg_kcycle`-th level.
+  This keeps iteration counts nearly constant with grid size, but revisits the coarse levels, whose cost is dominated by communication latency, so each iteration costs more.
+
+### The automatic choice
+
+With the defaults (`proj_mg_kcycle = -1`, `proj_mg_bottom = -1`), the solver chooses by rank count:
+
+| Ranks                                      | Cycle             | Bottom solve |
+| ------------------------------------------ | ----------------- | ------------ |
+| below `proj_mg_k_ranks`                    | V-cycle           | exact        |
+| `proj_mg_k_ranks` up to `proj_mg_cg_ranks` | K-cycle (every 2) | exact        |
+| above `proj_mg_cg_ranks`                   | K-cycle (every 2) | V-cycle      |
+
+The thresholds depend on the machine (MPI latency for the coarse levels, host speed for the bottom solve) and on the cells per rank.
+More cells per rank make the fine-level work larger compared with coarse-level latency, which moves both crossovers to higher rank counts.
+The defaults were measured on OLCF Frontier, one rank per MI250X GCD, with 300^3 cells per rank (the 3D Taylor-Green vortex at Mach 0.01).
+
+### Tuning for a machine or problem
+
+Run a short version of the production case (20 to 50 time steps) at the rank count of interest, with `run_time_info = 'T'`.
+Then `run_time.inf` reports the pressure-solve iterations of every step (column "PCG its"), and the simulation's output reports the average time per step.
+Compare settings by **time per step**: fewer iterations only help if they do not cost more in total.
+
+1. **Bottom solve.** Run `proj_mg_bottom = 1` and `2`.
+   Once the V-cycle bottom is faster at your rank count, set `proj_mg_cg_ranks` below that count.
+2. **Cycle type.** Run `proj_mg_kcycle = 0`, `2` and `3`, with the bottom solve fixed to the better choice from step 1.
+   V-cycles are cheapest per iteration and usually fastest on few ranks; K-cycles win once the extra V-cycle iterations cost more than the coarse-level revisits.
+   Set `proj_mg_k_ranks` near the rank count where `proj_mg_kcycle = 2` starts winning.
+   `1` gives the fewest iterations, but on GPUs its coarse-level revisits usually make it the slowest; `3` falls between `0` and `2`.
+3. **Sweeps.** With the cycle chosen, try `proj_mg_sweeps = 1` and `3`.
+   More sweeps cut iterations but cost more per iteration on every level.
+
+For a weak-scaling study, run steps 1 and 2 at the smallest and largest rank counts.
+If one setting wins at both, set it explicitly so every run uses the same solver.
+
+Iteration counts also depend on the physics: lower Mach numbers and larger density contrasts make the pressure equation harder.
+If a production case differs strongly from the one used to tune, check its "PCG its" column; a count approaching `proj_max_iters` means the solve is not converging within the iteration limit.
+
+Different solver settings agree to within the solve tolerance, not bit for bit.
+Keep them fixed when comparing runs exactly, for example in regression tests.
 
 
 <div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

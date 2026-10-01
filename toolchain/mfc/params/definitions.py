@@ -381,6 +381,10 @@ CONSTRAINTS = {
     "t_step_print": {"min": 1},
     "proj_max_iters": {"min": 1},
     "proj_mg_sweeps": {"min": 1},
+    "proj_mg_kcycle": {"min": -1},
+    "proj_mg_k_ranks": {"min": 1},
+    "proj_mg_cg_ranks": {"min": 1},
+    "proj_mg_bottom": {"choices": [-1, 1, 2], "value_labels": {-1: "auto", 1: "exact", 2: "V-cycle"}},
     "cfl_target": {"min": 0},
     "collision_temporal_resolution": {"min": 1},
     "ramp_ratio": {"min": 1},
@@ -788,6 +792,10 @@ def _load():
         "flux_lim",
         "proj_max_iters",
         "proj_mg_sweeps",
+        "proj_mg_kcycle",
+        "proj_mg_k_ranks",
+        "proj_mg_bottom",
+        "proj_mg_cg_ranks",
     ]:
         _r(n, INT)
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
@@ -1480,6 +1488,10 @@ _nv(
     "proj_max_acfl",
     "proj_mg_omega",
     "proj_mg_sweeps",
+    "proj_mg_kcycle",
+    "proj_mg_k_ranks",
+    "proj_mg_bottom",
+    "proj_mg_cg_ranks",
     "surface_tension_model",
 )
 _nv(

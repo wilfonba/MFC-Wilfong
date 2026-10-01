@@ -39,6 +39,12 @@ cd "${MFC_ROOT_DIR}"
 cd - > /dev/null
 echo
 
+% if gpu_enabled:
+    export MPICH_GPU_SUPPORT_ENABLED=1
+    #export GTL_ENABLE_HSA_IPC_SIGNAL_CACHE=1 # Cray MPICH 9.1.0 onwards; optional, but recommended
+    #export HSA_ENABLE_IPC_MODE_LEGACY=1
+% endif
+
 ulimit -s unlimited
 
 % for target in targets:
@@ -47,6 +53,8 @@ ulimit -s unlimited
     % if engine == 'batch':
         # Broadcast binary to compute nodes
         sbcast --send-libs -pf ${target.get_install_binpath(case)} /mnt/bb/$USER/${target.name}
+        ## Offload image loads fail when every rank reads the fresh sbcast copy at once; read it once per node first
+        srun --nodes ${nodes} --ntasks-per-node 1 bash -c "cat /mnt/bb/$USER/${target.name} /mnt/bb/$USER/${target.name}_libs/* > /dev/null"
     % endif
 
     % if not mpi:
