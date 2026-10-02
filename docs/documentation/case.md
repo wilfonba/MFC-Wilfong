@@ -1552,7 +1552,7 @@ The above variables correspond to optional physics.
 
 ## Appendix: Projection method iterative solve tuning {#sec-projection-solve-tuning}
 
-With `proj_method = 'T'`, every Runge-Kutta stage solves a Helmholtz-type equation for the pressure.
+With ``proj_method = 'T'``, every Runge-Kutta stage solves a Helmholtz-type equation for the pressure.
 This solve usually dominates the cost of a time step, and its parameters trade cost per iteration against the number of iterations.
 The defaults suit most cases; this appendix explains what each parameter does and how to choose values for a new machine or an unusual problem.
 
@@ -1599,7 +1599,7 @@ The defaults were measured on OLCF Frontier, one rank per MI250X GCD, with 300^3
 
 ### Tuning for a machine or problem
 
-Run a short version of the production case (20 to 50 time steps) at the rank count of interest, with `run_time_info = 'T'`.
+Run a short version of the production case (20 to 50 time steps) at the rank count of interest, with ``run_time_info = 'T'``.
 Then `run_time.inf` reports the pressure-solve iterations of every step (column "PCG its"), and the simulation's output reports the average time per step.
 Compare settings by **time per step**: fewer iterations only help if they do not cost more in total.
 

@@ -40,8 +40,8 @@
 !! solves p - rho*c^2*tau^2*div(rho_f^-1 grad p) = p_adv - rho*c^2*tau*div(u*_f) with div, grad and the Laplacian all taken on
 !! faces, so they compose exactly and the projected face velocity satisfies the discrete pressure equation. The solve is PCG
 !! preconditioned by a geometric multigrid V-cycle coupled across ranks: each level exchanges one ghost layer with its neighbors
-!! (one aggregated message per neighbor), coarsens to one cell per rank, and every rank continues the hierarchy on that
-!! gathered rank-level problem: solved directly when small, else by one host V-cycle.
+!! (one aggregated message per neighbor), coarsens to one cell per rank, and every rank continues the hierarchy on that gathered
+!! rank-level problem: solved directly when small, else by one host V-cycle.
 !> @brief All-Mach pressure projection
 module m_projection
 
@@ -66,6 +66,7 @@ module m_projection
     integer, parameter :: mg_maxlev = 24
     real(wp), parameter :: res_floor = 1.e2_wp*epsilon(1._wp)  !< residual round-off floor, relative to the right-hand side
     real(wp), allocatable, dimension(:,:,:,:) :: uf            !< face velocity; index j is the face between cells j and j+1
+    real(wp), allocatable, dimension(:,:,:,:) :: uf0           !< the face velocity that transported the current stage
     real(wp), allocatable, dimension(:,:,:) :: divu, rhs_p     !< div of uf, and the pressure transport rate
     real(wp), allocatable, dimension(:,:,:) :: pflx            !< upwind pressure flux on the faces of one direction
     real(wp), allocatable, dimension(:,:,:) :: p_stage, p_step0
@@ -80,7 +81,7 @@ module m_projection
     real(stp), allocatable, dimension(:,:,:), target :: solid
     type(scalar_field), dimension(1)                 :: solid_sf
     $:GPU_DECLARE(create='[solid, solid_sf]')
-    $:GPU_DECLARE(create='[uf, divu, rhs_p, pflx, p_stage, p_step0, rhoc, dcoef, bvec, xs, rs, zs, qs, pk]')
+    $:GPU_DECLARE(create='[uf, uf0, divu, rhs_p, pflx, p_stage, p_step0, rhoc, dcoef, bvec, xs, rs, zs, qs, pk]')
     !> Well-balanced surface tension, with one ghost layer: curvature (1) and |grad c| (2), both zero outside the interface band
     real(wp), allocatable, dimension(:,:,:,:) :: kap
     real(wp), allocatable, dimension(:,:,:,:) :: gnd  !< grad(alpha_1) (1:num_dims) and its magnitude (0), two ghost layers
@@ -92,17 +93,17 @@ module m_projection
     !! mg_poff, laid out as level 1
     integer, parameter                  :: mg_bottom_max = 128
     integer                             :: mg_nlev, mg_gx, mg_gy, mg_gz, mg_poff
-    integer                             :: mg_blev  !< Level this solve stops at (s_mg_omega): mg_nlev, or the truncation
+    integer                             :: mg_blev             !< Level this solve stops at (s_mg_omega): mg_nlev, or the truncation
     real(wp), dimension(mg_maxlev)      :: mg_om               !< Coarse-correction scale into each level (s_mg_omega)
     real(wp), parameter                 :: mg_om_r0 = 0.02_wp  !< Helmholtz-to-Laplacian ratio that halves the scale's excess
     integer, dimension(mg_maxlev)       :: mg_nx, mg_ny, mg_nz, mg_off
     real(wp), allocatable, dimension(:) :: mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r
     $:GPU_DECLARE(create='[mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r]')
-    !> K-cycle vectors of the coarse levels (indexed as mg_e; allocated with mg_kspace > 0): the right-hand side (kr), the
-    !! first step's preconditioned direction (kc) and its image under the level operator (kv)
+    !> K-cycle vectors of the coarse levels (indexed as mg_e; allocated with mg_kspace > 0): the right-hand side (kr), the first
+    !! step's preconditioned direction (kc) and its image under the level operator (kv)
     real(wp), allocatable, dimension(:) :: mg_kr, mg_kc, mg_kv
     $:GPU_DECLARE(create='[mg_kr, mg_kc, mg_kv]')
-    real(wp), parameter                 :: mg_kt = 0.25_wp  !< K-cycle skips its second step once the residual falls by this
+    real(wp), parameter :: mg_kt = 0.25_wp  !< K-cycle skips its second step once the residual falls by this
 
     !> Ghost-layer exchange: side q = 1..6 is (x, y, z) x (low, high); mg_nbr(q) is the neighbor rank, this rank for a periodic
     !! seam, or -1. Each exchange sends one message per distinct neighbor, holding all its sides
@@ -117,29 +118,29 @@ module m_projection
     integer, dimension(6, mg_maxlev)    :: mg_sbeg, mg_slen, mg_rbeg, mg_rlen
     $:GPU_DECLARE(create='[mg_smode, mg_boff]')
 
-    !> Bottom level, gathered to every rank: crs_n cells in all, rank r's crs_cnt(r + 1) of them (a crs_sz(:, r + 1) block)
-    !! numbered from crs_disp(r + 1) + 1, x fastest. crs_n is at most mg_bottom_max, or num_procs past that, when it is the rank
-    !! grid itself. Every rank continues the hierarchy on it: level lv holds crs_ln(lv) cells from crs_loff(lv) + 1, at rank-grid
-    !! coordinates crs_co, as a stencil (diagonal crs_ad, conductance crs_ak(q, i) to cell crs_aj(q, i), 0 for none); a 2x2x2 box
-    !! aggregates to cell crs_agg(i) of the next level, and the last level (at most mg_bottom_max cells) is factored densely in
-    !! crs_l. With one level the bottom solve is exact; past mg_bottom_max cells it is one V-cycle (an exact solve costs every rank
-    !! more the more ranks there are), unless crs_exact keeps the bottom whole and CG solves it (crs_cg)
+    !> Bottom level, gathered to every rank: crs_n cells in all, rank r's crs_cnt(r + 1) of them (a crs_sz(:, r + 1) block) numbered
+    !! from crs_disp(r + 1) + 1, x fastest. crs_n is at most mg_bottom_max, or num_procs past that, when it is the rank grid itself.
+    !! Every rank continues the hierarchy on it: level lv holds crs_ln(lv) cells from crs_loff(lv) + 1, at rank-grid coordinates
+    !! crs_co, as a stencil (diagonal crs_ad, conductance crs_ak(q, i) to cell crs_aj(q, i), 0 for none); a 2x2x2 box aggregates to
+    !! cell crs_agg(i) of the next level, and the last level (at most mg_bottom_max cells) is factored densely in crs_l. With one
+    !! level the bottom solve is exact; past mg_bottom_max cells it is one V-cycle (an exact solve costs every rank more the more
+    !! ranks there are), unless crs_exact keeps the bottom whole and CG solves it (crs_cg)
     integer :: crs_n, crs_nl, crs_tot
-    logical :: crs_exact                                !< bottom solved exactly (proj_mg_bottom, or by rank count)
-    logical :: crs_cg                                   !< exactly, by CG, as it is too large to factor densely
-    real(wp), parameter :: crs_tol = 1.e-12_wp          !< CG bottom tolerance, relative to its right-hand side
-    integer :: mg_kspace                                !< levels between K-cycle steps (proj_mg_kcycle, or by rank count)
+    logical :: crs_exact                        !< bottom solved exactly (proj_mg_bottom, or by rank count)
+    logical :: crs_cg                           !< exactly, by CG, as it is too large to factor densely
+    real(wp), parameter :: crs_tol = 1.e-12_wp  !< CG bottom tolerance, relative to its right-hand side
+    integer :: mg_kspace                        !< levels between K-cycle steps (proj_mg_kcycle, or by rank count)
     integer, dimension(mg_maxlev) :: crs_ln, crs_loff
     integer, dimension(3, mg_maxlev) :: crs_ld
     integer, allocatable, dimension(:) :: crs_cnt, crs_disp, crs_agg
     integer, allocatable, dimension(:,:) :: crs_sz, crs_aj, crs_co
     real(wp), allocatable, dimension(:,:) :: crs_l, crs_ak
     real(wp), allocatable, dimension(:) :: crs_ad, crs_x, crs_b
-    logical, dimension(3) :: wall_lo, wall_hi  !< this rank owns a solid wall face on that side
-    logical, dimension(3) :: seam_lo, seam_hi  !< that side couples to another rank or, periodically, to this one
-    logical :: faces_ready                     !< uf has been seeded from the cell velocities
-    logical :: wb_st                           !< well-balanced surface tension
-    integer :: gk0, gk1, gl0, gl1              !< y and z extents including one ghost layer where those directions exist
+    logical, dimension(3) :: wall_lo, wall_hi   !< this rank owns a solid wall face on that side
+    logical, dimension(3) :: seam_lo, seam_hi   !< that side couples to another rank or, periodically, to this one
+    logical :: faces_ready                      !< uf has been seeded from the cell velocities
+    logical :: wb_st                            !< well-balanced surface tension
+    integer :: gk0, gk1, gl0, gl1               !< y and z extents including one ghost layer where those directions exist
 
 contains
 
@@ -158,7 +159,7 @@ contains
         ! A K-cycle reaches the bottom several times per cycle, which multiplies the cost of an exact solve there
         crs_exact = proj_mg_bottom == 1 .or. (proj_mg_bottom == -1 .and. mg_kspace == 0 .and. num_procs <= proj_mg_cg_ranks)
 
-        @:ALLOCATE(uf(-1:m + 1, -1:n + 1, -1:p + 1, 1:num_dims))
+        @:ALLOCATE(uf(-1:m + 1, -1:n + 1, -1:p + 1, 1:num_dims), uf0(-1:m + 1, -1:n + 1, -1:p + 1, 1:num_dims))
         @:ALLOCATE(divu(0:m, 0:n, 0:p), rhs_p(0:m, 0:n, 0:p), p_stage(0:m, 0:n, 0:p), p_step0(0:m, 0:n, 0:p))
         @:ALLOCATE(pflx(-1:m + 1, -1:n + 1, -1:p + 1), rhoc(-1:m + 1, -1:n + 1, -1:p + 1))
         @:ALLOCATE(dcoef(0:m, 0:n, 0:p), bvec(0:m, 0:n, 0:p))
@@ -670,6 +671,19 @@ contains
             #:endfor
         end if
 
+        ! Keep the face velocity this stage was transported with, for s_mass_lag below
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l]')
+        do i = 1, num_dims
+            do l = l0, l1
+                do k = k0, k1
+                    do j = -1, m + 1
+                        uf0(j, k, l, i) = uf(j, k, l, i)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
         ! Star density with its ghosts, and the face predictor from the star cell velocities
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]')
         do l = l0, l1
@@ -789,6 +803,8 @@ contains
         #:endfor
         call s_zero_wall_faces()
 
+        call s_mass_lag(q_cons_vf, tau)
+
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gam, pinf, qv, ke, ar, al]')
         do l = 0, p
             do k = 0, n
@@ -811,6 +827,62 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_projection_apply
+
+    !> The stage transported the partial densities and volume fractions with uf0, while the pressure solve compressed p with the
+    !! corrected uf: left alone, the two disagree by tau*rho*div(uf - uf0) every stage, an entropy error that accumulates wherever
+    !! that divergence persists (small scales, walls, low acoustic CFL). Move them by the difference too, conservatively for the
+    !! partial densities (alpha in its advective form), upwinded on the new face velocity. Momentum keeps uf0, which the entropy
+    !! does not see. Each component is summed into rhs_p, free once the pressure system is built, then applied.
+    subroutine s_mass_lag(q_cons_vf, tau)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(wp), intent(in)                                   :: tau
+        real(wp)                                               :: c, dd, du, tl
+        integer                                                :: iq, q, j, k, l, ncomp
+
+        tl = tau  ! a dummy may alias a host variable, which a device kernel must not reference
+        ! A lone fluid's alpha is 1, which the difference leaves unchanged
+
+        ncomp = merge(num_fluids, 2*num_fluids, num_fluids == 1)
+        do iq = 1, ncomp
+            q = merge(iq, eqn_idx%adv%beg + iq - num_fluids - 1, iq <= num_fluids)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, c, dd, du]', firstprivate='[q, iq]')
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        c = 0._wp; dd = 0._wp
+                        #:for D, DXV, SV, IP1, IM1 in [(1, 'dx', 'j', 'j + 1, k, l', 'j - 1, k, l'), &
+                            (2, 'dy', 'k', 'j, k + 1, l', 'j, k - 1, l'), (3, 'dz', 'l', 'j, k, l + 1', 'j, k, l - 1')]
+                            if (num_dims >= ${D}$) then
+                                du = uf(j, k, l, ${D}$) - uf0(j, k, l, ${D}$)
+                                c = c + du*real(merge(q_cons_vf(q)%sf(j, k, l), q_cons_vf(q)%sf(${IP1}$), uf(j, k, l, &
+                                                & ${D}$) >= 0._wp), wp)/${DXV}$(${SV}$)
+                                dd = dd + du/${DXV}$(${SV}$)
+                                du = uf(${IM1}$, ${D}$) - uf0(${IM1}$, ${D}$)
+                                c = c - du*real(merge(q_cons_vf(q)%sf(${IM1}$), q_cons_vf(q)%sf(j, k, l), uf(${IM1}$, &
+                                                & ${D}$) >= 0._wp), wp)/${DXV}$(${SV}$)
+                                dd = dd - du/${DXV}$(${SV}$)
+                            end if
+                        #:endfor
+                        if (iq > num_fluids) c = c - real(q_cons_vf(q)%sf(j, k, l), wp)*dd
+                        rhs_p(j, k, l) = c
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', firstprivate='[q, tl]')
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_vf(q)%sf(j, k, l) = real(real(q_cons_vf(q)%sf(j, k, l), wp) - tl*rhs_p(j, k, l), stp)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end do
+
+    end subroutine s_mass_lag
 
     !> PCG on the SPD pressure system, preconditioned by one multigrid V-cycle. The solution is left in pk with filled ghosts.
     impure subroutine s_pcg_solve(bc_type)
@@ -1278,8 +1350,8 @@ contains
     end function f_crs_nbr
 
     !> Gather every bottom cell's row (its diagonal sum and its face conductances with their global neighbors) into the global
-    !! bottom stencil, coarsen it as the device levels are, and factor the last level; a face whose two sides fall in one cell
-    !! (a periodic seam across a one-cell width, or a face inside an aggregated box) couples the cell to itself and cancels
+    !! bottom stencil, coarsen it as the device levels are, and factor the last level; a face whose two sides fall in one cell (a
+    !! periodic seam across a one-cell width, or a face inside an aggregated box) couples the cell to itself and cancels
     impure subroutine s_mg_bottom_build()
 
         real(wp), dimension(13, crs_cnt(proc_rank + 1)) :: row
@@ -1472,7 +1544,6 @@ contains
 
     !> (A x)_i of bottom-hierarchy cell i
     pure real(wp) function f_crs_ax(i) result(ax)
-
         integer, intent(in) :: i
         integer             :: q
 
@@ -1691,8 +1762,8 @@ contains
     end subroutine s_mg_precond
 
     !> One cycle on level lv, from mg_f(lv) into mg_e(lv), which must start at zero, ghosts included. Each smoothing phase freezes
-    !! the ghost layer for all its sweeps; pre-sweeps run red then black and post-sweeps black then red, so a V-cycle is a
-    !! symmetric operator. The coarse problem gets one cycle, or every mg_kspace levels two flexible-CG steps (s_mg_kstep)
+    !! the ghost layer for all its sweeps; pre-sweeps run red then black and post-sweeps black then red, so a V-cycle is a symmetric
+    !! operator. The coarse problem gets one cycle, or every mg_kspace levels two flexible-CG steps (s_mg_kstep)
     recursive impure subroutine s_mg_cycle(lv)
 
         integer, intent(in) :: lv
@@ -1749,8 +1820,7 @@ contains
         call s_mg_cycle(c)
         call s_mg_exchange(c, off)
         s1 = 0._wp; s2 = 0._wp; s3 = 0._wp; s4 = 0._wp; s5 = 0._wp
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, dg, nb]', reduction='[[s1, s2, s3, s4, s5]]', &
-                          & reductionOp='[+]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, dg, nb]', reduction='[[s1, s2, s3, s4, s5]]', reductionOp='[+]')
         do kk = 0, nz - 1
             do jj = 0, ny - 1
                 do ii = 0, nx - 1
@@ -1798,7 +1868,7 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-            sl(1:3, 1) = [s2, s4, s5]
+            sl(1:3,1) = [s2, s4, s5]
             call s_mpi_allreduce_vectors_sum(sl(1:3,:), sg(1:3,:), 3, 1)
             ! gamma = d.v, beta = d.A d, alpha2 = d.(r - a1 v); rho2 = beta - gamma^2/rho1
             rho2 = sg(2, 1) - sg(1, 1)**2/s1
@@ -1938,7 +2008,7 @@ contains
 
         $:GPU_EXIT_DATA(detach='[pk_sf(1)%sf, solid_sf(1)%sf]')
         @:DEALLOCATE(solid)
-        @:DEALLOCATE(uf, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap, gnd)
+        @:DEALLOCATE(uf, uf0, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap, gnd)
         @:DEALLOCATE(mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r, mg_kr, mg_kc, mg_kv)
         if (allocated(crs_l)) deallocate (crs_l)
         deallocate (crs_x, crs_b, crs_ad, crs_ak, crs_aj, crs_agg, crs_co, crs_cnt, crs_disp, crs_sz)
