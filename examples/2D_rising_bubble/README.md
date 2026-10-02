@@ -21,11 +21,11 @@ against ~720,000 explicit steps (~2.4 h), about 58x in wall time.
 
 | quantity                | h = 1/40 | h = 1/80 | TP2D (finest) |
 |-------------------------|----------|----------|---------------|
-| min circularity         | 0.919    | 0.907    | 0.901         |
-| max rise velocity       | 0.234    | 0.239    | 0.242         |
-| centroid height, t = 3  | 1.073    | 1.079    | 1.081         |
+| min circularity         | 0.912    | 0.904    | 0.901         |
+| max rise velocity       | 0.238    | 0.241    | 0.242         |
+| centroid height, t = 3  | 1.081    | 1.081    | 1.081         |
 
 Test case 2 converges toward the reference more slowly: from h = 1/40 to 1/80 the first rise-velocity
-peak goes 0.240 -> 0.247 (TP2D 0.252) and the final centroid 1.071 -> 1.093 (TP2D 1.138), and the
-circularity follows FreeLIFE and MooNMD. The second rise-velocity peak near t = 2 is not yet
-reproduced at these resolutions, and the late rise velocity stays ~15% low.
+peak goes 0.244 -> 0.249 (TP2D 0.252) and the final centroid 1.090 -> 1.104 (TP2D 1.138), and the
+final circularity (0.479) lies between FreeLIFE's and MooNMD's. The second rise-velocity peak near t = 2 is
+not yet reproduced at these resolutions, and the late rise velocity stays ~15% low.
