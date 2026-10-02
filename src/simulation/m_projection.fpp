@@ -154,7 +154,8 @@ contains
         ! Automatic choices by rank count; the thresholds are machine-dependent (docs: "Projection method iterative solve tuning")
         mg_kspace = proj_mg_kcycle
         if (mg_kspace < 0) mg_kspace = merge(2, 0, num_procs >= proj_mg_k_ranks)
-        crs_exact = proj_mg_bottom == 1 .or. (proj_mg_bottom == -1 .and. num_procs <= proj_mg_cg_ranks)
+        ! A K-cycle reaches the bottom several times per cycle, which multiplies the cost of an exact solve there
+        crs_exact = proj_mg_bottom == 1 .or. (proj_mg_bottom == -1 .and. mg_kspace == 0 .and. num_procs <= proj_mg_cg_ranks)
 
         @:ALLOCATE(uf(-1:m + 1, -1:n + 1, -1:p + 1, 1:num_dims))
         @:ALLOCATE(divu(0:m, 0:n, 0:p), rhs_p(0:m, 0:n, 0:p), p_stage(0:m, 0:n, 0:p), p_step0(0:m, 0:n, 0:p))
