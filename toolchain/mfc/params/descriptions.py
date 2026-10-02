@@ -180,6 +180,7 @@ DESCRIPTIONS = {
     "proj_mg_k_ranks": "Rank count at and above which proj_mg_kcycle = -1 uses K-cycles (every 2 levels)",
     "proj_mg_bottom": "Pressure-solve multigrid bottom solve: 1 exact, 2 V-cycle, -1 by rank count",
     "proj_mg_cg_ranks": "Largest rank count proj_mg_bottom = -1 solves exactly, with V-cycles",
+    "proj_mg_trunc": "Stop the pressure-solve multigrid at the first level whose spacing spans this many screening lengths (c*dt); 0 never",
     "proj_max_acfl": "Cap on the CFL-derived projection time step, as a multiple of the explicit acoustic one (0: no cap)",
     "down_sample": "Enable output downsampling",
     "perturb_flow_fluid": "Fluid index for flow perturbation",

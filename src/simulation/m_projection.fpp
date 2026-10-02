@@ -92,6 +92,7 @@ module m_projection
     !! mg_poff, laid out as level 1
     integer, parameter                  :: mg_bottom_max = 128
     integer                             :: mg_nlev, mg_gx, mg_gy, mg_gz, mg_poff
+    integer                             :: mg_blev  !< Level this solve stops at (s_mg_omega): mg_nlev, or the truncation
     real(wp), dimension(mg_maxlev)      :: mg_om               !< Coarse-correction scale into each level (s_mg_omega)
     real(wp), parameter                 :: mg_om_r0 = 0.02_wp  !< Helmholtz-to-Laplacian ratio that halves the scale's excess
     integer, dimension(mg_maxlev)       :: mg_nx, mg_ny, mg_nz, mg_off
@@ -1149,7 +1150,7 @@ contains
         end do
 
         call s_mg_omega()
-        call s_mg_bottom_build()
+        if (mg_blev == mg_nlev) call s_mg_bottom_build()
 
     end subroutine s_mg_build
 
@@ -1160,11 +1161,11 @@ contains
     impure subroutine s_mg_omega()
 
         real(wp), dimension(2, mg_maxlev) :: sums, sums_glb
-        real(wp)                          :: sd, sk, dg, nb
+        real(wp)                          :: sd, sk, dg, nb, r1
         integer                           :: lv, ii, jj, kk, idx, off, nx, ny, nz, ex, ey, gx, gy, gz, sy, sz
 
         gx = mg_gx; gy = mg_gy; gz = mg_gz
-        do lv = 2, mg_nlev
+        do lv = 1, mg_nlev
             nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); off = mg_off(lv); ex = nx + 2*gx; ey = ny + 2*gy; sy = ex; sz = ex*ey
             sd = 0._wp; sk = 0._wp
             $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, dg, nb]', reduction='[[sd, sk]]', reductionOp='[+]')
@@ -1181,10 +1182,26 @@ contains
             $:END_GPU_PARALLEL_LOOP()
             sums(:,lv) = [sd, sk]
         end do
-        if (mg_nlev > 1) call s_mpi_allreduce_vectors_sum(sums(:,2:mg_nlev), sums_glb(:,2:mg_nlev), 2, mg_nlev - 1)
+        call s_mpi_allreduce_vectors_sum(sums(:,1:mg_nlev), sums_glb(:,1:mg_nlev), 2, mg_nlev)
         do lv = 2, mg_nlev
             mg_om(lv - 1) = 1._wp + (proj_mg_omega - 1._wp)/(1._wp + sums_glb(1, lv)/(mg_om_r0*max(sums_glb(2, lv), tiny(1._wp))))
         end do
+
+        ! Stop at the first level whose spacing spans proj_mg_trunc screening lengths. The pressure equation screens over
+        ! l = h/sqrt(6 r1), r1 the fine level's Helmholtz-to-Laplacian diagonal ratio (l is about c*dt, the acoustic CFL in cells);
+        ! error longer than l has eigenvalues near the Helmholtz diagonal, which CG resolves cheaply, so the coarser, rank-spanning
+        ! levels and the gathered bottom add little. The coarse ratios cannot show this: summing aggregates doubles a level's
+        ! ratio, where the spacing squared quadruples
+        mg_blev = mg_nlev
+        if (proj_mg_trunc > 0._wp) then
+            r1 = sums_glb(1, 1)/max(sums_glb(2, 1), tiny(1._wp))
+            do lv = 2, mg_nlev
+                if (6._wp*r1*4._wp**(lv - 1) >= proj_mg_trunc**2) then
+                    mg_blev = lv
+                    exit
+                end if
+            end do
+        end if
 
     end subroutine s_mg_omega
 
@@ -1695,16 +1712,20 @@ contains
         call nvtxStartRange("PROJ-MG-EXCHANGE")
         call s_mg_exchange(lv, mg_off(lv))
         call nvtxEndRange
-        call s_mg_restrict(lv)
-        if (mg_kspace > 0 .and. lv + 1 < mg_nlev .and. mod(lv, max(mg_kspace, 1)) == 0) then
-            call s_mg_kstep(lv + 1)
-        else
-            call s_mg_cycle(lv + 1)
+        ! At a truncation level (mg_blev < mg_nlev) the cycle is its two smoothing phases alone, still symmetric; CG takes the
+        ! screened error longer than the level's spacing
+        if (lv < mg_blev) then
+            call s_mg_restrict(lv)
+            if (mg_kspace > 0 .and. lv + 1 < mg_blev .and. mod(lv, max(mg_kspace, 1)) == 0) then
+                call s_mg_kstep(lv + 1)
+            else
+                call s_mg_cycle(lv + 1)
+            end if
+            call s_mg_prolong(lv)
+            call nvtxStartRange("PROJ-MG-EXCHANGE")
+            call s_mg_exchange(lv, mg_off(lv))
+            call nvtxEndRange
         end if
-        call s_mg_prolong(lv)
-        call nvtxStartRange("PROJ-MG-EXCHANGE")
-        call s_mg_exchange(lv, mg_off(lv))
-        call nvtxEndRange
         do i = 1, proj_mg_sweeps
             call s_mg_smooth(lv, 1); call s_mg_smooth(lv, 0)
         end do
