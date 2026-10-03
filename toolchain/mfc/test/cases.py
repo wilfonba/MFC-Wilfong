@@ -3371,6 +3371,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     case["t_step_start"] = 0
                     case["t_step_stop"] = 50
                     case["t_step_save"] = 50
+                # Adaptive-dt examples: keep only the initial and final states
+                if "t_save" in case and "t_stop" in case:
+                    case["t_save"] = case["t_stop"]
 
                 if case.get("recon_type") == 2:
                     for k in ("weno_order", "weno_eps", "wenoz_q", "teno_CT"):
