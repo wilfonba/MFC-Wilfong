@@ -557,6 +557,20 @@ contains
 
     end function f_cond
 
+    !> Pressure correction of a face velocity, tau*grad(p)/rho_f with the operator's own conductance (area 1), so div(uf) matches
+    !! the solved pressure exactly
+    pure function f_face_gf(ra, rb, sa, sb, dist, pa, pb, tau) result(gf)
+
+        $:GPU_ROUTINE(function_name='f_face_gf', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)  :: ra, rb, dist, pa, pb, tau
+        real(stp), intent(in) :: sa, sb
+        real(wp)              :: gf
+
+        gf = tau*f_cond(ra, rb, sa, sb, 1._wp, dist)*(pb - pa)
+
+    end function f_face_gf
+
     !> Well-balanced (Brackbill CSF) capillary acceleration of a face: sigma*kappa_f*(c_b - c_a)/(d_f*rho_f), with rho_f the same
     !! arithmetic face density as the pressure operator, so a constant curvature is balanced exactly by a pressure jump. kappa_f is
     !! the |grad c|-weighted mean of the adjacent cells' curvature (weights wa, wb)
@@ -672,17 +686,19 @@ contains
         end if
 
         ! Keep the face velocity this stage was transported with, for s_mass_lag below
-        $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l]')
-        do i = 1, num_dims
-            do l = l0, l1
-                do k = k0, k1
-                    do j = -1, m + 1
-                        uf0(j, k, l, i) = uf(j, k, l, i)
+        if (proj_lag_corr > 0) then
+            $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l]')
+            do i = 1, num_dims
+                do l = l0, l1
+                    do k = k0, k1
+                        do j = -1, m + 1
+                            uf0(j, k, l, i) = uf(j, k, l, i)
+                        end do
                     end do
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
         ! Star density with its ghosts, and the face predictor from the star cell velocities
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]')
@@ -759,6 +775,8 @@ contains
         call s_pcg_solve(bc_type)
         call nvtxEndRange
 
+        if (proj_lag_corr == 2) call s_mass_lag(q_cons_vf, tau, .true.)
+
         ! Face correction with the operator's own conductance (area 1), so div(uf) matches the solved pressure exactly. Cells take
         ! the mean of their faces' net acceleration (body force less pressure gradient, zero on walls): a hydrostatic balance on
         ! the faces then leaves the cells at rest too, and for uniform density this is the centered pressure gradient
@@ -772,9 +790,9 @@ contains
                 do l = ${LB}$, p
                     do k = ${KB}$, n
                         do j = ${JB}$, m
-                            gf = tau*f_cond(rhoc(j, k, l), rhoc(${IP1}$), solid(j, k, l), solid(${IP1}$), 1._wp, &
-                                            & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))*(real(pk(${IP1}$), wp) - real(pk(j, &
-                                            & k, l), wp))
+                            gf = f_face_gf(rhoc(j, k, l), rhoc(${IP1}$), solid(j, k, l), solid(${IP1}$), &
+                                           & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)), real(pk(j, k, l), wp), &
+                                           & real(pk(${IP1}$), wp), tau)
                             uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) - gf
                             pflx(j, k, l) = ga - gf
                             if (wbl) pflx(j, k, l) = pflx(j, k, l) + tau*f_capillary_accel(kap(j, k, l, 1), kap(${IP1}$, 1), &
@@ -803,7 +821,7 @@ contains
         #:endfor
         call s_zero_wall_faces()
 
-        call s_mass_lag(q_cons_vf, tau)
+        if (proj_lag_corr > 0) call s_mass_lag(q_cons_vf, tau, .false.)
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gam, pinf, qv, ke, ar, al]')
         do l = 0, p
@@ -828,43 +846,71 @@ contains
 
     end subroutine s_projection_apply
 
-    !> The stage transported the partial densities and volume fractions with uf0, while the pressure solve compressed p with the
-    !! corrected uf: left alone, the two disagree by tau*rho*div(uf - uf0) every stage, an entropy error that accumulates wherever
-    !! that divergence persists (small scales, walls, low acoustic CFL). Move them by the difference too, conservatively for the
-    !! partial densities (alpha in its advective form), upwinded on the new face velocity. Momentum keeps uf0, which the entropy
-    !! does not see. Each component is summed into rhs_p, free once the pressure system is built, then applied.
-    subroutine s_mass_lag(q_cons_vf, tau)
+    !> The stage transported the partial densities, volume fractions and momentum with uf0, while the pressure solve compressed p
+    !! with the corrected face velocity: left alone, density and pressure disagree by tau*rho*div(u_f - uf0) every stage, an entropy
+    !! error that accumulates wherever that divergence persists (small scales, walls, low acoustic CFL), and the moved mass would
+    !! not carry its momentum. Move them by the difference too, conservatively (alpha in its advective form), upwinded on the
+    !! corrected face velocity. Momentum (mom) is moved before the correction, which forms that velocity here as the correction
+    !! will, so every upwind value, ghosts included, is the pre-correction state on both sides of a rank seam; the densities and
+    !! alpha after it, where uf is final and the correction has read the transported alpha. Each component is summed into rhs_p,
+    !! free once the pressure system is built, then applied.
+    subroutine s_mass_lag(q_cons_vf, tau, mom)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(in)                                   :: tau
-        real(wp)                                               :: c, dd, du, tl
-        integer                                                :: iq, q, j, k, l, ncomp
+        logical, intent(in)                                    :: mom
+        real(wp)                                               :: c, dd, du, vn, tl
+        integer                                                :: iq, q, j, k, l, nalpha, i1, i2
+        logical                                                :: pre
+        logical                                                :: wl1, wh1, wl2, wh2, wl3, wh3
 
-        tl = tau  ! a dummy may alias a host variable, which a device kernel must not reference
+        tl = tau; pre = mom  ! a dummy may alias a host variable, which a device kernel must not reference
+        wl1 = wall_lo(1); wh1 = wall_hi(1); wl2 = wall_lo(2); wh2 = wall_hi(2); wl3 = wall_lo(3); wh3 = wall_hi(3)
         ! A lone fluid's alpha is 1, which the difference leaves unchanged
-
-        ncomp = merge(num_fluids, 2*num_fluids, num_fluids == 1)
-        do iq = 1, ncomp
-            q = merge(iq, eqn_idx%adv%beg + iq - num_fluids - 1, iq <= num_fluids)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, c, dd, du]', firstprivate='[q, iq]')
+        nalpha = merge(0, num_fluids, num_fluids == 1)
+        i1 = merge(num_fluids + nalpha + 1, 1, mom)
+        i2 = merge(num_fluids + nalpha + num_dims, num_fluids + nalpha, mom)
+        do iq = i1, i2
+            if (iq <= num_fluids) then
+                q = iq
+            else if (iq <= num_fluids + nalpha) then
+                q = eqn_idx%adv%beg + iq - num_fluids - 1
+            else
+                q = eqn_idx%mom%beg + iq - num_fluids - nalpha - 1
+            end if
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, c, dd, du, vn]', firstprivate='[q, tl, pre, wl1, wh1, wl2, wh2, &
+                                & wl3, wh3]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         c = 0._wp; dd = 0._wp
-                        #:for D, DXV, SV, IP1, IM1 in [(1, 'dx', 'j', 'j + 1, k, l', 'j - 1, k, l'), &
-                            (2, 'dy', 'k', 'j, k + 1, l', 'j, k - 1, l'), (3, 'dz', 'l', 'j, k, l + 1', 'j, k, l - 1')]
+                        #:for D, DXV, SV, UB, IP1, IM1 in [(1, 'dx', 'j', 'm', 'j + 1, k, l', 'j - 1, k, l'), &
+                            (2, 'dy', 'k', 'n', 'j, k + 1, l', 'j, k - 1, l'), &
+                            (3, 'dz', 'l', 'p', 'j, k, l + 1', 'j, k, l - 1')]
                             if (num_dims >= ${D}$) then
-                                du = uf(j, k, l, ${D}$) - uf0(j, k, l, ${D}$)
-                                c = c + du*real(merge(q_cons_vf(q)%sf(j, k, l), q_cons_vf(q)%sf(${IP1}$), uf(j, k, l, &
-                                                & ${D}$) >= 0._wp), wp)/${DXV}$(${SV}$)
+                                ! High face: between this cell and the next
+                                vn = uf(j, k, l, ${D}$)
+                                if (pre) vn = (vn - f_face_gf(rhoc(j, k, l), rhoc(${IP1}$), solid(j, k, l), solid(${IP1}$), &
+                                    & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)), real(pk(j, k, l), wp), real(pk(${IP1}$), &
+                                    & wp), tl))*real((1._stp - solid(j, k, l))*(1._stp - solid(${IP1}$)), wp)
+                                if (${SV}$ == ${UB}$ .and. wh${D}$) vn = 0._wp
+                                du = vn - uf0(j, k, l, ${D}$)
+                                c = c + du*real(merge(q_cons_vf(q)%sf(j, k, l), q_cons_vf(q)%sf(${IP1}$), vn >= 0._wp), &
+                                                & wp)/${DXV}$(${SV}$)
                                 dd = dd + du/${DXV}$(${SV}$)
-                                du = uf(${IM1}$, ${D}$) - uf0(${IM1}$, ${D}$)
-                                c = c - du*real(merge(q_cons_vf(q)%sf(${IM1}$), q_cons_vf(q)%sf(j, k, l), uf(${IM1}$, &
-                                                & ${D}$) >= 0._wp), wp)/${DXV}$(${SV}$)
+                                ! Low face: between the previous cell and this one
+                                vn = uf(${IM1}$, ${D}$)
+                                if (pre) vn = (vn - f_face_gf(rhoc(${IM1}$), rhoc(j, k, l), solid(${IM1}$), solid(j, k, l), &
+                                    & 0.5_wp*(${DXV}$(${SV}$ - 1) + ${DXV}$(${SV}$)), real(pk(${IM1}$), wp), real(pk(j, k, l), &
+                                    & wp), tl))*real((1._stp - solid(${IM1}$))*(1._stp - solid(j, k, l)), wp)
+                                if (${SV}$ == 0 .and. wl${D}$) vn = 0._wp
+                                du = vn - uf0(${IM1}$, ${D}$)
+                                c = c - du*real(merge(q_cons_vf(q)%sf(${IM1}$), q_cons_vf(q)%sf(j, k, l), vn >= 0._wp), &
+                                                & wp)/${DXV}$(${SV}$)
                                 dd = dd - du/${DXV}$(${SV}$)
                             end if
                         #:endfor
-                        if (iq > num_fluids) c = c - real(q_cons_vf(q)%sf(j, k, l), wp)*dd
+                        if (iq > num_fluids .and. iq <= num_fluids + nalpha) c = c - real(q_cons_vf(q)%sf(j, k, l), wp)*dd
                         rhs_p(j, k, l) = c
                     end do
                 end do
