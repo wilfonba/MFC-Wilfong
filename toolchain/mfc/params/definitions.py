@@ -384,6 +384,8 @@ CONSTRAINTS = {
     "proj_mg_kcycle": {"min": -1},
     "proj_mg_k_ranks": {"min": 1},
     "proj_mg_cg_ranks": {"min": 1},
+    "proj_mg_trunc": {"min": 0},
+    "proj_lag_corr": {"choices": [0, 1, 2], "value_labels": {0: "off", 1: "mass", 2: "mass and momentum"}},
     "proj_mg_bottom": {"choices": [-1, 1, 2], "value_labels": {-1: "auto", 1: "exact", 2: "V-cycle"}},
     "cfl_target": {"min": 0},
     "collision_temporal_resolution": {"min": 1},
@@ -796,6 +798,7 @@ def _load():
         "proj_mg_k_ranks",
         "proj_mg_bottom",
         "proj_mg_cg_ranks",
+        "proj_lag_corr",
     ]:
         _r(n, INT)
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
@@ -805,6 +808,7 @@ def _load():
     _r("proj_tol", REAL)
     _r("proj_max_acfl", REAL)
     _r("proj_mg_omega", REAL)
+    _r("proj_mg_trunc", REAL)
     for n in [
         "mixlayer_vel_coef",
         "mixlayer_perturb_k0",
@@ -1492,6 +1496,8 @@ _nv(
     "proj_mg_k_ranks",
     "proj_mg_bottom",
     "proj_mg_cg_ranks",
+    "proj_mg_trunc",
+    "proj_lag_corr",
     "surface_tension_model",
 )
 _nv(

@@ -538,8 +538,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
     def alter_projection(dimInfo):
-        # The goldens hold the pressure solve the tests were made with: tight, and without the coarse-correction scale
-        stack.push("Projection", {"proj_method": "T", "proj_tol": 1e-10, "proj_mg_omega": 1.0})
+        # The goldens hold the pressure solve the tests were made with: tight, without the coarse-correction scale or truncation
+        stack.push("Projection", {"proj_method": "T", "proj_tol": 1e-10, "proj_mg_omega": 1.0, "proj_mg_trunc": 0.0})
         cases.append(define_case_d(stack, "", {}))
         cases.append(define_case_d(stack, "Walls", get_bc_mods(-2, dimInfo)))
         gravity = {**get_bc_mods(-2, dimInfo), "bf_x": "T", "g_x": -10.0, "k_x": 0.0, "w_x": 0.0, "p_x": 0.0}
@@ -3371,6 +3371,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     case["t_step_start"] = 0
                     case["t_step_stop"] = 50
                     case["t_step_save"] = 50
+                # Adaptive-dt examples: keep only the initial and final states
+                if "t_save" in case and "t_stop" in case:
+                    case["t_save"] = case["t_stop"]
 
                 if case.get("recon_type") == 2:
                     for k in ("weno_order", "weno_eps", "wenoz_q", "teno_CT"):

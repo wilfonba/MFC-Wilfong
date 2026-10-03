@@ -31,6 +31,7 @@ parser.add_argument("--explicit", action="store_true", help="explicit HLLC at th
 parser.add_argument("--rdma", action="store_true", help="GPU-aware MPI (rdma_mpi) instead of staging halos through the host")
 parser.add_argument("--kcycle", type=int, default=-1, help="multigrid levels between K-cycle coarse corrections, 0 for V-cycles, -1 by rank count (default: %(default)s)")
 parser.add_argument("--bottom", type=int, default=-1, choices=[-1, 1, 2], help="multigrid bottom solve: 1 exact, 2 V-cycle, -1 by rank count (default: %(default)s)")
+parser.add_argument("--trunc", type=float, default=1.0, help="truncate the multigrid where a level spans this many screening lengths (c*dt), 0 never (default: %(default)s)")
 parser.add_argument("--low-mach", type=int, default=0, choices=[0, 1, 2], help="HLLC low-Mach correction with --explicit (default: %(default)s)")
 args, _ = parser.parse_known_args()
 if not 0.0 < args.mach <= 0.1:
@@ -93,6 +94,7 @@ print(
             "proj_method": "F" if args.explicit else "T",
             "proj_mg_kcycle": args.kcycle,
             "proj_mg_bottom": args.bottom,
+            "proj_mg_trunc": args.trunc,
             "low_Mach": args.low_mach,
             "format": 1,
             "precision": 2,

@@ -591,8 +591,10 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `proj_mg_sweeps`           | Integer | Symmetric red-black smoothing sweeps per multigrid level in the pressure solve (default 2) |
 | `proj_mg_kcycle`           | Integer | Multigrid levels between Krylov (K-cycle) coarse corrections in the pressure solve: every that many levels the coarse problem gets two flexible-CG steps instead of one cycle, which keeps iteration counts from growing with the grid. 0 for plain V-cycles; -1 chooses by rank count (V-cycles below `proj_mg_k_ranks`, 2 at or above it) (default -1). See [Projection method iterative solve tuning](#sec-projection-solve-tuning) |
 | `proj_mg_k_ranks`          | Integer | With `proj_mg_kcycle = -1`, the rank count at and above which K-cycles (every 2 levels) replace V-cycles (default 1024, measured on OLCF Frontier) |
-| `proj_mg_bottom`           | Integer | Pressure-solve multigrid bottom solve, the problem left at one cell per rank, gathered to every rank: [1] exact (dense factorization up to 128 cells, else CG) [2] one V-cycle that coarsens it further; -1 chooses by rank count (exact up to `proj_mg_cg_ranks`, V-cycle above) (default -1) |
-| `proj_mg_cg_ranks`         | Integer | With `proj_mg_bottom = -1`, the largest rank count solved exactly; past it the cost of an exact bottom solve, which every rank repeats, outgrows the iterations it saves (default 8192, measured on OLCF Frontier) |
+| `proj_mg_bottom`           | Integer | Pressure-solve multigrid bottom solve, the problem left at one cell per rank, gathered to every rank: [1] exact (dense factorization up to 128 cells, else CG) [2] one V-cycle that coarsens it further; -1 chooses: exact with V-cycles up to `proj_mg_cg_ranks` ranks, else the V-cycle (default -1) |
+| `proj_mg_cg_ranks`         | Integer | With `proj_mg_bottom = -1` and V-cycles, the largest rank count solved exactly; past it the cost of an exact bottom solve, which every rank repeats, outgrows the iterations it saves (default 8192, measured on OLCF Frontier) |
+| `proj_mg_trunc`            | Real    | Stop the pressure-solve multigrid at the first level whose spacing spans this many screening lengths (about c*dt, the acoustic CFL in cells), smoothing that level and skipping the coarser ones and the gathered bottom solve. 0 never truncates (default 1). See [Projection method iterative solve tuning](#sec-projection-solve-tuning) |
+| `proj_lag_corr`            | Integer | Stage-lag correction: each stage transports with the face velocity from before the pressure solve, and this moves the transported variables by the difference afterwards. 0 off, 1 partial densities and volume fractions (keeps density on the isentrope of its pressure), 2 also momentum (default 1) |
 | `proj_max_acfl`            | Real    | With `cfl_adap_dt` or `cfl_const_dt`, caps the projection time step at this multiple of the explicit acoustic one (default 0: advective limit only). With `cfl_adap_dt` the first step is acoustic-limited and `dt` then grows by at most `ramp_ratio` (default 1.1 here) per step |
 
 - \* Options that work only with `model_eqns = 2`.
@@ -1551,7 +1553,7 @@ The above variables correspond to optional physics.
 
 ## Appendix: Projection method iterative solve tuning {#sec-projection-solve-tuning}
 
-With `proj_method = 'T'`, every Runge-Kutta stage solves a Helmholtz-type equation for the pressure.
+With ``proj_method = 'T'``, every Runge-Kutta stage solves a Helmholtz-type equation for the pressure.
 This solve usually dominates the cost of a time step, and its parameters trade cost per iteration against the number of iterations.
 The defaults suit most cases; this appendix explains what each parameter does and how to choose values for a new machine or an unusual problem.
 
@@ -1572,15 +1574,25 @@ Each iteration is preconditioned by geometric multigrid:
   A K-cycle (`proj_mg_kcycle > 0`) instead gives the coarse problem two flexible-CG steps, each preconditioned by one cycle, on every `proj_mg_kcycle`-th level.
   This keeps iteration counts nearly constant with grid size, but revisits the coarse levels, whose cost is dominated by communication latency, so each iteration costs more.
 
+### Truncating the hierarchy
+
+The pressure equation is screened: a pressure change's influence decays over a screening length of about c*dt, the distance sound travels in one step, which in cells is about the acoustic CFL (the AcCFL column of `run_time.inf`).
+Error that varies over longer distances than that has eigenvalues close to the Helmholtz (diagonal) term, so CG resolves it in a few iterations without help from the coarsest levels.
+With `proj_mg_trunc > 0` (the default is 1), each solve stops the hierarchy at the first level whose spacing spans at least `proj_mg_trunc` screening lengths, estimated from the finest level; that level is only smoothed.
+The coarser levels, which span many ranks and whose cost is communication latency, and the gathered bottom solve (`proj_mg_bottom`) are then skipped, so the multigrid communicates only with neighbouring ranks.
+At low Mach number or with long time steps the screening length exceeds what the hierarchy spans, no level qualifies, and the solve stays global as before.
+On the 3D Taylor-Green vortex at Mach 0.01 (acoustic CFL 50), 1 was faster than 2 and than no truncation, with fewer iterations, as the coarsest levels hurt convergence as well as costing communication. For a new problem compare 1 and 2 against `proj_mg_trunc = 0`.
+
 ### The automatic choice
 
 With the defaults (`proj_mg_kcycle = -1`, `proj_mg_bottom = -1`), the solver chooses by rank count:
 
-| Ranks                                      | Cycle             | Bottom solve |
-| ------------------------------------------ | ----------------- | ------------ |
-| below `proj_mg_k_ranks`                    | V-cycle           | exact        |
-| `proj_mg_k_ranks` up to `proj_mg_cg_ranks` | K-cycle (every 2) | exact        |
-| above `proj_mg_cg_ranks`                   | K-cycle (every 2) | V-cycle      |
+| Ranks                    | Cycle             | Bottom solve |
+| ------------------------ | ----------------- | ------------ |
+| below `proj_mg_k_ranks`  | V-cycle           | exact        |
+| `proj_mg_k_ranks` and up | K-cycle (every 2) | V-cycle      |
+
+A K-cycle reaches the bottom several times per cycle, so an exact bottom solve, which costs more the more ranks there are, is chosen only with V-cycles; `proj_mg_cg_ranks` then caps it for runs that force `proj_mg_kcycle = 0` on many ranks.
 
 The thresholds depend on the machine (MPI latency for the coarse levels, host speed for the bottom solve) and on the cells per rank.
 More cells per rank make the fine-level work larger compared with coarse-level latency, which moves both crossovers to higher rank counts.
@@ -1588,13 +1600,14 @@ The defaults were measured on OLCF Frontier, one rank per MI250X GCD, with 300^3
 
 ### Tuning for a machine or problem
 
-Run a short version of the production case (20 to 50 time steps) at the rank count of interest, with `run_time_info = 'T'`.
+Run a short version of the production case (20 to 50 time steps) at the rank count of interest, with ``run_time_info = 'T'``.
 Then `run_time.inf` reports the pressure-solve iterations of every step (column "PCG its"), and the simulation's output reports the average time per step.
 Compare settings by **time per step**: fewer iterations only help if they do not cost more in total.
 
-1. **Bottom solve.** Run `proj_mg_bottom = 1` and `2`.
+1. **Bottom solve.** With V-cycles (`proj_mg_kcycle = 0`), run `proj_mg_bottom = 1` and `2`.
    Once the V-cycle bottom is faster at your rank count, set `proj_mg_cg_ranks` below that count.
-2. **Cycle type.** Run `proj_mg_kcycle = 0`, `2` and `3`, with the bottom solve fixed to the better choice from step 1.
+   With K-cycles the V-cycle bottom is almost always faster, as the bottom is reached several times per cycle.
+2. **Cycle type.** Run `proj_mg_kcycle = 0` (with the better bottom solve from step 1), `2` and `3`.
    V-cycles are cheapest per iteration and usually fastest on few ranks; K-cycles win once the extra V-cycle iterations cost more than the coarse-level revisits.
    Set `proj_mg_k_ranks` near the rank count where `proj_mg_kcycle = 2` starts winning.
    `1` gives the fewest iterations, but on GPUs its coarse-level revisits usually make it the slowest; `3` falls between `0` and `2`.

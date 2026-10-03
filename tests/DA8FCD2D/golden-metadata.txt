@@ -1,19 +1,53 @@
-This file was created on 2026-09-13 11:31:40.325852.
+This file was created on 2026-10-03 13:39:02.273588.
 
 mfc.sh:
 
-    Invocation: test --no-build --no-gpu --generate -j 4 --only 135F548B 49893269 4BED9896 5A22B45F B317404C C8AD6271 D6794F4C DA8FCD2D E085CC5A E5B66084 F200F862
-    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        953f3872977b856118068439c1559090ddbe2555 on feat/ib-force-history (dirty)
+    Invocation: test --only DA8FCD2D C7927D03 E5B66084 70EC99CE B2EC143C A582B270 9A00542C AE9A7D73 9308DF8D FBB296DA A078904B 5304E59F 5B195322 5CAA4E68 986BC1A2 F200F862 --generate --no-debug -j 4
+    Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        0956dd2210590697517bfa8b7d58c67f956798b8 on allMachProjection (dirty)
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
+    
+        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
+        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : ON
+        OpenMP  : OFF
+    
+        Fypp    : /fastscratch/bwilfong3/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 simulation:
 
     CMake Configuration:
     
-        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
+        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
     
-        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
+        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
+        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
@@ -23,10 +57,10 @@ simulation:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : OFF
+        OpenACC : ON
         OpenMP  : OFF
     
-        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
+        Fypp    : /fastscratch/bwilfong3/software/MFC-Wilfong/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -44,10 +78,10 @@ pre_process:
 
     CMake Configuration:
     
-        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
+        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
     
-        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
+        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
+        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -57,10 +91,10 @@ pre_process:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : OFF
+        OpenACC : ON
         OpenMP  : OFF
     
-        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
+        Fypp    : /fastscratch/bwilfong3/software/MFC-Wilfong/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -78,10 +112,10 @@ post_process:
 
     CMake Configuration:
     
-        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
+        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
     
-        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
+        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
+        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -91,44 +125,10 @@ post_process:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : OFF
+        OpenACC : ON
         OpenMP  : OFF
     
-        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : nvc
-        CXX      : nvc++
-        FC       : nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
-    
-        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
+        Fypp    : /fastscratch/bwilfong3/software/MFC-Wilfong/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      32%
+    CPU(s) scaling MHz:                      37%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00
