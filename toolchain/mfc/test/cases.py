@@ -3233,6 +3233,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_dam_break",
                 "2D_dam_break_obstacle",
                 "2D_rising_bubble",
+                "2D_bubble_column",
                 # hcid 209 reads interface_profile.dat, which case.py writes next to itself, not into the test directory
                 "2D_interface_breakup",
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
