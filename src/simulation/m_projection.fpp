@@ -126,22 +126,22 @@ module m_projection
     !! level the bottom solve is exact; past mg_bottom_max cells it is one V-cycle (an exact solve costs every rank more the more
     !! ranks there are), unless crs_exact keeps the bottom whole and CG solves it (crs_cg)
     integer :: crs_n, crs_nl, crs_tot
-    logical :: crs_exact                        !< bottom solved exactly (proj_mg_bottom, or by rank count)
-    logical :: crs_cg                           !< exactly, by CG, as it is too large to factor densely
+    logical :: crs_exact  !< bottom solved exactly (proj_mg_bottom, or by rank count)
+    logical :: crs_cg  !< exactly, by CG, as it is too large to factor densely
     real(wp), parameter :: crs_tol = 1.e-12_wp  !< CG bottom tolerance, relative to its right-hand side
-    integer :: mg_kfull                         !< levels between K-cycle steps when a solve reaches the bottom
-    integer :: mg_kspace                        !< ... in this solve: mg_kfull, or V-cycles once truncated (s_mg_omega)
+    integer :: mg_kfull  !< levels between K-cycle steps when a solve reaches the bottom
+    integer :: mg_kspace  !< levels between K-cycle steps in this solve: mg_kfull, or V-cycles once truncated (s_mg_omega)
     integer, dimension(mg_maxlev) :: crs_ln, crs_loff
     integer, dimension(3, mg_maxlev) :: crs_ld
     integer, allocatable, dimension(:) :: crs_cnt, crs_disp, crs_agg
     integer, allocatable, dimension(:,:) :: crs_sz, crs_aj, crs_co
     real(wp), allocatable, dimension(:,:) :: crs_l, crs_ak
     real(wp), allocatable, dimension(:) :: crs_ad, crs_x, crs_b
-    logical, dimension(3) :: wall_lo, wall_hi   !< this rank owns a solid wall face on that side
-    logical, dimension(3) :: seam_lo, seam_hi   !< that side couples to another rank or, periodically, to this one
-    logical :: faces_ready                      !< uf has been seeded from the cell velocities
-    logical :: wb_st                            !< well-balanced surface tension
-    integer :: gk0, gk1, gl0, gl1               !< y and z extents including one ghost layer where those directions exist
+    logical, dimension(3) :: wall_lo, wall_hi  !< this rank owns a solid wall face on that side
+    logical, dimension(3) :: seam_lo, seam_hi  !< that side couples to another rank or, periodically, to this one
+    logical :: faces_ready  !< uf has been seeded from the cell velocities
+    logical :: wb_st  !< well-balanced surface tension
+    integer :: gk0, gk1, gl0, gl1  !< y and z extents including one ghost layer where those directions exist
 
 contains
 
@@ -772,7 +772,10 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (stage == 1) proj_pcg_iters = 0
+        if (stage == 1) then
+            proj_pcg_iters = 0
+            proj_pcg_res = 0._wp
+        end if
         call nvtxStartRange("PROJ-PCG")
         call s_pcg_solve(bc_type)
         call nvtxEndRange
@@ -936,7 +939,7 @@ contains
     impure subroutine s_pcg_solve(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        real(wp)                                                   :: bnorm, rnorm, rtol, rz, rz_new, zq, dq, alpha, beta
+        real(wp)                                                   :: bnorm, rnorm, rtol, rz, rz_new, zq, dq, alpha, beta, r0
         integer                                                    :: it, j, k, l, idx, off, ex, ey, gx, gy, gz, sh
 
         call nvtxStartRange("PROJ-MG-BUILD")
@@ -972,6 +975,7 @@ contains
         bnorm = sqrt(f_dot(bvec, bvec))
         rnorm = sqrt(f_dot(rs, rs))
         rtol = max(proj_tol*rnorm, res_floor*bnorm)
+        r0 = rnorm
 
         if (rnorm > rtol) then
             call nvtxStartRange("PROJ-VCYCLE")
@@ -1018,6 +1022,8 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end do
+            ! Inside the branch: a solve already below its floor takes no iterations and reports none
+            proj_pcg_res = max(proj_pcg_res, rnorm/r0)
         end if
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
