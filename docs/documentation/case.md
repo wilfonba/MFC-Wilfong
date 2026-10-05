@@ -584,7 +584,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `igr_iter_solver`          | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
 | `num_igr_iters`            | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
-| `proj_method`              | Logical | All-Mach pressure projection: the pressure is solved implicitly, so the time step is limited by the flow speed rather than the sound speed (default F) |
+| `proj_method`              | Logical | All-Mach pressure projection: the pressure is solved implicitly, so the time step is limited by the flow speed rather than the sound speed. The five-equation model advects alpha, so a mixed interface cell compresses with the advected mixture's stiff modulus rather than Wood's: gas bubbles barely expand or contract with pressure (default F) |
 | `proj_tol`                 | Real    | Projection pressure-solve tolerance, relative to the initial residual (default 1e-6)  |
 | `proj_max_iters`           | Integer | Maximum iterations of the projection pressure solve (default 100) |
 | `proj_mg_omega`            | Real    | Multigrid coarse-grid correction scale in the pressure solve for Poisson-like (low-Mach) levels, in (0, 2); each level eases it toward 1 as compressibility dominates (default 1.8) |
