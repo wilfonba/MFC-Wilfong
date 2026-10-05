@@ -34,11 +34,12 @@ DILUTE_VOID_FRACTION_MAX = 0.1
 # See the contributing guide for how to add entries.
 PHYSICS_DOCS = {
     "check_inflow_ramp": {
-        "title": "GRCBC Inflow Ramp",
+        "title": "Inflow Ramp",
         "category": "Boundary Conditions",
         "math": r"f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2",
         "explanation": "A ramped inflow scales the inflow velocity from a fraction f_0 of its final value to "
-        "that value over a duration tau. It requires grcbc_in to act on, a non-negative duration, and f_0 in [0, 1].",
+        "that value over a duration tau. It requires an inflow to act on (grcbc_in, or a Dirichlet boundary or patch), "
+        "a non-negative duration, and f_0 in [0, 1].",
     },
     # Thermodynamic Constraints
     "check_stiffened_eos": {
@@ -771,10 +772,14 @@ class CaseValidator:
             ramp = self.get(f"bc_{d}%vel_in_ramp", 0) or 0
             frac0 = self.get(f"bc_{d}%vel_in_frac0", 0) or 0
             self.prohibit(ramp < 0, f"bc_{d}%vel_in_ramp must be >= 0")
-            # a ramp needs an inflow to act on
+            # a ramp needs an inflow to act on: a GRCBC inflow, or a Dirichlet face or boundary patch
+            grcbc = self.get(f"bc_{d}%grcbc_in", "F") == "T"
+            dirichlet = any(self.get(f"bc_{d}%{e}", 0) == -17 for e in ("beg", "end")) or any(
+                self.get(f"patch_bc({i})%type", 0) == -17 and self.get(f"patch_bc({i})%dir", 0) == "xyz".index(d) + 1 for i in range(1, (self.get("num_bc_patches", 0) or 0) + 1)
+            )
             self.prohibit(
-                ramp > 0 and self.get(f"bc_{d}%grcbc_in", "F") != "T",
-                f"bc_{d}%vel_in_ramp requires bc_{d}%grcbc_in",
+                ramp > 0 and not (grcbc or dirichlet),
+                f"bc_{d}%vel_in_ramp requires bc_{d}%grcbc_in or a Dirichlet (-17) boundary or patch normal to {d}",
             )
             self.prohibit(not 0 <= frac0 <= 1, f"bc_{d}%vel_in_frac0 must lie in [0, 1]")
 
@@ -814,13 +819,6 @@ class CaseValidator:
             self.prohibit(kin_model not in (0, 1, 2), f"patch_ib({i})%kin_model must be 0, 1 or 2")
             self.prohibit(kin_model > 0 and self.get(f"patch_ib({i})%moving_ibm", 0) != 1, f"patch_ib({i})%kin_model requires moving_ibm = 1")
             self.prohibit(kin_model > 0 and p <= 0, f"patch_ib({i})%kin_model requires a 3D case (p > 0)")
-            # Geometries 4, 5, 11 and 12 have their centroid replaced by the marked-cell centre of mass, with the
-            # difference kept in centroid_offset and re-applied when the patch is drawn. Prescribed kinematics write
-            # the centroid outright every stage, so the body would render centroid_offset away from the hinge.
-            self.prohibit(
-                kin_model > 0 and self.get(f"patch_ib({i})%geometry", 0) in (4, 5, 11, 12),
-                f"patch_ib({i})%kin_model is not supported for geometries 4, 5, 11 and 12, whose centroid is offset to the centre of mass",
-            )
             self.prohibit(kin_model == 1 and (self.get(f"patch_ib({i})%kin_freq", 0) or 0) <= 0, f"patch_ib({i})%kin_freq must be > 0 when kin_model = 1")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_pitch_rate", 0) or 0) <= 0, f"patch_ib({i})%kin_pitch_rate must be > 0 when kin_model = 2")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_smooth", 0) or 0) <= 0, f"patch_ib({i})%kin_smooth must be > 0 when kin_model = 2")

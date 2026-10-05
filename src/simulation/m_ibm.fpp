@@ -48,6 +48,7 @@ module m_ibm
     $:GPU_DECLARE(create='[num_gps]')
 #endif
     logical :: moving_immersed_boundary_flag
+    logical :: centroid_offsets_active = .false.  !< some patch is a moving airfoil or STL, which carries a centroid_offset
 
     ! IB MPI buffers
     integer, allocatable  :: send_ids(:), recv_ids(:)
@@ -79,8 +80,10 @@ contains
     !> Initializes the values of various IBM variables, such as ghost points and image points.
     impure subroutine s_ibm_setup()
 
-        integer         :: i, j, k
+        integer         :: i, j, k, gid
+        integer(kind=8) :: n_need
         real(wp)        :: t_init  !< initial time for prescribed kinematics
+        real(wp)        :: max_num_gps_rank
         integer(kind=8) :: max_num_gps
 
         call nvtxStartRange("SETUP-IBM-MODULE")
@@ -124,16 +127,31 @@ contains
         $:GPU_UPDATE(device='[ib_markers%sf, corrected_gps%sf]')
         call s_apply_ib_patches(ib_markers)
         $:GPU_UPDATE(host='[ib_markers%sf]')
+        call s_check_every_patch_marked()
+        ! One reduction decides whether any patch needs an offset, so cases without one (particle clouds have thousands of
+        ! patches) skip the per-patch collectives. Then loop over global ids: ranks hold different patches.
+        call s_mpi_allreduce_integer_sum(int(count([(f_needs_centroid_offset(patch_ib(i)), i=1, num_ibs)]), 8), n_need)
+        centroid_offsets_active = n_need > 0_8
+        if (centroid_offsets_active) then
+            do gid = 1, num_gbl_ibs
+                call s_get_neighborhood_idx(gid, i)
+                call s_compute_centroid_offset(gid, i)
+            end do
+            call s_restore_centroid_offsets(t_init)
+        end if
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i)  ! offsets are computed after IB markers are generated
             $:GPU_UPDATE(device='[patch_ib(i)]')
         end do
 
         ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps)
         if (moving_immersed_boundary_flag) then
+            ! Every rank allocates the same size, which must hold any one rank's peak as the body moves: twice the global
+            ! total, but at least eight times the largest per-rank count (a thin body crossing few of many ranks)
             call s_mpi_allreduce_integer_sum(int(num_gps, 8), max_num_gps)
-            max_num_gps = min(max_num_gps*2_8, int(m + 1, 8)*int(n + 1, 8)*int(p + 1, 8))
+            call s_mpi_allreduce_max(real(num_gps, wp), max_num_gps_rank)
+            max_num_gps = max(max_num_gps*2_8, 8_8*int(max_num_gps_rank, 8))
+            max_num_gps = min(max_num_gps, int(m + 1, 8)*int(n + 1, 8)*int(p + 1, 8))
         else
             max_num_gps = int(num_gps, 8)
         end if
@@ -237,7 +255,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         integer :: i, j, k, l, q, r                                          !< Iterator variables
         integer :: jj, kk, ll                                                !< Neighbor iterators
         integer :: rad, rad_z, num_nbrs                                      !< Neighbor stencil radius and population
@@ -252,20 +270,19 @@ contains
         real(wp) :: c_IP
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)                       :: Gs
-            real(wp), dimension(3)                       :: alpha_rho_IP, alpha_IP, alpha_rho_GP
-            real(wp), dimension(3)                       :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(18)                      :: nmom_IP
-            real(wp), dimension(12)                      :: presb_IP, massv_IP
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_IP
+            real(wp), dimension(3)  :: Gs
+            real(wp), dimension(3)  :: alpha_rho_IP, alpha_IP, alpha_rho_GP
+            real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(18) :: nmom_IP
+            real(wp), dimension(12) :: presb_IP, massv_IP
         #:else
-            real(wp), dimension(num_fluids)  :: Gs
-            real(wp), dimension(num_fluids)  :: alpha_rho_IP, alpha_IP, alpha_rho_GP
-            real(wp), dimension(nb)          :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(nb*nmom)     :: nmom_IP
-            real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
-            real(wp), dimension(num_species) :: Ys_IP
+            real(wp), dimension(num_fluids) :: Gs
+            real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP, alpha_rho_GP
+            real(wp), dimension(nb)         :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(nb*nmom)    :: nmom_IP
+            real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
         #:endif
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_IP
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
@@ -769,31 +786,20 @@ contains
                             ghost_points(local_idx)%z_periodicity = zp
                             ghost_points(local_idx)%slip = patch_ib(neighborhood_patch_id)%slip
 
-                            if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
-                                ghost_points(local_idx)%DB(1) = -1
-                            else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
-                                ghost_points(local_idx)%DB(1) = 1
-                            else
-                                ghost_points(local_idx)%DB(1) = 0
-                            end if
-
-                            if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
-                                ghost_points(local_idx)%DB(2) = -1
-                            else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
-                                ghost_points(local_idx)%DB(2) = 1
-                            else
-                                ghost_points(local_idx)%DB(2) = 0
-                            end if
-
-                            if (p /= 0) then
-                                if ((z_cc(k) - dz(k)) < glb_bounds(3)%beg) then
-                                    ghost_points(local_idx)%DB(3) = -1
-                                else if ((z_cc(k) + dz(k)) > glb_bounds(3)%end) then
-                                    ghost_points(local_idx)%DB(3) = 1
-                                else
-                                    ghost_points(local_idx)%DB(3) = 0
+                            #:for X, ID, IDX in [('x', 1, 'i'), ('y', 2, 'j'), ('z', 3, 'k')]
+                                ghost_points(local_idx)%DB(${ID}$) = 0
+                                if (${ID}$ <= num_dims) then  ! Onlyrun the numeher of dimensions present
+                                    if (ib_bc_${X}$%beg /= BC_PERIODIC) then
+                                        if ((${X}$_cc(${IDX}$) - d${X}$(${IDX}$)) < glb_bounds(${ID}$)%beg) then
+                                            ! if the grid cell is in a wall on the "left"
+                                            ghost_points(local_idx)%DB(${ID}$) = -1
+                                        else if ((${X}$_cc(${IDX}$) + d${X}$(${IDX}$)) > glb_bounds(${ID}$)%end) then
+                                            ! if the grid cell is in a wall on the "right"
+                                            ghost_points(local_idx)%DB(${ID}$) = 1
+                                        end if
+                                    end if
                                 end if
-                            end if
+                            #:endfor
                         end if
                     end if
                 end do
@@ -1063,6 +1069,12 @@ contains
         call nvtxStartRange("COMPUTE-GHOST-POINTS")
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps)
+        ! overrunning ghost_points is a silent device fault; name the numbers instead
+        if (int(num_gps, 8) > int(size(ghost_points), 8)) then
+            print '(A,I0,A,I0,A,I0)', 'ghost points on rank ', proc_rank, ' grew to ', num_gps, ' but the array holds ', &
+                & size(ghost_points)
+            call s_mpi_abort('moving immersed boundary: ghost-point count exceeded its allocation')
+        end if
         ! num_gps is a declare-target module variable and bounds every device loop over the ghost points; it is
         ! copied to the device once in s_ibm_setup, so without this refresh the kernels keep the setup-time count
         ! as a moving body's count changes: stale list entries beyond the current count are written as wall
@@ -1137,8 +1149,9 @@ contains
             thetad = damp*patch_ib(i)%kin_theta0*sin(arg_th) + amp*patch_ib(i)%kin_theta0*omega*cos(arg_th)
         end if
 
-        ! centroid relative to the hinge: Rx(phi) Ry(theta) offset
-        r = patch_ib(i)%kin_offset
+        ! centroid relative to the hinge: Rx(phi) Ry(theta) offset. kin_offset points to the case-file centroid; a
+        ! centroid moved to the centre of mass (geometries 4, 5, 11, 12) sits centroid_offset short of it
+        r = patch_ib(i)%kin_offset - patch_ib(i)%centroid_offset
         c(1) = cos(theta)*r(1) + sin(theta)*r(3)
         c(2) = r(2)
         c(3) = -sin(theta)*r(1) + cos(theta)*r(3)
@@ -1197,85 +1210,90 @@ contains
             end do
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, xp, yp, zp, ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, &
-                            & local_force_contribution, cell_volume, local_torque_contribution, dynamic_viscosity, &
-                            & viscous_stress]', copy='[forces, torques]', copyin='[dynamic_viscosities]', collapse=3)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p
-                    encoded_ib_idx = ib_markers%sf(i, j, k)
-                    if (encoded_ib_idx /= 0) then
-                        call s_decode_patch_periodicity(encoded_ib_idx, ib_idx_temp, xp, yp, zp)
-                        call s_get_neighborhood_idx(ib_idx_temp, ib_idx)  ! global patch ID -> local index
-                        if (ib_idx > 0) then
-                            ! get the vector pointing to the grid cell from the IB centroid
-                            radial_vector(1) = x_cc(i) - (patch_ib(ib_idx)%x_centroid + real(xp, &
-                                          & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
-                            radial_vector(2) = y_cc(j) - (patch_ib(ib_idx)%y_centroid + real(yp, &
-                                          & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
-                            radial_vector(3) = 0._wp
-                            if (num_dims == 3) radial_vector(3) = z_cc(k) - (patch_ib(ib_idx)%z_centroid + real(zp, &
-                                & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
+        ! no kernel over zero-size mapped arrays: a rank can hold no patch after a handoff
+        if (num_ibs > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, xp, yp, zp, ib_idx, ib_idx_temp, encoded_ib_idx, fluid_idx, radial_vector, &
+                                & local_force_contribution, cell_volume, local_torque_contribution, dynamic_viscosity, &
+                                & viscous_stress]', copy='[forces, torques]', copyin='[dynamic_viscosities]', collapse=3)
+            do i = 0, m
+                do j = 0, n
+                    do k = 0, p
+                        encoded_ib_idx = ib_markers%sf(i, j, k)
+                        if (encoded_ib_idx /= 0) then
+                            call s_decode_patch_periodicity(encoded_ib_idx, ib_idx_temp, xp, yp, zp)
+                            call s_get_neighborhood_idx(ib_idx_temp, ib_idx)  ! global patch ID -> local index
+                            if (ib_idx > 0) then
+                                ! get the vector pointing to the grid cell from the IB centroid
+                                radial_vector(1) = x_cc(i) - (patch_ib(ib_idx)%x_centroid + real(xp, &
+                                              & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
+                                radial_vector(2) = y_cc(j) - (patch_ib(ib_idx)%y_centroid + real(yp, &
+                                              & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
+                                radial_vector(3) = 0._wp
+                                if (num_dims == 3) radial_vector(3) = z_cc(k) - (patch_ib(ib_idx)%z_centroid + real(zp, &
+                                    & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
-                            local_force_contribution(:) = 0._wp
+                                local_force_contribution(:) = 0._wp
 
-                            ! compute the pressure force component, which is the negative pressure gradient
-                            do l = -fd_number, fd_number
-                                local_force_contribution(1) = local_force_contribution(1) - (fd_coeff_x(l, &
-                                                         & i)*q_prim_vf(eqn_idx%E)%sf(i + l, j, k))
-                                local_force_contribution(2) = local_force_contribution(2) - (fd_coeff_y(l, &
-                                                         & j)*q_prim_vf(eqn_idx%E)%sf(i, j + l, k))
-                                if (num_dims == 3) then
-                                    local_force_contribution(3) = local_force_contribution(3) - (fd_coeff_z(l, &
-                                                             & k)*q_prim_vf(eqn_idx%E)%sf(i, j, k + l))
-                                end if
-                            end do
-
-                            ! get the viscous stress and add its contribution if that is considered
-                            if (viscous) then
-                                ! compute the volume-weighted local dynamic viscosity
-                                dynamic_viscosity = 0._wp
-                                do fluid_idx = 1, num_fluids
-                                    ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
-                                    dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + eqn_idx%adv%beg - 1)%sf(i, j, &
-                                        & k)*dynamic_viscosities(fluid_idx))
-                                end do
-
+                                ! compute the pressure force component, which is the negative pressure gradient
                                 do l = -fd_number, fd_number
-                                    call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i + l, j, k)
-                                    local_force_contribution(1:3) = local_force_contribution(1:3) + fd_coeff_x(l, &
-                                                             & i)*viscous_stress(1,1:3)
-
-                                    call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i, j + l, k)
-                                    local_force_contribution(1:3) = local_force_contribution(1:3) + fd_coeff_y(l, &
-                                                             & j)*viscous_stress(2,1:3)
-
+                                    local_force_contribution(1) = local_force_contribution(1) - (fd_coeff_x(l, &
+                                                             & i)*q_prim_vf(eqn_idx%E)%sf(i + l, j, k))
+                                    local_force_contribution(2) = local_force_contribution(2) - (fd_coeff_y(l, &
+                                                             & j)*q_prim_vf(eqn_idx%E)%sf(i, j + l, k))
                                     if (num_dims == 3) then
-                                        call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i, j, &
-                                                                             & k + l)
-                                        local_force_contribution(1:3) = local_force_contribution(1:3) + fd_coeff_z(l, &
-                                                                 & k)*viscous_stress(3,1:3)
+                                        local_force_contribution(3) = local_force_contribution(3) - (fd_coeff_z(l, &
+                                                                 & k)*q_prim_vf(eqn_idx%E)%sf(i, j, k + l))
                                     end if
                                 end do
-                            end if
 
-                            call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
+                                ! get the viscous stress and add its contribution if that is considered
+                                if (viscous) then
+                                    ! compute the volume-weighted local dynamic viscosity
+                                    dynamic_viscosity = 0._wp
+                                    do fluid_idx = 1, num_fluids
+                                        ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
+                                        dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + eqn_idx%adv%beg - 1)%sf(i, &
+                                            & j, k)*dynamic_viscosities(fluid_idx))
+                                    end do
 
-                            ! Update the force and torque values atomically to prevent race conditions
-                            cell_volume = dx(i)*dy(j)
-                            if (num_dims == 3) cell_volume = cell_volume*dz(k)
-                            do l = 1, num_dims
-                                $:GPU_ATOMIC(atomic='update')
-                                forces(ib_idx, l) = forces(ib_idx, l) + (local_force_contribution(l)*cell_volume)
-                                $:GPU_ATOMIC(atomic='update')
-                                torques(ib_idx, l) = torques(ib_idx, l) + local_torque_contribution(l)*cell_volume
-                            end do
-                        end if  ! ib_idx > 0
-                    end if
+                                    do l = -fd_number, fd_number
+                                        call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i + l, &
+                                                                             & j, k)
+                                        local_force_contribution(1:3) = local_force_contribution(1:3) + fd_coeff_x(l, &
+                                                                 & i)*viscous_stress(1,1:3)
+
+                                        call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i, &
+                                                                             & j + l, k)
+                                        local_force_contribution(1:3) = local_force_contribution(1:3) + fd_coeff_y(l, &
+                                                                 & j)*viscous_stress(2,1:3)
+
+                                        if (num_dims == 3) then
+                                            call s_compute_viscous_stress_tensor(viscous_stress, q_prim_vf, dynamic_viscosity, i, &
+                                                                                 & j, k + l)
+                                            local_force_contribution(1:3) = local_force_contribution(1:3) + fd_coeff_z(l, &
+                                                                     & k)*viscous_stress(3,1:3)
+                                        end if
+                                    end do
+                                end if
+
+                                call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
+
+                                ! Update the force and torque values atomically to prevent race conditions
+                                cell_volume = dx(i)*dy(j)
+                                if (num_dims == 3) cell_volume = cell_volume*dz(k)
+                                do l = 1, num_dims
+                                    $:GPU_ATOMIC(atomic='update')
+                                    forces(ib_idx, l) = forces(ib_idx, l) + (local_force_contribution(l)*cell_volume)
+                                    $:GPU_ATOMIC(atomic='update')
+                                    torques(ib_idx, l) = torques(ib_idx, l) + local_torque_contribution(l)*cell_volume
+                                end do
+                            end if  ! ib_idx > 0
+                        end if
+                    end do
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
         call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
 
@@ -1296,14 +1314,16 @@ contains
         end do
 
         ! apply the summed forces
-        $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
-        do i = 1, num_ibs
-            do l = 1, 3
-                patch_ib(i)%force(l) = forces(i, l)
-                patch_ib(i)%torque(l) = torques(i, l)
+        if (num_ibs > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
+            do i = 1, num_ibs
+                do l = 1, 3
+                    patch_ib(i)%force(l) = forces(i, l)
+                    patch_ib(i)%torque(l) = torques(i, l)
+                end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
         call nvtxEndRange
 
@@ -1311,27 +1331,36 @@ contains
 
     !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
     !> These patches include things like NACA airfoils and STL models
-    subroutine s_compute_centroid_offset(ib_marker)
+    !> Move a moving airfoil/STL patch's centroid to its centre of mass, keeping the difference in centroid_offset. Collective:
+    !! every rank calls it for every global id, contributing zeros for patches it does not hold.
+    subroutine s_compute_centroid_offset(gid, ib_marker)
 
-        integer, intent(in)      :: ib_marker
+        integer, intent(in)      :: gid        !< global patch id
+        integer, intent(in)      :: ib_marker  !< local index on this rank; <= 0 if not held
         integer                  :: i, j, k, num_cells_local, decoded_gbl_id
-        integer(kind=8)          :: num_cells
+        integer(kind=8)          :: num_cells, needs_loc, needs_glb
         real(wp), dimension(1:3) :: center_of_mass, center_of_mass_local
 
-        ! Offset only needs to be computes for specific geometries
+        needs_loc = 0_8
+        if (ib_marker > 0) then
+            if (f_needs_centroid_offset(patch_ib(ib_marker))) needs_loc = 1_8
+        end if
+        call s_mpi_allreduce_integer_sum(needs_loc, needs_glb)
+        if (needs_glb == 0_8) then
+            if (ib_marker > 0) patch_ib(ib_marker)%centroid_offset(:) = 0._wp
+            return
+        end if
 
-        if (patch_ib(ib_marker)%geometry == 4 .or. patch_ib(ib_marker)%geometry == 5 .or. patch_ib(ib_marker)%geometry == 11 &
-            & .or. patch_ib(ib_marker)%geometry == 12) then
-            center_of_mass_local = [0._wp, 0._wp, 0._wp]
-            num_cells_local = 0
-
+        center_of_mass_local = [0._wp, 0._wp, 0._wp]
+        num_cells_local = 0
+        if (ib_marker > 0) then
             ! get the summed mass distribution and number of cells to divide by
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) /= 0) then
                             call s_decode_patch_periodicity(ib_markers%sf(i, j, k), decoded_gbl_id)
-                            if (decoded_gbl_id == patch_ib(ib_marker)%gbl_patch_id) then
+                            if (decoded_gbl_id == gid) then
                                 num_cells_local = num_cells_local + 1
                                 center_of_mass_local = center_of_mass_local + [x_cc(i), y_cc(j), 0._wp]
                                 if (num_dims == 3) center_of_mass_local(3) = center_of_mass_local(3) + z_cc(k)
@@ -1340,35 +1369,73 @@ contains
                     end do
                 end do
             end do
-
-            ! reduce the mass contribution over all MPI ranks and compute COM
-            call s_mpi_allreduce_integer_sum(int(num_cells_local, 8), num_cells)
-            if (num_cells /= 0) then
-                call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
-                call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
-                call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
-                center_of_mass = center_of_mass/real(num_cells, wp)
-            else
-                patch_ib(ib_marker)%centroid_offset = [0._wp, 0._wp, 0._wp]
-                return
-            end if
-
-            ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the
-            ! current centroid
-            patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, &
-                     & patch_ib(ib_marker)%z_centroid] - center_of_mass
-            patch_ib(ib_marker)%x_centroid = center_of_mass(1)
-            patch_ib(ib_marker)%y_centroid = center_of_mass(2)
-            patch_ib(ib_marker)%z_centroid = center_of_mass(3)
-
-            ! rotate the centroid offset back into the local coords of the IB
-            patch_ib(ib_marker)%centroid_offset = matmul(patch_ib(ib_marker)%rotation_matrix_inverse, &
-                     & patch_ib(ib_marker)%centroid_offset)
-        else
-            patch_ib(ib_marker)%centroid_offset(:) = [0._wp, 0._wp, 0._wp]
         end if
 
+        ! reduce the mass contribution over all MPI ranks and compute COM
+        call s_mpi_allreduce_integer_sum(int(num_cells_local, 8), num_cells)
+        call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
+        call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
+        call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
+        if (ib_marker <= 0) return
+        if (num_cells == 0) then
+            patch_ib(ib_marker)%centroid_offset = [0._wp, 0._wp, 0._wp]
+            return
+        end if
+        center_of_mass = center_of_mass/real(num_cells, wp)
+
+        ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the
+        ! current centroid
+        patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, &
+                 & patch_ib(ib_marker)%z_centroid] - center_of_mass
+        patch_ib(ib_marker)%x_centroid = center_of_mass(1)
+        patch_ib(ib_marker)%y_centroid = center_of_mass(2)
+        patch_ib(ib_marker)%z_centroid = center_of_mass(3)
+
+        ! rotate the centroid offset back into the local coords of the IB
+        patch_ib(ib_marker)%centroid_offset = matmul(patch_ib(ib_marker)%rotation_matrix_inverse, &
+                 & patch_ib(ib_marker)%centroid_offset)
+
     end subroutine s_compute_centroid_offset
+
+    !> A moving airfoil or STL (geometries 4, 5, 11, 12) moves its centroid to the centre of mass and keeps a centroid_offset
+    pure logical function f_needs_centroid_offset(patch)
+
+        type(ib_patch_parameters), intent(in) :: patch
+
+        f_needs_centroid_offset = patch%moving_ibm /= 0 .and. any(patch%geometry == [4, 5, 11, 12])
+
+    end function f_needs_centroid_offset
+
+    !> On restart, replace the re-measured centroid offsets with the ones the run was using (restart_data/ib_offset_<step>.dat,
+    !! written with each checkpoint), and re-place kinematics-driven bodies about them. No file: the measured offsets stand.
+    impure subroutine s_restore_centroid_offsets(t_init)
+
+        real(wp), intent(in)                 :: t_init
+        character(len=path_len + 2*name_len) :: file_loc
+        logical                              :: file_exist
+        integer                              :: gid, i, ios, file_unit, step
+        real(wp), dimension(3)               :: off
+
+        step = t_step_start
+        if (cfl_dt) step = n_start
+        if (step == 0) return
+        write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_offset_', step, '.dat'
+        inquire (file=trim(file_loc), exist=file_exist)
+        if (.not. file_exist) return
+        open (newunit=file_unit, file=trim(file_loc), status='old', action='read', iostat=ios)
+        if (ios /= 0) return
+        do
+            read (file_unit, *, iostat=ios) gid, off
+            if (ios /= 0) exit
+            call s_get_neighborhood_idx(gid, i)
+            if (i > 0) then
+                patch_ib(i)%centroid_offset = off
+                if (patch_ib(i)%moving_ibm /= 0 .and. patch_ib(i)%kin_model > 0) call s_prescribed_kinematics(i, t_init)
+            end if
+        end do
+        close (file_unit)
+
+    end subroutine s_restore_centroid_offsets
 
     !> Computes the moment of inertia for an immersed boundary
     subroutine s_compute_moment_of_inertia(patch, axis, moment)
@@ -1508,15 +1575,17 @@ contains
                 do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
                     ! send forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
                     pack_pos = 0
-                    $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
-                    do i = 1, num_ibs
-                        send_ids(i) = patch_ib(i)%gbl_patch_id
-                        do l = 1, 3
-                            send_ft(l, i) = forces(i, l)
-                            send_ft(l + 3, i) = torques(i, l)
+                    if (num_ibs > 0) then
+                        $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
+                        do i = 1, num_ibs
+                            send_ids(i) = patch_ib(i)%gbl_patch_id
+                            do l = 1, 3
+                                send_ft(l, i) = forces(i, l)
+                                send_ft(l + 3, i) = torques(i, l)
+                            end do
                         end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
                     $:GPU_UPDATE(host='[send_ids, send_ft]')
                     call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
@@ -1531,20 +1600,22 @@ contains
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
                         $:GPU_UPDATE(device='[recv_ids(1:recv_count), recv_ft(:, 1:recv_count)]')
-                        $:GPU_PARALLEL_LOOP(private='[i, j, l]', copy='[forces, torques]')
-                        do i = 1, recv_count
-                            call s_get_neighborhood_idx(recv_ids(i), j)
-                            if (j > 0) then
-                                ! add forces and subtract recv_snap prevent double-counting
-                                do l = 1, 3
-                                    forces(j, l) = forces(j, l) + recv_ft(l, i) - recv_forces_snap(j, l)
-                                    torques(j, l) = torques(j, l) + recv_ft(l + 3, i) - recv_torques_snap(j, l)
-                                    recv_forces_snap(j, l) = recv_ft(l, i)
-                                    recv_torques_snap(j, l) = recv_ft(l + 3, i)
-                                end do
-                            end if
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
+                        if (num_ibs > 0) then
+                            $:GPU_PARALLEL_LOOP(private='[i, j, l]', copy='[forces, torques]')
+                            do i = 1, recv_count
+                                call s_get_neighborhood_idx(recv_ids(i), j)
+                                if (j > 0) then
+                                    ! add forces and subtract recv_snap prevent double-counting
+                                    do l = 1, 3
+                                        forces(j, l) = forces(j, l) + recv_ft(l, i) - recv_forces_snap(j, l)
+                                        torques(j, l) = torques(j, l) + recv_ft(l + 3, i) - recv_torques_snap(j, l)
+                                        recv_forces_snap(j, l) = recv_ft(l, i)
+                                        recv_torques_snap(j, l) = recv_ft(l + 3, i)
+                                    end do
+                                end if
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
                     end if
                     tag = tag + 2
                 end do
@@ -1559,15 +1630,17 @@ contains
 
                 do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
                     pack_pos = 0
-                    $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
-                    do i = 1, num_ibs
-                        send_ids(i) = patch_ib(i)%gbl_patch_id
-                        do l = 1, 3
-                            send_ft(l, i) = forces(i, l)
-                            send_ft(l + 3, i) = torques(i, l)
+                    if (num_ibs > 0) then
+                        $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
+                        do i = 1, num_ibs
+                            send_ids(i) = patch_ib(i)%gbl_patch_id
+                            do l = 1, 3
+                                send_ft(l, i) = forces(i, l)
+                                send_ft(l + 3, i) = torques(i, l)
+                            end do
                         end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
                     $:GPU_UPDATE(host='[send_ids, send_ft]')
                     call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
@@ -1581,17 +1654,19 @@ contains
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
                         $:GPU_UPDATE(device='[recv_ids(1:recv_count), recv_ft(:, 1:recv_count)]')
-                        $:GPU_PARALLEL_LOOP(private='[i, j, l]', copy='[forces, torques]')
-                        do i = 1, recv_count
-                            call s_get_neighborhood_idx(recv_ids(i), j)
-                            if (j > 0) then
-                                do l = 1, 3
-                                    forces(j, l) = recv_ft(l, i)
-                                    torques(j, l) = recv_ft(l + 3, i)
-                                end do
-                            end if
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
+                        if (num_ibs > 0) then
+                            $:GPU_PARALLEL_LOOP(private='[i, j, l]', copy='[forces, torques]')
+                            do i = 1, recv_count
+                                call s_get_neighborhood_idx(recv_ids(i), j)
+                                if (j > 0) then
+                                    do l = 1, 3
+                                        forces(j, l) = recv_ft(l, i)
+                                        torques(j, l) = recv_ft(l + 3, i)
+                                    end do
+                                end if
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
                     end if
                     tag = tag + 2
                 end do
@@ -1767,6 +1842,36 @@ contains
         neighborhood_idx = ib_gbl_idx_lookup(gbl_idx)
 
     end subroutine s_get_neighborhood_idx
+
+    !> Abort if any immersed boundary marks no cell anywhere. The owning rank is chosen by the patch centroid, so an STL placed with
+    !! model_translate while its centroid is left elsewhere is handed to ranks that do not hold it, and it vanishes silently. One
+    !! pass over the cells and one reduction, whatever the number of patches.
+    impure subroutine s_check_every_patch_marked()
+
+        integer(kind=8), allocatable :: cnt_loc(:), cnt_glb(:)
+        integer                      :: gid, i, j, k
+
+        if (num_gbl_ibs == 0) return
+        allocate (cnt_loc(num_gbl_ibs), cnt_glb(num_gbl_ibs))
+        cnt_loc = 0_8
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    if (ib_markers%sf(i, j, k) /= 0) then
+                        call s_decode_patch_periodicity(ib_markers%sf(i, j, k), gid)
+                        cnt_loc(gid) = cnt_loc(gid) + 1_8
+                    end if
+                end do
+            end do
+        end do
+        call s_mpi_allreduce_integer_sum_vec(cnt_loc, cnt_glb)
+        @:PROHIBIT(any(cnt_glb == 0_8), &
+                   & "An immersed boundary marked no cell anywhere: its centroid decides which rank owns it, so a body placed " &
+                   & // "elsewhere with model_translate is handed to a rank that does not hold it. Set patch_ib%x/y/z_centroid " &
+                   & // "to where the body actually is.")
+        deallocate (cnt_loc, cnt_glb)
+
+    end subroutine s_check_every_patch_marked
 
     subroutine s_update_ib_lookup()
 
