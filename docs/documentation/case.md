@@ -589,8 +589,8 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `proj_max_iters`           | Integer | Maximum iterations of the projection pressure solve (default 100) |
 | `proj_mg_omega`            | Real    | Multigrid coarse-grid correction scale in the pressure solve for Poisson-like (low-Mach) levels, in (0, 2); each level eases it toward 1 as compressibility dominates (default 1.8) |
 | `proj_mg_sweeps`           | Integer | Symmetric red-black smoothing sweeps per multigrid level in the pressure solve (default 2) |
-| `proj_mg_kcycle`           | Integer | Multigrid levels between Krylov (K-cycle) coarse corrections in the pressure solve: every that many levels the coarse problem gets two flexible-CG steps instead of one cycle, which keeps iteration counts from growing with the grid. 0 for plain V-cycles; -1 chooses by rank count (V-cycles below `proj_mg_k_ranks`, 2 at or above it) (default -1). See [Projection method iterative solve tuning](#sec-projection-solve-tuning) |
-| `proj_mg_k_ranks`          | Integer | With `proj_mg_kcycle = -1`, the rank count at and above which K-cycles (every 2 levels) replace V-cycles (default 1024, measured on OLCF Frontier) |
+| `proj_mg_kcycle`           | Integer | Multigrid levels between Krylov (K-cycle) coarse corrections in the pressure solve: every that many levels the coarse problem gets two flexible-CG steps instead of one cycle, which keeps iteration counts from growing with the grid. 0 for plain V-cycles; -1 chooses per solve: V-cycles when the hierarchy is truncated (`proj_mg_trunc`), else by rank count (V-cycles below `proj_mg_k_ranks`, 2 at or above it) (default -1). See [Projection method iterative solve tuning](#sec-projection-solve-tuning) |
+| `proj_mg_k_ranks`          | Integer | With `proj_mg_kcycle = -1`, the rank count at and above which K-cycles (every 2 levels) replace V-cycles in solves that reach the bottom, untruncated (default 1024, measured on OLCF Frontier) |
 | `proj_mg_bottom`           | Integer | Pressure-solve multigrid bottom solve, the problem left at one cell per rank, gathered to every rank: [1] exact (dense factorization up to 128 cells, else CG) [2] one V-cycle that coarsens it further; -1 chooses: exact with V-cycles up to `proj_mg_cg_ranks` ranks, else the V-cycle (default -1) |
 | `proj_mg_cg_ranks`         | Integer | With `proj_mg_bottom = -1` and V-cycles, the largest rank count solved exactly; past it the cost of an exact bottom solve, which every rank repeats, outgrows the iterations it saves (default 8192, measured on OLCF Frontier) |
 | `proj_mg_trunc`            | Real    | Stop the pressure-solve multigrid at the first level whose spacing spans this many screening lengths (about c*dt, the acoustic CFL in cells), smoothing that level and skipping the coarser ones and the gathered bottom solve. 0 never truncates (default 1). See [Projection method iterative solve tuning](#sec-projection-solve-tuning) |
@@ -1585,7 +1585,9 @@ On the 3D Taylor-Green vortex at Mach 0.01 (acoustic CFL 50), 1 was faster than 
 
 ### The automatic choice
 
-With the defaults (`proj_mg_kcycle = -1`, `proj_mg_bottom = -1`), the solver chooses by rank count:
+With the defaults (`proj_mg_kcycle = -1`, `proj_mg_bottom = -1`, `proj_mg_trunc = 1`), a solve whose hierarchy is truncated uses V-cycles and never reaches the bottom.
+Truncation fixes the hierarchy's depth by the screening length rather than the grid size, so V-cycle iteration counts stay flat as ranks are added, and K-cycles would only add cost (on the 3D Taylor-Green vortex they also took more iterations).
+A solve that is not truncated (low Mach number, long time steps) chooses by rank count:
 
 | Ranks                    | Cycle             | Bottom solve |
 | ------------------------ | ----------------- | ------------ |

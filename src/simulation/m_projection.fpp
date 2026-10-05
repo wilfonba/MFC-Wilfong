@@ -99,7 +99,7 @@ module m_projection
     integer, dimension(mg_maxlev)       :: mg_nx, mg_ny, mg_nz, mg_off
     real(wp), allocatable, dimension(:) :: mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r
     $:GPU_DECLARE(create='[mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r]')
-    !> K-cycle vectors of the coarse levels (indexed as mg_e; allocated with mg_kspace > 0): the right-hand side (kr), the first
+    !> K-cycle vectors of the coarse levels (indexed as mg_e; allocated with mg_kfull > 0): the right-hand side (kr), the first
     !! step's preconditioned direction (kc) and its image under the level operator (kv)
     real(wp), allocatable, dimension(:) :: mg_kr, mg_kc, mg_kv
     $:GPU_DECLARE(create='[mg_kr, mg_kc, mg_kv]')
@@ -129,7 +129,8 @@ module m_projection
     logical :: crs_exact                        !< bottom solved exactly (proj_mg_bottom, or by rank count)
     logical :: crs_cg                           !< exactly, by CG, as it is too large to factor densely
     real(wp), parameter :: crs_tol = 1.e-12_wp  !< CG bottom tolerance, relative to its right-hand side
-    integer :: mg_kspace                        !< levels between K-cycle steps (proj_mg_kcycle, or by rank count)
+    integer :: mg_kfull                         !< levels between K-cycle steps when a solve reaches the bottom
+    integer :: mg_kspace                        !< ... in this solve: mg_kfull, or V-cycles once truncated (s_mg_omega)
     integer, dimension(mg_maxlev) :: crs_ln, crs_loff
     integer, dimension(3, mg_maxlev) :: crs_ld
     integer, allocatable, dimension(:) :: crs_cnt, crs_disp, crs_agg
@@ -154,10 +155,11 @@ contains
 #endif
 
         ! Automatic choices by rank count; the thresholds are machine-dependent (docs: "Projection method iterative solve tuning")
-        mg_kspace = proj_mg_kcycle
-        if (mg_kspace < 0) mg_kspace = merge(2, 0, num_procs >= proj_mg_k_ranks)
+        mg_kfull = proj_mg_kcycle
+        if (mg_kfull < 0) mg_kfull = merge(2, 0, num_procs >= proj_mg_k_ranks)
+        mg_kspace = mg_kfull
         ! A K-cycle reaches the bottom several times per cycle, which multiplies the cost of an exact solve there
-        crs_exact = proj_mg_bottom == 1 .or. (proj_mg_bottom == -1 .and. mg_kspace == 0 .and. num_procs <= proj_mg_cg_ranks)
+        crs_exact = proj_mg_bottom == 1 .or. (proj_mg_bottom == -1 .and. mg_kfull == 0 .and. num_procs <= proj_mg_cg_ranks)
 
         @:ALLOCATE(uf(-1:m + 1, -1:n + 1, -1:p + 1, 1:num_dims), uf0(-1:m + 1, -1:n + 1, -1:p + 1, 1:num_dims))
         @:ALLOCATE(divu(0:m, 0:n, 0:p), rhs_p(0:m, 0:n, 0:p), p_stage(0:m, 0:n, 0:p), p_step0(0:m, 0:n, 0:p))
@@ -204,7 +206,7 @@ contains
         mg_poff = tot
         @:ALLOCATE(mg_d(tot), mg_kx(tot), mg_ky(tot), mg_kz(tot), mg_f(tot), mg_r(tot))
         @:ALLOCATE(mg_e(tot + (mg_nx(1) + 2*mg_gx)*(mg_ny(1) + 2*mg_gy)*(mg_nz(1) + 2*mg_gz)))
-        kl = mg_off(min(2, mg_nlev)) + 1; ku = merge(mg_poff, kl - 1, mg_kspace > 0)
+        kl = mg_off(min(2, mg_nlev)) + 1; ku = merge(mg_poff, kl - 1, mg_kfull > 0)
         @:ALLOCATE(mg_kr(kl:ku), mg_kc(kl:ku), mg_kv(kl:ku))
         tot = 2*((n + 1)*(p + 1) + (m + 1)*(p + 1) + (m + 1)*(n + 1))
         @:ALLOCATE(mg_sbuf(tot), mg_rbuf(tot))
@@ -1320,6 +1322,11 @@ contains
                 end if
             end do
         end if
+
+        ! K-cycles pay off by keeping iterations flat as the hierarchy deepens with the grid; a truncated hierarchy stops at a
+        ! fixed depth set by the screening length, so with proj_mg_kcycle = -1 it keeps V-cycles, cheaper and fewer iterations
+        mg_kspace = mg_kfull
+        if (proj_mg_kcycle < 0 .and. mg_blev < mg_nlev) mg_kspace = 0
 
     end subroutine s_mg_omega
 
