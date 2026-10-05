@@ -22,6 +22,12 @@ by a hash of its lattice cell (`--seed`), so the initial condition is a single a
 `--single` instead places one bubble of diameter `--d` at the centre of a column `--spacing` diameters wide, a check of
 its expansion against the adiabatic law.
 
-Limitations: the gas expands adiabatically (no heat conduction), where millimetre bubbles rising this slowly are close
+Caveat: the projection's five-equation model advects alpha, so the mixed cells at each bubble's interface compress
+with the advected mixture's stiff modulus and the bubbles barely expand. A single 8 mm bubble (`--single --d 8e-3
+--spacing 6 --depth 0.2`) rising 7 cm captures 7.5% of its adiabatic expansion at 16 cells per diameter, 39% at 32 and
+64% at 64; under a 0.1 bar headspace (`--p-top 1e4`, about 5% expansion) 2% and 18% at 16 and 32. The case shows
+the flow, not yet the expansion physics it is meant for.
+
+Other limitations: the gas expands adiabatically (no heat conduction), where millimetre bubbles rising this slowly are close
 to isothermal; in 2D each bubble is a cylinder; and at 16 cells per diameter the thin films between bubbles drain
 numerically, so close bubbles coalesce sooner than they physically would.
