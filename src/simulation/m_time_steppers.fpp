@@ -464,6 +464,8 @@ contains
             ! reads it, not after. Its GPU_DECLARE only creates device storage and never copies the host value, so
             ! without this the first RHS of a run reads uninitialised memory and later stages read a stale time.
             $:GPU_UPDATE(device='[mytime]')
+            ! Before the RHS, since the characteristic BCs read accel_bf
+            if (bf_x .or. bf_y .or. bf_z) call s_compute_acceleration(mytime)
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                & t_step, s)
 

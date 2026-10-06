@@ -14,7 +14,7 @@ module m_compute_cbc
     private; public :: s_compute_slip_wall_L, s_compute_nonreflecting_subsonic_buffer_L, &
         & s_compute_nonreflecting_subsonic_inflow_L, s_compute_nonreflecting_subsonic_outflow_L, &
         & s_compute_force_free_subsonic_outflow_L, s_compute_constant_pressure_subsonic_outflow_L, s_compute_supersonic_inflow_L, &
-        & s_compute_supersonic_outflow_L
+        & s_compute_supersonic_outflow_L, s_add_body_force_L
 
 contains
     !> Base L1 calculation
@@ -359,5 +359,35 @@ contains
         L(eqn_idx%adv%end) = lambda(3)*(dpres_ds + rho*c*dvel_ds(dir_idx(1)))
 
     end subroutine s_compute_supersonic_outflow_L
+
+    !> Body force correction: each CBC's incoming-wave rule is applied to the source-inclusive waves L1 + delta and L5 - delta
+    !! (Sutherland & Kennedy 2003), since the body force is added to the boundary cell outside the CBC.
+    subroutine s_add_body_force_L(bc, lambda, L, delta)
+
+        $:GPU_ROUTINE(function_name='s_add_body_force_L',parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in)                :: bc
+        real(wp), dimension(3), intent(in) :: lambda
+        #:if USING_AMD
+            real(wp), dimension(${AMD_SYS_SIZE_MAX}$), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        real(wp), intent(in) :: delta  !< rho*c times the inward-normal body acceleration
+
+        if (bc == BC_CHAR_SLIP_WALL .or. bc == BC_CHAR_FF_SUB_OUTFLOW) then
+            L(eqn_idx%adv%end) = L(eqn_idx%adv%end) + 2._wp*delta
+        else if (bc == BC_CHAR_NR_SUB_INFLOW .or. bc == BC_CHAR_NR_SUB_OUTFLOW) then
+            L(eqn_idx%adv%end) = L(eqn_idx%adv%end) + delta
+        else if (bc == BC_CHAR_SUP_INFLOW) then
+            L(1) = L(1) - delta
+            L(eqn_idx%adv%end) = L(eqn_idx%adv%end) + delta
+        else if (bc == BC_CHAR_NR_SUB_BUFFER) then
+            ! Only the waves the buffer zeroes (incoming, lambda > 0) are corrected
+            L(1) = L(1) - (5.e-1_wp + 5.e-1_wp*sign(1._wp, lambda(1)))*delta
+            L(eqn_idx%adv%end) = L(eqn_idx%adv%end) + (5.e-1_wp + 5.e-1_wp*sign(1._wp, lambda(3)))*delta
+        end if
+
+    end subroutine s_add_body_force_L
 
 end module m_compute_cbc

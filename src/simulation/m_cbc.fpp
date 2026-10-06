@@ -476,6 +476,7 @@ contains
         real(wp)                                               :: dqv_dt
         real(wp)                                               :: dpres_ds
         real(wp)                                               :: ramp  !< inflow ramp factor; unity unless a ramp is set
+        real(wp)                                               :: a_n   !< inward-normal body acceleration
 
         #:if USING_AMD
             real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: L
@@ -522,6 +523,10 @@ contains
         $:GPU_UPDATE(device='[cbc_dir, cbc_loc]')
 
         call s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, ix, iy, iz)
+
+        ! The mirrored frame at the end boundary flips the normal direction
+        a_n = 0._wp
+        if (bodyForces) a_n = -cbc_loc*accel_bf(cbc_dir)
 
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
 
@@ -599,7 +604,7 @@ contains
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
                                     & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx]')
+                                    & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx, a_n]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
@@ -788,6 +793,9 @@ contains
                             call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, &
                                                                 & dYs_ds)
                         end if
+
+                        if (a_n /= 0._wp) call s_add_body_force_L(merge(bc_${XYZ}$%beg, bc_${XYZ}$%end, cbc_loc == -1), lambda, &
+                            & L, rho*c*a_n)
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then

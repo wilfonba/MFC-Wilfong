@@ -17,7 +17,7 @@ module m_body_forces
     implicit none
 
     private
-    public :: s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
+    public :: s_compute_acceleration, s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
         & s_finalize_body_forces_module
 
     integer, parameter                      :: spbf_num_freq = 8
@@ -296,10 +296,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: i, j, k, l  !< Loop variables
-
-        if (bf_x .or. bf_y .or. bf_z) then
-            call s_compute_acceleration(mytime)
-        end if
 
         if (bf_spatial_support) then
             call s_compute_body_force_with_spatial_support(mytime, bounds)

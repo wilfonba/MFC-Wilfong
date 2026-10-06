@@ -1820,6 +1820,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "", {}))
 
+        # Characteristic BCs, whose incoming waves carry the body-force correction
+        cases.append(define_case_d(stack, "bc=-5,-8", {**{f"bc_{d}%beg": -5 for d in dimInfo[0]}, **{f"bc_{d}%end": -8 for d in dimInfo[0]}}))
+
         stack.push("cfl_adap_dt=T", {"cfl_adap_dt": "T", "cfl_target": 0.08, "t_save": 0.025, "n_start": 0, "t_stop": 0.025})
         cases.append(define_case_d(stack, "", {}))
 
