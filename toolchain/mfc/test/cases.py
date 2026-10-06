@@ -550,6 +550,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
             cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
         cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
+        # Small enough for the explicit diffusion limit at the base dt
+        conduction = {"fluid_pp(1)%k_therm": 1.0e-4, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-4, "fluid_pp(2)%cv": 1.0}
+        cases.append(define_case_d(stack, "Conduction", conduction))
         if len(dimInfo[0]) == 2:
             # A ramped Dirichlet inflow at x = 0 and a pressure outlet at x = 1, between no-slip walls
             inflow = {"bc_x%beg": -17, "bc_x%end": -3, "bc_y%beg": -16, "bc_y%end": -16, "bc_x%pres_out": 0.1, "bc_x%vel_in_ramp": 1e-3, "patch_icpp(1)%vel(1)": 0.5}

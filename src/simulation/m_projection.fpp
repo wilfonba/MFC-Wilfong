@@ -60,8 +60,8 @@ module m_projection
 
     implicit none
 
-    private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_face_props, s_projection_apply, &
-        & s_finalize_projection_module
+    private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_face_props, s_projection_heat, &
+        & s_projection_apply, s_finalize_projection_module
 
     integer, parameter :: mg_maxlev = 24
     real(wp), parameter :: res_floor = 1.e2_wp*epsilon(1._wp)  !< residual round-off floor, relative to the right-hand side
@@ -594,6 +594,46 @@ contains
         #:endfor
 
     end subroutine s_projection_face_props
+
+    !> Conduction heating of one direction sweep from the energy source flux fe (-k dT/dn on faces). At fixed alpha and phase
+    !! densities d(rho e) = Gamma dp, so the pressure transport rate gains -div(q)/Gamma, and the energy rebuilt from p carries it
+    subroutine s_projection_heat(id, q_prim_vf, fe)
+
+        integer, intent(in)                                 :: id
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), intent(in)                      :: fe
+        real(wp)                                            :: rho, gam, pinf, qv
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: ar, al
+        #:else
+            real(wp), dimension(num_fluids) :: ar, al
+        #:endif
+        integer :: i, j, k, l
+
+        #:for D, SV, COORDS, DXV in [(1, 'j', '{SI}, k, l', 'dx'), (2, 'k', 'j, {SI}, l', 'dy'), (3, 'l', 'j, k, {SI}', 'dz')]
+            #:set SF = lambda offs: COORDS.format(SI=SV + offs)
+            if (id == ${D}$) then
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gam, pinf, qv, ar, al]')
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                ar(i) = real(q_prim_vf(i)%sf(j, k, l), wp)
+                                al(i) = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
+                            end do
+                            call s_compute_mixture_coefficients(ar, al, rho, gam, pinf, qv)
+                            rhs_p(j, k, l) = rhs_p(j, k, l) + (real(fe%sf(${SF(' - 1')}$), wp) - real(fe%sf(j, k, l), &
+                                  & wp))/(${DXV}$(${SV}$)*gam)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_projection_heat
 
     !> Divergence of the face velocity in cell (j, k, l): the one operator the transport sources and the pressure equation share
     function f_div_uf(j, k, l) result(dv)

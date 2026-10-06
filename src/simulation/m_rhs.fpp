@@ -718,7 +718,7 @@ contains
 
                     if (proj_method) then
                         call s_projection_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf, bc_type)
-                        if (viscous .or. surface_tension) call s_projection_source_rhs(id, q_T_sf, rhs_vf)
+                        if (viscous .or. surface_tension .or. heat_conduction) call s_projection_source_rhs(id, q_T_sf, rhs_vf)
                         cycle
                     end if
 
@@ -1067,8 +1067,8 @@ contains
 
     end subroutine s_set_face_bounds
 
-    !> Viscous and capillary contributions under the projection: the source fluxes a Riemann solve would build, from the face data
-    !! the projection supplies, differenced by the same routine as in the explicit path
+    !> Viscous, capillary and conduction contributions under the projection: the source fluxes a Riemann solve would build, from the
+    !! face data the projection supplies, differenced by the same routine as in the explicit path
     subroutine s_projection_source_rhs(id, q_T_sf, rhs_vf)
 
         integer, intent(in)                                    :: id
@@ -1080,6 +1080,12 @@ contains
             & dqR_prim_dz_n(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, id, irx, iry, irz)
         call s_initialize_riemann_solver(flux_src_n(id)%vf, id)
         call s_projection_face_props(id, qR_rsx_vf, qL_rsx_vf, flux_src_n(id)%vf)
+
+        ! Conduction alone in the energy flux, before the viscous work joins it: it reaches p as heat
+        if (heat_conduction) then
+            call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, flux_src_n(id)%vf, irx, iry, irz)
+            call s_projection_heat(id, q_prim_qp%vf, flux_src_n(id)%vf(eqn_idx%E))
+        end if
 
         if (viscous) then
             call s_compute_viscous_source_flux(q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
