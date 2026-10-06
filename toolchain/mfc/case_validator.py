@@ -1657,7 +1657,7 @@ class CaseValidator:
         for d in ["x", "y", "z"]:
             for e in ["beg", "end"]:
                 bc = self.get(f"bc_{d}%{e}")
-                self.prohibit(bc is not None and bc not in [-1, -2, -3, -15, -16], f"proj_method does not support bc_{d}%{e} = {bc}")
+                self.prohibit(bc is not None and bc not in [-1, -2, -3, -15, -16, -17], f"proj_method does not support bc_{d}%{e} = {bc}")
 
     def check_igr_simulation(self):
         """Checks IGR constraints specific to simulation"""

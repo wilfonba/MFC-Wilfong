@@ -1387,6 +1387,8 @@ The boundary condition supported by the MFC are listed in table [Boundary Condit
 Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#sec-simulation-algorithm)).
 The entries labeled "Characteristic." are characteristic boundary conditions based on \cite Thompson87 and \cite Thompson90.
 
+With `proj_method`, the boundaries may be periodic (-1), reflective or walls (-2, -15, -16), extrapolation (-3) or Dirichlet (-17), whole or as boundary patches. A Dirichlet face carries the normal velocity of its ghost cell, ramped by `bc_[x,y,z]%%vel_in_ramp`, and is neither predicted nor pressure-corrected, so it feeds the domain a prescribed volume flux. An extrapolation face is closed to the pressure solve unless `bc_[x,y,z]%%pres_out` is set for that direction, when it is a pressure outlet held at that value, through which flow can leave; an inflow needs one, or the fluid it brings in can only compress.
+
 ### Generalized Characteristic Boundary conditions
 
 | Parameter                     | Type    | Description |
@@ -1400,7 +1402,7 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | `bc_[x,y,z]%%vel_in_frac0`     | Real | Fraction of the final inflow velocity held before the ramp |
 | `bc_[x,y,z]%%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
 | `bc_[x,y,z]%%pres_in`          | Real    | Inflow pressure |
-| `bc_[x,y,z]%%pres_out`         | Real    | Outflow pressure |
+| `bc_[x,y,z]%%pres_out`         | Real    | Outflow pressure (also, under `proj_method`, the pressure of that direction's extrapolation outlets) |
 | `bc_[x,y,z]%%alpha_rho_in`     | Real Array | Inflow density |
 | `bc_[x,y,z]%%alpha_in`         | Real Array | Inflow void fraction |
 

@@ -551,6 +551,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
         cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
         if len(dimInfo[0]) == 2:
+            # A ramped Dirichlet inflow at x = 0 and a pressure outlet at x = 1, between no-slip walls
+            inflow = {"bc_x%beg": -17, "bc_x%end": -3, "bc_y%beg": -16, "bc_y%end": -16, "bc_x%pres_out": 0.1, "bc_x%vel_in_ramp": 1e-3, "patch_icpp(1)%vel(1)": 0.5}
+            cases.append(define_case_d(stack, "Dirichlet inflow", inflow))
             ibm = {"ib": "T", "num_ibs": 1, "fd_order": 2, "patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1, "patch_ib(1)%slip": "F"}
             cases.append(define_case_d(stack, "IBM", {**get_bc_mods(-2, dimInfo), **ibm}))
         if len(dimInfo[0]) > 1:
