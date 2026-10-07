@@ -59,6 +59,7 @@ module m_projection
     use m_nvtx
     use m_thermochem, only: num_species, molecular_weights, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, get_species_enthalpies_rt
+    use m_chemistry, only: compute_viscosity_and_inversion
 
     implicit none
 
@@ -575,13 +576,23 @@ contains
         real(wp), dimension(2) :: re_l, re_r
         integer                :: i, j, k, l, rs1, rs2
 
+        #:if chemistry
+            real(wp), dimension(num_species) :: Ys_l, Ys_r
+            real(wp)                         :: T_l, T_r, W
+        #:endif
+
         rs1 = Re_size(1); rs2 = Re_size(2)
 
         #:for D, SV, COORDS, JB, KB, LB in [(1, 'j', '{SI}, k, l', -1, 0, 0), (2, 'k', 'j, {SI}, l', 0, -1, 0), &
             (3, 'l', 'j, k, {SI}', 0, 0, -1)]
             #:set SF = lambda offs: COORDS.format(SI=SV + offs)
             if (id == ${D}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, al, ar, re_l, re_r]', firstprivate='[rs1, rs2]')
+                #:if chemistry
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, al, ar, re_l, re_r, Ys_l, Ys_r, T_l, T_r, W]', &
+                                        & firstprivate='[rs1, rs2]')
+                #:else
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, al, ar, re_l, re_r]', firstprivate='[rs1, rs2]')
+                #:endif
                 do l = ${LB}$, p
                     do k = ${KB}$, n
                         do j = ${JB}$, m
@@ -593,6 +604,19 @@ contains
                                 end do
                                 call s_compute_interface_reynolds(al, re_l, rs1, rs2)
                                 call s_compute_interface_reynolds(ar, re_r, rs1, rs2)
+                                #:if chemistry
+                                    ! A reacting mixture's viscosity is its transport model's, at each face state's T and Y
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_species
+                                        Ys_l(i) = qfl_rs(${SF('')}$, eqn_idx%species%beg + i - 1)
+                                        Ys_r(i) = qfr_rs(${SF(' + 1')}$, eqn_idx%species%beg + i - 1)
+                                    end do
+                                    call get_mixture_molecular_weight(Ys_l, W)
+                                    T_l = qfl_rs(${SF('')}$, eqn_idx%E)*W/(gas_constant*qfl_rs(${SF('')}$, 1))
+                                    call get_mixture_molecular_weight(Ys_r, W)
+                                    T_r = qfr_rs(${SF(' + 1')}$, eqn_idx%E)*W/(gas_constant*qfr_rs(${SF(' + 1')}$, 1))
+                                    call compute_viscosity_and_inversion(T_l, Ys_l, T_r, Ys_r, re_l(1), re_r(1))
+                                #:endif
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 2
                                     Re_avg_rsx_vf(j, k, l, i) = 2._wp/(1._wp/re_l(i) + 1._wp/re_r(i))
