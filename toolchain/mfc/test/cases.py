@@ -3358,6 +3358,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # is platform-marginal (CPU goldens fail on most GPU lanes). The fast
                 # "Non-Newtonian -> IBM" suite case covers IBM+NN portably at 1e-12.
                 "2D_ibm_poiseuille_nn",
+                # On the CI grid cap some of the array's small cylinders cover no cell, which the IB marking check rejects
+                "2D_porous_cylinder_array",
                 # Synthetic turbulence now uses a deterministic (compiler-independent) PRNG,
                 # but the 50-step forced run with a moving airfoil IB is FP-sensitive enough
                 # that Intel's aggressive FP model (FMA/fast trig) diverges from the golden on
