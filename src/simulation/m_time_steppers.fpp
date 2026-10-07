@@ -759,7 +759,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         ! Under the projection a body force, not the sound speed, bounds dt for fluid starting from rest: a parcel accelerated
-        ! over one step then moves at most cfl_target cells
+        ! from rest over one step then moves at most cfl_target**2/2 cells
         if (proj_method .and. bodyForces) then
             amax = 0._wp
             #:for XYZ in ['x', 'y', 'z']

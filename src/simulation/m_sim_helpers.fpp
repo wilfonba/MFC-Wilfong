@@ -72,6 +72,38 @@ contains
 
     end function f_compute_filtered_dtheta
 
+    !> Sum over directions of 1/spacing^2 at cell (j, k, l). An explicit diffusion with diffusivity D is RK-stable for D*dt*sum <=
+    !! 2.51/4 (RK3; 2/4 for RK1 and RK2), so the diffusive CFL numbers are D*dt*sum
+    function f_inv_dx2_sum(j, k, l) result(s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(in) :: j, k, l
+        real(wp)            :: s
+
+        s = 1._wp/dx(j)**2
+        if (n > 0) s = s + 1._wp/dy(k)**2
+        if (p > 0) then
+            if (grid_geometry == 3) then
+                s = s + 1._wp/f_compute_filtered_dtheta(k, l)**2
+            else
+                s = s + 1._wp/dz(l)**2
+            end if
+        end if
+
+    end function f_inv_dx2_sum
+
+    !> Momentum diffusivity of the viscous stress: normal stresses diffuse with (4/3 mu + mu_b)/rho, the largest coefficient
+    function f_visc_diffusivity(Re_l, rho) result(nu)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), dimension(2), intent(in) :: Re_l
+        real(wp), intent(in)               :: rho
+        real(wp)                           :: nu
+
+        nu = (4._wp/(3._wp*Re_l(1)) + 1._wp/Re_l(2))/rho
+
+    end function f_visc_diffusivity
+
     !> Computes the mixture coefficients, velocity and pressure of one cell
     subroutine s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
 
@@ -172,22 +204,19 @@ contains
 
         ! Viscous calculations
         if (viscous) then
+            vcfl = dt*f_visc_diffusivity(Re_l, rho)*f_inv_dx2_sum(j, k, l)
             if (p > 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k), fltr_dtheta)**2._wp
                         Rc = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), fltr_dtheta*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     else
-                        vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k), dz(l))**2._wp
                         Rc = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), dz(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     end if
                 #:endif
             else if (n > 0) then
-                vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
                 Rc = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c))/maxval(1._wp/Re_l)
             else
-                vcfl = maxval(dt/Re_l/rho)/dx(j)**2._wp
                 Rc = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if
         end if
@@ -224,18 +253,7 @@ contains
                 rho_cv = rho_cv + alpha_rho(i)*cvs(i)
             end do
 
-            if (p > 0) then
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k), fltr_dtheta)**2._wp)
-                else
-                    tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k), dz(l))**2._wp)
-                end if
-            else if (n > 0) then
-                tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k))**2._wp)
-            else
-                tcfl = dt*k_mix/(rho_cv*dx(j)**2._wp)
-            end if
+            tcfl = dt*k_mix/rho_cv*f_inv_dx2_sum(j, k, l)
         end if
 
     end subroutine s_compute_stability_from_dt
@@ -255,7 +273,7 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
         #:endif
         integer, intent(in) :: j, k, l
-        real(wp)            :: vcfl_dt, ccfl_dt, tcfl_dt, rho_c
+        real(wp)            :: ccfl_dt, rho_c
         real(wp)            :: fltr_dtheta
         real(wp)            :: k_mix, rho_cv
         integer             :: i
@@ -285,21 +303,7 @@ contains
         end if
 
         ! Viscous calculations
-        if (viscous) then
-            if (p > 0) then
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)/maxval(1/(rho*Re_l))
-                else
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)/maxval(1/(rho*Re_l))
-                end if
-            else if (n > 0) then
-                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
-            else
-                vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
-            end if
-            max_dt(2) = vcfl_dt
-        end if
+        if (viscous) max_dt(2) = cfl_target/(f_visc_diffusivity(Re_l, rho)*f_inv_dx2_sum(j, k, l))
 
         ! Capillary CFL calculations
         if (surface_tension) then
@@ -324,7 +328,7 @@ contains
             max_dt(3) = ccfl_dt
         end if
 
-        ! Thermal diffusion CFL: dt <= cfl * dx^2 * rho * cv / k
+        ! Thermal diffusion CFL: dt <= cfl * rho * cv / (k * sum(1/dx^2))
         if (heat_conduction) then
             k_mix = 0._wp
             rho_cv = 0._wp
@@ -334,19 +338,7 @@ contains
                 rho_cv = rho_cv + alpha_rho(i)*cvs(i)
             end do
 
-            if (p > 0) then
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    tcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)*rho_cv/max(k_mix, sgm_eps)
-                else
-                    tcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)*rho_cv/max(k_mix, sgm_eps)
-                end if
-            else if (n > 0) then
-                tcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)*rho_cv/max(k_mix, sgm_eps)
-            else
-                tcfl_dt = cfl_target*(dx(j)**2._wp)*rho_cv/max(k_mix, sgm_eps)
-            end if
-            max_dt(4) = tcfl_dt
+            max_dt(4) = cfl_target*rho_cv/(max(k_mix, sgm_eps)*f_inv_dx2_sum(j, k, l))
         end if
 
     end subroutine s_compute_dt_from_cfl
