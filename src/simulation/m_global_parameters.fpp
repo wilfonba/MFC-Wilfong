@@ -9,7 +9,7 @@
 module m_global_parameters
 
 #ifdef MFC_MPI
-    use mpi  !< Message passing interface (MPI) module
+    use mpi
 #endif
 
     use m_derived_types
@@ -475,6 +475,7 @@ contains
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%Re(:) = dflt_real
+            fluid_pp(i)%k_therm = 0._wp
             fluid_pp(i)%G = 0._wp
             fluid_pp(i)%non_newtonian = .false.
             fluid_pp(i)%K = dflt_real
@@ -675,6 +676,7 @@ contains
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
             particle_cloud(i)%cloud_geometry = 1
+            particle_cloud(i)%shell_axis = 3
             particle_cloud(i)%packing_method = dflt_int
             particle_cloud(i)%periodic = 0
         end do
@@ -990,7 +992,7 @@ contains
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, &
-                     & avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach]')
+                     & avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach, ib]')
         $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_nc_mode]')
 
         $:GPU_UPDATE(device='[Bx0]')

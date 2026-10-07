@@ -426,6 +426,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `kin_model = 1` prescribes hinged flapping kinematics at run time (no analytic expressions, so the binary is shared across parameter values): roll \f$\phi\f$ about the lab \f$x\f$ axis through `kin_hinge` and pitch \f$\theta\f$ about the body spanwise (\f$y\f$) axis through the hinge, composed as \f$R = R_x(\phi) R_y(\theta)\f$. With \f$\tau = t - t_0\f$ and amplitude envelope \f$A(\tau)\f$ (0 before onset, raised cosine over `kin_ramp`, then 1): \f$\phi = A \phi_0 \sin(2\pi f \tau)\f$, \f$\theta = \theta_m + A \theta_0 \sin(2\pi f \tau + \psi)\f$. The centroid follows \f$x_c = x_h + R\,\mathbf{r}_\mathrm{off}\f$ and the ghost-cell velocities use the lab-frame angular velocity \f$\dot\phi \mathbf{e}_x + \dot\theta R_x(\phi)\mathbf{e}_y\f$. Set the initial `x[y,z]_centroid` and `angles` consistently with \f$t = 0\f$ so pre-process marks the body in the right place.
 
 - `kin_model = 2` is the smoothed linear pitch-ramp-and-hold of the AIAA low-Reynolds-number canonical cases (Eldredge et al. 2009, Ol et al. 2010) about the hinge, with no roll: \f$\theta(t) = \theta_m + \frac{\theta_0}{2}\left[1 + \frac{1}{a t_p}\log\frac{\cosh(a\tau)}{\cosh(a(\tau - t_p))}\right]\f$, \f$\tau = t - t_0\f$, \f$t_p = \theta_0/\Omega\f$, so the angle rises from `kin_theta_mean` by `kin_theta0` at nominal rate `kin_pitch_rate` starting at `kin_t0`, smoothed by `kin_smooth`. The same hinge, offset and centroid conventions as `kin_model = 1` apply.
+
+- Airfoils and STL models (`geometry` 4, 5, 11, 12) can be driven by `kin_model` too. For these the solver moves the working centroid to the centre of mass of the marked cells and keeps the difference as an internal offset \f$\mathbf{d}\f$; `kin_offset` still refers to the centroid the case file names, and the kinematics rotate `kin_offset` \f$- \mathbf{d}\f$ about the hinge. Name a centroid that lies inside the body: the rank that owns a patch is chosen by its centroid, so an STL placed with `model_translate` while its centroid stays at the origin is handed to ranks that do not hold it.
   Available variables: `x` (`x_cc(i)`), `y` (`y_cc(j)`), `z` (`z_cc(k)`), `t` (current simulation time), and `r` (the IB patch radius).
   The same intrinsic functions and `pi` constant apply; bare `e` is not available.
 
@@ -456,13 +458,14 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `cloud_geometry`  | Integer | Shape of the cloud region. |
 | `shell_inner_radius` | Real | Inner radius for hemisphere-shell clouds (`cloud_geometry = 2`). |
 | `shell_outer_radius` | Real | Outer radius for hemisphere-shell clouds (`cloud_geometry = 2`). |
+| `shell_axis`      | Integer | Axis the hemisphere-shell cloud opens toward (`cloud_geometry = 2`). |
 | `moving_ibm`      | Integer | Motion flag applied to every particle (see `patch_ib(j)%%moving_ibm`). |
 | `seed`            | Integer | Random seed for reproducible placement (used by `packing_method = 1`). |
 | `packing_method`  | Integer | Algorithm used to place the particles. |
 
 - `cloud_geometry` selects the cloud region:
   - `1` (box) uses `x[y,z]_centroid` and `length_x[y,z]` to define the region.
-  - `2` uses `x[y,z]_centroid`, `shell_inner_radius`, and `shell_outer_radius` to define a half-annulus in 2D and a hemisphere shell in 3D. Particle centres are sampled between `shell_inner_radius + radius` and `shell_outer_radius - radius`, and the flat plane is kept clear by one particle radius. The flat face is fixed at `y_centroid` in 2D and `z_centroid` in 3D; the filled region opens toward positive `y` in 2D and positive `z` in 3D. The full shell extent (`x[y,z]_centroid +/- shell_outer_radius` on the open side, and one particle radius of clearance on the flat-face side) must lie inside the computational domain; a hemisphere shell also requires at least two dimensions (`n > 0`).
+  - `2` uses `x[y,z]_centroid`, `shell_inner_radius`, `shell_outer_radius`, and `shell_axis` to define a half-annulus in 2D and a hemisphere shell in 3D. Particle centres are sampled between `shell_inner_radius + radius` and `shell_outer_radius - radius`, and the flat plane is kept clear by one particle radius. `shell_axis` (`1`=x, `2`=y, `3`=z; default `3`) selects which axis the shell opens toward from its flat face at that axis's centroid; in 2D there is no z-axis, so any value other than `1` opens toward `+y` (matching the fixed behavior before `shell_axis` existed). The open axis needs one particle radius of clearance on its flat-face side and the full `shell_outer_radius` on its open side; the other axis (2D) or two axes (3D) need the full shell extent (`centroid +/- shell_outer_radius`) inside the domain. A hemisphere shell also requires at least two dimensions (`n > 0`).
 - `packing_method` selects how the `num_particles` are positioned within the cloud region:
   - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
   - `2` (lattice) places the particles on the optimally dense lattice for the geometry — a triangular lattice in 2D and a face-centered cubic lattice in 3D. The lattice spacing is derived from the particle density (`num_particles` over the region area/volume); if that spacing is below the required `2*radius + min_spacing`, the region is too dense and the run aborts.
@@ -476,6 +479,7 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `pi_inf`  | Real   | Stiffened-gas parameter \f$\Pi_\infty\f$ of fluid. |
 | `Re(1)` * | Real   | Shear viscosity of fluid.                      |
 | `Re(2)` * | Real   | Volume viscosity of fluid.                     |
+| `k_therm` | Real   | Thermal conductivity of fluid (Fourier heat conduction). |
 | `cv`   ** | Real   | Sffened-gas parameter $c_v$ of fluid.          |
 | `qv`   ** | Real   | Stiffened-gas parameter $q$ of fluid.          |
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
@@ -497,6 +501,8 @@ The parameters define material's property of compressible fluids that are used i
 
 When these parameters are undefined, fluids are treated as inviscid.
 Details of implementation of viscosity in MFC can be found in \cite Coralic15.
+
+- `fluid_pp(i)%%k_therm` sets the thermal conductivity of the $i$-th fluid, in units consistent with the rest of the (non-dimensional) case. A positive value on any fluid activates Fourier heat conduction, which adds \f$\nabla\cdot(k\nabla T)\f$ to the energy equation using the thermal-equilibrium mixture temperature and \f$k = \sum_i \alpha_i k_i\f$ (see @ref equations "Equations"). It requires `fluid_pp(i)%%cv` to be positive on every fluid that sets it (the mixture temperature is undefined without \f$c_v\f$), `model_eqns = 2` or `model_eqns = 3` (the mixture conductivity is weighted by volume fractions that `model_eqns = 1` does not carry), and `fluid_pp(i)%%eos` to be the stiffened-gas or ideal-gas equation of state. Heat conduction is independent of `viscous`: it can be enabled in an otherwise inviscid run. It is not supported with `igr`, nor with `chemistry` (which already carries its own mixture-averaged conduction through `chem_params%%diffusion`).
 
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
@@ -1250,6 +1256,8 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
+MFC generates and compiles the mechanism's Fortran routines itself. Supported mechanism features and the Cantera-only mixing-layer initialization are described in @ref thermochemistry "Thermochemistry implementation".
+
 ### 18. Chemistry-Specific Boundary Conditions
 
 | Parameter          | Type    | Description                                                                 |
@@ -1259,7 +1267,7 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `bc_[x,y,z]%%Twall_in`         | Real    | Temperature [K] of the entrance isothermal wall.                            |
 | `bc_[x,y,z]%%Twall_out`        | Real    | Temperature [K] of the exit isothermal wall.                                |
 
-This boundary condition can be used for fixed-temperature (isothermal) walls at the domain extremities. It is exclusively available for reacting flows and requires chemistry to be enabled. It properly evaluates heat and species fluxes at the interface when ``chemistry = 'T'``, ``chem_params%%diffusion = 'T'``, and the corresponding domain boundary is set to a slip wall (`bc_[x,y,z]%%[beg,end]` = -15) or a no-slip wall (`bc_[x,y,z]%%[beg,end]` = -16).
+This boundary condition can be used for fixed-temperature (isothermal) walls at the domain extremities. It requires a heat-conduction path so the wall flux can be evaluated: either a reacting flow with ``chemistry = 'T'`` and ``chem_params%%diffusion = 'T'``, or Fourier conduction with ``fluid_pp(i)%%k_therm`` > 0. The corresponding domain boundary must be set to a slip wall (`bc_[x,y,z]%%[beg,end]` = -15) or a no-slip wall (`bc_[x,y,z]%%[beg,end]` = -16). With chemistry it evaluates both heat and species fluxes; with Fourier conduction it evaluates the heat flux.
 
 
 
@@ -1384,7 +1392,7 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 
 This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on \cite Pirozzoli13. This enables to provide inflow and outflow conditions outside the computational domain.
 
-`bc_[x,y,z]%%vel_in_ramp` starts the inflow smoothly instead of holding it constant, which is what a jet or a tunnel accelerating from rest requires: the start-up is the event of interest, not a transient to be discarded. The inflow velocity is scaled by \f$f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2\f$, with \f$\tau\f$ = `vel_in_ramp`, \f$t_0\f$ = `vel_in_t0` and \f$f_0\f$ = `vel_in_frac0`, so it leaves \f$f_0\f$ of the final velocity at \f$t_0\f$ and is within half a percent of it at \f$t_0 + \tau\f$. A boundary with `vel_in_ramp = 0` is held constant, as before.
+`bc_[x,y,z]%%vel_in_ramp` starts the inflow smoothly instead of holding it constant, which is what a jet or a tunnel accelerating from rest requires: the start-up is the event of interest, not a transient to be discarded. The inflow velocity is scaled by \f$f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2\f$, with \f$\tau\f$ = `vel_in_ramp`, \f$t_0\f$ = `vel_in_t0` and \f$f_0\f$ = `vel_in_frac0`, so it leaves \f$f_0\f$ of the final velocity at \f$t_0\f$ and is within half a percent of it at \f$t_0 + \tau\f$. A boundary with `vel_in_ramp = 0` is held constant, as before. The ramp acts on a GRCBC inflow (`grcbc_in`) or on the ghost-cell velocity of a Dirichlet (-17) boundary or boundary patch normal to that direction, such as a nozzle set into a wall.
 
 ### Patch types {#patch-types}
 

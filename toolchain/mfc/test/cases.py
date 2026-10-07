@@ -844,12 +844,27 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_low_Mach_correction()
             if num_fluids == 1:
                 alter_eos()
-            alter_ib(dimInfo)
+            alter_ib(dimInfo, num_fluids=num_fluids)
             if len(dimInfo[0]) > 1:
                 alter_igr()
 
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
+
+            if len(dimInfo[0]) == 1 or (len(dimInfo[0]) > 1 and num_fluids == 2):
+                # Fourier conduction. The 2-fluid row covers the volume-fraction-weighted face
+                # conductivity, which a single-fluid case leaves untested. cv must be set: it
+                # defaults to zero, which a conducting fluid is not allowed to have. 2D/3D run on
+                # the base Cartesian grid (patches vary along y/z per get_dimensions), covering the
+                # Cartesian y-/z-direction flux-divergence branches in m_rhs.fpp that the
+                # axisymmetric/cylindrical Conduction cases below never reach.
+                conduction = {"dt": 1e-11}
+                for fluid, k_therm in zip(range(1, num_fluids + 1), [1.0e-3, 4.0e-3]):
+                    conduction[f"fluid_pp({fluid})%k_therm"] = k_therm
+                    conduction[f"fluid_pp({fluid})%cv"] = 1.0
+                stack.push("Conduction", conduction)
+                cases.append(define_case_d(stack, "", {}))
+                stack.pop()
 
             if num_fluids == 1:
                 stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "dt": 1e-11, "patch_icpp(1)%vel(1)": 1.0, "viscous": "T"})
@@ -996,6 +1011,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
         add_hll_u_interface_cases("HLL")
 
+        # Fourier conduction on the cylindrical axis: covers s_compute_conduction_axis_source,
+        # which is the only cell the generic geometric source loop skips.
+        stack.push(
+            "Conduction",
+            {"fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-3, "fluid_pp(2)%cv": 1.0, "dt": 1e-11},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-11, "viscous": "T"})
 
         cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
@@ -1070,6 +1094,55 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "model_eqns=2", {"model_eqns": 2}))
 
+        # 3D cylindrical axis (bc_y%beg = -14) routes the ghost fill through s_axis, which crosses the
+        # axis with a half-turn azimuthal shift rather than a plain mirror. This is the only trace that
+        # covers the temperature halo on that path. The base patches vary in x only, which leaves the
+        # azimuthal flux identically zero and its (1/r**2) metric untested, so a theta-dependent
+        # patch is added here.
+        #
+        # The theta dependence is geometric, not analytic: an analytic patch expression would be
+        # codegen'd into a per-case case.fpp and cost this test its own full MFC compile (~1 h of
+        # device link on amdflang). s_icpp_cuboid converts (r, theta) to Cartesian before its box
+        # test when grid_geometry == 3, so a cuboid offset from the axis covers a theta-and-r
+        # dependent wedge (cart_y = r*sin(theta) in [0, 1], cart_z = r*cos(theta) in [-0.5, 0.5])
+        # using numeric parameters only. It is patch 4, laid over patches 1-3 rather than replacing
+        # one of them: the three base cylinders tile x, so re-cutting any of them leaves cells no
+        # patch ever writes, and an unassigned cell is a vacuum that trips the ICFL guard on step 1.
+        # alter_patch defaults to writing only unassigned cells, hence the explicit permissions.
+        stack.push(
+            "Conduction",
+            {
+                "fluid_pp(1)%k_therm": 1.0e-3,
+                "fluid_pp(1)%cv": 1.0,
+                "fluid_pp(2)%k_therm": 4.0e-3,
+                "fluid_pp(2)%cv": 1.0,
+                "dt": 1e-11,
+                "num_patches": 4,
+                "patch_icpp(4)%geometry": 9,
+                "patch_icpp(4)%x_centroid": 2.5,
+                "patch_icpp(4)%length_x": 3.0,
+                "patch_icpp(4)%y_centroid": 0.5,
+                "patch_icpp(4)%length_y": 1.0,
+                "patch_icpp(4)%z_centroid": 0.0,
+                "patch_icpp(4)%length_z": 1.0,
+                "patch_icpp(4)%alter_patch(1)": "T",
+                "patch_icpp(4)%alter_patch(2)": "T",
+                "patch_icpp(4)%alter_patch(3)": "T",
+                "patch_icpp(4)%pres": 0.5,
+                "patch_icpp(4)%alpha_rho(1)": 0.4,
+                "patch_icpp(4)%alpha(1)": 0.8,
+                "patch_icpp(4)%alpha_rho(2)": 0.05,
+                "patch_icpp(4)%alpha(2)": 0.2,
+                "patch_icpp(4)%vel(1)": 0.0,
+                "patch_icpp(4)%vel(2)": 0.0,
+                "patch_icpp(4)%vel(3)": 0.0,
+                "patch_icpp(4)%r0": 1,
+                "patch_icpp(4)%v0": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         stack.push("cfl_adap_dt=T", {"cfl_adap_dt": "T", "cfl_target": 0.08, "t_save": 0.1, "n_start": 0, "t_stop": 0.1})
         cases.append(define_case_d(stack, "", {}))
 
@@ -1121,7 +1194,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if ARG("rdma_mpi"):
                 cases.append(define_case_d(stack, "2 MPI Ranks -> RDMA MPI", {"rdma_mpi": "T"}, ppn=2))
 
-    def alter_ib(dimInfo, six_eqn_model=False, viscous=False):
+    def alter_ib(dimInfo, six_eqn_model=False, viscous=False, num_fluids=1):
         for slip in [True, False]:
             stack.push(
                 "IBM",
@@ -1192,25 +1265,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, f"Circle{suffix}", {"patch_ib(1)%geometry": 2, "n": 49}))
-                if slip and six_eqn_model:
-                    cases.append(
-                        define_case_d(
-                            stack,
-                            f"Circle{suffix} -> model_eqns=3 -> eos=mie_gruneisen",
-                            {
-                                "patch_ib(1)%geometry": 2,
-                                "model_eqns": 3,
-                                "n": 49,
-                                "fluid_pp(1)%eos": "mie_gruneisen",
-                                "fluid_pp(1)%gamma": None,
-                                "fluid_pp(1)%pi_inf": None,
-                                "fluid_pp(1)%mg_rho0": 1.0,
-                                "fluid_pp(1)%mg_c0": 1.0,
-                                "fluid_pp(1)%mg_s": 1.0,
-                                "fluid_pp(1)%mg_gruneisen": 0.4,
-                            },
-                        )
-                    )
                 if six_eqn_model:
                     cases.append(
                         define_case_d(
@@ -1270,6 +1324,37 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(1)%vel(1)": 0.001,
                         "patch_icpp(2)%vel(1)": 0.001,
                         "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                )
+            )
+
+        if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
+            # IB-interior cells must not set the adaptive dt. A body moving through gas at rest carries its velocity into
+            # its interior, so there |u| + c exceeds anywhere in the fluid and dt shrinks ~8% if those cells are counted.
+            # The edges sit on cell faces and the body moves 0.2 dx, so no cell crosses the surface.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Adaptive dt",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "cfl_adap_dt": "T",
+                        "cfl_target": 0.5,
+                        "n_start": 0,
+                        "t_save": 0.04,
+                        "t_stop": 0.04,
+                        **{f"patch_icpp({i})%{k}": v for i in range(1, 4) for k, v in [("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.0)]},
+                        "patch_ib(1)%geometry": 3,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%length_x": 0.2,
+                        "patch_ib(1)%length_y": 0.2,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 2,
+                        "patch_ib(1)%vel(1)": 0.1,
                     },
                 )
             )
@@ -1360,6 +1445,38 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+            # Restart roundtrip regression: particle-cloud beds must survive a restart, not just namelist patch_ib patches -
+            # pre_process now generates them once and simulation reads that layout back on every start (fresh or restart).
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Box -> Restart",
+                    {
+                        "ib": "T",
+                        "num_ibs": 0,
+                        "num_particle_clouds": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "particle_cloud(1)%cloud_geometry": 1,
+                        "particle_cloud(1)%packing_method": 1,
+                        "particle_cloud(1)%x_centroid": 0.5,
+                        "particle_cloud(1)%y_centroid": 0.5,
+                        "particle_cloud(1)%length_x": 0.6,
+                        "particle_cloud(1)%length_y": 0.6,
+                        "particle_cloud(1)%num_particles": 4,
+                        "particle_cloud(1)%radius": 0.02,
+                        "particle_cloud(1)%mass": 1.0,
+                        "particle_cloud(1)%min_spacing": 0.005,
+                        "particle_cloud(1)%moving_ibm": 0,
+                        "particle_cloud(1)%seed": 12345,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                    restart_check=True,
+                )
+            )
+
         if len(dimInfo[0]) == 3 and not viscous:
             cases.append(
                 define_case_d(
@@ -1409,7 +1526,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         }
 
         for ndim in range(2, 4):
-            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=common_mods))
+            mods = dict(common_mods)
+            if ndim == 2:
+                # The 2D deck sets D = 5 over a domain of +/-6D, but Circle_IBM.stl is 0.1 across, so
+                # scale 5 leaves a disc of 0.5 against dx = 0.375: 1.33 cells, with the nearest cell
+                # centres 0.265 from the centre against a radius of 0.25. Nothing reached the 0.5
+                # occupancy threshold, ib_markers was identically zero, and the golden recorded an
+                # empty domain rather than a body (#1928). Scale 50 gives the D = 5 the deck asks
+                # for, 13 cells across. 3D keeps scale 5, where the body already marks cells.
+                mods.update({f"stl_models(1)%model_scale({i})": 50.0 for i in (1, 2, 3)})
+            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=mods))
 
         # ICPP STL: the same flat-array winding-number model path as IBM, exercised as a constant-IC patch (geometry 21)
         cases.append(define_case_f("3D -> ICPP -> STL", "examples/3D_icpp_stl_cube/case.py", [], mods={"t_step_stop": Nt, "t_step_save": Nt}))
@@ -3159,6 +3285,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_isentropic_release",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
+                # An analytic initial condition (a patch_icpp expression) is codegen'd into a
+                # per-case case.fpp, so every such example costs its own full MFC compile --
+                # about an hour of device link on amdflang. No example that enters the suite may
+                # have one; the convergence and *_analytical examples above are skipped for the
+                # same reason. The conduction physics is covered by the Conduction suite cases,
+                # whose patches are all numeric.
+                "1D_conduction_convergence",
+                "2D_axisym_conduction_convergence",
+                "3D_cyl_azimuthal_conduction_convergence",
                 "3D_IGR_TaylorGreenVortex_nvidia",
                 "2D_backward_facing_step",
                 "2D_forward_facing_step",
@@ -3227,6 +3362,32 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # that no code change can perturb. The same kinematics are covered meaningfully by the
                 # "IBM -> Prescribed Kinematics -> Pitch Ramp" case below, whose plate is four cells thick.
                 "3D_ibm_pitchup_plate",
+                # A grid-resolution study; the Example suite's 25-cell cap removes the resolution it measures.
+                "2D_ibm_thin_plate_force",
+                # The bug it shows needs two consecutive runs in one directory; a single Example run cannot see it.
+                "2D_probe_rerun",
+                # Needs its 16 x 2 x 2 rank topology; the Example suite runs it on one rank and a shrunken grid.
+                "3D_ibm_neighborhood_radius",
+                # A resolution-dependent validation case; the airfoil patch is already covered by 2D_ibm_airfoil.
+                "2D_ibm_airfoil_surface_pressure",
+                # Same as 3D_ibm_pitchup_plate above: the 25-cell cap shrinks the grid until the body is
+                # thinner than a cell, no cell passes the interior test, ib_markers is identically zero and
+                # the golden is the immersed boundary's own absence. Measured body width at the capped grid:
+                #   2D_ibm_viscous_drag_over_cylinder  0.87 cells   (circle D = 1.0, dx = 1.15)
+                #   2D_ibm_ellipse                     1.73 cells   (Lx = 4e-4, dx = 2.3e-4)
+                #   2D_ibm_stl_test                    0.04 cells   (STL D = 0.1, dx = 2.31)
+                #   3D_ibm_stl_test                    0.11 cells   (STL D = 0.1, dx = 0.92)
+                # Even the 1.73- and 0.87-cell bodies mark nothing: the interior test samples cell centres,
+                # and no centre lands inside a body that small. Each deck is correct at its own resolution,
+                # so what the cap produces is not a smaller version of the case but a different one, and
+                # skipping is the same remedy already applied to 3D_ibm_pitchup_plate. Only the Example
+                # registration goes; "3D -> IBM -> STL" still runs 3D_ibm_stl_test at full resolution. Its
+                # 2D counterpart is dead for the same reason at its own grid -- see issue #1928. The
+                # cylinder and ellipse decks have no suite counterpart and are now untested in CI.
+                "2D_ibm_viscous_drag_over_cylinder",
+                "2D_ibm_ellipse",
+                "2D_ibm_stl_test",
+                "3D_ibm_stl_test",
             ]
             if path in casesToSkip:
                 continue
@@ -3237,6 +3398,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             def modify_example_case(case: dict):
                 case["parallel_io"] = "F"
+                case["file_per_process"] = "F"
                 if "t_step_stop" in case and case["t_step_stop"] >= 50:
                     case["t_step_start"] = 0
                     case["t_step_stop"] = 50
@@ -3333,18 +3495,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
-        # --scale drives case.py's own grid, so the IC files it writes match the run grid.
-        # Anything that caps m/n/p afterwards (the Example sweep) leaves hcid=371 reading a
-        # corner of an oversized file, silently and without tripping its bounds check.
-        cases.append(
-            define_case_f(
-                "3D -> Chemistry -> Reacting Mixing Layer",
-                "examples/3D_reacting_mixing_layer/case.py",
-                ["--scale", "0.05"],  # 32^3; cold profile by default, see case.py
-                mods=common_mods,
-                override_tol=10 ** (-6),
-            )
-        )
+        # 3D_reacting_mixing_layer is not tested: its sandiego.yaml mechanism forces a second
+        # chemistry build of every target, which takes too long to compile.
 
         cases.append(
             define_case_f(

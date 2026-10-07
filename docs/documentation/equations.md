@@ -25,7 +25,7 @@ where:
 
 The parameter `model_eqns` (1, 2, or 3) selects the governing equation set.
 
-**Key source files:** `src/simulation/m_rhs.fpp` (RHS evaluation), `src/common/m_variables_conversion.fpp` (EOS and variable conversion).
+**Key source files:** `src/simulation/m_rhs.fpp` (RHS evaluation), `src/common/m_eos.fpp` (equations of state), `src/common/m_variables_conversion.fpp` (variable conversion and mixture rules).
 
 ---
 
@@ -396,6 +396,26 @@ This covers power-law shear-thinning/thickening (\f$\tau_0 = 0\f$), Bingham plas
 
 ---
 
+## 4a. Fourier Heat Conduction (`fluid_pp(i)%%k_therm`)
+
+**Source:** `src/simulation/m_conduction.fpp`
+
+Setting `fluid_pp(i)%%k_therm > 0` on any fluid adds a Fourier conduction term to the energy equation:
+
+\f[\frac{\partial(\rho E)}{\partial t} + \nabla\cdot\bigl[(\rho E + p)\,\mathbf{u}\bigr] = \cdots + \nabla\cdot(k\,\nabla T)\f]
+
+using a single thermal-equilibrium mixture temperature \f$T\f$ (the same value carried in `q_T_sf` and written by `T_wrt`) and a volume-fraction-weighted mixture conductivity:
+
+\f[k = \sum_i \alpha_i\,k_i, \qquad T = \frac{(\Gamma+1)\,p + \Pi_\infty}{\sum_i \alpha_i\rho_i\,c_{v,i}\,n_i}\f]
+
+The flux is direction-split and face-centered: a two-point difference of \f$T\f$ across each face, exact for this term since it has no cross-derivatives (an axis-cell correction applies in cylindrical coordinates; see the limitation below). The closure is implemented for the stiffened-gas and ideal-gas equations of state only, and for `model_eqns = 2` (5-equation) or `model_eqns = 3` (6-equation) — both carry the volume fractions \f$\alpha_i\f$ that weight \f$k\f$, which `model_eqns = 1` (gamma law) does not. Heat conduction is independent of `viscous`: it can be active in an otherwise inviscid simulation. It is not supported together with `igr` or `chemistry`; see @ref sec-fluid-materials in the case documentation for the full set of input constraints.
+
+A thermal diffusion CFL limit (`TCFL`) is added to the adaptive time-step candidates alongside `ICFL`/`VCFL`/`CCFL`.
+
+**Known limitation:** in cylindrical coordinates, the cell adjacent to the axis carries a non-converging \f$\sim\f$1-3% error in the conduction term. It is inherited from the two-point face-gradient every MFC diffusive flux uses, applied across the coordinate singularity at the axis — the same pattern as the two-point gradient in the chemistry diffusion flux (`src/common/m_chemistry.fpp`).
+
+---
+
 ## 5. Cylindrical Coordinates (`cyl_coord = .true.`) (\cite Wilfong26 Sec. 2.3)
 
 Additional geometric source terms appear with \f$1/r\f$ factors in the continuity, momentum, and energy equations. Key modifications:
@@ -658,7 +678,7 @@ Enthalpy flux with diffusion:
 
 \f[q_\text{diff} = \lambda\,\frac{\partial T}{\partial x} + \sum_k h_k\,\dot{m}_k\f]
 
-Reaction mechanisms are code-generated via Pyrometheus (\cite Cisneros26), which provides symbolic abstractions for thermochemistry that enable portable GPU computation and automatic differentiation of chemical source terms.
+Reaction mechanisms are compiled into Fortran by MFC's own thermochemistry generator, using Cantera to load mechanism and transport data. The generator derives from the Fortran path of Pyrometheus (\cite Cisneros26), with its MIT attribution retained. The generated routines support CPU, OpenACC, and OpenMP execution; MFC does not require Pyrometheus, JAX, or automatic differentiation. See @ref thermochemistry "Thermochemistry implementation".
 
 ---
 

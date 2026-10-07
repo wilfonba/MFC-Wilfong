@@ -62,7 +62,7 @@ contains
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*nnode
-        else if (chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures)) then
+        else if (heat_conduction .or. (chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures))) then
             v_size = sys_size + 1
         else
             v_size = sys_size
@@ -302,40 +302,38 @@ contains
     !> The goal of this subroutine is to determine the global extrema of the stability criteria in the computational domain. This is
     !! performed by sifting through the local extrema of each stability criterion. Note that each of the local extrema is from a
     !! single process, within its assigned section of the computational domain. Finally, note that the global extrema values are
-    !! only bookkeept on the rank 0 processor.
-    impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, bubs_loc, icfl_max_glb, &
-        & vcfl_max_glb, Rc_min_glb, bubs_glb, ccfl_max_loc, ccfl_max_glb)
+    !! only bookkept on the rank 0 processor. `max_loc`/`max_glb` hold the max-reduced criteria (ICFL, VCFL, CCFL, TCFL) and
+    !! `min_loc`/`min_glb` hold the min-reduced criteria (Rc).
+    impure subroutine s_mpi_reduce_stability_criteria_extrema(max_loc, min_loc, bubs_loc, max_glb, min_glb, bubs_glb)
 
-        real(wp), intent(in)  :: icfl_max_loc
-        real(wp), intent(in)  :: vcfl_max_loc
-        real(wp), intent(in)  :: Rc_min_loc
-        integer, intent(in)   :: bubs_loc
-        real(wp), intent(out) :: icfl_max_glb
-        real(wp), intent(out) :: vcfl_max_glb
-        real(wp), intent(out) :: Rc_min_glb
-        integer, intent(out)  :: bubs_glb
-        real(wp), intent(in)  :: ccfl_max_loc
-        real(wp), intent(out) :: ccfl_max_glb
+        real(wp), dimension(:), intent(in)  :: max_loc
+        real(wp), dimension(:), intent(in)  :: min_loc
+        integer, intent(in)                 :: bubs_loc
+        real(wp), dimension(:), intent(out) :: max_glb
+        real(wp), dimension(:), intent(out) :: min_glb
+        integer, intent(out)                :: bubs_glb
 
-        icfl_max_glb = icfl_max_loc
-        vcfl_max_glb = vcfl_max_loc
-        Rc_min_glb = Rc_min_loc
-        ccfl_max_glb = ccfl_max_loc
+        max_glb = max_loc
+        min_glb = min_loc
 
 #ifdef MFC_MPI
         block
             integer :: ierr
 
             bubs_glb = 0
-            call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+            call MPI_REDUCE(max_loc(1), max_glb(1), 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)  ! ICFL
 
             if (viscous) then
-                call MPI_REDUCE(vcfl_max_loc, vcfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
-                call MPI_REDUCE(Rc_min_loc, Rc_min_glb, 1, mpi_p, MPI_MIN, 0, MPI_COMM_WORLD, ierr)
+                call MPI_REDUCE(max_loc(2), max_glb(2), 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)  ! VCFL
+                call MPI_REDUCE(min_loc(1), min_glb(1), 1, mpi_p, MPI_MIN, 0, MPI_COMM_WORLD, ierr)  ! Rc
             end if
 
             if (surface_tension) then
-                call MPI_REDUCE(ccfl_max_loc, ccfl_max_glb, 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+                call MPI_REDUCE(max_loc(3), max_glb(3), 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)  ! CCFL
+            end if
+
+            if (heat_conduction) then
+                call MPI_REDUCE(max_loc(4), max_glb(4), 1, mpi_p, MPI_MAX, 0, MPI_COMM_WORLD, ierr)  ! TCFL
             end if
 
             if (bubbles_lagrange) then
@@ -343,18 +341,7 @@ contains
             end if
         end block
 #else
-        icfl_max_glb = icfl_max_loc
         bubs_glb = 0
-
-        if (viscous) then
-            vcfl_max_glb = vcfl_max_loc
-            Rc_min_glb = Rc_min_loc
-        end if
-
-        if (surface_tension) then
-            ccfl_max_glb = ccfl_max_loc
-        end if
-
         if (bubbles_lagrange) bubs_glb = bubs_loc
 #endif
 
@@ -426,6 +413,22 @@ contains
 #endif
 
     end subroutine s_mpi_allreduce_integer_sum
+
+    !> Reduce an integer(8) array to its element-wise global sum across all MPI ranks.
+    impure subroutine s_mpi_allreduce_integer_sum_vec(var_loc, var_glb)
+
+        integer(kind=8), dimension(:), intent(in)  :: var_loc
+        integer(kind=8), dimension(:), intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        call MPI_ALLREDUCE(var_loc, var_glb, size(var_loc), MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
+#endif
+
+    end subroutine s_mpi_allreduce_integer_sum_vec
 
     !> Reduce a local real value to its global minimum across all MPI ranks.
     impure subroutine s_mpi_allreduce_min(var_loc, var_glb)
@@ -538,6 +541,24 @@ contains
 
     end subroutine s_mpi_abort
 
+    !> Abort naming the file if MPI_FILE_OPEN failed. File errors default to MPI_ERRORS_RETURN, so an unchecked failure carries on
+    !! with an invalid handle and crashes somewhere unrelated.
+    impure subroutine s_check_mpi_file_open(ierr, file_loc)
+
+        integer, intent(in)          :: ierr
+        character(len=*), intent(in) :: file_loc
+
+#ifdef MFC_MPI
+        character(len=MPI_MAX_ERROR_STRING) :: msg
+        integer                             :: msg_len, ierr2
+
+        if (ierr == MPI_SUCCESS) return
+        call MPI_ERROR_STRING(ierr, msg, msg_len, ierr2)
+        call s_mpi_abort('MPI_FILE_OPEN failed on ' // trim(file_loc) // ': ' // msg(1:msg_len))
+#endif
+
+    end subroutine s_check_mpi_file_open
+
     !> Halts all processes until all have reached barrier.
     impure subroutine s_mpi_barrier
 
@@ -589,7 +610,8 @@ contains
             v_size = nVar + 2*nb*nnode
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
-        else if (present(q_T_sf) .and. chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures)) then
+        else if (present(q_T_sf) .and. (heat_conduction .or. (chemistry .and. (chem_params%diffusion &
+                 & .or. exchange_all_chemistry_temperatures)))) then
             ! Consumers that convert over ghost-inclusive bounds request temperature exchange for every chemistry run.
             ! The temperature Newton guess must be valid at rank seams even when diffusion is disabled:
             ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output

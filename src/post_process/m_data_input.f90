@@ -135,6 +135,7 @@ contains
             if (parallel_io .and. file_per_process) then
 #ifdef MFC_MPI
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call s_check_mpi_file_open(ierr, file_loc)
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
 
@@ -145,6 +146,7 @@ contains
             else if (parallel_io) then
 #ifdef MFC_MPI
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call s_check_mpi_file_open(ierr, file_loc)
 
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
@@ -192,8 +194,9 @@ contains
             allocate (ib_markers%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             allocate (q_T_sf%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
+            q_T_sf%sf = 0._wp  ! Buffer population reads the interior before anything writes it
         end if
 
     end subroutine s_allocate_field_arrays
@@ -312,6 +315,7 @@ contains
             end if
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
             call MPI_TYPE_COMMIT(filetype, ierr)
@@ -336,6 +340,7 @@ contains
             if (file_exist) then
                 data_size = n_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call s_check_mpi_file_open(ierr, file_loc)
 
                 call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
                 call MPI_TYPE_COMMIT(filetype, ierr)
@@ -359,6 +364,7 @@ contains
                 if (file_exist) then
                     data_size = p_glb + 2
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                    call s_check_mpi_file_open(ierr, file_loc)
 
                     call MPI_TYPE_VECTOR(data_size, 1, stride, mpi_p, filetype, ierr)
                     call MPI_TYPE_COMMIT(filetype, ierr)
@@ -413,6 +419,7 @@ contains
 
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call s_check_mpi_file_open(ierr, file_loc)
 
                 if (down_sample) then
                     call s_initialize_mpi_data_ds(m, n, p, q_cons_temp)
@@ -470,6 +477,7 @@ contains
 
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call s_check_mpi_file_open(ierr, file_loc)
 
                 call s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
 
@@ -560,7 +568,7 @@ contains
             deallocate (ib_markers%sf)
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             deallocate (q_T_sf%sf)
         end if
 

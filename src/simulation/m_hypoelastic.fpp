@@ -11,7 +11,7 @@ module m_hypoelastic
     use m_global_parameters
     use m_finite_differences
     use m_helper
-    use m_variables_conversion, only: f_bulk_modulus, s_phase_bulk_modulus
+    use m_eos, only: s_phase_bulk_modulus
 
     implicit none
 
@@ -59,12 +59,13 @@ contains
         end do
         $:GPU_UPDATE(device='[Gs_hypo]')
 
-        @:ALLOCATE(fd_coeff_x_hypo(-fd_number:fd_number, 0:m))
+        ! s_compute_finite_difference_coefficients always extends fd_number beyond the interior on each side
+        @:ALLOCATE(fd_coeff_x_hypo(-fd_number:fd_number,-fd_number:m + fd_number))
         if (n > 0) then
-            @:ALLOCATE(fd_coeff_y_hypo(-fd_number:fd_number, 0:n))
+            @:ALLOCATE(fd_coeff_y_hypo(-fd_number:fd_number,-fd_number:n + fd_number))
         end if
         if (p > 0) then
-            @:ALLOCATE(fd_coeff_z_hypo(-fd_number:fd_number, 0:p))
+            @:ALLOCATE(fd_coeff_z_hypo(-fd_number:fd_number,-fd_number:p + fd_number))
         end if
 
         ! Computing centered finite difference coefficients

@@ -18,6 +18,8 @@ A test is considered passing when our error tolerances are met in order to maint
 - `--percent` (`%`) to specify a percentage of the test suite to select at random and test
 - `--max-attempts` (`-m`) the maximum number of attempts to make on a test before considering it failed
 - `--no-examples` skips the testing of cases in the examples folder
+- `--no-chemistry` skips every case that uses chemistry (``chemistry = 'T'``), including reacting example cases
+- `--no-build` runs against existing binaries without rebuilding. Some cases (chemistry, analytic initial conditions) need their own build, which `./mfc.sh build` does not produce; build everything the suite needs with `./mfc.sh test --dry-run <options>`. If any required binary is missing, `--no-build` stops before running any case and lists what is missing.
 - `--rdma-mpi` runs additional tests where RDMA MPI is enabled.
 
 To specify a computer, pass the `-c` flag to `./mfc.sh run` like so:
@@ -110,6 +112,17 @@ Each of these fails quietly rather than loudly.
   a different configuration. Chemistry has its own configuration that a plain `./mfc.sh
   build` never produces, so a `--no-build` run can report failures from stale binaries and
   hide real compile breaks. Run chemistry-touching sets without it.
+- **A case that needs a build of its own is red on exactly one lane.** Anything that changes
+  what `MFCTarget.get_slug` hashes — most often an analytic initial condition, i.e. a
+  `patch_icpp` value written as an expression rather than a number — gives the case its own
+  `case.fpp` and its own install directory. Most lanes pre-build every such variant with
+  `./mfc.sh test --dry-run -a`, but Frontier AMD gpu-omp cannot afford to (each amdflang
+  device link is ~1 h), so it pre-builds only the default and the chemistry configurations;
+  the test job then runs `--no-build` and `srun` reports `execve(): .../pre_process: No such
+  file or directory`, which reads like a filesystem fault an hour and a half into the run.
+  Prefer geometric variation to analytic (cuboid bounds are plain numbers), or skip the
+  example via `casesToSkip`. `toolchain/mfc/lint_test_suite.py` enforces this in the lint
+  gate, before any cluster job is queued.
 - **Identify the newest binary by the binary's own mtime**, not by its install directory's:
   a stale configuration's directory can be newer than a fresh build's.
 - **The pre-commit hook lives in the main repository's `.git/hooks/`**, and git exports

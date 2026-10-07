@@ -664,6 +664,46 @@ that defines the routine. Helpers added to `m_riemann_state.fpp` are automatical
 in scope for every solver module that `use`s it — no additional declare-target
 annotations are needed at call sites.
 
+## Module boundaries and NVHPC inlining
+
+**Moving a device helper into another file can silently cost ~25% on NVHPC.** NVHPC has no
+device LTO, so MFC's only cross-file inlining is the two-pass `-Mextract=lib:` / `-Minline=lib:`
+scheme in `cmake/MFCTargets.cmake`. That inliner **refuses any device routine that has a
+subroutine call anywhere in its call tree**, reporting:
+
+```
+subprogram not inlined -- missing prototype during crossing files: <name>
+```
+
+The refusal propagates: a caller of a refused routine is refused too. Measured on nvfortran
+25.11 (A100), the following hold for a routine that must inline across files:
+
+| in the routine's body | inlines across files? |
+|---|---|
+| arithmetic, branches on module logicals, module array reads, early `return` | yes |
+| a call to a scalar-returning function that is itself inlinable | yes (the callee need not be inlined) |
+| a call to a **subroutine** | **no** |
+| the routine *returns* a derived type or an array | **no** — never inlinable |
+
+There is no build-level escape: `-Mextract` always captures pre-inline source, so re-extracting
+in stages, compiling several files in one invocation, and `levels:`/`maxsize:`/`name:`/`except:`
+all fail, as does `-Mipa` (ignored in 25.x). Cray and AMD do their own whole-program IPA and are
+unaffected, and CPU builds do not care — so this shows up as an NVHPC-only benchmark regression
+while every other job stays green.
+
+**Symptom.** Grind time regresses on NVHPC alone, with unchanged source semantics. Confirm by
+comparing per-routine stack frames: `-Minfo=inline` and `-gpu=ptxinfo` are already on, so
+`Function properties for ...` lines jumping from ~8 bytes to 200–350 bytes with matching
+`spill stores`/`spill loads` is the fingerprint. Registers per thread going *down* while the
+kernel gets slower is the same story seen from `ncu`.
+
+**Rule of thumb.** Draw a module boundary where inlining already fails, not in the middle of a
+chain that currently inlines. Solver kernels never inlined `s_compute_mixture_coefficients` or
+`s_compute_speed_of_sound` even before `m_eos` existed, which makes that a free cut point; the
+phase chain those two call (`s_phase_coefficients` → `s_eos_coefficients` → `s_reference_curve`)
+must stay in the same file as them. This is why those four routines live in `src/common/m_eos.fpp`
+alongside the EOS operators even though mixture closure is not, strictly, an equation of state.
+
 ------------------------------------------------------------------------------------------
 
 # Debugging Tools and Tips for GPUs
@@ -845,7 +885,9 @@ MFC's build raises the cap (`-attributor-max-pi-accesses=16384`, passed to the o
 linker in `cmake/MFCTargets.cmake`), which restores full pointer precision for the whole
 image and makes kernel quality independent of unrelated edits. The cost is a longer
 device link. If a build's device link is unexpectedly slow, this flag is why — do not
-remove it; kernel performance becomes nondeterministic across commits without it.
+remove it; kernel performance becomes nondeterministic across commits without it. The cap
+is unchanged in AFAR 24.3 ([ROCm/llvm-project#4070](https://github.com/ROCm/llvm-project/issues/4070);
+fix proposed in [#4094](https://github.com/ROCm/llvm-project/pull/4094)).
 
 The failure signature without the flag: after adding a kernel, unrelated kernels'
 resource usage shifts image-wide (uniform LDS increase, scratch/spill jumps visible in
@@ -862,7 +904,8 @@ while the host still registers it. The first launch aborts with
     omptarget error: Failed to load kernel ...
 
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
-hoist it into its own (module) subroutine with the locals passed as arguments.
+hoist it into its own (module) subroutine with the locals passed as arguments. A minimal
+reproducer runs correctly on AFAR 24.3, but this is not yet verified inside MFC.
 
 ## Silent-Failure Traps {#silent-failure-traps}
 
@@ -900,14 +943,13 @@ answer is wrong, or one backend diverges from all the others.
   passes a `parameter` array from `m_thermochem`, such as `molecular_weights`, into a
   declare-target routine. Read such arrays directly in the kernel, or pass a plain local
   computed from them.
-- **The `USING_AMD` fypp guards are load-bearing, not a stale workaround.** They swap a
-  device-global array bound for a literal in `src/common/include/shared_parallel_macros.fpp`
-  and its 86 use sites. Setting `USING_AMD = False` and rebuilding amdflang `--gpu mp`
-  without case optimization compiles completely clean, then produces NaNs in CBC, the
-  `wave_speeds=2` Riemann path, immersed boundaries, surface tension, QBMM and viscous
-  cases, and MHD HLLD, while both Lagrange bubble cases complete with out-of-tolerance
-  answers. A compile-only check returns green, so any attempt to remove these must run the
-  tests rather than just build.
+- **The `USING_AMD` fypp guards are load-bearing for performance.** They swap a device-global
+  array bound for a literal in `src/common/include/shared_parallel_macros.fpp` and its use
+  sites. On AFAR 24.3, `USING_AMD = False` (no case optimization) gives correct results but runs
+  4-5x slower: private arrays sized by runtime globals move from registers to scratch (the
+  WENO kernel goes from 0 to 400 B of scratch per thread and runs 11x slower; HLLC 4.9x). On
+  AFAR 23.2.x it also produced NaNs in CBC, `wave_speeds=2`, IBM, surface tension, QBMM,
+  viscous, and MHD HLLD cases. Removing them needs a benchmark, not just the tests.
 - `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
   `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
 
