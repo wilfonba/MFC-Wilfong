@@ -1640,7 +1640,6 @@ class CaseValidator:
             "hypoelasticity",
             "hyperelasticity",
             "mhd",
-            "chemistry",
             "relax",
             "alt_soundspeed",
             "acoustic_source",
@@ -1651,6 +1650,10 @@ class CaseValidator:
             "synthetic_turbulence",
         ]:
             self.prohibit(self.get(flag, "F") == "T", f"proj_method does not support {flag} = T")
+        self.prohibit(
+            self.get("chemistry", "F") == "T" and self.get("chem_params%reactions", "F") == "T",
+            "proj_method supports chemistry without reactions (chem_params%reactions = F) so far",
+        )
         for i in range(1, (self.get("num_fluids") or 1) + 1):
             eos = self.get(f"fluid_pp({i})%eos")
             self.prohibit(eos not in (None, 1, 2, "stiffened_gas", "ideal_gas"), f"proj_method supports only stiffened- and ideal-gas fluids (fluid_pp({i})%eos)")

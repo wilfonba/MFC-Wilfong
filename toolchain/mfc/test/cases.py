@@ -3653,6 +3653,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+        outlets = {"proj_method": "T", "bc_x%pres_out": 101325.0, "bc_y%pres_out": 101325.0}
+        cases.append(define_case_d(stack, "Projection", outlets, override_tol=10 ** (-10)))
         stack.pop()
 
         stack.push(
@@ -3695,6 +3697,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+        cases.append(define_case_d(stack, "Projection", {"proj_method": "T"}, override_tol=10 ** (-10)))
 
         stack.pop()
 
