@@ -485,10 +485,10 @@ contains
             if (s == 1) then
                 if (run_time_info) then
                     if (igr) then
-                        call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
+                        call s_write_run_time_information(q_cons_ts(1)%vf, q_T_sf, t_step)
                     end if
                     if (.not. igr) then
-                        call s_write_run_time_information(q_prim_vf, t_step)
+                        call s_write_run_time_information(q_prim_vf, q_T_sf, t_step)
                     end if
                 end if
 
@@ -687,6 +687,7 @@ contains
         real(wp)               :: qv                 !< Cell-avg. fluid reference energy
         real(wp)               :: c                  !< Cell-avg. sound speed
         real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
+        real(wp)               :: Dth                !< Cell thermal diffusivity (s_compute_cell_diffusivity)
         real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
         real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
@@ -710,7 +711,7 @@ contains
         ccfl_dt_local = huge(1.0_wp)
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
                             & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
                             & tcfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
@@ -746,7 +747,8 @@ contains
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
                         end if
 
-                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
+                        call s_compute_cell_diffusivity(q_prim_vf, q_T_sf, pres, rho, alpha, alpha_rho, Re, Dth, j, k, l)
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, Dth, j, k, l)
 
                         icfl_dt_local = min(icfl_dt_local, max_dt(1))
                         vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
