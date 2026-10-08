@@ -44,6 +44,13 @@ module m_ibm
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
+    !> Stefan (blowing) velocity of a reacting surface at its ghost points, zero elsewhere, per direction: the projection, which
+    !! keeps faces touching an immersed boundary closed, carries it on the faces a ghost cell shares with the gas. Allocated full
+    !! size only under proj_method with a reacting surface (ib_blowing)
+    type(scalar_field), dimension(3), public :: ib_vblow
+    logical, public                          :: ib_blowing = .false.
+    $:GPU_DECLARE(create='[ib_vblow, ib_blowing]')
+
     !> 1 at ghost points whose image point reaches the fluid, 0 elsewhere. Ghost points with a buried image point average over these
     !! neighbors, and never over each other.
     type(integer_field) :: corrected_gps
@@ -71,6 +78,8 @@ contains
     !> Allocates memory for the variables in the IBM module
     impure subroutine s_initialize_ibm_module()
 
+        integer :: i
+
         if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
             @:ALLOCATE(corrected_gps%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
@@ -81,6 +90,21 @@ contains
 
         @:ACC_SETUP_SFs(ib_markers)
         @:ACC_SETUP_SFs(corrected_gps)
+
+        ib_blowing = proj_method .and. chemistry .and. any(patch_ib(1:num_ibs)%surface_reaction == 1)
+        do i = 1, 3
+            if (.not. ib_blowing) then
+                @:ALLOCATE(ib_vblow(i)%sf(0:0, 0:0, 0:0))
+            else if (p > 0) then
+                @:ALLOCATE(ib_vblow(i)%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
+            else
+                @:ALLOCATE(ib_vblow(i)%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
+            end if
+            ib_vblow(i)%sf = 0._stp
+            $:GPU_UPDATE(device='[ib_vblow(i)%sf]')
+        end do
+        @:ACC_SETUP_SFs(ib_vblow(1), ib_vblow(2), ib_vblow(3))
+        $:GPU_UPDATE(device='[ib_blowing]')
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
 
@@ -490,11 +514,25 @@ contains
                 ! Calculate velocity of ghost cell
                 call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, pres_IP, vel_g)
 
+                if (ib_blowing) then
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, num_dims
+                        ib_vblow(q)%sf(j, k, l) = 0._stp
+                    end do
+                end if
                 if (chemistry .and. patch_ib(patch_id)%inj_species == 0 .and. patch_ib(patch_id)%surface_reaction == 1 &
                     & .and. surface_converged) then
                     norm(1:3) = gp%levelset_norm
                     buf = sqrt(sum(norm**2))
-                    if (buf > 0._wp) vel_g = vel_g + v_stefan*norm/buf
+                    if (buf > 0._wp) then
+                        vel_g = vel_g + v_stefan*norm/buf
+                        if (ib_blowing) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do q = 1, num_dims
+                                ib_vblow(q)%sf(j, k, l) = real(v_stefan*norm(q)/buf, stp)
+                            end do
+                        end if
+                    end if
                 end if
 
                 ! Set momentum
@@ -2018,6 +2056,9 @@ contains
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(corrected_gps%sf)
+        do i = 1, 3
+            @:DEALLOCATE(ib_vblow(i)%sf)
+        end do
         @:DEALLOCATE(ib_gbl_idx_lookup)
         do i = 1, num_ib_airfoils_max
             if (allocated(ib_airfoil_grids(i)%upper)) then

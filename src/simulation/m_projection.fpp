@@ -55,7 +55,7 @@ module m_projection
     use m_eos
     use m_body_forces, only: s_compute_acceleration
     use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, s_compute_interface_reynolds
-    use m_ibm, only: ib_markers
+    use m_ibm, only: ib_markers, ib_vblow, ib_blowing
     use m_nvtx
     use m_thermochem, only: num_species, molecular_weights, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, get_species_enthalpies_rt
@@ -348,10 +348,13 @@ contains
 
     end subroutine s_dirichlet_faces
 
-    !> Normal velocity vanishes on solid walls and on faces touching a stationary immersed boundary
+    !> Normal velocity vanishes on solid walls and on faces touching a stationary immersed boundary, except a reacting surface's
+    !! Stefan velocity (ib_vblow) on the faces its ghost cells share with the gas, which feeds the gas the gasified mass
     subroutine s_zero_wall_faces()
 
-        integer :: j, k, l
+        real(wp) :: sa, sb
+        logical  :: blow
+        integer  :: j, k, l
 
         #:set UB = {'j': 'm', 'k': 'n', 'l': 'p'}
         #:for D, NV, LO, HI, FB, FI in [(1, 'j', '-1, k, l', 'm, k, l', 'fbx', 'k, l'), (2, 'k', 'j, -1, l', 'j, n, l', 'fby', 'j, l'), &
@@ -370,14 +373,19 @@ contains
         #:endfor
 
         if (ib) then
+            blow = ib_blowing  ! a host flag, firstprivate below
             #:for D, IP1, LB, KB, JB in [(1, 'j + 1, k, l', 0, 0, -1), (2, 'j, k + 1, l', 0, -1, 0), (3, 'j, k, l + 1', -1, 0, 0)]
                 if (num_dims >= ${D}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, sa, sb]', firstprivate='[blow]')
                     do l = ${LB}$, p
                         do k = ${KB}$, n
                             do j = ${JB}$, m
-                                uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$)*real((1._stp - solid(j, k, l))*(1._stp - solid(${IP1}$)), &
-                                   & wp)
+                                sa = real(solid(j, k, l), wp); sb = real(solid(${IP1}$), wp)
+                                if (sa + sb > 0.5_wp) then
+                                    uf(j, k, l, ${D}$) = 0._wp
+                                    if (blow .and. sa + sb < 1.5_wp) uf(j, k, l, ${D}$) = sa*real(ib_vblow(${D}$)%sf(j, k, l), &
+                                        & wp) + sb*real(ib_vblow(${D}$)%sf(${IP1}$), wp)
+                                end if
                             end do
                         end do
                     end do
@@ -403,6 +411,13 @@ contains
         integer                                                                             :: i, j, k, l, o, nr
 
         if (id == 1) then
+            ! A reacting surface's blowing, which s_zero_wall_faces puts on the faces its ghost cells share with the gas, at rank
+            ! seams too
+            if (ib_blowing) then
+                do i = 1, num_dims
+                    call s_populate_F_igr_buffers(bc_type, ib_vblow(i:i))
+                end do
+            end if
             if (.not. faces_ready) then
                 call s_projection_face_codes(bc_type)
                 if (ib) call s_build_solid(bc_type)
@@ -1149,9 +1164,10 @@ contains
                             if (num_dims >= ${D}$) then
                                 ! High face: between this cell and the next
                                 vn = uf(j, k, l, ${D}$)
-                                if (pre) vn = (vn - f_face_gf(rhoc(j, k, l), rhoc(${IP1}$), solid(j, k, l), solid(${IP1}$), &
+                                ! The correction (zero across an immersed boundary, whose faces keep their prescribed velocity)
+                                if (pre) vn = vn - f_face_gf(rhoc(j, k, l), rhoc(${IP1}$), solid(j, k, l), solid(${IP1}$), &
                                     & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)), real(pk(j, k, l), wp), real(pk(${IP1}$), &
-                                    & wp), tl))*real((1._stp - solid(j, k, l))*(1._stp - solid(${IP1}$)), wp)
+                                    & wp), tl)
                                 if (${SV}$ == ${UB}$) then
                                     if (f_wall_face(${FB}$(${FI}$, 2))) vn = 0._wp
                                 end if
@@ -1161,9 +1177,9 @@ contains
                                 dd = dd + du/${DXV}$(${SV}$)
                                 ! Low face: between the previous cell and this one
                                 vn = uf(${IM1}$, ${D}$)
-                                if (pre) vn = (vn - f_face_gf(rhoc(${IM1}$), rhoc(j, k, l), solid(${IM1}$), solid(j, k, l), &
+                                if (pre) vn = vn - f_face_gf(rhoc(${IM1}$), rhoc(j, k, l), solid(${IM1}$), solid(j, k, l), &
                                     & 0.5_wp*(${DXV}$(${SV}$ - 1) + ${DXV}$(${SV}$)), real(pk(${IM1}$), wp), real(pk(j, k, l), &
-                                    & wp), tl))*real((1._stp - solid(${IM1}$))*(1._stp - solid(j, k, l)), wp)
+                                    & wp), tl)
                                 if (${SV}$ == 0) then
                                     if (f_wall_face(${FB}$(${FI}$, 1))) vn = 0._wp
                                 end if
