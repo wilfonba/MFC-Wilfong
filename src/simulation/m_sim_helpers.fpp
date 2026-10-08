@@ -11,10 +11,14 @@ module m_sim_helpers
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+    use m_thermochem, only: num_species, get_mixture_specific_heat_cv_mass, get_mixture_thermal_conductivity_mixavg, &
+        & get_mixture_viscosity_mixavg
+    use m_thermochem_state, only: get_mixavg_transport_state
 
     implicit none
 
-    private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names
+    private; public :: s_compute_cell_state, s_compute_cell_diffusivity, s_compute_stability_from_dt, s_compute_dt_from_cfl, &
+        & dt_limiter, dt_limiter_names
 
     !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, TCFL, the collision cap, or the ramp limiter)
     character(len=4)                          :: dt_limiter = 'none'
@@ -71,6 +75,38 @@ contains
         end if
 
     end function f_compute_filtered_dtheta
+
+    !> Sum over directions of 1/spacing^2 at cell (j, k, l). An explicit diffusion with diffusivity D is RK-stable for D*dt*sum <=
+    !! 2.51/4 (RK3; 2/4 for RK1 and RK2), so the diffusive CFL numbers are D*dt*sum
+    function f_inv_dx2_sum(j, k, l) result(s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(in) :: j, k, l
+        real(wp)            :: s
+
+        s = 1._wp/dx(j)**2
+        if (n > 0) s = s + 1._wp/dy(k)**2
+        if (p > 0) then
+            if (grid_geometry == 3) then
+                s = s + 1._wp/f_compute_filtered_dtheta(k, l)**2
+            else
+                s = s + 1._wp/dz(l)**2
+            end if
+        end if
+
+    end function f_inv_dx2_sum
+
+    !> Momentum diffusivity of the viscous stress: normal stresses diffuse with (4/3 mu + mu_b)/rho, the largest coefficient
+    function f_visc_diffusivity(Re_l, rho) result(nu)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), dimension(2), intent(in) :: Re_l
+        real(wp), intent(in)               :: rho
+        real(wp)                           :: nu
+
+        nu = (4._wp/(3._wp*Re_l(1)) + 1._wp/Re_l(2))/rho
+
+    end function f_visc_diffusivity
 
     !> Computes the mixture coefficients, velocity and pressure of one cell
     subroutine s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
@@ -132,7 +168,73 @@ contains
     end subroutine s_compute_cell_state
 
     !> Computes stability criterion for a specified dt
-    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
+    !> Thermal diffusivity of cell (j, k, l) for the explicit diffusion step limit, zero without diffusion: k/(rho cv) of Fourier
+    !! conduction, or for a diffusing reacting mixture its constant-volume lambda/(rho cv), raised to the largest species
+    !! diffusivity with mixture-averaged transport. A viscous reacting mixture's Re(1) becomes the 1/mu its viscous flux uses
+    subroutine s_compute_cell_diffusivity(q_prim_vf, q_T_sf, pres, rho, alpha, alpha_rho, Re, Dth, j, k, l)
+
+        $:GPU_ROUTINE(function_name='s_compute_cell_diffusivity', parallelism='[seq]', cray_inline=True)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), intent(in)                      :: q_T_sf
+        real(wp), intent(in)                                :: pres, rho
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha, alpha_rho
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
+        #:endif
+        real(wp), dimension(2), intent(inout) :: Re
+        real(wp), intent(out)                 :: Dth
+        integer, intent(in)                   :: j, k, l
+        real(wp)                              :: k_mix, rho_cv
+        integer                               :: i
+
+        #:if chemistry
+            real(wp), dimension(num_species) :: Ys, Xs, Dk
+            real(wp)                         :: T, cv, lam, W, mu
+        #:endif
+
+        Dth = 0._wp
+        if (heat_conduction) then
+            k_mix = 0._wp
+            rho_cv = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                k_mix = k_mix + alpha(i)*fluid_k_therm(i)
+                rho_cv = rho_cv + alpha_rho(i)*cvs(i)
+            end do
+            Dth = k_mix/max(rho_cv, sgm_eps)
+        end if
+
+        #:if chemistry
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_species
+                Ys(i) = q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)
+            end do
+            T = q_T_sf%sf(j, k, l)
+            if (chem_params%diffusion) then
+                call get_mixture_specific_heat_cv_mass(T, Ys, cv)
+                if (chem_params%transport_model == 1) then
+                    call get_mixavg_transport_state(pres, T, Ys, W, Xs, Dk, lam)
+                    Dth = lam/(rho*cv)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_species
+                        Dth = max(Dth, Dk(i))
+                    end do
+                else
+                    call get_mixture_thermal_conductivity_mixavg(T, Ys, lam)
+                    Dth = lam/(rho*cv)
+                end if
+            end if
+            if (viscous) then
+                call get_mixture_viscosity_mixavg(T, Ys, mu)
+                Re(1) = 1._wp/mu
+            end if
+        #:endif
+
+    end subroutine s_compute_cell_diffusivity
+
+    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, alpha, alpha_rho, Dth, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
@@ -140,6 +242,7 @@ contains
         real(wp), intent(inout)                   :: icfl
         real(wp), intent(inout)                   :: vcfl, Rc, ccfl, tcfl
         real(wp), dimension(2), intent(in)        :: Re_l
+        real(wp), intent(in)                      :: Dth
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3), intent(in) :: alpha, alpha_rho
         #:else
@@ -147,8 +250,7 @@ contains
         #:endif
         integer, intent(in) :: j, k, l
         real(wp)            :: fltr_dtheta
-        real(wp)            :: k_mix, rho_cv, rho_c
-        integer             :: i
+        real(wp)            :: rho_c
 
         ! Inviscid CFL calculation
         ! The multi-dimensional CFL terms are written out here rather than
@@ -172,22 +274,19 @@ contains
 
         ! Viscous calculations
         if (viscous) then
+            vcfl = dt*f_visc_diffusivity(Re_l, rho)*f_inv_dx2_sum(j, k, l)
             if (p > 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k), fltr_dtheta)**2._wp
                         Rc = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), fltr_dtheta*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     else
-                        vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k), dz(l))**2._wp
                         Rc = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c), dz(l)*(abs(vel(3)) + c))/maxval(1._wp/Re_l)
                     end if
                 #:endif
             else if (n > 0) then
-                vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
                 Rc = min(dx(j)*(abs(vel(1)) + c), dy(k)*(abs(vel(2)) + c))/maxval(1._wp/Re_l)
             else
-                vcfl = maxval(dt/Re_l/rho)/dx(j)**2._wp
                 Rc = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if
         end if
@@ -215,50 +314,28 @@ contains
         end if
 
         ! Thermal diffusion CFL
-        if (heat_conduction) then
-            k_mix = 0._wp
-            rho_cv = 0._wp
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                k_mix = k_mix + alpha(i)*fluid_k_therm(i)
-                rho_cv = rho_cv + alpha_rho(i)*cvs(i)
-            end do
-
-            if (p > 0) then
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k), fltr_dtheta)**2._wp)
-                else
-                    tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k), dz(l))**2._wp)
-                end if
-            else if (n > 0) then
-                tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k))**2._wp)
-            else
-                tcfl = dt*k_mix/(rho_cv*dx(j)**2._wp)
-            end if
-        end if
+        tcfl = dt*Dth*f_inv_dx2_sum(j, k, l)
 
     end subroutine s_compute_stability_from_dt
 
     !> Computes the candidate dts for a specified CFL number: max_dt(1) from the inviscid, max_dt(2) the viscous, max_dt(3) the
     !! capillary, and max_dt(4) the thermal diffusion criterion (huge where the criterion is inactive)
-    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, alpha, alpha_rho, j, k, l)
+    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, alpha, alpha_rho, Dth, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in)                      :: c, rho
         real(wp), dimension(4), intent(out)       :: max_dt
         real(wp), dimension(2), intent(in)        :: Re_l
+        real(wp), intent(in)                      :: Dth
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3), intent(in) :: alpha, alpha_rho
         #:else
             real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
         #:endif
         integer, intent(in) :: j, k, l
-        real(wp)            :: vcfl_dt, ccfl_dt, tcfl_dt, rho_c
+        real(wp)            :: ccfl_dt, rho_c
         real(wp)            :: fltr_dtheta
-        real(wp)            :: k_mix, rho_cv
-        integer             :: i
 
         max_dt(2) = huge(1._wp)
         max_dt(3) = huge(1._wp)
@@ -285,21 +362,7 @@ contains
         end if
 
         ! Viscous calculations
-        if (viscous) then
-            if (p > 0) then
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)/maxval(1/(rho*Re_l))
-                else
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)/maxval(1/(rho*Re_l))
-                end if
-            else if (n > 0) then
-                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
-            else
-                vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
-            end if
-            max_dt(2) = vcfl_dt
-        end if
+        if (viscous) max_dt(2) = cfl_target/(f_visc_diffusivity(Re_l, rho)*f_inv_dx2_sum(j, k, l))
 
         ! Capillary CFL calculations
         if (surface_tension) then
@@ -324,30 +387,8 @@ contains
             max_dt(3) = ccfl_dt
         end if
 
-        ! Thermal diffusion CFL: dt <= cfl * dx^2 * rho * cv / k
-        if (heat_conduction) then
-            k_mix = 0._wp
-            rho_cv = 0._wp
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                k_mix = k_mix + alpha(i)*fluid_k_therm(i)
-                rho_cv = rho_cv + alpha_rho(i)*cvs(i)
-            end do
-
-            if (p > 0) then
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    tcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)*rho_cv/max(k_mix, sgm_eps)
-                else
-                    tcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)*rho_cv/max(k_mix, sgm_eps)
-                end if
-            else if (n > 0) then
-                tcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)*rho_cv/max(k_mix, sgm_eps)
-            else
-                tcfl_dt = cfl_target*(dx(j)**2._wp)*rho_cv/max(k_mix, sgm_eps)
-            end if
-            max_dt(4) = tcfl_dt
-        end if
+        ! Thermal diffusion CFL: dt <= cfl/(D sum(1/dx^2))
+        if (Dth > 0._wp) max_dt(4) = cfl_target/(Dth*f_inv_dx2_sum(j, k, l))
 
     end subroutine s_compute_dt_from_cfl
 

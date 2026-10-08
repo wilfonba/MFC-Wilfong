@@ -1640,7 +1640,6 @@ class CaseValidator:
             "hypoelasticity",
             "hyperelasticity",
             "mhd",
-            "chemistry",
             "relax",
             "alt_soundspeed",
             "acoustic_source",
@@ -1651,13 +1650,17 @@ class CaseValidator:
             "synthetic_turbulence",
         ]:
             self.prohibit(self.get(flag, "F") == "T", f"proj_method does not support {flag} = T")
+        self.prohibit(
+            self.get("chemistry", "F") == "T" and self.get("chem_params%reactions", "F") == "T" and (self.get("chem_params%reaction_substeps") or 0) <= 0,
+            "proj_method integrates reactions only operator-split (chem_params%reaction_substeps > 0): an explicit reaction source neither survives its time step nor reaches the pressure equation",
+        )
         for i in range(1, (self.get("num_fluids") or 1) + 1):
             eos = self.get(f"fluid_pp({i})%eos")
             self.prohibit(eos not in (None, 1, 2, "stiffened_gas", "ideal_gas"), f"proj_method supports only stiffened- and ideal-gas fluids (fluid_pp({i})%eos)")
         for d in ["x", "y", "z"]:
             for e in ["beg", "end"]:
                 bc = self.get(f"bc_{d}%{e}")
-                self.prohibit(bc is not None and bc not in [-1, -2, -3, -15, -16], f"proj_method does not support bc_{d}%{e} = {bc}")
+                self.prohibit(bc is not None and bc not in [-1, -2, -3, -15, -16, -17], f"proj_method does not support bc_{d}%{e} = {bc}")
 
     def check_igr_simulation(self):
         """Checks IGR constraints specific to simulation"""

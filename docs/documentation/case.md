@@ -503,7 +503,7 @@ The parameters define material's property of compressible fluids that are used i
 When these parameters are undefined, fluids are treated as inviscid.
 Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 
-- `fluid_pp(i)%%k_therm` sets the thermal conductivity of the $i$-th fluid, in units consistent with the rest of the (non-dimensional) case. A positive value on any fluid activates Fourier heat conduction, which adds \f$\nabla\cdot(k\nabla T)\f$ to the energy equation using the thermal-equilibrium mixture temperature and \f$k = \sum_i \alpha_i k_i\f$ (see @ref equations "Equations"). It requires `fluid_pp(i)%%cv` to be positive on every fluid that sets it (the mixture temperature is undefined without \f$c_v\f$), `model_eqns = 2` or `model_eqns = 3` (the mixture conductivity is weighted by volume fractions that `model_eqns = 1` does not carry), and `fluid_pp(i)%%eos` to be the stiffened-gas or ideal-gas equation of state. Heat conduction is independent of `viscous`: it can be enabled in an otherwise inviscid run. It is not supported with `igr`, nor with `chemistry` (which already carries its own mixture-averaged conduction through `chem_params%%diffusion`).
+- `fluid_pp(i)%%k_therm` sets the thermal conductivity of the $i$-th fluid, in units consistent with the rest of the (non-dimensional) case. A positive value on any fluid activates Fourier heat conduction, which adds \f$\nabla\cdot(k\nabla T)\f$ to the energy equation using the thermal-equilibrium mixture temperature and \f$k = \sum_i \alpha_i k_i\f$ (see @ref equations "Equations"). It requires `fluid_pp(i)%%cv` to be positive on every fluid that sets it (the mixture temperature is undefined without \f$c_v\f$), `model_eqns = 2` or `model_eqns = 3` (the mixture conductivity is weighted by volume fractions that `model_eqns = 1` does not carry), and `fluid_pp(i)%%eos` to be the stiffened-gas or ideal-gas equation of state. Heat conduction is independent of `viscous`: it can be enabled in an otherwise inviscid run. It is not supported with `igr`, nor with `chemistry` (which already carries its own mixture-averaged conduction through `chem_params%%diffusion`). With `proj_method` the conducted heat enters the pressure equation, \f$\partial_t p \mathrel{+}= -\nabla\cdot\mathbf{q}/\Gamma\f$, and the energy follows from the solved pressure; it stays explicit, so the thermal limit (`TCFL`) often sets the time step.
 
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
@@ -744,7 +744,7 @@ restart data being resumed from. Pass `-t pre_process` explicitly (as in the res
 
 - `cfl_const_dt` enables constant `dt` time-stepping where `dt` results in a specified CFL for the initial condition
 
-- `cfl_target` specifies the target CFL value
+- `cfl_target` specifies the target CFL value. It bounds the acoustic number in each direction, and the diffusive numbers \f$D\,\Delta t\sum_d \Delta x_d^{-2}\f$ of viscosity (`VCFL`, \f$D = (4\mu/3 + \mu_b)/\rho\f$) and conduction (`TCFL`, \f$D = k/(\rho c_v)\f$), which RK3 keeps stable up to about 0.63 (0.5 for RK1 and RK2)
 
 - `ramp_ratio` limits how much the adaptive time step can grow from one time step to the next: `dt` is capped at `ramp_ratio` times the previous `dt`. Must be at least 1. When unset, the time step growth is unlimited.
 
@@ -1268,6 +1268,8 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 - `chem_params%%reaction_substeps` controls how the reaction source is integrated. With `0` (default) the net production rates are added to the flow right-hand side and advanced by the flow time stepper (fine for hydrogen). With a value `> 0`, the reaction is instead integrated by operator splitting after each flow update: every cell's constant-density, constant-internal-energy reactor is advanced over the timestep with that many sub-steps of an **α-QSS** (quasi-steady-state) integrator — a matrix-free, Jacobian-free predictor–corrector (Mott/CHEMEQ2) that splits the net rate into creation/destruction parts and applies a Padé α-weighting, so it stays stable on stiff mechanisms where an explicit source diverges. This decouples the (often much faster) chemical timescale from the flow timestep and is required for stiff mechanisms — e.g. hydrocarbons such as GRI-Mech methane, which otherwise diverge on the first step
 - `chem_params%%adap_substeps` (default `F`) makes each rank choose its α-QSS sub-step count per flow step from the largest chemical stiffness among its own cells: the count sits at `reaction_substeps` (the floor) in inert or burned gas and rises toward `reaction_substeps_max` (the ceiling) only across the reaction front. It uses no MPI collectives. When enabled, `reaction_substeps >= 1` and `reaction_substeps_max >= reaction_substeps` are required
 
+- With `proj_method`, reactions are integrated only operator-split (`chem_params%%reaction_substeps > 0`): the reactor raises the pressure of its cells at constant volume, which the next pressure solve turns into expansion. The mixture is an ideal gas, its energy follows from the solved pressure, and species and heat diffusion enter the pressure equation through \f$\partial p/\partial(\rho e)\f$ and \f$\partial p/\partial(\rho Y_k)\f$ at fixed density. Diffusion stays explicit: with `cfl_adap_dt` its limit enters the time step as `TCFL`, \f$D\,\Delta t\sum_d \Delta x_d^{-2}\f$ with \f$D\f$ the larger of \f$\lambda/(\rho c_v)\f$ and, with mixture-averaged transport, the species diffusivities
+
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
 MFC generates and compiles the mechanism's Fortran routines itself. Supported mechanism features and the Cantera-only mixing-layer initialization are described in @ref thermochemistry "Thermochemistry implementation".
@@ -1387,6 +1389,8 @@ The boundary condition supported by the MFC are listed in table [Boundary Condit
 Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#sec-simulation-algorithm)).
 The entries labeled "Characteristic." are characteristic boundary conditions based on \cite Thompson87 and \cite Thompson90.
 
+With `proj_method`, the boundaries may be periodic (-1), reflective or walls (-2, -15, -16), extrapolation (-3) or Dirichlet (-17), whole or as boundary patches. A Dirichlet face carries the normal velocity of its ghost cell, ramped by `bc_[x,y,z]%%vel_in_ramp`, and is neither predicted nor pressure-corrected, so it feeds the domain a prescribed volume flux. An extrapolation face is closed to the pressure solve unless `bc_[x,y,z]%%pres_out` is set for that direction, when it is a pressure outlet held at that value, through which flow can leave; an inflow needs one, or the fluid it brings in can only compress.
+
 ### Generalized Characteristic Boundary conditions
 
 | Parameter                     | Type    | Description |
@@ -1400,7 +1404,7 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | `bc_[x,y,z]%%vel_in_frac0`     | Real | Fraction of the final inflow velocity held before the ramp |
 | `bc_[x,y,z]%%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
 | `bc_[x,y,z]%%pres_in`          | Real    | Inflow pressure |
-| `bc_[x,y,z]%%pres_out`         | Real    | Outflow pressure |
+| `bc_[x,y,z]%%pres_out`         | Real    | Outflow pressure (also, under `proj_method`, the pressure of that direction's extrapolation outlets) |
 | `bc_[x,y,z]%%alpha_rho_in`     | Real Array | Inflow density |
 | `bc_[x,y,z]%%alpha_in`         | Real Array | Inflow void fraction |
 

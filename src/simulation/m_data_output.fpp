@@ -115,7 +115,7 @@ contains
         write (3, '(A9,3(2X,A10))', advance="no") 'Time-step', 'dt', 'Time', trim(merge('AdvCFL Max', 'ICFL Max  ', proj_method))
         if (proj_method) write (3, '(2X,A10,2X,A7,2X,A10)', advance="no") 'AcCFL Max', 'PCG its', 'PCG res'
         if (surface_tension) write (3, '(2X,A10)', advance="no") 'CCFL Max'
-        if (heat_conduction) write (3, '(2X,A10)', advance="no") 'TCFL Max'
+        if (heat_conduction .or. chem_params%diffusion) write (3, '(2X,A10)', advance="no") 'TCFL Max'
         if (viscous) write (3, '(2X,A10,2X,A10)', advance="no") 'VCFL Max', 'Rc Min'
         if (bubbles_lagrange) write (3, '(2X,A10)', advance="no") 'N Bubbles'
 
@@ -156,9 +156,10 @@ contains
     end subroutine s_open_probe_files
 
     !> Write stability criteria extrema to the run-time information file at the given time step
-    impure subroutine s_write_run_time_information(q_prim_vf, t_step)
+    impure subroutine s_write_run_time_information(q_prim_vf, q_T_sf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), intent(in)                      :: q_T_sf
         integer, intent(in)                                 :: t_step
         real(wp)                                            :: rho  !< Cell-avg. density
 
@@ -176,6 +177,7 @@ contains
         real(wp)               :: qv  !< Cell-avg. internal energy reference value
         real(wp)               :: c  !< Cell-avg. sound speed
         real(wp), dimension(2) :: Re  !< Cell-avg. Reynolds numbers
+        real(wp)               :: Dth  !< Cell thermal diffusivity (s_compute_cell_diffusivity)
         integer                :: j, k, l
         real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
         real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
@@ -198,9 +200,10 @@ contains
         mu_frac_max_loc = 0._wp
         acfl_max_loc = 0._wp
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
-                            & icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, vcfl_max_loc, &
-                            & ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc, acfl_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, &
+                            & qv, icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, &
+                            & vcfl_max_loc, ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc, acfl_max_loc], [Rc_min_loc]]', &
+                            & reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -210,11 +213,13 @@ contains
                     if (include_cell) then
                         call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, &
                                                   & k, l)
+                        call s_compute_cell_diffusivity(q_prim_vf, q_T_sf, pres, rho, alpha, alpha_rho, Re, Dth, j, k, l)
 
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
                         ! Acoustics are implicit under the projection: report their CFL, then make ICFL advective
                         if (proj_method) then
-                            call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
+                            call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, Dth, j, k, l, icfl, vcfl, Rc, &
+                                                             & ccfl, tcfl)
                             acfl_max_loc = max(acfl_max_loc, icfl)
                             c = 0._wp
                         end if
@@ -245,12 +250,13 @@ contains
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
                         end if
 
-                        call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
+                        call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, Dth, j, k, l, icfl, vcfl, Rc, ccfl, &
+                                                         & tcfl)
 
                         icfl_max_loc = max(icfl_max_loc, icfl)
                         vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
                         ccfl_max_loc = max(ccfl_max_loc, merge(ccfl, 0.0_wp, surface_tension))
-                        tcfl_max_loc = max(tcfl_max_loc, merge(tcfl, 0.0_wp, heat_conduction))
+                        tcfl_max_loc = max(tcfl_max_loc, tcfl)
                         Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                     end if
                 end do
@@ -274,7 +280,7 @@ contains
             if (viscous) vcfl_max_glb = vcfl_max_loc
             if (viscous) Rc_min_glb = Rc_min_loc
             if (surface_tension) ccfl_max_glb = ccfl_max_loc
-            if (heat_conduction) tcfl_max_glb = tcfl_max_loc
+            if (heat_conduction .or. chem_params%diffusion) tcfl_max_glb = tcfl_max_loc
             if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
@@ -292,7 +298,7 @@ contains
             if (ccfl_max_glb > ccfl_max) ccfl_max = ccfl_max_glb
         end if
 
-        if (heat_conduction) then
+        if (heat_conduction .or. chem_params%diffusion) then
             if (tcfl_max_glb > tcfl_max) tcfl_max = tcfl_max_glb
         end if
 
@@ -312,7 +318,7 @@ contains
             write (3, '(I9,3(2X,ES10.3))', advance="no") t_step, dt, mytime, icfl_max_glb
             if (proj_method) write (3, '(2X,ES10.3,2X,I7,2X,ES10.3)', advance="no") acfl_max_glb, proj_pcg_iters, proj_pcg_res
             if (surface_tension) write (3, '(2X,ES10.3)', advance="no") ccfl_max_glb
-            if (heat_conduction) write (3, '(2X,ES10.3)', advance="no") tcfl_max_glb
+            if (heat_conduction .or. chem_params%diffusion) write (3, '(2X,ES10.3)', advance="no") tcfl_max_glb
             if (viscous) write (3, '(2X,ES10.3,2X,ES10.3)', advance="no") vcfl_max_glb, Rc_min_glb
             if (bubbles_lagrange) write (3, '(2X,I10)', advance="no") n_el_bubs_glb
 
@@ -401,7 +407,7 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
+                    call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, 0._wp, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
                     if (.not. f_approx_equal(icfl, icfl)) then
                         nan_hit = .true.
@@ -1947,7 +1953,7 @@ contains
             write (3, '(A,ES10.3)') 'ICFL Max: ', icfl_max
         end if
         if (surface_tension) write (3, '(A,ES10.3)') 'CCFL Max: ', ccfl_max
-        if (heat_conduction) write (3, '(A,ES10.3)') 'TCFL Max: ', tcfl_max
+        if (heat_conduction .or. chem_params%diffusion) write (3, '(A,ES10.3)') 'TCFL Max: ', tcfl_max
         if (viscous) write (3, '(A,ES10.3)') 'VCFL Max: ', vcfl_max
         if (viscous) write (3, '(A,ES10.3)') 'Rc Min: ', Rc_min
 
@@ -1984,7 +1990,7 @@ contains
             if (surface_tension) then
                 ccfl_max = 0._wp
             end if
-            if (heat_conduction) then
+            if (heat_conduction .or. chem_params%diffusion) then
                 tcfl_max = 0._wp
             end if
             if (viscous) then

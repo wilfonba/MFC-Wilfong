@@ -57,11 +57,14 @@ module m_projection
     use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, s_compute_interface_reynolds
     use m_ibm, only: ib_markers
     use m_nvtx
+    use m_thermochem, only: num_species, molecular_weights, gas_constant, get_mixture_molecular_weight, &
+        & get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, get_species_enthalpies_rt
+    use m_chemistry, only: compute_viscosity_and_inversion
 
     implicit none
 
-    private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_face_props, s_projection_apply, &
-        & s_finalize_projection_module
+    private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_face_props, s_projection_heat, &
+        & s_projection_apply, s_finalize_projection_module
 
     integer, parameter :: mg_maxlev = 24
     real(wp), parameter :: res_floor = 1.e2_wp*epsilon(1._wp)  !< residual round-off floor, relative to the right-hand side
@@ -137,11 +140,17 @@ module m_projection
     integer, allocatable, dimension(:,:) :: crs_sz, crs_aj, crs_co
     real(wp), allocatable, dimension(:,:) :: crs_l, crs_ak
     real(wp), allocatable, dimension(:) :: crs_ad, crs_x, crs_b
-    logical, dimension(3) :: wall_lo, wall_hi  !< this rank owns a solid wall face on that side
-    logical, dimension(3) :: seam_lo, seam_hi  !< that side couples to another rank or, periodically, to this one
-    logical :: faces_ready  !< uf has been seeded from the cell velocities
-    logical :: wb_st  !< well-balanced surface tension
-    integer :: gk0, gk1, gl0, gl1  !< y and z extents including one ghost layer where those directions exist
+    !> Boundary code of each domain face, low (1) and high (2) side, copied from bc_type: walls and boundary patches per face
+    integer, allocatable, dimension(:,:,:) :: fbx, fby, fbz
+    $:GPU_DECLARE(create='[fbx, fby, fbz]')
+    !> An extrapolation (-3) face is a pressure outlet held at bc_[x,y,z]%pres_out where that is set: its conductance couples the
+    !! boundary cell to a ghost at pout, so flow leaves where the solve would otherwise see a wall
+    logical, dimension(3)  :: has_pout
+    real(wp), dimension(3) :: pout
+    logical, dimension(3)  :: seam_lo, seam_hi    !< that side couples to another rank or, periodically, to this one
+    logical                :: faces_ready         !< uf has been seeded from the cell velocities
+    logical                :: wb_st               !< well-balanced surface tension
+    integer                :: gk0, gk1, gl0, gl1  !< y and z extents including one ghost layer where those directions exist
 
 contains
 
@@ -213,8 +222,6 @@ contains
         @:PIN_HOST(mg_sbuf, mg_rbuf)
 
         #:for D, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            wall_lo(${D}$) = any(bc_${XYZ}$%beg == [BC_REFLECTIVE, BC_SLIP_WALL, BC_NO_SLIP_WALL])
-            wall_hi(${D}$) = any(bc_${XYZ}$%end == [BC_REFLECTIVE, BC_SLIP_WALL, BC_NO_SLIP_WALL])
             seam_lo(${D}$) = bc_${XYZ}$%beg >= 0 .or. bc_${XYZ}$%beg == BC_PERIODIC
             seam_hi(${D}$) = bc_${XYZ}$%end >= 0 .or. bc_${XYZ}$%end == BC_PERIODIC
             mg_nbr(2*${D}$ - 1) = f_seam_rank(bc_${XYZ}$%beg, num_dims >= ${D}$)
@@ -223,6 +230,11 @@ contains
         call s_mg_exchange_layout()
         call s_mg_bottom_layout()
 
+        #:for D, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+            has_pout(${D}$) = .not. f_is_default(bc_${XYZ}$%pres_out) .and. num_dims >= ${D}$
+            pout(${D}$) = merge(bc_${XYZ}$%pres_out, 0._wp, has_pout(${D}$))
+        #:endfor
+        @:ALLOCATE(fbx(0:n, 0:p, 1:2), fby(0:merge(m, 0, n > 0), 0:p, 1:2), fbz(0:merge(m, 0, p > 0), 0:merge(n, 0, p > 0), 1:2))
         faces_ready = .false.
         gk0 = merge(-1, 0, n > 0); gk1 = merge(n + 1, n, n > 0)
         gl0 = merge(-1, 0, p > 0); gl1 = merge(p + 1, p, p > 0)
@@ -236,6 +248,32 @@ contains
         end if
 
     end subroutine s_initialize_projection_module
+
+    !> A wall face: its normal velocity vanishes
+    pure logical function f_wall_face(code)
+
+        $:GPU_ROUTINE(function_name='f_wall_face', parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in) :: code
+
+        f_wall_face = code == BC_REFLECTIVE .or. code == BC_SLIP_WALL .or. code == BC_NO_SLIP_WALL
+
+    end function f_wall_face
+
+    !> Copy the boundary code of each domain face from bc_type, on the host where pre-process left it
+    impure subroutine s_projection_face_codes(bc_type)
+
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer                                                    :: e
+
+        do e = 1, 2
+            fbx(:,:,e) = int(bc_type(1, e)%sf(0,:,:))
+            if (num_dims > 1) fby(:,:,e) = int(bc_type(2, e)%sf(0:m,0,:))
+            if (num_dims > 2) fbz(:,:,e) = int(bc_type(3, e)%sf(0:m,0:n,0))
+        end do
+        $:GPU_UPDATE(device='[fbx, fby, fbz]')
+
+    end subroutine s_projection_face_codes
 
     !> Face velocity from the average of the cell velocities either side (primitive velocities, with ghosts)
     subroutine s_projection_init_faces(q_prim_vf)
@@ -280,27 +318,55 @@ contains
 
     end subroutine s_build_solid
 
+    !> A Dirichlet (-17) face, a whole boundary or a patch such as a nozzle set into a wall, carries the normal velocity of its
+    !! ghost cell, which s_dirichlet sets from the boundary buffer and its inflow ramp: prescribed, it is neither predicted nor
+    !! pressure-corrected (the pressure ghost is a zero-gradient copy) and the solve sees it as a source of volume
+    subroutine s_dirichlet_faces(q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        integer                                             :: j, k, l
+
+        #:set UB = {'j': 'm', 'k': 'n', 'l': 'p'}
+        ! The low face and its ghost cell share index -1; the high face is m (n, p), its ghost m + 1
+        #:for D, NV, LO, HI, GH, FB, FI in [(1, 'j', '-1, k, l', 'm, k, l', 'm + 1, k, l', 'fbx', 'k, l'), &
+            (2, 'k', 'j, -1, l', 'j, n, l', 'j, n + 1, l', 'fby', 'j, l'), (3, 'l', 'j, k, -1', 'j, k, p', 'j, k, p + 1', 'fbz', &
+             & 'j, k')]
+            #:set TV = [v for v in ['l', 'k', 'j'] if v != NV]
+            if (num_dims >= ${D}$) then
+                $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]')
+                do ${TV[0]}$ = 0, ${UB[TV[0]]}$
+                    do ${TV[1]}$ = 0, ${UB[TV[1]]}$
+                        if (${FB}$(${FI}$, 1) == BC_DIRICHLET) uf(${LO}$, &
+                            & ${D}$) = real(q_prim_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(${LO}$), wp)
+                        if (${FB}$(${FI}$, 2) == BC_DIRICHLET) uf(${HI}$, &
+                            & ${D}$) = real(q_prim_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(${GH}$), wp)
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_dirichlet_faces
+
     !> Normal velocity vanishes on solid walls and on faces touching a stationary immersed boundary
     subroutine s_zero_wall_faces()
 
         integer :: j, k, l
 
         #:set UB = {'j': 'm', 'k': 'n', 'l': 'p'}
-        #:for D, NV, LO, HI in [(1, 'j', '-1, k, l', 'm, k, l'), (2, 'k', 'j, -1, l', 'j, n, l'), (3, 'l', 'j, k, -1', 'j, k, p')]
+        #:for D, NV, LO, HI, FB, FI in [(1, 'j', '-1, k, l', 'm, k, l', 'fbx', 'k, l'), (2, 'k', 'j, -1, l', 'j, n, l', 'fby', 'j, l'), &
+            (3, 'l', 'j, k, -1', 'j, k, p', 'fbz', 'j, k')]
             #:set TV = [v for v in ['l', 'k', 'j'] if v != NV]
-            #:for SIDE, FACE in [('lo', LO), ('hi', HI)]
-                if (num_dims >= ${D}$) then
-                    if (wall_${SIDE}$(${D}$)) then
-                        $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]')
-                        do ${TV[0]}$ = 0, ${UB[TV[0]]}$
-                            do ${TV[1]}$ = 0, ${UB[TV[1]]}$
-                                uf(${FACE}$, ${D}$) = 0._wp
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-                end if
-            #:endfor
+            if (num_dims >= ${D}$) then
+                $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]')
+                do ${TV[0]}$ = 0, ${UB[TV[0]]}$
+                    do ${TV[1]}$ = 0, ${UB[TV[1]]}$
+                        if (f_wall_face(${FB}$(${FI}$, 1))) uf(${LO}$, ${D}$) = 0._wp
+                        if (f_wall_face(${FB}$(${FI}$, 2))) uf(${HI}$, ${D}$) = 0._wp
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         #:endfor
 
         if (ib) then
@@ -338,6 +404,7 @@ contains
 
         if (id == 1) then
             if (.not. faces_ready) then
+                call s_projection_face_codes(bc_type)
                 if (ib) call s_build_solid(bc_type)
                 call s_projection_init_faces(q_prim_vf)
                 faces_ready = .true.
@@ -362,6 +429,7 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+            call s_dirichlet_faces(q_prim_vf)
         end if
 
         ! Reconstruction stencil half-width, for the immersed-boundary fallback below
@@ -431,6 +499,22 @@ contains
                                             & eqn_idx%mom%beg + i - 1), stp)
                                 end if
                             end do
+                            #:if chemistry
+                                ! Species ride the mass flux with their upwind mass fraction, so their sum stays the density
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%species%beg, eqn_idx%species%end
+                                    if (near .and. up_l) then
+                                        a_up = real(q_prim_vf(i)%sf(${SF('')}$), wp)
+                                    else if (near) then
+                                        a_up = real(q_prim_vf(i)%sf(${SF(' + 1')}$), wp)
+                                    else if (up_l) then
+                                        a_up = qfl_rs(${SF('')}$, i)
+                                    else
+                                        a_up = qfr_rs(${SF(' + 1')}$, i)
+                                    end if
+                                    flux_vf(i)%sf(${SF('')}$) = real(fm*a_up, stp)
+                                end do
+                            #:endif
                             if (near .and. up_l) then
                                 pflx(j, k, l) = vf*real(q_prim_vf(eqn_idx%E)%sf(${SF('')}$), wp)
                             else if (near) then
@@ -492,13 +576,23 @@ contains
         real(wp), dimension(2) :: re_l, re_r
         integer                :: i, j, k, l, rs1, rs2
 
+        #:if chemistry
+            real(wp), dimension(num_species) :: Ys_l, Ys_r
+            real(wp)                         :: T_l, T_r, W
+        #:endif
+
         rs1 = Re_size(1); rs2 = Re_size(2)
 
         #:for D, SV, COORDS, JB, KB, LB in [(1, 'j', '{SI}, k, l', -1, 0, 0), (2, 'k', 'j, {SI}, l', 0, -1, 0), &
             (3, 'l', 'j, k, {SI}', 0, 0, -1)]
             #:set SF = lambda offs: COORDS.format(SI=SV + offs)
             if (id == ${D}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, al, ar, re_l, re_r]', firstprivate='[rs1, rs2]')
+                #:if chemistry
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, al, ar, re_l, re_r, Ys_l, Ys_r, T_l, T_r, W]', &
+                                        & firstprivate='[rs1, rs2]')
+                #:else
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, al, ar, re_l, re_r]', firstprivate='[rs1, rs2]')
+                #:endif
                 do l = ${LB}$, p
                     do k = ${KB}$, n
                         do j = ${JB}$, m
@@ -510,6 +604,19 @@ contains
                                 end do
                                 call s_compute_interface_reynolds(al, re_l, rs1, rs2)
                                 call s_compute_interface_reynolds(ar, re_r, rs1, rs2)
+                                #:if chemistry
+                                    ! A reacting mixture's viscosity is its transport model's, at each face state's T and Y
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_species
+                                        Ys_l(i) = qfl_rs(${SF('')}$, eqn_idx%species%beg + i - 1)
+                                        Ys_r(i) = qfr_rs(${SF(' + 1')}$, eqn_idx%species%beg + i - 1)
+                                    end do
+                                    call get_mixture_molecular_weight(Ys_l, W)
+                                    T_l = qfl_rs(${SF('')}$, eqn_idx%E)*W/(gas_constant*qfl_rs(${SF('')}$, 1))
+                                    call get_mixture_molecular_weight(Ys_r, W)
+                                    T_r = qfr_rs(${SF(' + 1')}$, eqn_idx%E)*W/(gas_constant*qfr_rs(${SF(' + 1')}$, 1))
+                                    call compute_viscosity_and_inversion(T_l, Ys_l, T_r, Ys_r, re_l(1), re_r(1))
+                                #:endif
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 2
                                     Re_avg_rsx_vf(j, k, l, i) = 2._wp/(1._wp/re_l(i) + 1._wp/re_r(i))
@@ -529,6 +636,105 @@ contains
         #:endfor
 
     end subroutine s_projection_face_props
+
+    !> Diffusive heating of one direction sweep from the source fluxes (energy -k dT/dn, plus species and their enthalpy with
+    !! chemistry). At fixed alpha and phase densities d(rho e) = Gamma dp, so the pressure transport rate gains -div(q)/Gamma, and
+    !! the energy rebuilt from p carries it. A reacting mixture's p(rho e, rho Y_k) is differenced the same way: R/cv per energy,
+    !! R_k T - (R/cv) e_k per species
+    subroutine s_projection_heat(id, q_prim_vf, flux_src_vf)
+
+        integer, intent(in)                                 :: id
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_vf
+        real(wp)                                            :: rho, gam, pinf, qv, src
+
+        #:if chemistry
+            real(wp), dimension(num_species) :: rY, Ys, hrt
+            real(wp)                         :: R, T, cv
+        #:endif
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: ar, al
+        #:else
+            real(wp), dimension(num_fluids) :: ar, al
+        #:endif
+        integer :: i, j, k, l
+
+        #:for D, SV, COORDS, DXV in [(1, 'j', '{SI}, k, l', 'dx'), (2, 'k', 'j, {SI}, l', 'dy'), (3, 'l', 'j, k, {SI}', 'dz')]
+            #:set SF = lambda offs: COORDS.format(SI=SV + offs)
+            if (id == ${D}$) then
+                #:if chemistry
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, src, rY, Ys, hrt, R, T, cv]')
+                #:else
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gam, pinf, qv, src, ar, al]')
+                #:endif
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            src = (real(flux_src_vf(eqn_idx%E)%sf(${SF(' - 1')}$), wp) - real(flux_src_vf(eqn_idx%E)%sf(j, k, l), &
+                                   & wp))/${DXV}$(${SV}$)
+                            #:if chemistry
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_species
+                                    rY(i) = real(q_prim_vf(1)%sf(j, k, l)*q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l), wp)
+                                end do
+                                call s_chem_mixture(rY, real(q_prim_vf(eqn_idx%E)%sf(j, k, l), wp), rho, Ys, R, T, cv)
+                                call get_species_enthalpies_rt(T, hrt)
+                                src = src*R/cv
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_species
+                                    src = src + gas_constant*T/molecular_weights(i)*(1._wp + R/cv*(1._wp - hrt(i))) &
+                                        & *(real(flux_src_vf(eqn_idx%species%beg + i - 1)%sf(${SF(' - 1')}$), &
+                                        & wp) - real(flux_src_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l), wp))/${DXV}$(${SV}$)
+                                end do
+                            #:else
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    ar(i) = real(q_prim_vf(i)%sf(j, k, l), wp)
+                                    al(i) = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
+                                end do
+                                call s_compute_mixture_coefficients(ar, al, rho, gam, pinf, qv)
+                                src = src/gam
+                            #:endif
+                            rhs_p(j, k, l) = rhs_p(j, k, l) + src
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_projection_heat
+
+    #:if chemistry
+        !> Ideal-gas mixture of partial densities rY at pressure pres: density, mass fractions, gas constant, temperature and cv.
+        !! The projection's Gamma and bulk modulus are cv/R and (1 + R/cv) p
+        subroutine s_chem_mixture(rY, pres, rho, Ys, R, T, cv)
+
+            $:GPU_ROUTINE(function_name='s_chem_mixture', parallelism='[seq]', cray_inline=True)
+
+            real(wp), dimension(num_species), intent(in)  :: rY
+            real(wp), intent(in)                          :: pres
+            real(wp), intent(out)                         :: rho, R, T, cv
+            real(wp), dimension(num_species), intent(out) :: Ys
+            real(wp)                                      :: W
+            integer                                       :: i
+
+            rho = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_species
+                Ys(i) = max(0._wp, rY(i))
+                rho = rho + Ys(i)
+            end do
+            rho = max(rho, sgm_eps)
+            Ys = Ys/rho
+            call get_mixture_molecular_weight(Ys, W)
+            R = gas_constant/W
+            T = pres/(rho*R)
+            call get_mixture_specific_heat_cv_mass(T, Ys, cv)
+
+        end subroutine s_chem_mixture
+    #:endif
 
     !> Divergence of the face velocity in cell (j, k, l): the one operator the transport sources and the pressure equation share
     function f_div_uf(j, k, l) result(dv)
@@ -665,7 +871,12 @@ contains
         real(wp) :: tau, rho, gam, pinf, qv, rc2, dv
         real(wp) :: vol, ke, ga, gf
         real(wp), dimension(3) :: acc
-        logical :: wlo, whi, wbl
+        logical :: wbl, fix
+
+        #:if chemistry
+            real(wp), dimension(num_species) :: rY, Ys
+            real(wp)                         :: R, T, cv, e, pc
+        #:endif
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: ar, al
@@ -721,21 +932,28 @@ contains
         if (wb_st) call s_compute_curvature(q_cons_vf)
         wbl = wb_st
 
-        ! Body forces and well-balanced surface tension enter on faces, where they meet the pressure gradient that balances them
-        #:for D, DXV, SV, IP1, LB, KB, JB in [(1, 'dx', 'j', 'j + 1, k, l', 0, 0, -1), (2, 'dy', 'k', 'j, k + 1, l', 0, -1, 0), &
-            (3, 'dz', 'l', 'j, k, l + 1', -1, 0, 0)]
+        ! Body forces and well-balanced surface tension enter on faces, where they meet the pressure gradient that balances them.
+        ! A Dirichlet face keeps its prescribed velocity
+        #:for D, DXV, SV, UB, IP1, LB, KB, JB, FB, FI in [(1, 'dx', 'j', 'm', 'j + 1, k, l', 0, 0, -1, 'fbx', 'k, l'), &
+            (2, 'dy', 'k', 'n', 'j, k + 1, l', 0, -1, 0, 'fby', 'j, l'), (3, 'dz', 'l', 'p', 'j, k, l + 1', -1, 0, 0, 'fbz', &
+             & 'j, k')]
             if (num_dims >= ${D}$) then
                 ga = tau*acc(${D}$)
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, fix]')
                 do l = ${LB}$, p
                     do k = ${KB}$, n
                         do j = ${JB}$, m
-                            uf(j, k, l, ${D}$) = 0.5_wp*(real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(j, k, l), wp)/rhoc(j, k, &
-                               & l) + real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(${IP1}$), wp)/rhoc(${IP1}$)) + ga
-                            if (wbl) uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) + tau*f_capillary_accel(kap(j, k, l, 1), &
-                                & kap(${IP1}$, 1), kap(j, k, l, 2), kap(${IP1}$, 2), real(q_cons_vf(eqn_idx%adv%beg)%sf(j, k, l), &
-                                & wp), real(q_cons_vf(eqn_idx%adv%beg)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
-                                & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))
+                            fix = .false.
+                            if (${SV}$ == -1) fix = ${FB}$(${FI}$, 1) == BC_DIRICHLET
+                            if (${SV}$ == ${UB}$) fix = ${FB}$(${FI}$, 2) == BC_DIRICHLET
+                            if (.not. fix) then
+                                uf(j, k, l, ${D}$) = 0.5_wp*(real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(j, k, l), wp)/rhoc(j, &
+                                   & k, l) + real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(${IP1}$), wp)/rhoc(${IP1}$)) + ga
+                                if (wbl) uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) + tau*f_capillary_accel(kap(j, k, l, 1), &
+                                    & kap(${IP1}$, 1), kap(j, k, l, 2), kap(${IP1}$, 2), real(q_cons_vf(eqn_idx%adv%beg)%sf(j, k, &
+                                    & l), wp), real(q_cons_vf(eqn_idx%adv%beg)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
+                                    & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))
+                            end if
                         end do
                     end do
                 end do
@@ -745,20 +963,35 @@ contains
         call s_zero_wall_faces()
 
         ! SPD system D_c p + sum_f K_f (p - p_nb) = b, the Helmholtz row scaled by V_c/(rho c^2 tau^2)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gam, pinf, qv, rc2, dv, vol, ar, al]')
+        #:if chemistry
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, rc2, dv, vol, rY, Ys, R, T, cv, pc]')
+        #:else
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gam, pinf, qv, rc2, dv, vol, ar, al]')
+        #:endif
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     if (stage == 1) p_step0(j, k, l) = p_stage(j, k, l)
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_fluids
-                        ar(i) = real(q_cons_vf(i)%sf(j, k, l), wp)
-                        al(i) = real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
-                    end do
-                    call s_compute_mixture_coefficients(ar, al, rho, gam, pinf, qv)
-                    ! Allaire's model advects alpha, so gamma_mix and pi_inf_mix are advected and Dp/Dt = -K div(u) with K the
-                    ! mixture bulk modulus (not Wood's, which belongs to the Kapila model)
-                    rc2 = max(f_bulk_modulus(p_stage(j, k, l), gam, pinf), sgm_eps)
+                    #:if chemistry
+                        ! The frozen ideal-gas modulus of the mixture
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_species
+                            rY(i) = real(q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l), wp)
+                        end do
+                        pc = p_stage(j, k, l)
+                        call s_chem_mixture(rY, pc, rho, Ys, R, T, cv)
+                        rc2 = max((1._wp + R/cv)*pc, sgm_eps)
+                    #:else
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            ar(i) = real(q_cons_vf(i)%sf(j, k, l), wp)
+                            al(i) = real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
+                        end do
+                        call s_compute_mixture_coefficients(ar, al, rho, gam, pinf, qv)
+                        ! Allaire's model advects alpha, so gamma_mix and pi_inf_mix are advected and Dp/Dt = -K div(u) with K the
+                        ! mixture bulk modulus (not Wood's, which belongs to the Kapila model)
+                        rc2 = max(f_bulk_modulus(p_stage(j, k, l), gam, pinf), sgm_eps)
+                    #:endif
                     dv = f_div_uf(j, k, l)
                     vol = dx(j)
                     if (num_dims > 1) vol = vol*dy(k)
@@ -785,12 +1018,11 @@ contains
         ! Face correction with the operator's own conductance (area 1), so div(uf) matches the solved pressure exactly. Cells take
         ! the mean of their faces' net acceleration (body force less pressure gradient, zero on walls): a hydrostatic balance on
         ! the faces then leaves the cells at rest too, and for uniform density this is the centered pressure gradient
-        #:for D, DXV, SV, UB, IP1, IM1, LB, KB, JB in [(1, 'dx', 'j', 'm', 'j + 1, k, l', 'j - 1, k, l', 0, 0, -1), &
-            (2, 'dy', 'k', 'n', 'j, k + 1, l', 'j, k - 1, l', 0, -1, 0), (3, 'dz', 'l', 'p', 'j, k, l + 1', 'j, k, l - 1', -1, 0, &
-             & 0)]
+        #:for D, DXV, SV, UB, IP1, IM1, LB, KB, JB, FB, FI in [(1, 'dx', 'j', 'm', 'j + 1, k, l', 'j - 1, k, l', 0, 0, -1, 'fbx', &
+            & 'k, l'), (2, 'dy', 'k', 'n', 'j, k + 1, l', 'j, k - 1, l', 0, -1, 0, 'fby', 'j, l'), (3, 'dz', 'l', 'p', 'j, k, l + 1', &
+            & 'j, k, l - 1', -1, 0, 0, 'fbz', 'j, k')]
             if (num_dims >= ${D}$) then
                 ga = tau*acc(${D}$)
-                wlo = wall_lo(${D}$); whi = wall_hi(${D}$)
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, gf]')
                 do l = ${LB}$, p
                     do k = ${KB}$, n
@@ -804,7 +1036,11 @@ contains
                                 & kap(j, k, l, 2), kap(${IP1}$, 2), real(q_cons_vf(eqn_idx%adv%beg)%sf(j, k, l), wp), &
                                 & real(q_cons_vf(eqn_idx%adv%beg)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
                                 & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))
-                            if ((${SV}$ == -1 .and. wlo) .or. (${SV}$ == ${UB}$ .and. whi)) pflx(j, k, l) = 0._wp
+                            if (${SV}$ == -1) then
+                                if (f_wall_face(${FB}$(${FI}$, 1)) .or. ${FB}$(${FI}$, 1) == BC_DIRICHLET) pflx(j, k, l) = 0._wp
+                            else if (${SV}$ == ${UB}$) then
+                                if (f_wall_face(${FB}$(${FI}$, 2)) .or. ${FB}$(${FI}$, 2) == BC_DIRICHLET) pflx(j, k, l) = 0._wp
+                            end if
                             pflx(j, k, l) = pflx(j, k, l)*real((1._stp - solid(j, k, l))*(1._stp - solid(${IP1}$)), wp)
                         end do
                     end do
@@ -828,22 +1064,40 @@ contains
 
         if (proj_lag_corr > 0) call s_mass_lag(q_cons_vf, tau, .false.)
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gam, pinf, qv, ke, ar, al]')
+        #:if chemistry
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, ke, rY, Ys, R, T, cv, e]')
+        #:else
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gam, pinf, qv, ke, ar, al]')
+        #:endif
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_fluids
-                        ar(i) = real(q_cons_vf(i)%sf(j, k, l), wp)
-                        al(i) = real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
-                    end do
-                    call s_compute_mixture_coefficients(ar, al, rho, gam, pinf, qv)
+                    #:if chemistry
+                        ! The ideal-gas mixture at the solved pressure: T = p/(rho R), then e(T, Y), with no Newton solve
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_species
+                            rY(i) = real(q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l), wp)
+                        end do
+                        call s_chem_mixture(rY, real(pk(j, k, l), wp), rho, Ys, R, T, cv)
+                        call get_mixture_energy_mass(T, Ys, e)
+                    #:else
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            ar(i) = real(q_cons_vf(i)%sf(j, k, l), wp)
+                            al(i) = real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
+                        end do
+                        call s_compute_mixture_coefficients(ar, al, rho, gam, pinf, qv)
+                    #:endif
                     ke = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         ke = ke + 0.5_wp*real(q_cons_vf(i)%sf(j, k, l), wp)*(real(q_cons_vf(i)%sf(j, k, l), wp)/rho)
                     end do
-                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = real(gam*real(pk(j, k, l), wp) + pinf + qv + ke, stp)
+                    #:if chemistry
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = real(rho*e + ke, stp)
+                    #:else
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = real(gam*real(pk(j, k, l), wp) + pinf + qv + ke, stp)
+                    #:endif
                 end do
             end do
         end do
@@ -865,40 +1119,42 @@ contains
         real(wp), intent(in)                                   :: tau
         logical, intent(in)                                    :: mom
         real(wp)                                               :: c, dd, du, vn, tl
-        integer                                                :: iq, q, j, k, l, nalpha, i1, i2
+        integer                                                :: iq, q, j, k, l, nalpha, nspec, i1, i2
         logical                                                :: pre
-        logical                                                :: wl1, wh1, wl2, wh2, wl3, wh3
 
         tl = tau; pre = mom  ! a dummy may alias a host variable, which a device kernel must not reference
-        wl1 = wall_lo(1); wh1 = wall_hi(1); wl2 = wall_lo(2); wh2 = wall_hi(2); wl3 = wall_lo(3); wh3 = wall_hi(3)
-        ! A lone fluid's alpha is 1, which the difference leaves unchanged
+        ! A lone fluid's alpha is 1, which the difference leaves unchanged; a reacting mixture's species move with its density
         nalpha = merge(0, num_fluids, num_fluids == 1)
-        i1 = merge(num_fluids + nalpha + 1, 1, mom)
-        i2 = merge(num_fluids + nalpha + num_dims, num_fluids + nalpha, mom)
+        nspec = merge(num_species, 0, chemistry)
+        i1 = merge(num_fluids + nalpha + nspec + 1, 1, mom)
+        i2 = merge(num_fluids + nalpha + nspec + num_dims, num_fluids + nalpha + nspec, mom)
         do iq = i1, i2
             if (iq <= num_fluids) then
                 q = iq
             else if (iq <= num_fluids + nalpha) then
                 q = eqn_idx%adv%beg + iq - num_fluids - 1
+            else if (iq <= num_fluids + nalpha + nspec) then
+                q = eqn_idx%species%beg + iq - num_fluids - nalpha - 1
             else
-                q = eqn_idx%mom%beg + iq - num_fluids - nalpha - 1
+                q = eqn_idx%mom%beg + iq - num_fluids - nalpha - nspec - 1
             end if
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, c, dd, du, vn]', firstprivate='[q, tl, pre, wl1, wh1, wl2, wh2, &
-                                & wl3, wh3]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, c, dd, du, vn]', firstprivate='[q, tl, pre]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         c = 0._wp; dd = 0._wp
-                        #:for D, DXV, SV, UB, IP1, IM1 in [(1, 'dx', 'j', 'm', 'j + 1, k, l', 'j - 1, k, l'), &
-                            (2, 'dy', 'k', 'n', 'j, k + 1, l', 'j, k - 1, l'), &
-                            (3, 'dz', 'l', 'p', 'j, k, l + 1', 'j, k, l - 1')]
+                        #:for D, DXV, SV, UB, IP1, IM1, FB, FI in [(1, 'dx', 'j', 'm', 'j + 1, k, l', 'j - 1, k, l', 'fbx', 'k, l'), &
+                            (2, 'dy', 'k', 'n', 'j, k + 1, l', 'j, k - 1, l', 'fby', 'j, l'), &
+                            (3, 'dz', 'l', 'p', 'j, k, l + 1', 'j, k, l - 1', 'fbz', 'j, k')]
                             if (num_dims >= ${D}$) then
                                 ! High face: between this cell and the next
                                 vn = uf(j, k, l, ${D}$)
                                 if (pre) vn = (vn - f_face_gf(rhoc(j, k, l), rhoc(${IP1}$), solid(j, k, l), solid(${IP1}$), &
                                     & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)), real(pk(j, k, l), wp), real(pk(${IP1}$), &
                                     & wp), tl))*real((1._stp - solid(j, k, l))*(1._stp - solid(${IP1}$)), wp)
-                                if (${SV}$ == ${UB}$ .and. wh${D}$) vn = 0._wp
+                                if (${SV}$ == ${UB}$) then
+                                    if (f_wall_face(${FB}$(${FI}$, 2))) vn = 0._wp
+                                end if
                                 du = vn - uf0(j, k, l, ${D}$)
                                 c = c + du*real(merge(q_cons_vf(q)%sf(j, k, l), q_cons_vf(q)%sf(${IP1}$), vn >= 0._wp), &
                                                 & wp)/${DXV}$(${SV}$)
@@ -908,7 +1164,9 @@ contains
                                 if (pre) vn = (vn - f_face_gf(rhoc(${IM1}$), rhoc(j, k, l), solid(${IM1}$), solid(j, k, l), &
                                     & 0.5_wp*(${DXV}$(${SV}$ - 1) + ${DXV}$(${SV}$)), real(pk(${IM1}$), wp), real(pk(j, k, l), &
                                     & wp), tl))*real((1._stp - solid(${IM1}$))*(1._stp - solid(j, k, l)), wp)
-                                if (${SV}$ == 0 .and. wl${D}$) vn = 0._wp
+                                if (${SV}$ == 0) then
+                                    if (f_wall_face(${FB}$(${FI}$, 1))) vn = 0._wp
+                                end if
                                 du = vn - uf0(${IM1}$, ${D}$)
                                 c = c - du*real(merge(q_cons_vf(q)%sf(${IM1}$), q_cons_vf(q)%sf(j, k, l), vn >= 0._wp), &
                                                 & wp)/${DXV}$(${SV}$)
@@ -957,6 +1215,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        if (any(has_pout)) call s_pout_rhs()
         call s_set_dir(xs)
         call s_apply_operator()
 
@@ -1036,8 +1295,63 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
         call s_populate_F_igr_buffers(bc_type, pk_sf)
+        if (any(has_pout)) call s_pout_ghosts()
 
     end subroutine s_pcg_solve
+
+    !> A pressure outlet's fixed ghost enters the right-hand side as conductance times pout, its search-direction ghost being zero
+    subroutine s_pout_rhs()
+
+        integer  :: j, k, l, off, ex, ey, gx, gy, gz
+        real(wp) :: po
+
+        off = mg_off(1); gx = mg_gx; gy = mg_gy; gz = mg_gz; ex = mg_nx(1) + 2*gx; ey = mg_ny(1) + 2*gy
+        #:set UB = {'j': 'm', 'k': 'n', 'l': 'p'}
+        #:for D, NV, KC, LO, HI, HF, FB, FI in [(1, 'j', 'mg_kx', '0, k, l', 'm, k, l', 'm + 1, k, l', 'fbx', 'k, l'), &
+            (2, 'k', 'mg_ky', 'j, 0, l', 'j, n, l', 'j, n + 1, l', 'fby', 'j, l'), &
+            (3, 'l', 'mg_kz', 'j, k, 0', 'j, k, p', 'j, k, p + 1', 'fbz', 'j, k')]
+            #:set TV = [v for v in ['l', 'k', 'j'] if v != NV]
+            if (has_pout(${D}$)) then
+                po = pout(${D}$)
+                $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[po]')
+                do ${TV[0]}$ = 0, ${UB[TV[0]]}$
+                    do ${TV[1]}$ = 0, ${UB[TV[1]]}$
+                        if (${FB}$(${FI}$, &
+                            & 1) == BC_GHOST_EXTRAP) bvec(${LO}$) = bvec(${LO}$) + ${KC}$(${MG_IX(*LO.split(', '))}$)*po
+                        if (${FB}$(${FI}$, &
+                            & 2) == BC_GHOST_EXTRAP) bvec(${HI}$) = bvec(${HI}$) + ${KC}$(${MG_IX(*HF.split(', '))}$)*po
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_pout_rhs
+
+    !> A pressure outlet's ghost holds pout, so the face correction pushes flow out against it
+    subroutine s_pout_ghosts()
+
+        integer  :: j, k, l
+        real(wp) :: po
+
+        #:set UB = {'j': 'm', 'k': 'n', 'l': 'p'}
+        #:for D, NV, LO, HI, FB, FI in [(1, 'j', '-1, k, l', 'm + 1, k, l', 'fbx', 'k, l'), (2, 'k', 'j, -1, l', 'j, n + 1, l', 'fby', &
+            & 'j, l'), (3, 'l', 'j, k, -1', 'j, k, p + 1', 'fbz', 'j, k')]
+            #:set TV = [v for v in ['l', 'k', 'j'] if v != NV]
+            if (has_pout(${D}$)) then
+                po = pout(${D}$)
+                $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l]', firstprivate='[po]')
+                do ${TV[0]}$ = 0, ${UB[TV[0]]}$
+                    do ${TV[1]}$ = 0, ${UB[TV[1]]}$
+                        if (${FB}$(${FI}$, 1) == BC_GHOST_EXTRAP) pk(${LO}$) = real(po, stp)
+                        if (${FB}$(${FI}$, 2) == BC_GHOST_EXTRAP) pk(${HI}$) = real(po, stp)
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_pout_ghosts
 
     !> Search direction (interior) = v
     subroutine s_set_dir(v)
@@ -1183,9 +1497,10 @@ contains
         integer  :: lv, nx, ny, nz, cnx, cny, cnz, coff, ii, jj, kk, a, b, c, idx, cidx, sy, sz, off, ex, ey, gx, gy, gz, cex, cey
         integer  :: fi, fj, fk, a0, a1, b0, b1, c0, c1
         real(wp) :: area, sd, skx, sky, skz
-        logical  :: sl1, sh1, sl2, sh2, sl3, sh3
+        logical  :: sl1, sh1, sl2, sh2, sl3, sh3, po1, po2, po3
 
         sl1 = seam_lo(1); sh1 = seam_hi(1); sl2 = seam_lo(2); sh2 = seam_hi(2); sl3 = seam_lo(3); sh3 = seam_hi(3)
+        po1 = has_pout(1); po2 = has_pout(2); po3 = has_pout(3)
         gx = mg_gx; gy = mg_gy; gz = mg_gz
         off = mg_off(1); ex = mg_nx(1) + 2*gx; ey = mg_ny(1) + 2*gy
 
@@ -1201,14 +1516,15 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, area]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, area]', firstprivate='[po1, po2, po3]')
         do kk = 0, p + gz
             do jj = 0, n + gy
                 do ii = 0, m + gx
                     idx = ${MG_IX('ii', 'jj', 'kk')}$
                     if (ii <= m .and. jj <= n .and. kk <= p) mg_d(idx) = dcoef(ii, jj, kk)
-                    if (jj <= n .and. kk <= p .and. ((ii > 0 .and. ii <= m) .or. (ii == 0 .and. sl1) .or. (ii == m + 1 .and. sh1)) &
-                        & ) then
+                    if (jj <= n .and. kk <= p .and. ((ii > 0 .and. ii <= m) .or. (ii == 0 .and. (sl1 .or. (po1 .and. fbx(jj, kk, &
+                        & 1) == BC_GHOST_EXTRAP))) .or. (ii == m + 1 .and. (sh1 .or. (po1 .and. fbx(jj, kk, &
+                        & 2) == BC_GHOST_EXTRAP))))) then
                         area = 1._wp
                         if (num_dims > 1) area = dy(jj)
                         if (num_dims > 2) area = area*dz(kk)
@@ -1216,8 +1532,9 @@ contains
                               & area, 0.5_wp*(dx(ii - 1) + dx(ii)))
                     end if
                     if (num_dims > 1) then
-                        if (ii <= m .and. kk <= p .and. ((jj > 0 .and. jj <= n) .or. (jj == 0 .and. sl2) .or. (jj == n + 1 &
-                            & .and. sh2))) then
+                        if (ii <= m .and. kk <= p .and. ((jj > 0 .and. jj <= n) .or. (jj == 0 .and. (sl2 .or. (po2 .and. fby(ii, &
+                            & kk, 1) == BC_GHOST_EXTRAP))) .or. (jj == n + 1 .and. (sh2 .or. (po2 .and. fby(ii, kk, &
+                            & 2) == BC_GHOST_EXTRAP))))) then
                             area = dx(ii)
                             if (num_dims > 2) area = area*dz(kk)
                             mg_ky(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj - 1, kk), solid(ii, jj, kk), solid(ii, jj - 1, kk), &
@@ -1225,8 +1542,9 @@ contains
                         end if
                     end if
                     if (num_dims > 2) then
-                        if (ii <= m .and. jj <= n .and. ((kk > 0 .and. kk <= p) .or. (kk == 0 .and. sl3) .or. (kk == p + 1 &
-                            & .and. sh3))) then
+                        if (ii <= m .and. jj <= n .and. ((kk > 0 .and. kk <= p) .or. (kk == 0 .and. (sl3 .or. (po3 .and. fbz(ii, &
+                            & jj, 1) == BC_GHOST_EXTRAP))) .or. (kk == p + 1 .and. (sh3 .or. (po3 .and. fbz(ii, jj, &
+                            & 2) == BC_GHOST_EXTRAP))))) then
                             mg_kz(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj, kk - 1), solid(ii, jj, kk), solid(ii, jj, kk - 1), &
                                   & dx(ii)*dy(jj), 0.5_wp*(dz(kk - 1) + dz(kk)))
                         end if
@@ -1451,6 +1769,8 @@ contains
             crs_ad(i) = rows(1, i)
             do q = 1, 6
                 g = nint(rows(2*q, i))
+                ! No neighbour: a domain face, whose conductance (a pressure outlet's; zero on a wall) couples to a fixed ghost
+                if (g == 0) crs_ad(i) = crs_ad(i) + rows(2*q + 1, i)
                 if (g == i) g = 0
                 crs_aj(q, i) = max(g, 0)
                 crs_ak(q, i) = merge(rows(2*q + 1, i), 0._wp, g > 0)
@@ -2067,7 +2387,7 @@ contains
 
         $:GPU_EXIT_DATA(detach='[pk_sf(1)%sf, solid_sf(1)%sf]')
         @:DEALLOCATE(solid)
-        @:DEALLOCATE(uf, uf0, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap, gnd)
+        @:DEALLOCATE(uf, uf0, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap, gnd, fbx, fby, fbz)
         @:DEALLOCATE(mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r, mg_kr, mg_kc, mg_kv)
         if (allocated(crs_l)) deallocate (crs_l)
         deallocate (crs_x, crs_b, crs_ad, crs_ak, crs_aj, crs_agg, crs_co, crs_cnt, crs_disp, crs_sz)

@@ -550,7 +550,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
             cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
         cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
+        # Small enough for the explicit diffusion limit at the base dt
+        conduction = {"fluid_pp(1)%k_therm": 1.0e-4, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-4, "fluid_pp(2)%cv": 1.0}
+        cases.append(define_case_d(stack, "Conduction", conduction))
         if len(dimInfo[0]) == 2:
+            # A ramped Dirichlet inflow at x = 0 and a pressure outlet at x = 1, between no-slip walls
+            inflow = {"bc_x%beg": -17, "bc_x%end": -3, "bc_y%beg": -16, "bc_y%end": -16, "bc_x%pres_out": 0.1, "bc_x%vel_in_ramp": 1e-3, "patch_icpp(1)%vel(1)": 0.5}
+            cases.append(define_case_d(stack, "Dirichlet inflow", inflow))
             ibm = {"ib": "T", "num_ibs": 1, "fd_order": 2, "patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1, "patch_ib(1)%slip": "F"}
             cases.append(define_case_d(stack, "IBM", {**get_bc_mods(-2, dimInfo), **ibm}))
         if len(dimInfo[0]) > 1:
@@ -3336,6 +3342,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
+                "2D_flame_vortex_projection",  # its tabulated IC/ matches only its own grid
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
                 "2D_hypo_hlld",  # acoustic demo case, not a regression test
                 "3D_hypo_hlld",  # acoustic demo case, not a regression test
@@ -3352,6 +3359,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # is platform-marginal (CPU goldens fail on most GPU lanes). The fast
                 # "Non-Newtonian -> IBM" suite case covers IBM+NN portably at 1e-12.
                 "2D_ibm_poiseuille_nn",
+                # On the CI grid cap some of the array's small cylinders cover no cell, which the IB marking check rejects
+                "2D_porous_cylinder_array",
+                "2D_rayleigh_benard_projection",  # analytic initial condition needs its own build
+                "2D_flickering_flame_projection",  # analytic initial condition needs its own build
                 # Synthetic turbulence now uses a deterministic (compiler-independent) PRNG,
                 # but the 50-step forced run with a moving airfoil IB is FP-sensitive enough
                 # that Intel's aggressive FP model (FMA/fast trig) diverges from the golden on
@@ -3467,6 +3478,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "examples/nD_perfect_reactor/case.py",
                 ["--ndim", "1"],
                 mods={**common_mods, "chem_params%reaction_substeps": 10},
+            )
+        )
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions -> Projection",
+                "examples/nD_perfect_reactor/case.py",
+                ["--ndim", "1"],
+                mods={**common_mods, "chem_params%reaction_substeps": 10, "proj_method": "T"},
             )
         )
 
@@ -3644,6 +3663,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+        outlets = {"proj_method": "T", "bc_x%pres_out": 101325.0, "bc_y%pres_out": 101325.0}
+        cases.append(define_case_d(stack, "Projection", outlets, override_tol=10 ** (-10)))
         stack.pop()
 
         stack.push(
@@ -3686,6 +3707,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+        cases.append(define_case_d(stack, "Projection", {"proj_method": "T"}, override_tol=10 ** (-10)))
 
         stack.pop()
 

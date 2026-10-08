@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""
+2D planar liquid jet: water issuing from a nozzle in a wall into still air, with the all-Mach pressure projection.
+
+The nozzle is a Dirichlet (-17) boundary patch of width --d set into the no-slip floor; its inflow velocity ramps from rest to
+--U over --ramp (bc_y%vel_in_ramp), so the start-up is part of the flow rather than an impulsive slug. The sides and top are
+pressure outlets at the ambient pressure (extrapolation boundaries with bc_[x,y]%pres_out), through which the jet and the air it
+entrains leave. Water and air at 20 C: water a stiffened gas (gamma = 6.12, pi_inf = 3.43e8 Pa), air an ideal gas, with
+viscosity and surface tension. SI units.
+
+The Mach number is ~3e-3 in the water and ~1.5e-2 in the air, so the projection steps at the flow's pace where the explicit
+solver must resolve the water's 1450 m/s sound speed: at the defaults 5,600 steps against ~740,000 (the air around the jet's
+head, at up to ~2.4 U, sets the projection's step). --explicit runs it as a control.
+"""
+
+import argparse
+import json
+import math
+
+parser = argparse.ArgumentParser(description="2D planar liquid jet into air, all-Mach pressure projection")
+parser.add_argument("--d", type=float, default=2.0e-3, help="nozzle width [m] (default: %(default)s)")
+parser.add_argument("--U", type=float, default=5.0, help="jet velocity [m/s] (default: %(default)s)")
+parser.add_argument("--ramp", type=float, default=2.0e-3, help="duration of the inflow ramp from rest [s] (default: %(default)s)")
+parser.add_argument("--width", type=float, default=16, help="domain width in nozzle widths (default: %(default)s)")
+parser.add_argument("--height", type=float, default=40, help="domain height in nozzle widths (default: %(default)s)")
+parser.add_argument("--ppd", type=int, default=16, help="cells per nozzle width (default: %(default)s)")
+parser.add_argument("--tstop", type=float, default=0.016, help="end time [s] (default: %(default)s)")
+parser.add_argument("--saves", type=int, default=40, help="number of outputs (default: %(default)s)")
+parser.add_argument("--cfl", type=float, default=0.25, help="cfl_target: advective with the projection, acoustic with --explicit (default: %(default)s)")
+parser.add_argument("--explicit", action="store_true", help="explicit HLLC at the acoustic limit instead, as a control")
+args, _ = parser.parse_known_args()
+
+# Water and air at 20 C
+rho_l, mu_l, rho_g, mu_g, sigma, p0 = 998.0, 1.0e-3, 1.2, 1.8e-5, 0.072, 101325.0
+gamma_l, pi_inf_l, gamma_g = 6.12, 3.43e8, 1.4
+
+D, U = args.d, args.U
+W, H = args.width * D, args.height * D
+dx = D / args.ppd
+eps = 1.0e-8
+print(
+    f"We = {rho_l * U**2 * D / sigma:.0f}, Re = {rho_l * U * D / mu_l:.0f}, Mach (water) = {U / math.sqrt(gamma_l * (p0 + pi_inf_l) / rho_l):.1e}, "
+    f"{int(round(W / dx))} x {int(round(H / dx))} cells",
+    file=__import__("sys").stderr,
+)
+
+print(
+    json.dumps(
+        {
+            "run_time_info": "T",
+            "x_domain%beg": 0.0,
+            "x_domain%end": W,
+            "y_domain%beg": 0.0,
+            "y_domain%end": H,
+            "m": int(round(W / dx)) - 1,
+            "n": int(round(H / dx)) - 1,
+            "p": 0,
+            "cfl_adap_dt": "T",
+            "cfl_target": args.cfl,
+            "n_start": 0,
+            "t_stop": args.tstop,
+            "t_save": args.tstop / args.saves,
+            "num_patches": 2,
+            "model_eqns": 2,
+            "num_fluids": 2,
+            "time_stepper": 3,
+            "weno_order": 5,
+            "weno_eps": 1.0e-16,
+            "mp_weno": "T",
+            "riemann_solver": 2,
+            "wave_speeds": 1,
+            "avg_state": 2,
+            # Open sides and top at the ambient pressure; a no-slip floor holding the nozzle
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -16,
+            "bc_y%end": -3,
+            "bc_x%pres_out": p0,
+            "bc_y%pres_out": p0,
+            "num_bc_patches": 1,
+            "patch_bc(1)%dir": 2,
+            "patch_bc(1)%loc": -1,
+            "patch_bc(1)%geometry": 1,
+            "patch_bc(1)%type": -17,
+            "patch_bc(1)%centroid(1)": 0.5 * W,
+            "patch_bc(1)%length(1)": D,
+            "bc_y%vel_in_ramp": args.ramp,
+            "proj_method": "F" if args.explicit else "T",
+            "proj_max_acfl": 0.0 if args.explicit else 1000.0,  # bounds only the start-up, while the air is at rest
+            "viscous": "T",
+            "fluid_pp(1)%Re(1)": 1.0 / mu_l,
+            "fluid_pp(2)%Re(1)": 1.0 / mu_g,
+            "surface_tension": "T",
+            "sigma": sigma,
+            "surface_tension_model": "conservative" if args.explicit else "well_balanced",
+            "format": 1,
+            "precision": 2,
+            "prim_vars_wrt": "T",
+            "parallel_io": "T",
+            # Patch 1: still air
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5 * W,
+            "patch_icpp(1)%y_centroid": 0.5 * H,
+            "patch_icpp(1)%length_x": W,
+            "patch_icpp(1)%length_y": H,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(1)%pres": p0,
+            "patch_icpp(1)%alpha_rho(1)": eps * rho_l,
+            "patch_icpp(1)%alpha_rho(2)": (1 - eps) * rho_g,
+            "patch_icpp(1)%alpha(1)": eps,
+            "patch_icpp(1)%alpha(2)": 1 - eps,
+            "patch_icpp(1)%cf_val": 0,
+            # Patch 2: the water in the nozzle's boundary cells, which the Dirichlet patch takes its inflow state from
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%x_centroid": 0.5 * W,
+            "patch_icpp(2)%y_centroid": 0.0,
+            "patch_icpp(2)%length_x": D,
+            "patch_icpp(2)%length_y": 2 * dx,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(2)%vel(2)": U,
+            "patch_icpp(2)%pres": p0,
+            "patch_icpp(2)%alpha_rho(1)": (1 - eps) * rho_l,
+            "patch_icpp(2)%alpha_rho(2)": eps * rho_g,
+            "patch_icpp(2)%alpha(1)": 1 - eps,
+            "patch_icpp(2)%alpha(2)": eps,
+            "patch_icpp(2)%cf_val": 1,
+            "fluid_pp(1)%eos": "stiffened_gas",
+            "fluid_pp(1)%gamma": 1.0 / (gamma_l - 1.0),
+            "fluid_pp(1)%pi_inf": gamma_l * pi_inf_l / (gamma_l - 1.0),
+            "fluid_pp(2)%eos": "stiffened_gas",
+            "fluid_pp(2)%gamma": 1.0 / (gamma_g - 1.0),
+            "fluid_pp(2)%pi_inf": 0.0,
+        }
+    )
+)

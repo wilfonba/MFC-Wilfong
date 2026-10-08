@@ -630,6 +630,7 @@ contains
             bc_${dir}$%vel_in_ramp = 0._wp
             bc_${dir}$%vel_in_t0 = 0._wp
             bc_${dir}$%vel_in_frac0 = 0._wp
+            bc_${dir}$%pres_out = dflt_real
         #:endfor
 
         ! Lagrangian subgrid bubble model

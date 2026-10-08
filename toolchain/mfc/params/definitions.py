@@ -79,7 +79,7 @@ HINTS = {
         "vel_in": "Inlet velocity component (used with `grcbc_in`)",
         "vel_out": "Outlet velocity component (used with `grcbc_vel_out`)",
         "pres_in": "Inlet pressure (used with `grcbc_in`)",
-        "pres_out": "Outlet pressure (used with `grcbc_out`)",
+        "pres_out": "Outlet pressure (used with `grcbc_out`, or under proj_method the pressure of extrapolation (-3) outlets)",
         "alpha_rho_in": "Inlet partial density per fluid (used with `grcbc_in`)",
         "alpha_in": "Inlet volume fraction per fluid (used with `grcbc_in`)",
         "vb1": "Boundary velocity component 1 at domain begin",
