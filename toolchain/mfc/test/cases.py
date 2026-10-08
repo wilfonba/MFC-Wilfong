@@ -3342,6 +3342,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
+                "2D_flame_vortex_projection",  # its tabulated IC/ matches only its own grid
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
                 "2D_hypo_hlld",  # acoustic demo case, not a regression test
                 "3D_hypo_hlld",  # acoustic demo case, not a regression test
@@ -3361,6 +3362,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # On the CI grid cap some of the array's small cylinders cover no cell, which the IB marking check rejects
                 "2D_porous_cylinder_array",
                 "2D_rayleigh_benard_projection",  # analytic initial condition needs its own build
+                "2D_flickering_flame_projection",  # analytic initial condition needs its own build
                 # Synthetic turbulence now uses a deterministic (compiler-independent) PRNG,
                 # but the 50-step forced run with a moving airfoil IB is FP-sensitive enough
                 # that Intel's aggressive FP model (FMA/fast trig) diverges from the golden on
@@ -3476,6 +3478,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "examples/nD_perfect_reactor/case.py",
                 ["--ndim", "1"],
                 mods={**common_mods, "chem_params%reaction_substeps": 10},
+            )
+        )
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions -> Projection",
+                "examples/nD_perfect_reactor/case.py",
+                ["--ndim", "1"],
+                mods={**common_mods, "chem_params%reaction_substeps": 10, "proj_method": "T"},
             )
         )
 

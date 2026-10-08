@@ -1651,8 +1651,8 @@ class CaseValidator:
         ]:
             self.prohibit(self.get(flag, "F") == "T", f"proj_method does not support {flag} = T")
         self.prohibit(
-            self.get("chemistry", "F") == "T" and self.get("chem_params%reactions", "F") == "T",
-            "proj_method supports chemistry without reactions (chem_params%reactions = F) so far",
+            self.get("chemistry", "F") == "T" and self.get("chem_params%reactions", "F") == "T" and (self.get("chem_params%reaction_substeps") or 0) <= 0,
+            "proj_method integrates reactions only operator-split (chem_params%reaction_substeps > 0): an explicit reaction source neither survives its time step nor reaches the pressure equation",
         )
         for i in range(1, (self.get("num_fluids") or 1) + 1):
             eos = self.get(f"fluid_pp({i})%eos")
