@@ -22,6 +22,7 @@ module m_global_parameters
     real(wp) :: wall_time = 0
     real(wp) :: wall_time_avg = 0
     integer  :: proj_pcg_iters = 0    !< Projection pressure-solve iterations of the last time step, summed over its stages
+    integer  :: sts_stages = 0        !< RKL2 stages of the last time step's super-time-stepped diffusion (diff_sts)
     real(wp) :: proj_pcg_res = 0._wp  !< Largest final pressure-solve residual of the last time step, relative to its initial one
 
     ! Logistics
@@ -406,6 +407,8 @@ contains
         any_non_newtonian = .false.
         num_igr_iters = dflt_num_igr_iters
         proj_method = .false.
+        diff_sts = .false.
+        diff_sts_max = 64
         proj_tol = 1.e-6_wp
         proj_max_iters = 100
         proj_max_acfl = 0._wp

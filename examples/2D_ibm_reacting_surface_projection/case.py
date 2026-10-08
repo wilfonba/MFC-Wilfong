@@ -11,6 +11,8 @@ cfl_target 0.5, since the explicit diffusion near the hot wall sets the step.
 The surface's Stefan (blowing) velocity, at most ~6 mm/s here, enters on the faces the boundary's ghost cells share with the
 gas, carrying the gasified mass into it with the surface composition.
 
+--sts super-time-steps the species and heat diffusion (diff_sts, RKL2), lifting its limit on the step.
+
 This example exercises:
     - immersed-boundary surface chemistry
     - species diffusion
@@ -29,11 +31,18 @@ Required mechanism files:
     carbon_surface_bradley_11species.yaml
 """
 
+import argparse
 import json
 import os
 import sys
 
 import cantera as ct
+
+parser = argparse.ArgumentParser(description="2D reacting carbon cylinder, all-Mach pressure projection")
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC's toolchain's internal state.")
+parser.add_argument("--sts", action="store_true", help="super-time-step the diffusion (diff_sts)")
+parser.add_argument("--sts-max", type=int, default=64, help="diff_sts_max: most RKL2 stages per step (default: %(default)s)")
+args = parser.parse_args()
 
 #
 # USER PARAMETERS
@@ -223,6 +232,8 @@ case = {
     "bc_y%end": -1,
     "proj_method": "T",
     "proj_max_acfl": 1.0e4,
+    "diff_sts": "T" if args.sts else "F",
+    "diff_sts_max": args.sts_max,
     # Chemistry and transport
     "chemistry": chemistry,
     "chem_params%diffusion": diffusion,

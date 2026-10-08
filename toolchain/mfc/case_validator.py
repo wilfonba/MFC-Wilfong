@@ -267,6 +267,14 @@ PHYSICS_DOCS = {
             "capillary stress tensor or, with surface_tension_model = 2, a well-balanced face CSF."
         ),
     },
+    "check_diffusion_sts": {
+        "title": "Super-Time-Stepped Diffusion",
+        "category": "Feature Compatibility",
+        "explanation": (
+            "RKL2 super-time-stepping of heat conduction and species diffusion, split from the flow step: needs a diffusion to "
+            "advance, adaptive time stepping (which sizes its stages), and a Cartesian grid."
+        ),
+    },
     "check_non_newtonian": {
         "title": "Non-Newtonian (Herschel-Bulkley) Viscosity",
         "category": "Feature Compatibility",
@@ -1655,6 +1663,19 @@ class CaseValidator:
         self.prohibit(riemann_solver == 4 and relativity, "HLLD is not available for RMHD (relativity)")
         self.prohibit(hyper_cleaning and not mhd, "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0, "Hyperbolic cleaning is not supported for 1D simulations")
+
+    def check_diffusion_sts(self):
+        """Checks super-time-stepped diffusion (diff_sts) constraints"""
+        if self.get("diff_sts", "F") != "T":
+            return
+        conduction = any((self.get(f"fluid_pp({i})%k_therm") or 0) > 0 for i in range(1, (self.get("num_fluids") or 1) + 1))
+        chem_diffusion = self.get("chemistry", "F") == "T" and self.get("chem_params%diffusion", "F") == "T"
+        self.prohibit(not (conduction or chem_diffusion), "diff_sts needs a diffusion to advance: fluid_pp(i)%k_therm > 0 or chem_params%diffusion")
+        self.prohibit(self.get("cfl_adap_dt", "F") != "T", "diff_sts requires cfl_adap_dt, from which it sizes its stages")
+        self.prohibit(self.get("cyl_coord", "F") == "T", "diff_sts does not support cylindrical coordinates")
+        self.prohibit(self.get("igr", "F") == "T", "diff_sts does not support igr")
+        smax = self.get("diff_sts_max")
+        self.prohibit(smax is not None and smax < 2, "diff_sts_max must be at least 2")
 
     def check_projection_simulation(self):
         """Checks all-Mach pressure projection constraints"""
@@ -3132,6 +3153,7 @@ class CaseValidator:
         self.check_mhd_simulation()
         self.check_igr_simulation()
         self.check_projection_simulation()
+        self.check_diffusion_sts()
         self.check_acoustic_source()
         self.check_adaptive_time_stepping()
         self.check_alt_soundspeed()

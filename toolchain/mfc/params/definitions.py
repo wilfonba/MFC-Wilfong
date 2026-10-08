@@ -801,6 +801,7 @@ def _load():
         "proj_mg_bottom",
         "proj_mg_cg_ranks",
         "proj_lag_corr",
+        "diff_sts_max",
     ]:
         _r(n, INT)
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
@@ -833,6 +834,7 @@ def _load():
         "cont_damage",
         "igr",
         "proj_method",
+        "diff_sts",
         "down_sample",
         "old_grid",
         "old_ic",
@@ -1489,6 +1491,8 @@ _nv(
     "nv_uvm_pref_gpu",
     "riemann_solver",
     "proj_method",
+    "diff_sts",
+    "diff_sts_max",
     "proj_tol",
     "proj_max_iters",
     "proj_max_acfl",

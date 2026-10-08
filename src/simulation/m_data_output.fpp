@@ -36,6 +36,7 @@ module m_data_output
     real(wp) :: ccfl_max       !< CCFL criterion maximum
     real(wp) :: acfl_max       !< Acoustic CFL maximum under proj_method, whose ICFL is advective
     integer  :: pcg_iters_max  !< Most pressure-solve iterations in one time step under proj_method
+    integer  :: sts_max        !< Most RKL2 diffusion stages in one time step under diff_sts
     real(wp) :: pcg_res_max    !< Largest final relative pressure-solve residual of any time step under proj_method
     real(wp) :: tcfl_max       !< TCFL criterion maximum
     real(wp) :: Rc_min         !< Rc criterion maximum
@@ -116,6 +117,7 @@ contains
         if (proj_method) write (3, '(2X,A10,2X,A7,2X,A10)', advance="no") 'AcCFL Max', 'PCG its', 'PCG res'
         if (surface_tension) write (3, '(2X,A10)', advance="no") 'CCFL Max'
         if (heat_conduction .or. chem_params%diffusion) write (3, '(2X,A10)', advance="no") 'TCFL Max'
+        if (diff_sts) write (3, '(2X,A7)', advance="no") 'STS s'
         if (viscous) write (3, '(2X,A10,2X,A10)', advance="no") 'VCFL Max', 'Rc Min'
         if (bubbles_lagrange) write (3, '(2X,A10)', advance="no") 'N Bubbles'
 
@@ -293,6 +295,7 @@ contains
         acfl_max = max(acfl_max, acfl_max_glb)
         pcg_iters_max = max(pcg_iters_max, proj_pcg_iters)
         pcg_res_max = max(pcg_res_max, proj_pcg_res)
+        sts_max = max(sts_max, sts_stages)
 
         if (surface_tension) then
             if (ccfl_max_glb > ccfl_max) ccfl_max = ccfl_max_glb
@@ -319,6 +322,7 @@ contains
             if (proj_method) write (3, '(2X,ES10.3,2X,I7,2X,ES10.3)', advance="no") acfl_max_glb, proj_pcg_iters, proj_pcg_res
             if (surface_tension) write (3, '(2X,ES10.3)', advance="no") ccfl_max_glb
             if (heat_conduction .or. chem_params%diffusion) write (3, '(2X,ES10.3)', advance="no") tcfl_max_glb
+            if (diff_sts) write (3, '(2X,I7)', advance="no") sts_stages
             if (viscous) write (3, '(2X,ES10.3,2X,ES10.3)', advance="no") vcfl_max_glb, Rc_min_glb
             if (bubbles_lagrange) write (3, '(2X,I10)', advance="no") n_el_bubs_glb
 
@@ -1954,6 +1958,7 @@ contains
         end if
         if (surface_tension) write (3, '(A,ES10.3)') 'CCFL Max: ', ccfl_max
         if (heat_conduction .or. chem_params%diffusion) write (3, '(A,ES10.3)') 'TCFL Max: ', tcfl_max
+        if (diff_sts) write (3, '(A,I0)') 'STS stages Max: ', sts_max
         if (viscous) write (3, '(A,ES10.3)') 'VCFL Max: ', vcfl_max
         if (viscous) write (3, '(A,ES10.3)') 'Rc Min: ', Rc_min
 
@@ -1987,6 +1992,7 @@ contains
             acfl_max = 0._wp
             pcg_iters_max = 0
             pcg_res_max = 0._wp
+            sts_max = 0
             if (surface_tension) then
                 ccfl_max = 0._wp
             end if

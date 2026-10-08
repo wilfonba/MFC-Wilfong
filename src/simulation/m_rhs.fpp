@@ -44,7 +44,11 @@ module m_rhs
 
     implicit none
 
-    private; public :: s_initialize_rhs_module, s_compute_rhs, s_finalize_rhs_module
+    private; public :: s_initialize_rhs_module, s_compute_rhs, s_compute_diffusion_rhs, s_finalize_rhs_module, sts_rate
+
+    !> Energy and species rates of the step's super-time-stepped diffusion (diff_sts), which every stage adds
+    type(scalar_field), allocatable, dimension(:) :: sts_rate
+    $:GPU_DECLARE(create='[sts_rate]')
 
     type(vector_field) :: q_cons_qp  !< WENO-reconstructed cell-average conservative variables at quadrature points
     $:GPU_DECLARE(create='[q_cons_qp]')
@@ -601,18 +605,7 @@ contains
         call nvtxStartRange("COMPUTE-RHS")
 
         if (.not. igr) then
-            ! Association/Population of Working Variables
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
-            do i = 1, sys_size
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+            call s_load_cons_qp(q_cons_vf)
 
             ! Converting Conservative to Primitive Variables
 
@@ -718,9 +711,8 @@ contains
 
                     if (proj_method) then
                         call s_projection_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf, bc_type)
-                        if (viscous .or. surface_tension .or. heat_conduction .or. chem_params%diffusion) then
-                            call s_projection_source_rhs(id, q_T_sf, rhs_vf)
-                        end if
+                        if (viscous .or. surface_tension .or. ((heat_conduction .or. chem_params%diffusion) .and. .not. diff_sts)) &
+                            & call s_projection_source_rhs(id, q_T_sf, rhs_vf)
                         cycle
                     end if
 
@@ -733,22 +725,22 @@ contains
                         call nvtxEndRange
                     end if
 
-                    ! RHS for diffusion
-                    if (chemistry .and. chem_params%diffusion) then
+                    ! RHS for diffusion, unless super-time-stepped apart from the flow (diff_sts)
+                    if (chemistry .and. chem_params%diffusion .and. .not. diff_sts) then
                         call nvtxStartRange("RHS-CHEM-DIFFUSION")
                         call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, q_T_sf)
                         call nvtxEndRange
                     end if
 
                     ! RHS for Fourier heat conduction
-                    if (heat_conduction) then
+                    if (heat_conduction .and. .not. diff_sts) then
                         call nvtxStartRange("RHS-CONDUCTION")
                         call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, flux_src_n(id)%vf, irx, iry, irz)
                         call nvtxEndRange
                     end if
 
                     ! Viscous stress contribution to RHS
-                    if (viscous .or. surface_tension .or. chem_params%diffusion .or. heat_conduction) then
+                    if (viscous .or. surface_tension .or. ((chem_params%diffusion .or. heat_conduction) .and. .not. diff_sts)) then
                         call nvtxStartRange("RHS-ADD-PHYSICS")
                         call s_compute_additional_physics_rhs(id, q_prim_qp%vf, q_T_sf, rhs_vf, flux_src_n(id)%vf, &
                                                               & dq_prim_dx_qp(1)%vf, dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
@@ -827,6 +819,8 @@ contains
             end if
         end if
         ! END: Dimensional Splitting Loop
+
+        if (diff_sts) call s_add_sts_rates(rhs_vf)
 
         ! RHS additions for hypoelasticity (interface-consistent path, after all sweeps)
         if (hypo_nc_mode == hypo_nc_mode_interface) then
@@ -1069,6 +1063,120 @@ contains
 
     end subroutine s_set_face_bounds
 
+    !> Copy q_cons_vf into q_cons_qp, whose partial densities and volume fractions q_prim_qp shares
+    subroutine s_load_cons_qp(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        integer                                             :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
+        do i = 1, sys_size
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                        q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_load_cons_qp
+
+    !> Diffusion alone, the operator the super-time-stepped split advances (diff_sts): the energy and species rates of Fourier
+    !! conduction and multispecies diffusion of q_cons_vf, into rhs_vf (the other equations untouched)
+    impure subroutine s_compute_diffusion_rhs(q_cons_vf, q_T_sf, bc_type, pb_in, mv_in, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_cons_vf
+        type(scalar_field), intent(inout)                                                          :: q_T_sf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in)                                 :: bc_type
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        type(scalar_field), dimension(sys_size), intent(inout)                                     :: rhs_vf
+        integer                                                                                    :: id, i, j, k, l, i2, j0, k0, l0
+
+        call s_load_cons_qp(q_cons_vf)
+        call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
+        call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf)
+
+        ! Energy and, with chemistry, the species (between them sit equations diffusion leaves alone)
+        i2 = merge(eqn_idx%species%end, eqn_idx%E, chemistry)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i2]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = eqn_idx%E, i2
+                        if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) rhs_vf(i)%sf(j, k, l) = 0._wp
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        do id = 1, num_dims
+            call s_set_face_bounds(id)
+            j0 = irx%beg; k0 = iry%beg; l0 = irz%beg  ! irx, iry, irz are stale on the device
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i2, j0, k0, l0]')
+            do l = l0, p
+                do k = k0, n
+                    do j = j0, m
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%E, i2
+                            if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) flux_src_n(id)%vf(i)%sf(j, k, l) = 0._wp
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            if (heat_conduction) call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, flux_src_n(id)%vf, irx, iry, irz)
+            if (chem_params%diffusion) call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, &
+                & irz, q_T_sf)
+            #:for D, SV, IM1, DXV in [(1, 'j', 'j - 1, k, l', 'dx'), (2, 'k', 'j, k - 1, l', 'dy'), (3, 'l', 'j, k, l - 1', 'dz')]
+                if (id == ${D}$) then
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i2]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%E, i2
+                                    if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
+                                        & l) + real((real(flux_src_n(id)%vf(i)%sf(${IM1}$), wp) - real(flux_src_n(id)%vf(i)%sf(j, &
+                                        & k, l), wp))/${DXV}$(${SV}$), stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+            #:endfor
+        end do
+
+    end subroutine s_compute_diffusion_rhs
+
+    !> Add the super-time-stepped diffusion rates, sts_rate, to rhs_vf and, under the projection, to the pressure rate
+    subroutine s_add_sts_rates(rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        integer                                                :: i, j, k, l, i2
+
+        i2 = merge(eqn_idx%species%end, eqn_idx%E, chemistry)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i2]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = eqn_idx%E, i2
+                        if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
+                            & l) + sts_rate(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        if (proj_method) call s_projection_rates(q_prim_qp%vf, sts_rate)
+
+    end subroutine s_add_sts_rates
+
     !> Viscous, capillary, conduction and species-diffusion contributions under the projection: the source fluxes a Riemann solve
     !! would build, from the face data the projection supplies, differenced by the same routine as in the explicit path
     subroutine s_projection_source_rhs(id, q_T_sf, rhs_vf)
@@ -1083,11 +1191,13 @@ contains
         call s_initialize_riemann_solver(flux_src_n(id)%vf, id)
         call s_projection_face_props(id, qR_rsx_vf, qL_rsx_vf, flux_src_n(id)%vf)
 
-        ! Diffusion alone in the energy flux, before the viscous work joins it: it reaches p as heat
-        if (heat_conduction) call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, flux_src_n(id)%vf, irx, iry, irz)
-        if (chem_params%diffusion) call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, &
-            & q_T_sf)
-        if (heat_conduction .or. chem_params%diffusion) call s_projection_heat(id, q_prim_qp%vf, flux_src_n(id)%vf)
+        ! Diffusion alone in the energy flux, before the viscous work joins it: it reaches p as heat (unless super-time-stepped)
+        if (.not. diff_sts) then
+            if (heat_conduction) call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, flux_src_n(id)%vf, irx, iry, irz)
+            if (chem_params%diffusion) call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, &
+                & irz, q_T_sf)
+            if (heat_conduction .or. chem_params%diffusion) call s_projection_heat(id, q_prim_qp%vf, flux_src_n(id)%vf)
+        end if
 
         if (viscous) then
             call s_compute_viscous_source_flux(q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &

@@ -64,7 +64,7 @@ module m_projection
     implicit none
 
     private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_face_props, s_projection_heat, &
-        & s_projection_apply, s_finalize_projection_module
+        & s_projection_rates, s_projection_apply, s_finalize_projection_module
 
     integer, parameter :: mg_maxlev = 24
     real(wp), parameter :: res_floor = 1.e2_wp*epsilon(1._wp)  !< residual round-off floor, relative to the right-hand side
@@ -652,66 +652,83 @@ contains
 
     end subroutine s_projection_face_props
 
-    !> Diffusive heating of one direction sweep from the source fluxes (energy -k dT/dn, plus species and their enthalpy with
-    !! chemistry). At fixed alpha and phase densities d(rho e) = Gamma dp, so the pressure transport rate gains -div(q)/Gamma, and
-    !! the energy rebuilt from p carries it. A reacting mixture's p(rho e, rho Y_k) is differenced the same way: R/cv per energy,
-    !! R_k T - (R/cv) e_k per species
-    subroutine s_projection_heat(id, q_prim_vf, flux_src_vf)
+    !> Pressure rate of energy and species rates re and ry at fixed density. At fixed alpha and phase densities d(rho e) = Gamma dp,
+    !! so re/Gamma; a reacting mixture's p(rho e, rho Y_k) is differenced the same way: R/cv per energy, R_k T - (R/cv) e_k per
+    !! species
+    function f_dpdt(q_prim_vf, j, k, l, re, ry) result(dp)
 
-        integer, intent(in)                                 :: id
+        $:GPU_ROUTINE(function_name='f_dpdt', parallelism='[seq]', cray_inline=True)
+
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_vf
-        real(wp)                                            :: rho, gam, pinf, qv, src
+        integer, intent(in)                                 :: j, k, l
+        real(wp), intent(in)                                :: re
+        real(wp), dimension(num_species), intent(in)        :: ry
+        real(wp)                                            :: dp, rho, gam, pinf, qv
+        integer                                             :: i
 
         #:if chemistry
-            real(wp), dimension(num_species) :: rY, Ys, hrt
+            real(wp), dimension(num_species) :: rd, Ys, hrt
             real(wp)                         :: R, T, cv
         #:endif
-
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: ar, al
         #:else
             real(wp), dimension(num_fluids) :: ar, al
         #:endif
-        integer :: i, j, k, l
+
+        #:if chemistry
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_species
+                rd(i) = real(q_prim_vf(1)%sf(j, k, l)*q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l), wp)
+            end do
+            call s_chem_mixture(rd, real(q_prim_vf(eqn_idx%E)%sf(j, k, l), wp), rho, Ys, R, T, cv)
+            call get_species_enthalpies_rt(T, hrt)
+            dp = re*R/cv
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_species
+                dp = dp + gas_constant*T/molecular_weights(i)*(1._wp + R/cv*(1._wp - hrt(i)))*ry(i)
+            end do
+        #:else
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                ar(i) = real(q_prim_vf(i)%sf(j, k, l), wp)
+                al(i) = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
+            end do
+            call s_compute_mixture_coefficients(ar, al, rho, gam, pinf, qv)
+            dp = re/gam
+        #:endif
+
+    end function f_dpdt
+
+    !> Diffusive heating of one direction sweep from the source fluxes (energy -k dT/dn, plus species and their enthalpy with
+    !! chemistry): the pressure transport rate gains their divergence's f_dpdt, and the energy rebuilt from p carries it
+    subroutine s_projection_heat(id, q_prim_vf, flux_src_vf)
+
+        integer, intent(in)                                 :: id
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_vf
+        real(wp)                                            :: re
+        real(wp), dimension(num_species)                    :: ry
+        integer                                             :: i, j, k, l
 
         #:for D, SV, COORDS, DXV in [(1, 'j', '{SI}, k, l', 'dx'), (2, 'k', 'j, {SI}, l', 'dy'), (3, 'l', 'j, k, {SI}', 'dz')]
             #:set SF = lambda offs: COORDS.format(SI=SV + offs)
             if (id == ${D}$) then
-                #:if chemistry
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, src, rY, Ys, hrt, R, T, cv]')
-                #:else
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gam, pinf, qv, src, ar, al]')
-                #:endif
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, re, ry]')
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            src = (real(flux_src_vf(eqn_idx%E)%sf(${SF(' - 1')}$), wp) - real(flux_src_vf(eqn_idx%E)%sf(j, k, l), &
-                                   & wp))/${DXV}$(${SV}$)
+                            re = (real(flux_src_vf(eqn_idx%E)%sf(${SF(' - 1')}$), wp) - real(flux_src_vf(eqn_idx%E)%sf(j, k, l), &
+                                  & wp))/${DXV}$(${SV}$)
+                            ry = 0._wp
                             #:if chemistry
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_species
-                                    rY(i) = real(q_prim_vf(1)%sf(j, k, l)*q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l), wp)
+                                    ry(i) = (real(flux_src_vf(eqn_idx%species%beg + i - 1)%sf(${SF(' - 1')}$), &
+                                       & wp) - real(flux_src_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l), wp))/${DXV}$(${SV}$)
                                 end do
-                                call s_chem_mixture(rY, real(q_prim_vf(eqn_idx%E)%sf(j, k, l), wp), rho, Ys, R, T, cv)
-                                call get_species_enthalpies_rt(T, hrt)
-                                src = src*R/cv
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_species
-                                    src = src + gas_constant*T/molecular_weights(i)*(1._wp + R/cv*(1._wp - hrt(i))) &
-                                        & *(real(flux_src_vf(eqn_idx%species%beg + i - 1)%sf(${SF(' - 1')}$), &
-                                        & wp) - real(flux_src_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l), wp))/${DXV}$(${SV}$)
-                                end do
-                            #:else
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_fluids
-                                    ar(i) = real(q_prim_vf(i)%sf(j, k, l), wp)
-                                    al(i) = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
-                                end do
-                                call s_compute_mixture_coefficients(ar, al, rho, gam, pinf, qv)
-                                src = src/gam
                             #:endif
-                            rhs_p(j, k, l) = rhs_p(j, k, l) + src
+                            rhs_p(j, k, l) = rhs_p(j, k, l) + f_dpdt(q_prim_vf, j, k, l, re, ry)
                         end do
                     end do
                 end do
@@ -720,6 +737,35 @@ contains
         #:endfor
 
     end subroutine s_projection_heat
+
+    !> The pressure transport rate of given energy and species rates (rate_vf at eqn_idx%E and the species), such as the
+    !! super-time-stepped diffusion's (diff_sts)
+    subroutine s_projection_rates(q_prim_vf, rate_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf, rate_vf
+        real(wp)                                            :: re
+        real(wp), dimension(num_species)                    :: ry
+        integer                                             :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, re, ry]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    re = real(rate_vf(eqn_idx%E)%sf(j, k, l), wp)
+                    ry = 0._wp
+                    #:if chemistry
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_species
+                            ry(i) = real(rate_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l), wp)
+                        end do
+                    #:endif
+                    rhs_p(j, k, l) = rhs_p(j, k, l) + f_dpdt(q_prim_vf, j, k, l, re, ry)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_projection_rates
 
     #:if chemistry
         !> Ideal-gas mixture of partial densities rY at pressure pres: density, mass fractions, gas constant, temperature and cv.

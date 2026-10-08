@@ -573,6 +573,8 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `t_step_stop`              | Integer | Simulation stopping time step |
 | `t_step_save`              | Integer | Frequency to output data |
 | `t_step_print`             | Integer | Frequency to print the current step number to standard output (default 1) |
+| `diff_sts`                 | Logical | Super-time-step heat conduction and species diffusion with RKL2 (Meyer, Balsara & Aslam 2014): each step advances them in as many stages as its thermal CFL number needs, and every RK stage adds the resulting rates. Needs `cfl_adap_dt`; not with `igr` or `cyl_coord` (default F) |
+| `diff_sts_max`             | Integer | With `diff_sts`, the most RKL2 stages per step; past it the thermal limit (`TCFL`) bounds `dt` (default 64) |
 | `cfl_adap_dt`              | Logical | CFL based adaptive time-stepping |
 | `cfl_const_dt`             | Logical | CFL based non-adaptive time-stepping |
 | `cfl_dt`                   | Logical | Enable CFL-based time stepping |

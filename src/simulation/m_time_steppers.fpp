@@ -30,6 +30,7 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_projection, only: s_projection_apply
+    use m_diffusion_sts, only: s_diffusion_sts, f_sts_stages, f_sts_bound
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
@@ -466,6 +467,9 @@ contains
         ! Adaptive dt: initial stage
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
+        ! Super-time-stepped diffusion (diff_sts): its rates over the step, which every stage adds
+        if (diff_sts) call s_diffusion_sts(q_cons_ts(1)%vf, q_T_sf, bc_type, pb_ts(1)%sf, mv_ts(1)%sf, rhs_vf, dt, sts_stages)
+
         do s = 1, nstage
             call system_clock(stage_t0)
             ! mytime is read on the device by the GRCBC inflow ramp, so it has to be current before the RHS that
@@ -693,6 +697,7 @@ contains
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
+        real(wp)               :: tcfl_ref           !< Step at which the thermal CFL number equals cfl_target
         real(wp)               :: ramp               !< Growth cap on dt, the projection's default when ramp_ratio is unset
         logical                :: proj_ac            !< The projection's seeding step: keep the acoustic limit
         real(wp)               :: amax, hmin         !< Projection body-force bound and smallest cell width
@@ -792,6 +797,10 @@ contains
             call s_mpi_allreduce_min_vec(dt_candidates_loc, dt_candidates_glb)
         end if
 
+        ! Super-time-stepped diffusion (diff_sts) bounds dt only past diff_sts_max stages, and its stage count follows dt
+        tcfl_ref = dt_candidates_glb(4)
+        if (diff_sts) dt_candidates_glb(4) = tcfl_ref/cfl_target*f_sts_bound(diff_sts_max)
+
         dt = minval(dt_candidates_glb)
         dt_limiter = dt_limiter_names(minloc(dt_candidates_glb, dim=1))
 
@@ -804,6 +813,7 @@ contains
             dt_limiter = 'RAMP'
         end if
         proj_dt_seeded = proj_dt_seeded .or. proj_ac
+        if (diff_sts) sts_stages = f_sts_stages(dt*cfl_target/tcfl_ref)
 
         $:GPU_UPDATE(device='[dt]')
 

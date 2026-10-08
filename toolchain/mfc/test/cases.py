@@ -553,6 +553,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Small enough for the explicit diffusion limit at the base dt
         conduction = {"fluid_pp(1)%k_therm": 1.0e-4, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-4, "fluid_pp(2)%cv": 1.0}
         cases.append(define_case_d(stack, "Conduction", conduction))
+        # 100x the conductivity, past the explicit limit, super-time-stepped
+        sts = {f"fluid_pp({i})%k_therm": 100 * conduction[f"fluid_pp({i})%k_therm"] for i in [1, 2]}
+        cases.append(define_case_d(stack, ["Conduction", "diff_sts=T"], {**conduction, **adap, **sts, "proj_max_acfl": 5.0, "diff_sts": "T"}))
         if len(dimInfo[0]) == 2:
             # A ramped Dirichlet inflow at x = 0 and a pressure outlet at x = 1, between no-slip walls
             inflow = {"bc_x%beg": -17, "bc_x%end": -3, "bc_y%beg": -16, "bc_y%end": -16, "bc_x%pres_out": 0.1, "bc_x%vel_in_ramp": 1e-3, "patch_icpp(1)%vel(1)": 0.5}
@@ -3740,6 +3743,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
         cases.append(define_case_d(stack, "Projection", {"proj_method": "T"}, override_tol=10 ** (-10)))
+        sts = {"proj_method": "T", "diff_sts": "T", "cfl_adap_dt": "T", "cfl_target": 0.5, "n_start": 0, "t_save": 5e-6, "t_stop": 5e-6, "proj_max_acfl": 20.0}
+        cases.append(define_case_d(stack, ["Projection", "diff_sts=T"], sts, override_tol=10 ** (-10)))
 
         stack.pop()
 
