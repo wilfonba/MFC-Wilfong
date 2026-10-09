@@ -343,7 +343,7 @@ contains
             if (viscous) then
                 if (.not. f_approx_equal(vcfl_max_glb, vcfl_max_glb)) then
                     call s_mpi_abort('VCFL is NaN. Exiting.')
-                else if (vcfl_max_glb > 1._wp) then
+                else if (vcfl_max_glb > 1._wp .and. .not. (diff_sts .and. proj_method)) then  ! super-time-stepped past it
                     print *, 'vcfl', vcfl_max_glb
                     call s_mpi_abort('VCFL is greater than 1.0. Exiting.')
                 end if

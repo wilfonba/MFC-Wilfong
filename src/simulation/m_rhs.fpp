@@ -44,12 +44,16 @@ module m_rhs
 
     implicit none
 
-    private; public :: s_initialize_rhs_module, s_compute_rhs, s_compute_diffusion_rhs, s_finalize_rhs_module, sts_rate
+    private; public :: s_initialize_rhs_module, s_compute_rhs, s_compute_diffusion_rhs, s_finalize_rhs_module, sts_rate, sts_beg, &
+        & sts_end
 
-    !> Energy and species rates of the step's super-time-stepped diffusion (diff_sts), which every stage adds
+    !> Rates of the step's super-time-stepped diffusion (diff_sts), which every stage adds
     type(scalar_field), allocatable, dimension(:) :: sts_rate
     $:GPU_DECLARE(create='[sts_rate]')
 
+    !> The super-time-stepped equations, sts_beg to sts_end less those between the energy and the species: the momentum under the
+    !! projection when viscous, the energy, and the species with chemistry
+    integer            :: sts_beg, sts_end
     type(vector_field) :: q_cons_qp  !< WENO-reconstructed cell-average conservative variables at quadrature points
     $:GPU_DECLARE(create='[q_cons_qp]')
 
@@ -151,6 +155,9 @@ contains
 
         $:GPU_ENTER_DATA(copyin='[idwbuff]')
         $:GPU_UPDATE(device='[idwbuff]')
+
+        sts_beg = merge(eqn_idx%mom%beg, eqn_idx%E, viscous .and. proj_method)
+        sts_end = merge(eqn_idx%species%end, eqn_idx%E, chemistry)
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
@@ -711,7 +718,7 @@ contains
 
                     if (proj_method) then
                         call s_projection_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf, bc_type)
-                        if (viscous .or. surface_tension .or. ((heat_conduction .or. chem_params%diffusion) .and. .not. diff_sts)) &
+                        if (surface_tension .or. ((viscous .or. heat_conduction .or. chem_params%diffusion) .and. .not. diff_sts)) &
                             & call s_projection_source_rhs(id, q_T_sf, rhs_vf)
                         cycle
                     end if
@@ -1083,46 +1090,65 @@ contains
 
     end subroutine s_load_cons_qp
 
-    !> Diffusion alone, the operator the super-time-stepped split advances (diff_sts): the energy and species rates of Fourier
-    !! conduction and multispecies diffusion of q_cons_vf, into rhs_vf (the other equations untouched)
+    !> Diffusion alone, the operator the super-time-stepped split advances (diff_sts): the rates of Fourier conduction, multispecies
+    !! diffusion and, under the projection, viscous stress of q_cons_vf into rhs_vf (other equations untouched). Face viscosities
+    !! come from the cell states; the viscous work stays out of the energy, which the projection rebuilds from p
     impure subroutine s_compute_diffusion_rhs(q_cons_vf, q_T_sf, bc_type, pb_in, mv_in, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_cons_vf
-        type(scalar_field), intent(inout)                                                          :: q_T_sf
-        type(integer_field), dimension(1:num_dims,1:2), intent(in)                                 :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), intent(inout) :: q_T_sf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
-        type(scalar_field), dimension(sys_size), intent(inout)                                     :: rhs_vf
-        integer                                                                                    :: id, i, j, k, l, i2, j0, k0, l0
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        integer :: id, i, j, k, l, i1, i2, j0, k0, l0
 
         call s_load_cons_qp(q_cons_vf)
         call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
         call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf)
 
-        ! Energy and, with chemistry, the species (between them sit equations diffusion leaves alone)
-        i2 = merge(eqn_idx%species%end, eqn_idx%E, chemistry)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i2]')
+        i1 = sts_beg; i2 = sts_end
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i1, i2]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     $:GPU_LOOP(parallelism='[seq]')
-                    do i = eqn_idx%E, i2
-                        if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) rhs_vf(i)%sf(j, k, l) = 0._wp
+                    do i = i1, i2
+                        if (i <= eqn_idx%E .or. i >= eqn_idx%species%beg) rhs_vf(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        if (i1 < eqn_idx%E) then
+            call s_get_viscous(qL_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_rsx_vf, dqR_prim_dx_n, &
+                               & dqR_prim_dy_n, dqR_prim_dz_n, qR_prim, q_prim_qp, dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp, &
+                               & idwbuff(1), idwbuff(2), idwbuff(3))
+            ! Both face states are the cells' own
+            $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l]')
+            do i = 1, sys_size
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            qL_rsx_vf(j, k, l, i) = q_prim_qp%vf(i)%sf(j, k, l)
+                            qR_rsx_vf(j, k, l, i) = q_prim_qp%vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
         do id = 1, num_dims
             call s_set_face_bounds(id)
             j0 = irx%beg; k0 = iry%beg; l0 = irz%beg  ! irx, iry, irz are stale on the device
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i2, j0, k0, l0]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i1, i2, j0, k0, l0]')
             do l = l0, p
                 do k = k0, n
                     do j = j0, m
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%E, i2
-                            if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) flux_src_n(id)%vf(i)%sf(j, k, l) = 0._wp
+                        do i = i1, i2
+                            if (i <= eqn_idx%E .or. i >= eqn_idx%species%beg) flux_src_n(id)%vf(i)%sf(j, k, l) = 0._wp
                         end do
                     end do
                 end do
@@ -1131,42 +1157,70 @@ contains
             if (heat_conduction) call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, flux_src_n(id)%vf, irx, iry, irz)
             if (chem_params%diffusion) call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, &
                 & irz, q_T_sf)
-            #:for D, SV, IM1, DXV in [(1, 'j', 'j - 1, k, l', 'dx'), (2, 'k', 'j, k - 1, l', 'dy'), (3, 'l', 'j, k, l - 1', 'dz')]
-                if (id == ${D}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i2]')
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = eqn_idx%E, i2
-                                    if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
-                                        & l) + real((real(flux_src_n(id)%vf(i)%sf(${IM1}$), wp) - real(flux_src_n(id)%vf(i)%sf(j, &
-                                        & k, l), wp))/${DXV}$(${SV}$), stp)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
-            #:endfor
+            call s_flux_src_divergence(id, eqn_idx%E, i2, rhs_vf)
+            if (i1 < eqn_idx%E) then
+                call s_populate_riemann_states_variables_buffers(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, &
+                    & dqR_prim_dz_n(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, id, irx, &
+                    & iry, irz)
+                call s_projection_face_props(id, qR_rsx_vf, qL_rsx_vf, flux_src_n(id)%vf)
+                call s_compute_viscous_source_flux(q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                   & dqR_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                   & dqR_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                   & dqR_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                   & q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                   & dqL_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                   & dqL_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                   & dqL_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_n(id)%vf, &
+                                                   & q_prim_qp%vf, id, irx, iry, irz)
+                call s_flux_src_divergence(id, eqn_idx%mom%beg, eqn_idx%mom%end, rhs_vf)
+            end if
         end do
 
     end subroutine s_compute_diffusion_rhs
+
+    !> Add the divergence of direction id's source fluxes of equations i1 to i2, less those between the energy and the species, to
+    !! rhs_vf
+    subroutine s_flux_src_divergence(id, i1, i2, rhs_vf)
+
+        integer, intent(in)                                    :: id, i1, i2
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        integer                                                :: i, j, k, l
+
+        #:for D, SV, IM1, DXV in [(1, 'j', 'j - 1, k, l', 'dx'), (2, 'k', 'j, k - 1, l', 'dy'), (3, 'l', 'j, k, l - 1', 'dz')]
+            if (id == ${D}$) then
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i1, i2]')
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = i1, i2
+                                if (i <= eqn_idx%E .or. i >= eqn_idx%species%beg) rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
+                                    & l) + real((real(flux_src_n(id)%vf(i)%sf(${IM1}$), wp) - real(flux_src_n(id)%vf(i)%sf(j, k, &
+                                    & l), wp))/${DXV}$(${SV}$), stp)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_flux_src_divergence
 
     !> Add the super-time-stepped diffusion rates, sts_rate, to rhs_vf and, under the projection, to the pressure rate
     subroutine s_add_sts_rates(rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer                                                :: i, j, k, l, i2
+        integer                                                :: i, j, k, l, i1, i2
 
-        i2 = merge(eqn_idx%species%end, eqn_idx%E, chemistry)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i2]')
+        i1 = sts_beg; i2 = sts_end
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[i1, i2]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     $:GPU_LOOP(parallelism='[seq]')
-                    do i = eqn_idx%E, i2
-                        if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
+                    do i = i1, i2
+                        if (i <= eqn_idx%E .or. i >= eqn_idx%species%beg) rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, &
                             & l) + sts_rate(i)%sf(j, k, l)
                     end do
                 end do
@@ -1199,7 +1253,8 @@ contains
             if (heat_conduction .or. chem_params%diffusion) call s_projection_heat(id, q_prim_qp%vf, flux_src_n(id)%vf)
         end if
 
-        if (viscous) then
+        ! Viscous stress too, unless super-time-stepped
+        if (viscous .and. .not. diff_sts) then
             call s_compute_viscous_source_flux(q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                & dqR_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                & dqR_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &

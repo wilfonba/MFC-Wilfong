@@ -174,7 +174,7 @@ DESCRIPTIONS = {
     "cont_damage": "Enable continuum damage model",
     "igr": "Enable implicit gradient reconstruction",
     "proj_method": "Enable the all-Mach pressure projection, which removes the acoustic time-step limit",
-    "diff_sts": "Advance heat conduction and species diffusion by RKL2 super-time-stepping, split from the flow step, so their explicit limit no longer bounds dt",
+    "diff_sts": "Advance heat conduction, species diffusion and, with proj_method, viscous stress by RKL2 super-time-stepping, so their explicit limits no longer bound dt",
     "diff_sts_max": "Most RKL2 stages per diffusion step (diff_sts)",
     "proj_tol": "Projection pressure-solve tolerance, relative to the initial residual",
     "proj_max_iters": "Maximum iterations of the projection pressure solve",

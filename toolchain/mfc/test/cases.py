@@ -549,7 +549,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, ["Gravity", "cfl_adap_dt=T"], {**gravity, **adap}))
         for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
             cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
-        cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
+        viscous = {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}
+        cases.append(define_case_d(stack, "Viscous", viscous))
+        # 100x the viscosity, past the explicit limit, super-time-stepped
+        sts_visc = {**viscous, **adap, "fluid_pp(1)%Re(1)": 1.0e2, "fluid_pp(2)%Re(1)": 5.0e1, "proj_max_acfl": 5.0, "diff_sts": "T"}
+        cases.append(define_case_d(stack, ["Viscous", "diff_sts=T"], sts_visc))
         # Small enough for the explicit diffusion limit at the base dt
         conduction = {"fluid_pp(1)%k_therm": 1.0e-4, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-4, "fluid_pp(2)%cv": 1.0}
         cases.append(define_case_d(stack, "Conduction", conduction))

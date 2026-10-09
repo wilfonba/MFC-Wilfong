@@ -1670,7 +1670,8 @@ class CaseValidator:
             return
         conduction = any((self.get(f"fluid_pp({i})%k_therm") or 0) > 0 for i in range(1, (self.get("num_fluids") or 1) + 1))
         chem_diffusion = self.get("chemistry", "F") == "T" and self.get("chem_params%diffusion", "F") == "T"
-        self.prohibit(not (conduction or chem_diffusion), "diff_sts needs a diffusion to advance: fluid_pp(i)%k_therm > 0 or chem_params%diffusion")
+        proj_viscous = self.get("viscous", "F") == "T" and self.get("proj_method", "F") == "T"
+        self.prohibit(not (conduction or chem_diffusion or proj_viscous), "diff_sts needs a diffusion to advance: fluid_pp(i)%k_therm > 0, chem_params%diffusion, or viscous with proj_method")
         self.prohibit(self.get("cfl_adap_dt", "F") != "T", "diff_sts requires cfl_adap_dt, from which it sizes its stages")
         self.prohibit(self.get("cyl_coord", "F") == "T", "diff_sts does not support cylindrical coordinates")
         self.prohibit(self.get("igr", "F") == "T", "diff_sts does not support igr")

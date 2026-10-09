@@ -697,7 +697,7 @@ contains
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
-        real(wp)               :: tcfl_ref           !< Step at which the thermal CFL number equals cfl_target
+        real(wp)               :: sts_ref            !< Step at which the super-time-stepped CFL numbers reach cfl_target
         real(wp)               :: ramp               !< Growth cap on dt, the projection's default when ramp_ratio is unset
         logical                :: proj_ac            !< The projection's seeding step: keep the acoustic limit
         real(wp)               :: amax, hmin         !< Projection body-force bound and smallest cell width
@@ -797,9 +797,14 @@ contains
             call s_mpi_allreduce_min_vec(dt_candidates_loc, dt_candidates_glb)
         end if
 
-        ! Super-time-stepped diffusion (diff_sts) bounds dt only past diff_sts_max stages, and its stage count follows dt
-        tcfl_ref = dt_candidates_glb(4)
-        if (diff_sts) dt_candidates_glb(4) = tcfl_ref/cfl_target*f_sts_bound(diff_sts_max)
+        ! Super-time-stepped diffusion (diff_sts) bounds dt only past diff_sts_max stages, and its stage count follows dt: the
+        ! thermal limit, and the viscous one where it is super-time-stepped too (under the projection)
+        if (diff_sts) then
+            sts_ref = dt_candidates_glb(4)
+            if (proj_method) sts_ref = min(sts_ref, dt_candidates_glb(2))
+            dt_candidates_glb(4) = dt_candidates_glb(4)/cfl_target*f_sts_bound(diff_sts_max)
+            if (proj_method) dt_candidates_glb(2) = dt_candidates_glb(2)/cfl_target*f_sts_bound(diff_sts_max)
+        end if
 
         dt = minval(dt_candidates_glb)
         dt_limiter = dt_limiter_names(minloc(dt_candidates_glb, dim=1))
@@ -813,7 +818,7 @@ contains
             dt_limiter = 'RAMP'
         end if
         proj_dt_seeded = proj_dt_seeded .or. proj_ac
-        if (diff_sts) sts_stages = f_sts_stages(dt*cfl_target/tcfl_ref)
+        if (diff_sts) sts_stages = f_sts_stages(dt*cfl_target/sts_ref)
 
         $:GPU_UPDATE(device='[dt]')
 

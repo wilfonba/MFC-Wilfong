@@ -5,16 +5,16 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief RKL2 super-time-stepping (Meyer, Balsara & Aslam, JCP 257, 2014) of heat conduction and species diffusion (diff_sts): s
-!! stages of the explicit diffusion operator advance them stably over a step up to (s^2 + s - 2)/4 times its forward-Euler limit.
-!! Run from the step's start state at fixed density and momentum, the result becomes rates (sts_rate) that every stage of the step
-!! adds to its right-hand side, under the projection through the pressure equation as the unsplit diffusion is. Left as a
-!! constant-volume pressure jump instead, the projection's relaxation of it loses energy.
+!> @brief RKL2 super-time-stepping (Meyer, Balsara & Aslam, JCP 257, 2014) of heat conduction, species diffusion and, under the
+!! projection, viscous stress (diff_sts): s stages of the explicit diffusion operator advance them stably over a step up to (s^2 + s
+!! - 2)/4 times its forward-Euler limit. Run from the step's start state at fixed density, the result becomes rates (sts_rate) that
+!! every stage of the step adds to its right-hand side, under the projection through the pressure equation as the unsplit diffusion
+!! is. Left as a constant-volume pressure jump instead, the projection's relaxation of it loses energy.
 module m_diffusion_sts
 
     use m_derived_types
     use m_global_parameters
-    use m_rhs, only: s_compute_diffusion_rhs, sts_rate
+    use m_rhs, only: s_compute_diffusion_rhs, sts_rate, sts_beg, sts_end
     use m_ibm, only: ib_markers
 
     implicit none
@@ -22,7 +22,7 @@ module m_diffusion_sts
     private; public :: s_initialize_diffusion_sts_module, s_diffusion_sts, f_sts_stages, f_sts_bound, &
         & s_finalize_diffusion_sts_module
 
-    !> The stage start Y0, the stage before last, and the operator at Y0, over the diffused equations (energy and species)
+    !> The stage start Y0, the stage before last, and the operator at Y0, over the super-time-stepped equations
     type(scalar_field), allocatable, dimension(:) :: y0, ym2, l0
     $:GPU_DECLARE(create='[y0, ym2, l0]')
 
@@ -48,12 +48,12 @@ contains
 
     end subroutine s_initialize_diffusion_sts_module
 
-    !> Equation i is diffused: the energy, and the species with chemistry
+    !> Equation i is super-time-stepped (see sts_beg)
     logical function f_diffused(i)
 
         integer, intent(in) :: i
 
-        f_diffused = i == eqn_idx%E .or. (chemistry .and. i >= eqn_idx%species%beg .and. i <= eqn_idx%species%end)
+        f_diffused = i >= sts_beg .and. i <= sts_end .and. (i <= eqn_idx%E .or. i >= eqn_idx%species%beg)
 
     end function f_diffused
 
@@ -96,24 +96,24 @@ contains
         integer, intent(in)                                                                        :: s
         real(wp)                                                                                   :: w1, mu, nu, mt, gt, td, y
         logical                                                                                    :: fluid
-        integer                                                                                    :: i, j, k, l, st, i2
+        integer                                                                                    :: i, j, k, l, st, i1, i2
 
         w1 = 4._wp/real(s*s + s - 2, wp)
         td = dt_in
-        i2 = merge(eqn_idx%species%end, eqn_idx%E, chemistry)
+        i1 = sts_beg; i2 = sts_end
 
         ! Y0 and L(Y0); Y1 = Y0 + w1/3 dt L(Y0)
         call s_compute_diffusion_rhs(q_cons_vf, q_T_sf, bc_type, pb_in, mv_in, rhs_vf)
         mt = f_b(1)*w1
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, fluid]', firstprivate='[mt, td, i2]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, fluid]', firstprivate='[mt, td, i1, i2]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     fluid = .true.
                     if (ib) fluid = ib_markers%sf(j, k, l) == 0
                     $:GPU_LOOP(parallelism='[seq]')
-                    do i = eqn_idx%E, i2
-                        if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) then
+                    do i = i1, i2
+                        if (i <= eqn_idx%E .or. i >= eqn_idx%species%beg) then
                             y0(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
                             ym2(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
                             l0(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l)
@@ -133,7 +133,7 @@ contains
             mt = mu*w1
             gt = -(1._wp - f_b(st - 1))*mt
             call s_compute_diffusion_rhs(q_cons_vf, q_T_sf, bc_type, pb_in, mv_in, rhs_vf)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, y, fluid]', firstprivate='[mu, nu, mt, gt, td, i2]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, y, fluid]', firstprivate='[mu, nu, mt, gt, td, i1, i2]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -141,8 +141,8 @@ contains
                         if (ib) fluid = ib_markers%sf(j, k, l) == 0
                         if (fluid) then
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%E, i2
-                                if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) then
+                            do i = i1, i2
+                                if (i <= eqn_idx%E .or. i >= eqn_idx%species%beg) then
                                     y = real(q_cons_vf(i)%sf(j, k, l), wp)
                                     q_cons_vf(i)%sf(j, k, l) = real(mu*y + nu*real(ym2(i)%sf(j, k, l), &
                                               & wp) + (1._wp - mu - nu)*real(y0(i)%sf(j, k, l), wp) + mt*td*real(rhs_vf(i)%sf(j, &
@@ -157,13 +157,13 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end do
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[td, i2]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]', firstprivate='[td, i1, i2]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     $:GPU_LOOP(parallelism='[seq]')
-                    do i = eqn_idx%E, i2
-                        if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) then
+                    do i = i1, i2
+                        if (i <= eqn_idx%E .or. i >= eqn_idx%species%beg) then
                             sts_rate(i)%sf(j, k, l) = real((real(q_cons_vf(i)%sf(j, k, l), wp) - real(y0(i)%sf(j, k, l), wp))/td, &
                                      & stp)
                             q_cons_vf(i)%sf(j, k, l) = y0(i)%sf(j, k, l)
