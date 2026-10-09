@@ -90,8 +90,8 @@ cells_per_D = 40
 cfl = 0.5
 
 # Convective nondimensional time: Tstar = t * u_inf / D
-Tstar = 24.0
-frames = 200
+Tstar = 36.0
+frames = 300
 
 # Chemistry and transport
 chemistry = "T"

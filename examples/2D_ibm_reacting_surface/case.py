@@ -65,7 +65,7 @@ Twall = 1200.0  # K
 
 # Cylinder and domain geometry
 D = 0.002  # cylinder diameter (m)
-Lx = 7.0 * D
+Lx = 14.0 * D
 Ly = 6.0 * D
 x_cyl = 2.0 * D
 y_cyl = Ly / 2.0
@@ -76,8 +76,8 @@ cells_per_D = 40
 cfl = 0.8
 
 # Convective nondimensional time: Tstar = t * u_inf / D
-Tstar = 12.0
-frames = 10
+Tstar = 36.0
+frames = 300
 
 # Chemistry and transport
 chemistry = "T"

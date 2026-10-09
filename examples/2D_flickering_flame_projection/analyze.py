@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 parser.add_argument("dir", help="case directory holding simulation.inp and restart_data/")
 parser.add_argument("--out", default="result.png", help="output image (default: %(default)s)")
 parser.add_argument("--probe", type=float, default=0.05, help="probe height on the axis [m] (default: %(default)s)")
-parser.add_argument("--d", type=float, default=0.01, help="slot width the run used [m] (default: %(default)s)")
+parser.add_argument("--d", type=float, default=0.05, help="slot width the run used [m] (default: %(default)s)")
 parser.add_argument("--panels", type=int, default=5, help="snapshots over the last flicker cycle (default: %(default)s)")
 parser.add_argument("--settle", type=float, default=0.1, help="start-up excluded from the spectrum [s] (default: %(default)s)")
 args = parser.parse_args()
