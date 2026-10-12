@@ -603,14 +603,11 @@ contains
             end if
         end if
 
+        ! Land exactly on t_stop. A fixed dt already lands on t_step_stop by step count; trimming it to t_step_stop*dt - mytime
+        ! would only change the run's last dt by round-off, which a run continuing past that step does not see
         if (cfl_dt) then
             if ((mytime + dt) >= t_stop) then
                 dt = t_stop - mytime
-                $:GPU_UPDATE(device='[dt]')
-            end if
-        else
-            if ((mytime + dt) >= finaltime) then
-                dt = finaltime - mytime
                 $:GPU_UPDATE(device='[dt]')
             end if
         end if
@@ -654,8 +651,14 @@ contains
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
-        ! Advance time after RK so source terms see current-step time
-        mytime = mytime + dt
+        ! Advance time after RK so source terms see current-step time. With a fixed dt, use the same t_step*dt a restart
+        ! starts from (p_main): a running sum drifts from it (1290 ulps by step 27000), so a restarted run would see the
+        ! prescribed IB kinematics, inflow ramps and forcing at slightly different times than the run it continues
+        if (cfl_dt) then
+            mytime = mytime + dt
+        else
+            mytime = (t_step + 1)*dt
+        end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
@@ -703,7 +706,8 @@ contains
                 open (1, file='time_data.dat', position='append', status='old')
             else
                 open (1, file='time_data.dat', status='new')
-                write (1, '(A10, A15, A15)') "Ranks", "s/step", "ns/gp/eq/rhs"
+                ! time_final is the fastest single RK stage (one RHS evaluation), not a whole step; see s_tvd_rk
+                write (1, '(A10, A15, A15)') "Ranks", "s/rhs", "ns/gp/eq/rhs"
             end if
 
             write (1, '(I10, 2(F15.8))') num_procs, time_final, grind_time
@@ -715,7 +719,8 @@ contains
                 open (1, file='io_time_data.dat', position='append', status='old')
             else
                 open (1, file='io_time_data.dat', status='new')
-                write (1, '(A10, A15)') "Ranks", "s/step"
+                ! io_time_final is the mean time of one s_save_data call
+                write (1, '(A10, A15)') "Ranks", "s/save"
             end if
 
             write (1, '(I10, F15.8)') num_procs, io_time_final
@@ -1319,6 +1324,9 @@ contains
                 nbr_ranks(n_nbrs) = nbr_ranks(i)
             end do
 
+            ! the IBs loaded from restart are this rank's own; neighbors learn their owner from the sender below
+            patch_ib(1:num_local_ibs)%owner_rank = proc_rank
+
             allocate (recv_counts(n_nbrs), requests(2*n_nbrs))
             do i = 1, n_nbrs
                 call MPI_IRECV(recv_counts(i), 1, MPI_INTEGER, nbr_ranks(i), 500, MPI_COMM_WORLD, requests(2*i - 1), ierr)
@@ -1347,14 +1355,13 @@ contains
                 @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
                            & "IB neighborhood exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i),i)
+                patch_ib(num_ibs + 1:num_ibs + recv_counts(i))%owner_rank = nbr_ranks(i)
                 num_ibs = num_ibs + recv_counts(i)
             end do
 
             deallocate (nbr_ranks, recv_counts, requests, recv_ibs)
         end if
 #endif
-
-        @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
 
     end subroutine s_build_ib_neighborhood
 
