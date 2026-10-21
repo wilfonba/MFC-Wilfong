@@ -411,6 +411,8 @@ PATTERNS = [
     (r"bc_([xyz])%grcbc_vel_out", "Enable GRCBC velocity at {0}-outlet"),
     (r"bc_([xyz])%isothermal_in", "Enable isothermal wall at {0}-inlet"),
     (r"bc_([xyz])%isothermal_out", "Enable isothermal wall at {0}-outlet"),
+    (r"bc_([xyz])%slip_in", "Characteristic wall (-5) at {0}-begin is slip (T) or no-slip (F)"),
+    (r"bc_([xyz])%slip_out", "Characteristic wall (-5) at {0}-end is slip (T) or no-slip (F)"),
     (r"bc_([xyz])%Twall_in", "Wall temperature at {0}-inlet"),
     (r"bc_([xyz])%Twall_out", "Wall temperature at {0}-outlet"),
     # patch_bc patterns

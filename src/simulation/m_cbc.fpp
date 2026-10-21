@@ -12,16 +12,17 @@ module m_cbc
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+    use m_eos
     use m_compute_cbc
     use m_boundary_primitives, only: f_vel_ramp
-    use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
+    use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, model_eqns_6eq, recon_type_weno, recon_type_muscl
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, &
         & get_mole_fractions
     use m_thermochem_state, only: get_mixture_caloric_state
 
     implicit none
 
-    private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
+    private; public :: s_initialize_cbc_module, s_cbc, s_initialize_cbc_no_slip, s_cbc_no_slip, s_finalize_cbc_module
 
     ! The cell-average primitive variables. They are obtained by reshaping (RS) q_prim_vf in the coordinate direction normal to the
     ! domain boundary along which the CBC is applied.
@@ -94,6 +95,8 @@ contains
 
         if (chemistry) then
             flux_cbc_index = sys_size
+        else if (model_eqns == model_eqns_6eq) then
+            flux_cbc_index = eqn_idx%int_en%end  ! the phase internal energies follow the waves too
         else
             flux_cbc_index = eqn_idx%adv%end
         end if
@@ -512,6 +515,7 @@ contains
         real(wp)                             :: T, sum_Enthalpies
         real(wp)                             :: Cv, Cp, e_mix, Mw, R_gas
         real(wp)                             :: vel_K_sum, vel_dv_dt_sum
+        real(wp)                             :: de_k        !< rate of phase k's internal energy (6-eq)
         integer                              :: i, j, k, r  !< Generic loop iterators
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
@@ -603,7 +607,7 @@ contains
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
                                     & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx, a_n]')
+                                    & vel_dv_dt_sum, i, j, ramp, de_k]', copyin='[dir_idx, a_n]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
@@ -884,6 +888,19 @@ contains
                             flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, &
                                                 & eqn_idx%E) + ds(0)*(pres*dgamma_dt + gamma*dpres_dt + dpi_inf_dt + dqv_dt &
                                                 & + rho*vel_dv_dt_sum + 5.e-1_wp*drho_dt*vel_K_sum)
+                        end if
+
+                        ! 6-eq: each phase's energy alpha (Gamma p + Pi) + alpha_rho qv changes at the same rates, so the phase
+                        ! energies keep summing to the mixture's. The boundary face's interface velocity is the interior one, so
+                        ! the alpha p div(u) source adds nothing here.
+                        if (model_eqns == model_eqns_6eq) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                call s_phase_internal_energy_rate(pres, adv_local(i), alpha_rho(i), i, dpres_dt, dadv_dt(i), &
+                                                                  & dalpha_rho_dt(i), de_k)
+                                flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%int_en%beg + i - 1) = flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                    & eqn_idx%int_en%beg + i - 1) + ds(0)*de_k
+                            end do
                         end if
 
                         ! Only HLL Method 1 uses per-fluid alpha source traces. HLL Method 2 carries a shared interface velocity and
@@ -1344,6 +1361,200 @@ contains
         ! END: Reshaping Outputted Data in z-direction
 
     end subroutine s_finalize_cbc
+
+    !> No-slip characteristic walls at each (direction, beg/end)
+    function f_cbc_no_slip_walls() result(wall)
+
+        logical, dimension(3, 2) :: wall
+
+        wall = .false.
+        #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (num_dims >= ${DIR}$) then
+                wall(${DIR}$, 1) = bc_${XYZ}$%beg == BC_CHAR_SLIP_WALL .and. .not. bc_${XYZ}$%slip_in
+                wall(${DIR}$, 2) = bc_${XYZ}$%end == BC_CHAR_SLIP_WALL .and. .not. bc_${XYZ}$%slip_out
+            end if
+        #:endfor
+
+    end function f_cbc_no_slip_walls
+
+    !> Start the cells on no-slip characteristic walls at the wall velocity, keeping their internal energy; s_cbc_no_slip then holds
+    !! it. Where walls meet, each wall's normal velocity is zero.
+    subroutine s_initialize_cbc_no_slip(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        logical, dimension(3, 2)                               :: wall
+        real(wp), dimension(3, 3, 2)                           :: vel_w  !< wall velocity (component, direction, beg/end)
+        integer, dimension(3)                                  :: lo, hi
+        real(wp), dimension(3)                                 :: vel
+        real(wp)                                               :: rho, dke
+        integer                                                :: d, s, i, j, k, l
+
+        wall = f_cbc_no_slip_walls()
+        if (.not. any(wall)) return
+        #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+            vel_w(:,${DIR}$, 1) = (/bc_${XYZ}$%vb1, bc_${XYZ}$%vb2, bc_${XYZ}$%vb3/)
+            vel_w(:,${DIR}$, 2) = (/bc_${XYZ}$%ve1, bc_${XYZ}$%ve2, bc_${XYZ}$%ve3/)
+        #:endfor
+
+        do d = 1, num_dims
+            do s = 1, 2
+                if (.not. wall(d, s)) cycle
+                lo = 0; hi = (/m, n, p/)
+                lo(d) = merge(0, hi(d), s == 1); hi(d) = lo(d)
+
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, vel, rho, dke]', copyin='[wall, vel_w, lo, hi, d, s]')
+                do l = lo(3), hi(3)
+                    do k = lo(2), hi(2)
+                        do j = lo(1), hi(1)
+                            vel = vel_w(:,d, s)
+                            if ((wall(1, 1) .and. j == 0) .or. (wall(1, 2) .and. j == m)) vel(1) = 0._wp
+                            if ((wall(2, 1) .and. k == 0) .or. (wall(2, 2) .and. k == n)) vel(2) = 0._wp
+                            if ((wall(3, 1) .and. l == 0) .or. (wall(3, 2) .and. l == p)) vel(3) = 0._wp
+
+                            rho = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                                rho = rho + q_cons_vf(i)%sf(j, k, l)
+                            end do
+
+                            dke = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_dims
+                                dke = dke + 5.e-1_wp*(rho*vel(i)**2 - q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)**2/rho)
+                                q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = rho*vel(i)
+                            end do
+                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + dke
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end do
+        end do
+
+    end subroutine s_initialize_cbc_no_slip
+
+    !> Characteristic no-slip wall, applied to the assembled RHS. With R the velocity forcing the normal LODI does not see
+    !! (transverse and viscous fluxes, body forces), the incoming acoustic wave becomes L5 = L1 + 2 rho c R_n and the zero-speed
+    !! waves L_t = R_t, so the wall cells' velocity rates vanish. Each component is set by one wave: a component normal to a no-slip
+    !! wall by that wall's acoustic wave, so corners are not corrected twice.
+    subroutine s_cbc_no_slip(q_prim_vf, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        logical, dimension(3, 2)                               :: wall
+        real(wp), dimension(3)                                 :: accel
+        integer, dimension(3)                                  :: lo, hi, idx
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho, adv_local, dalpha_rho_dt, dadv_dt
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, adv_local, dalpha_rho_dt, dadv_dt
+        #:endif
+        real(wp), dimension(3) :: vel, dvel
+        real(wp), dimension(2) :: Re_cbc
+        real(wp)               :: rho, gamma, pi_inf, qv, pres, c, rho_dt, sgn, vel_rate
+        real(wp)               :: dpres, drho, dgamma, dpi_inf, dqv, de_k
+        integer                :: d, s, i, j, k, l
+
+        wall = f_cbc_no_slip_walls()
+        if (.not. any(wall)) return
+        accel = 0._wp
+        if (bodyForces) accel = accel_bf
+
+        do d = 1, num_dims
+            do s = 1, 2
+                if (.not. wall(d, s)) cycle
+                lo = 0; hi = (/m, n, p/)
+                lo(d) = merge(0, hi(d), s == 1); hi(d) = lo(d)
+                sgn = merge(1._wp, -1._wp, s == 1)  !< inward normal
+
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, idx, alpha_rho, adv_local, dalpha_rho_dt, dadv_dt, vel, &
+                                    & dvel, Re_cbc, rho, gamma, pi_inf, qv, pres, c, rho_dt, vel_rate, dpres, drho, dgamma, &
+                                    & dpi_inf, dqv, de_k]', copyin='[wall, accel, lo, hi, d, sgn]')
+                do l = lo(3), hi(3)
+                    do k = lo(2), hi(2)
+                        do j = lo(1), hi(1)
+                            idx = (/j, k, l/)
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, eqn_idx%cont%end
+                                alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
+                            end do
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, eqn_idx%adv%end - eqn_idx%E
+                                adv_local(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
+                            end do
+                            vel = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_dims
+                                vel(i) = q_prim_vf(eqn_idx%cont%end + i)%sf(j, k, l)
+                            end do
+                            pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
+
+                            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
+                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv_local, c, alpha_rho)
+
+                            rho_dt = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, eqn_idx%cont%end
+                                rho_dt = rho_dt + rhs_vf(i)%sf(j, k, l)
+                            end do
+
+                            ! Primitive velocity rates are cancelled: the normal one by L5, so the pressure answers it, and the
+                            ! tangential ones by L_t unless they are normal to another no-slip wall, whose L5 then owns them
+                            dvel = 0._wp
+                            dpres = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_dims
+                                vel_rate = (rhs_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) - vel(i)*rho_dt)/rho + accel(i)
+                                if (i == d) then
+                                    dvel(i) = -vel_rate
+                                    dpres = -rho*c*sgn*vel_rate
+                                else if (.not. ((wall(i, 1) .and. idx(i) == 0) .or. (wall(i, 2) .and. idx(i) == hi(i)))) then
+                                    dvel(i) = -vel_rate
+                                end if
+                            end do
+
+                            ! The acoustic wave changes each partial density by mf dp/c^2 and leaves the volume fractions alone
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, eqn_idx%cont%end
+                                dalpha_rho_dt(i) = alpha_rho(i)/rho*dpres/(c*c)
+                            end do
+                            dadv_dt = 0._wp
+
+                            call s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, alpha_rho, adv_local, drho, dgamma, &
+                                                                   & dpi_inf, dqv)
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, eqn_idx%cont%end
+                                rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + dalpha_rho_dt(i)
+                            end do
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_dims
+                                rhs_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
+                                       & l) + vel(i)*drho + rho*dvel(i)
+                            end do
+                            rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
+                                   & l) + pres*dgamma + gamma*dpres + dpi_inf + dqv + rho*sum(vel*dvel) + 5.e-1_wp*drho*sum(vel**2)
+
+                            ! 6-eq: the phase energies take their shares of the same change, so they keep summing to the mixture's
+                            if (model_eqns == model_eqns_6eq) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    call s_phase_internal_energy_rate(pres, adv_local(i), alpha_rho(i), i, dpres, 0._wp, &
+                                                                      & dalpha_rho_dt(i), de_k)
+                                    rhs_vf(eqn_idx%int_en%beg + i - 1)%sf(j, k, l) = rhs_vf(eqn_idx%int_en%beg + i - 1)%sf(j, k, &
+                                           & l) + de_k
+                                end do
+                            end if
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end do
+        end do
+
+    end subroutine s_cbc_no_slip
 
     !> Detect whether any domain boundary uses characteristic boundary conditions
     elemental subroutine s_any_cbc_boundaries(toggle)

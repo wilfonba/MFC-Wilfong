@@ -1,0 +1,120 @@
+This file was created on 2026-10-07 11:46:18.087223.
+
+mfc.sh:
+
+    Invocation: test --generate -o CC682A65 -j 8
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        c472222f1148ca3b8661baec055cff380bab06e3 on CBCImprovements (dirty)
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.31.3 on Bens-MacBook-Air-6.local
+    
+        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.31.3 on Bens-MacBook-Air-6.local
+    
+        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.31.3 on Bens-MacBook-Air-6.local
+    
+        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
+        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+CPU:
+
+    CPU Info:
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 8
+    machdep.cpu.core_count: 8
+    machdep.cpu.logical_per_package: 8
+    machdep.cpu.thread_count: 8
+    machdep.cpu.brand_string: Apple M2
+

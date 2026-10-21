@@ -76,6 +76,8 @@ HINTS = {
         "grcbc_in": "Enables GRCBC subsonic inflow (bc type -7)",
         "grcbc_out": "Enables GRCBC subsonic outflow (bc type -8)",
         "grcbc_vel_out": "GRCBC velocity outlet (requires `grcbc_out`)",
+        "slip_in": "Characteristic wall (bc type -5) at domain begin is slip (T, default) or no-slip (F)",
+        "slip_out": "Characteristic wall (bc type -5) at domain end is slip (T, default) or no-slip (F)",
         "vel_in": "Inlet velocity component (used with `grcbc_in`)",
         "vel_out": "Outlet velocity component (used with `grcbc_vel_out`)",
         "pres_in": "Inlet pressure (used with `grcbc_in`)",
@@ -1119,7 +1121,7 @@ def _load():
 
         for a in ["Twall_in", "Twall_out"]:
             _r(f"{px}{a}", REAL, {"bc"})
-        for a in ["isothermal_in", "isothermal_out"]:
+        for a in ["isothermal_in", "isothermal_out", "slip_in", "slip_out"]:
             _r(f"{px}{a}", LOG, {"bc"})
 
     # patch_bc (10 BC patches)

@@ -1394,6 +1394,17 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 
 `bc_[x,y,z]%%vel_in_ramp` starts the inflow smoothly instead of holding it constant, which is what a jet or a tunnel accelerating from rest requires: the start-up is the event of interest, not a transient to be discarded. The inflow velocity is scaled by \f$f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2\f$, with \f$\tau\f$ = `vel_in_ramp`, \f$t_0\f$ = `vel_in_t0` and \f$f_0\f$ = `vel_in_frac0`, so it leaves \f$f_0\f$ of the final velocity at \f$t_0\f$ and is within half a percent of it at \f$t_0 + \tau\f$. A boundary with `vel_in_ramp = 0` is held constant, as before. The ramp acts on a GRCBC inflow (`grcbc_in`) or on the ghost-cell velocity of a Dirichlet (-17) boundary or boundary patch normal to that direction, such as a nozzle set into a wall.
 
+### Characteristic no-slip walls
+
+| Parameter                     | Type    | Description |
+| ---:                          | :----:  | :--- |
+| `bc_[x,y,z]%%slip_in`          | Logical | Characteristic wall (`bc_[x,y,z]%%beg` = -5) is slip (`T`, default) or no-slip (`F`) |
+| `bc_[x,y,z]%%slip_out`         | Logical | Characteristic wall (`bc_[x,y,z]%%end` = -5) is slip (`T`, default) or no-slip (`F`) |
+| `bc_[x,y,z]%%vb[1,2,3]`        | Real    | Velocity of the no-slip wall at the domain begin (tangential components only) |
+| `bc_[x,y,z]%%ve[1,2,3]`        | Real    | Velocity of the no-slip wall at the domain end (tangential components only) |
+
+A no-slip characteristic wall is an adiabatic wall in the sense of \cite Poinsot92 and \cite Lodato08: once the right-hand side is assembled, its incoming acoustic wave cancels the normal forcing that the normal one-dimensional relations do not see (transverse and viscous fluxes, body forces), so the wall pressure responds to it, and its zero-speed waves cancel the tangential forcing. The boundary cells therefore keep the wall velocity, which they are given at start-up. As for every characteristic boundary, the wall lies at the boundary cells' centers. Where no-slip walls meet, each velocity component is held by the acoustic wave of the wall it is normal to. A wall may not move toward a neighbouring characteristic wall: the velocity would have to vanish within one boundary cell at their shared corner, a singularity these cells cannot absorb, so lid-driven cavities should use no-slip walls of type -16. It requires `model_eqns` = 2 or 3 and is not supported with chemistry, `bf_spatial_support`, bubbles, hypoelasticity, MHD, immersed boundaries, QBMM, phase change (`relax`) or cylindrical coordinates.
+
 ### Patch types {#patch-types}
 
 | #    | Name                    | Dim.  | Smooth | Description |

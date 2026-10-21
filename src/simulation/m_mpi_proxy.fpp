@@ -125,7 +125,8 @@ contains
             & 'bc_y%grcbc_in', 'bc_y%grcbc_out', 'bc_y%grcbc_vel_out',            &
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',            &
             & 'bc_x%isothermal_in', 'bc_y%isothermal_in', 'bc_z%isothermal_in',   &
-            & 'bc_x%isothermal_out', 'bc_y%isothermal_out', 'bc_z%isothermal_out']
+            & 'bc_x%isothermal_out', 'bc_y%isothermal_out', 'bc_z%isothermal_out',   &
+            & 'bc_x%slip_in', 'bc_y%slip_in', 'bc_z%slip_in', 'bc_x%slip_out', 'bc_y%slip_out', 'bc_z%slip_out']
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

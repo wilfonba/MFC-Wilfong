@@ -117,6 +117,7 @@ module m_derived_types
         !! the ramp duration is zero.
         real(wp) :: vel_in_ramp, vel_in_t0, vel_in_frac0
         logical  :: isothermal_in, isothermal_out
+        logical  :: slip_in, slip_out  !< Characteristic wall (-5) is slip (T) or no-slip (F) at beg/end
         real(wp) :: Twall_in, Twall_out
     end type int_bounds_info
 

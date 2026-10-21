@@ -613,6 +613,8 @@ contains
             bc_${dir}$%grcbc_in = .false.
             bc_${dir}$%grcbc_out = .false.
             bc_${dir}$%grcbc_vel_out = .false.
+            bc_${dir}$%slip_in = .true.
+            bc_${dir}$%slip_out = .true.
             bc_${dir}$%vel_in_ramp = 0._wp
             bc_${dir}$%vel_in_t0 = 0._wp
             bc_${dir}$%vel_in_frac0 = 0._wp

@@ -892,6 +892,8 @@ contains
 
         if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, q_prim_qp%vf, rhs_vf)
 
+        call s_cbc_no_slip(q_prim_qp%vf, rhs_vf)
+
         ! END: Additional physics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then

@@ -1049,6 +1049,8 @@ contains
             end do
         end if
 
+        call s_initialize_cbc_no_slip(q_cons_ts(1)%vf)
+
         if (qbmm .and. .not. polytropic) then
             $:GPU_UPDATE(device='[pb_ts(1)%sf, mv_ts(1)%sf]')
         end if
@@ -1088,6 +1090,7 @@ contains
         $:GPU_UPDATE(device='[bc_x%grcbc_in, bc_x%grcbc_out, bc_x%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
+        $:GPU_UPDATE(device='[bc_x%slip_in, bc_x%slip_out, bc_y%slip_in, bc_y%slip_out, bc_z%slip_in, bc_z%slip_out]')
 
         $:GPU_UPDATE(device='[bc_x%vel_in_ramp, bc_x%vel_in_t0, bc_x%vel_in_frac0]')
         $:GPU_UPDATE(device='[bc_y%vel_in_ramp, bc_y%vel_in_t0, bc_y%vel_in_frac0]')

@@ -41,7 +41,7 @@ module m_eos
         & s_compute_speed_of_sound_avg, s_initialize_eos_module, s_finalize_eos_module, f_pressure, f_bulk_modulus, &
         & f_relativistic_enthalpy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_mixture_temperature, &
         & f_is_state_dependent, s_phase_coefficients, s_phase_pressure_on_isentrope, s_phase_temperature, &
-        & s_phase_density_on_isentrope, s_phase_internal_energy, s_phase_bulk_modulus
+        & s_phase_density_on_isentrope, s_phase_internal_energy, s_phase_internal_energy_rate, s_phase_bulk_modulus
 
 contains
 
@@ -506,6 +506,24 @@ contains
         e_phase = alpha*(gamma*pres + pi_inf) + alpha_rho*qvs(i)
 
     end subroutine s_phase_internal_energy
+
+    !> Rate of change of phase i's internal energy alpha (Gamma p + Pi) + alpha_rho qv for given rates of the pressure, the volume
+    !! fraction and the partial density, with Gamma and Pi at the phase's own density.
+    subroutine s_phase_internal_energy_rate(pres, alpha, alpha_rho, i, dpres, dalpha, dalpha_rho, de_phase)
+
+        $:GPU_ROUTINE(function_name='s_phase_internal_energy_rate', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)  :: pres, alpha, alpha_rho, dpres, dalpha, dalpha_rho
+        integer, intent(in)   :: i
+        real(wp), intent(out) :: de_phase
+        real(wp)              :: rho, gamma, pi_inf, dpi, dgamma
+
+        call s_phase_coefficients(alpha_rho, alpha, i, rho, gamma, pi_inf, dpi, dgamma)
+        ! alpha d(Gamma)/dt = dGamma/drho (d(alpha_rho)/dt - rho d(alpha)/dt), and likewise for Pi
+        de_phase = gamma*(alpha*dpres + pres*dalpha) + pi_inf*dalpha + (pres*dgamma + dpi)*(dalpha_rho - rho*dalpha) + qvs(i) &
+                          & *dalpha_rho
+
+    end subroutine s_phase_internal_energy_rate
 
     !> Bulk modulus rho c^2 of phase i at pressure pres: f_bulk_modulus for a constant-coefficient fluid, bit for bit, minus the
     !! reference-curve terms rho (dPi/drho + p dGamma/drho)/Gamma otherwise.

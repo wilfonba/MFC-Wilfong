@@ -345,6 +345,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for bc in [-1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -15, -16, -17]:
             cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
 
+        # Characteristic no-slip walls; viscous, so the wall closure absorbs viscous and transverse forcing
+        noslip = {f"bc_{d}%slip_{s}": "F" for d in dimInfo[0] for s in ("in", "out")}
+        cases.append(define_case_d(stack, "bc=-5 no-slip", {**get_bc_mods(-5, dimInfo), **noslip, "viscous": "T", "fluid_pp(1)%Re(1)": 1000}))
+
     def alter_grcbc(dimInfo):
         if len(dimInfo[0]) == 1:
             stack.push(
@@ -506,6 +510,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_capillary():
         stack.push("", {"patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 1, "model_eqns": 3, "surface_tension": "T"})
         cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3"], {}))
+        for bc in [-5, -16]:
+            cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3", f"bc={bc}"], {"bc_x%beg": bc, "bc_x%end": bc}))
         stack.pop()
 
     def alter_weno(dimInfo):
@@ -692,6 +698,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(3)%alpha_rho(2)": 0.0225,
                         "patch_icpp(3)%alpha(2)": 0.8,
                     },
+                )
+                cases.append(define_case_d(stack, ["model_eqns=3", "bc=-8"], {"model_eqns": 3, **get_bc_mods(-8, dimInfo)}))
+                # Characteristic no-slip walls with the 6-equation model
+                noslip = {f"bc_{d}%slip_{s}": "F" for d in dimInfo[0] for s in ("in", "out")}
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "model_eqns=3 -> bc=-5 no-slip",
+                        {"model_eqns": 3, **get_bc_mods(-5, dimInfo), **noslip, "viscous": "T", "fluid_pp(1)%Re(1)": 1000, "fluid_pp(2)%Re(1)": 1000},
+                    )
                 )
                 if dimInfo[0] == ["x"]:
                     # Fluid 1 on its own reference curve beside an ideal gas, so one kernel carries both EOS paths.

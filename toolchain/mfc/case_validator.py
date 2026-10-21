@@ -33,6 +33,15 @@ DILUTE_VOID_FRACTION_MAX = 0.1
 # to auto-generate docs/documentation/physics_constraints.md.
 # See the contributing guide for how to add entries.
 PHYSICS_DOCS = {
+    "check_cbc_no_slip": {
+        "title": "No-Slip Characteristic Wall",
+        "category": "Boundary Conditions",
+        "explanation": "A no-slip characteristic wall (slip_in or slip_out = F) is a characteristic wall (bc type -5) whose incoming "
+        "acoustic and zero-speed waves hold its boundary cells at the wall velocity (vb1-3 or ve1-3). The wall may only move "
+        "tangentially, and not toward a neighbouring characteristic wall: the boundary cells sit on the wall, so the velocity would "
+        "drop to zero within one cell at the shared corner, which is singular for them. Requires model_eqns = 2 or 3; not supported with chemistry, "
+        "bf_spatial_support, bubbles, hypoelasticity, MHD, immersed boundaries, QBMM, phase change or cylindrical coordinates.",
+    },
     "check_inflow_ramp": {
         "title": "Inflow Ramp",
         "category": "Boundary Conditions",
@@ -771,6 +780,28 @@ class CaseValidator:
                 f"bc_{d}%vel_in_ramp requires bc_{d}%grcbc_in or a Dirichlet (-17) boundary or patch normal to {d}",
             )
             self.prohibit(not 0 <= frac0 <= 1, f"bc_{d}%vel_in_frac0 must lie in [0, 1]")
+
+    def check_cbc_no_slip(self):
+        """Checks constraints on no-slip characteristic walls"""
+        for i, d in enumerate(("x", "y", "z"), start=1):
+            for bound, side, v in (("beg", "in", "vb"), ("end", "out", "ve")):
+                if self.get(f"bc_{d}%slip_{side}", "T") != "F":
+                    continue
+                self.prohibit(self.get(f"bc_{d}%{bound}") != -5, f"bc_{d}%slip_{side} = F requires bc_{d}%{bound} = -5 (characteristic wall)")
+                self.prohibit((self.get(f"bc_{d}%{v}{i}", 0) or 0) != 0, f"bc_{d}%{v}{i} must be 0: a wall cannot move through itself")
+                self.prohibit(self.get("model_eqns", 2) not in (2, 3), f"bc_{d}%slip_{side} = F requires model_eqns = 2 or 3")
+                # the wall closure cancels the uniform body force (bf_x/y/z) but not the spatially supported one, and its energy
+                # update does not cover the extra energies and equations of these models
+                for flag in ("chemistry", "bf_spatial_support", "bubbles_euler", "bubbles_lagrange", "hypoelasticity", "mhd", "ib", "qbmm", "relax", "cyl_coord"):
+                    self.prohibit(self.get(flag, "F") == "T", f"bc_{d}%slip_{side} = F is not supported with {flag}")
+                # wall cells sit on wall nodes, so a velocity into a neighbouring characteristic wall jumps to zero within one
+                # cell at the shared corner; that jump makes entropy the wall cells cannot shed (the lid-driven cavity)
+                for j, e in enumerate(("x", "y", "z"), start=1):
+                    moving = (self.get(f"bc_{d}%{v}{j}", 0) or 0) != 0
+                    self.prohibit(
+                        j != i and moving and -5 in (self.get(f"bc_{e}%beg"), self.get(f"bc_{e}%end")),
+                        f"bc_{d}%{v}{j} moves a no-slip characteristic wall into a characteristic wall at bc_{e}: use bc type -16 for both",
+                    )
 
     def check_ibm(self):
         """Checks constraints on Immersed Boundaries parameters"""
@@ -2990,6 +3021,7 @@ class CaseValidator:
         self.check_phase_change()
         self.check_ibm()
         self.check_inflow_ramp()
+        self.check_cbc_no_slip()
         self.check_eos_selector()
         self.check_stiffened_eos()
         self.check_eos_parameter_sanity()
