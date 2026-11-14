@@ -527,6 +527,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3"], {}))
         stack.pop()
 
+        # 5-equation capillary flux through the non-HLLC solvers
+        stack.push("capillary=T", {"sigma": 1, "surface_tension": "T"})
+        cases.append(define_case_d(stack, "riemann_solver=1", {"riemann_solver": 1}))
+        cases.append(define_case_d(stack, "riemann_solver=1 -> u-interface", {"riemann_solver": 1, "hll_u_interface": "T"}))
+        cases.append(define_case_d(stack, "riemann_solver=5", {"riemann_solver": 5}))
+        stack.pop()
+
     def alter_weno(dimInfo):
         for weno_order in [3, 5, 7]:
             stack.push(f"weno_order={weno_order}", {"weno_order": weno_order})

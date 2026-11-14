@@ -281,6 +281,15 @@ contains
                                 flux_src_rsx_vf(${SF('')}$, &
                                                 & eqn_idx%adv%beg) = (s_M*vel_R(norm_dir) - s_P*vel_L(norm_dir))/(s_M - s_P)
 
+                                ! Interface velocity for the capillary flux
+                                if (surface_tension) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_dims
+                                        vel_src_rsx_vf(${SF('')}$, &
+                                                       & dir_idx(i)) = (s_M*vel_R(dir_idx(i)) - s_P*vel_L(dir_idx(i)))/(s_M - s_P)
+                                    end do
+                                end if
+
                                 if (bubbles_euler) then
                                     ! From HLLC: Kills mass transport @ bubble gas density
                                     if (num_fluids > 1) then

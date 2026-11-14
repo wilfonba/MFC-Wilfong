@@ -18,7 +18,6 @@ module m_riemann_solver_hllc
     use m_constants, only: model_eqns_5eq, model_eqns_6eq, avg_state_roe, avg_state_arithmetic, wave_speeds_direct, &
         & wave_speeds_pressure
     use m_bubbles_EE
-    use m_surface_tension
     use m_chemistry
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights
     use m_thermochem_state, only: get_mixture_caloric_state
@@ -1678,10 +1677,6 @@ contains
                                                        & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), q_prim_vf, norm_dir, &
                                                        & ix, iy, iz)
                 end if
-            end if
-
-            if (surface_tension) then
-                call s_compute_capillary_source_flux(vel_src_rsx_vf, norm_dir, isx, isy, isz)
             end if
         #:endif
 
