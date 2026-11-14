@@ -3284,13 +3284,6 @@ class CaseValidator:
 
         self.prohibit(n == 0 and liutex_wrt, "liutex_wrt requires n > 0 (at least 2D)")
 
-    def check_surface_tension_post(self):
-        """Checks surface tension output constraints (post-process)"""
-        cf_wrt = self.get("cf_wrt", "F") == "T"
-        surface_tension = self.get("surface_tension", "F") == "T"
-
-        self.prohibit(cf_wrt and not surface_tension, "cf_wrt can only be enabled if surface_tension is enabled")
-
     def check_sim_data(self):
         """Checks interface/energy data output constraints (post-process)"""
         if self.get("sim_data", "F") != "T":
@@ -3741,7 +3734,6 @@ class CaseValidator:
         self.check_qm()
         self.check_liutex_post()
         self.check_schlieren()
-        self.check_surface_tension_post()
         self.check_sim_data()
         self.check_no_flow_variables()
 

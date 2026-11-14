@@ -322,7 +322,6 @@ contains
         liutex_wrt = .false.
         schlieren_wrt = .false.
         sim_data = .false.
-        cf_wrt = .false.
         ib_state_wrt = .false.
         lag_txt_wrt = .false.
         lag_header = .true.

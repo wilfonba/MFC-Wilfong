@@ -686,9 +686,7 @@ Reaction mechanisms are compiled into Fortran by MFC's own thermochemistry gener
 
 **Source:** `src/simulation/m_surface_tension.fpp`
 
-**Color function advection:**
-
-\f[\frac{\partial c}{\partial t} + \mathbf{u} \cdot \nabla c = 0\f]
+**Color function:** derived from the volume fraction of the first fluid, \f$c = \alpha_1\f$ (no separate transport equation).
 
 **Capillary stress tensor (CSF model):**
 

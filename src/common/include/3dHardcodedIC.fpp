@@ -244,8 +244,6 @@
 
         q_prim_vf(eqn_idx%E)%sf(i, j, k) = p0_ic + (q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) + q_prim_vf(eqn_idx%cont%end)%sf(i, &
                   & j, k))*g0_ic*(ih(start_idx(2) + j, start_idx(3) + k) - x_cc(i))
-
-        if (surface_tension) q_prim_vf(eqn_idx%c)%sf(i, j, k) = alph
     case (305)  ! 3D Interface from file axisymmetric
         alph = 0.5_wp*(1 + (1._wp - 2._wp*eps)*tanh((ih(start_idx(2) + j, 0) - x_cc(i))*(0.01_wp/dx_min)))
 
@@ -257,8 +255,6 @@
 
         q_prim_vf(eqn_idx%E)%sf(i, j, k) = p0_ic + (q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) + q_prim_vf(eqn_idx%cont%end)%sf(i, &
                   & j, k))*g0_ic*(ih(start_idx(1) + i, start_idx(3) + k) - y_cc(j))
-
-        if (surface_tension) q_prim_vf(eqn_idx%c)%sf(i, j, k) = alph
     case (306)  ! Smooth density blob on a uniform background (the AMR S0/matched benchmark IC)
         ! VERBATIM the codegen output for the analytic form "1 + 4*exp(-(cos(pi*x)**2 + cos(pi*y)**2 + cos(pi*z)**2)/0.15)"
         ! (same literals, same parenthesization) so the field is bit-identical to the analytic-IC path while the case dict

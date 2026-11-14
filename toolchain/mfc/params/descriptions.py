@@ -153,7 +153,6 @@ DESCRIPTIONS = {
     "c_wrt": "Write sound speed field",
     "T_wrt": "Write each fluid's temperature (needs cv > 0)",
     "omega_wrt": "Write vorticity field",
-    "cf_wrt": "Write color function field",
     # Immersed boundaries
     "ib": "Enable immersed boundary method",
     "ib_force_wrt": "Record the immersed-boundary force history to D/ib_forces.dat (default off)",
@@ -356,7 +355,6 @@ PATTERNS = [
     (r"patch_icpp\((\d+)\)%epsilon", "Interface thickness for patch {0}"),
     (r"patch_icpp\((\d+)\)%beta", "Shape parameter beta for patch {0}"),
     (r"patch_icpp\((\d+)\)%a\((\d+)\)", "Shape coefficient a({1}) for patch {0}"),
-    (r"patch_icpp\((\d+)\)%cf_val", "Color function value for patch {0}"),
     (r"patch_icpp\((\d+)\)%cv", "Specific heat at constant volume for patch {0}"),
     (r"patch_icpp\((\d+)\)%qv", "Heat of formation for patch {0}"),
     (r"patch_icpp\((\d+)\)%qvp", "Heat of formation prime for patch {0}"),

@@ -175,17 +175,10 @@ contains
             end do
         end if
 
-        if (surface_tension) then
-            do l = eqn_idx%adv%end + 1, eqn_idx%c - 1
-                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
-                           & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
-            end do
-        else
-            do l = eqn_idx%adv%end + 1, sys_size
-                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
-                           & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
-            end do
-        end if
+        do l = eqn_idx%adv%end + 1, sys_size
+            @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+        end do
 
         if (.not. igr) then
             @:ACC_SETUP_VFs(q_cons_qp, q_prim_qp)
@@ -207,12 +200,6 @@ contains
                 $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(l)%sf]')
                 $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(l)%sf]')
             end do
-        end if
-
-        if (surface_tension) then
-            q_prim_qp%vf(eqn_idx%c)%sf => q_cons_qp%vf(eqn_idx%c)%sf
-            $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(eqn_idx%c)%sf]')
-            $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(eqn_idx%c)%sf]')
         end if
 
         if (hyper_cleaning) then
@@ -1900,20 +1887,6 @@ contains
         integer                                                :: i, j, k, l
 
         if (idir == 1) then  ! x-direction
-            if (surface_tension) then
-                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
-                                   & l) + 1._wp/dx(j)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_rsx_vf(j, k, l, &
-                                   & eqn_idx%adv%beg) - flux_src_rsx_vf(j - 1, k, l, eqn_idx%adv%beg))
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
             if ((surface_tension .or. viscous) .or. chem_params%diffusion .or. heat_conduction) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
@@ -1946,20 +1919,6 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         else if (idir == 2) then  ! y-direction
-            if (surface_tension) then
-                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
-                                   & l) + 1._wp/dy(k)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_rsx_vf(j, k, l, &
-                                   & eqn_idx%adv%beg) - flux_src_rsx_vf(j, k - 1, l, eqn_idx%adv%beg))
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
             ! the axis-singularity stress treatment belongs to the physical axis only; bc_y is not swapped by the AMR fine advance
             if (cyl_coord .and. (.not. amr_in_fine_advance) .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
                 if (viscous) then
@@ -2078,20 +2037,6 @@ contains
                 end if
             end if
         else if (idir == 3) then  ! z-direction
-            if (surface_tension) then
-                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
-                                   & l) + 1._wp/dz(l)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_rsx_vf(j, k, l, &
-                                   & eqn_idx%adv%beg) - flux_src_rsx_vf(j, k, l - 1, eqn_idx%adv%beg))
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
             if ((surface_tension .or. viscous) .or. chem_params%diffusion .or. heat_conduction) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                 do l = 0, p

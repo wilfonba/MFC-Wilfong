@@ -447,7 +447,6 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
         "check_liutex_post",  # output dimension requirements
         "check_momentum_post",  # output dimension requirements
         "check_velocity_post",  # output dimension requirements
-        "check_surface_tension_post",  # output feature dependency
         "check_no_flow_variables",  # output variable selection
         "check_partial_domain",  # output format settings
         "check_perturb_density",  # parameter pairing validation

@@ -107,7 +107,6 @@ print(
             "fluid_pp(1)%Re(1)": 1 / mu_inf,
             "fluid_pp(2)%Re(1)": 1 / mu_J,
             "surface_tension": "T",
-            "cf_wrt": "T",
             "sigma": 0.072,
         }
     )
