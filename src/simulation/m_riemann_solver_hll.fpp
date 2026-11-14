@@ -557,8 +557,8 @@ contains
                                                 & /(s_M - s_P)
                                 end if
 
-                                ! Export interface velocity for NC RHS and viscous work
-                                if (need_nc_vel .or. viscous) then
+                                ! Export interface velocity for NC RHS, viscous work and capillary flux
+                                if (need_nc_vel .or. viscous .or. surface_tension) then
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
                                         if (0._wp <= s_L) then
@@ -569,7 +569,7 @@ contains
                                             vel_interface = (s_R*vel_L(dir_idx(i)) - s_L*vel_R(dir_idx(i)))/(s_R - s_L)
                                         end if
                                         if (need_nc_vel) nc_iface_vel_rsx_vf(${SF('')}$, dir_idx(i)) = vel_interface
-                                        if (viscous) vel_src_rsx_vf(${SF('')}$, dir_idx(i)) = vel_interface
+                                        if (viscous .or. surface_tension) vel_src_rsx_vf(${SF('')}$, dir_idx(i)) = vel_interface
                                     end do
                                 end if
 

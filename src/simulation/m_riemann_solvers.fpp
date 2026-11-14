@@ -17,6 +17,7 @@ module m_riemann_solvers
     use m_riemann_solver_hll
     use m_riemann_solver_hlld
     use m_riemann_solver_hypo_hlld
+    use m_surface_tension
 
     implicit none
 
@@ -58,6 +59,9 @@ contains
                 end if
             #:endif
         #:endfor
+
+        ! Every solver exports the face velocity to vel_src_rsx_vf when surface_tension is on
+        if (surface_tension) call s_compute_capillary_source_flux(vel_src_rsx_vf, norm_dir, isx, isy, isz)
 
     end subroutine s_riemann_solver
 

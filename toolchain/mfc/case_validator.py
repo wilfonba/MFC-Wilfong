@@ -1504,11 +1504,8 @@ class CaseValidator:
         self.prohibit(riemann_solver not in [1, 2, 4, 5], "riemann_solver must be 1 (HLL), 2 (HLLC), 4 (HLLD), or 5 (Lax-Friedrichs)")
         self.prohibit(hll_u_interface and riemann_solver != 1, "hll_u_interface requires HLL Riemann solver (riemann_solver = 1)")
         mhd = self.get("mhd", "F") == "T"
-        surface_tension = self.get("surface_tension", "F") == "T"
         self.prohibit(hll_u_interface and mhd, "HLL Method 2 does not support MHD (the MHD path zeroes the shared interface-velocity trace)")
         self.prohibit(riemann_solver == 1 and hll_u_interface and cyl_coord and self.get("p", 0) > 0, "HLL Method 2 is not supported for 3D cylindrical geometry")
-        self.prohibit(surface_tension and riemann_solver == 1 and not hll_u_interface, "surface_tension requires a shared interface-velocity representation (HLL Method 2 or HLLC)")
-        self.prohibit(surface_tension and riemann_solver == 5, "surface_tension requires a shared interface-velocity representation (HLL Method 2 or HLLC)")
         self.prohibit(riemann_solver != 2 and model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2 (HLLC)")
         self.prohibit(wave_speeds is not None and wave_speeds not in [1, 2], "wave_speeds must be 1 or 2")
         self.prohibit(avg_state is not None and avg_state not in [1, 2], "avg_state must be 1 or 2")
