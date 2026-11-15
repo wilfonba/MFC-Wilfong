@@ -1,12 +1,12 @@
-This file was created on 2026-11-13 20:49:10.213763.
+This file was created on 2026-11-14 22:21:38.664614.
 
 mfc.sh:
 
-    Invocation: test --gpu acc --generate --only 3C590118 41DE3AFF 14CDF382 1DEFB3E9 7DFDD2D4 205FB6C2 -j 6
+    Invocation: test --generate --gpu acc -g 0 1 -j 8 --only 3C590118 3859AF63 41DE3AFF 14CDF382 25EEEF0E AA9C637F 1DEFB3E9 7DFDD2D4 1ED671BA 205FB6C2
     Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        214bf371cf6acb8b8ab3f24eb5fba81159af0a10 on AMRST (dirty)
+    Git:        68bf0e06c55985383d480c5b39a7f67ddfc80d04 on AMRST (dirty)
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -16,8 +16,8 @@ post_process:
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -74,7 +74,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -83,8 +83,8 @@ simulation:
         C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -108,7 +108,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
@@ -117,9 +117,9 @@ pre_process:
         C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF

@@ -144,10 +144,6 @@ contains
                                 flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, eqn_idx%E) + Omega(1, &
                                                 & i)*vSrc_rsx_vf(j, k, l, i)
                             end do
-
-                            ! Continuum surface force capillary stress, Schmidmayer et al. JCP (2017)
-                            flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
-                                            & eqn_idx%E) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
                         end if
                     end do
                 end do
@@ -187,9 +183,6 @@ contains
                                     flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, eqn_idx%E) + Omega(2, &
                                                     & i)*vSrc_rsx_vf(j, k, l, i)
                                 end do
-
-                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
-                                                & eqn_idx%E) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 2)
                             end if
                         end do
                     end do
@@ -230,9 +223,6 @@ contains
                                     flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, eqn_idx%E) + Omega(3, &
                                                     & i)*vSrc_rsx_vf(j, k, l, i)
                                 end do
-
-                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
-                                                & eqn_idx%E) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 3)
                             end if
                         end do
                     end do
