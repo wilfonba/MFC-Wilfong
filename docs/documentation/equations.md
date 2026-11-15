@@ -696,13 +696,11 @@ In component form, with \f$\hat{w}_i = (\partial c / \partial x_i) / \|\nabla c\
 
 \f[\Omega_{xx} = -\sigma\,(\hat{w}_y^2 + \hat{w}_z^2)\,\|\nabla c\|, \qquad \Omega_{xy} = \sigma\,\hat{w}_x\,\hat{w}_y\,\|\nabla c\|\f]
 
-The capillary stress divergence is added to the momentum and energy equations. The total energy equation becomes:
+The capillary stress divergence is added to the momentum equation and its work to the energy equation. The total energy equation becomes:
 
-\f[\frac{\partial (\rho E + \varepsilon_0)}{\partial t} + \nabla \cdot \bigl[(\rho E + \varepsilon_0 + p)\,\mathbf{u} + (\boldsymbol{\Omega} - \boldsymbol{\tau}^v) \cdot \mathbf{u}\bigr] = 0\f]
+\f[\frac{\partial (\rho E)}{\partial t} + \nabla \cdot \bigl[(\rho E + p)\,\mathbf{u} + (\boldsymbol{\Omega} - \boldsymbol{\tau}^v) \cdot \mathbf{u}\bigr] = 0\f]
 
-**Capillary mixture energy:**
-
-\f[\varepsilon_0 = \sigma\,\|\nabla c\|\f]
+**Capillary energy:** the surface energy \f$\varepsilon_0 = \sigma\,\|\nabla c\|\f$ of \cite Schmidmayer17 is not tracked. The stored energy is \f$\rho E\f$ alone, so the energy flux carries no \f$\varepsilon_0\,\mathbf{u}\f$ term and the exchange \f$\boldsymbol{\Omega} : \nabla\mathbf{u}\f$ between surface and fluid energy is neglected. This is exact for rigid translation and rotation of an interface; for a deforming interface the pressure error is of order \f$\sigma\,\|\nabla c\|\f$.
 
 ---
 
