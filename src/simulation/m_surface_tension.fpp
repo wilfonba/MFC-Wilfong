@@ -15,7 +15,7 @@ module m_surface_tension
     use m_weno
     use m_muscl
     use m_helper
-    use m_boundary_common
+    use m_constants, only: BC_PERIODIC, BC_REFLECTIVE
     use m_riemann_state, only: flux_src_rsx_vf
 
     implicit none
@@ -239,16 +239,18 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: j, k, l, i
-        integer                                                    :: c_idx
+        integer                                                    :: c_idx, gy, gz
 
         c_idx = eqn_idx%adv%beg
 
-        ! compute gradient components
+        ! Gradient one layer into the ghosts, which the flux reads; like the viscous gradient it uses the already-filled
+        ! primitive ghosts (BCs/MPI, or the parent level on AMR fine blocks)
+        gy = min(n, 1); gz = min(p, 1)
 
         $:GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = -gz, p + gz
+            do k = -gy, n + gy
+                do j = -1, m + 1
                     c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))*(q_prim_vf(c_idx)%sf(j + 1, k, &
                            & l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
                 end do
@@ -257,9 +259,9 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = -gz, p + gz
+            do k = -gy, n + gy
+                do j = -1, m + 1
                     c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))*(q_prim_vf(c_idx)%sf(j, k + 1, &
                            & l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
                 end do
@@ -269,9 +271,9 @@ contains
 
         if (p > 0) then
             $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
+            do l = -gz, p + gz
+                do k = -gy, n + gy
+                    do j = -1, m + 1
                         c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(c_idx)%sf(j, k, &
                                & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
                     end do
@@ -281,9 +283,9 @@ contains
         end if
 
         $:GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = -gz, p + gz
+            do k = -gy, n + gy
+                do j = -1, m + 1
                     c_divs(num_dims + 1)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_dims
@@ -296,7 +298,17 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        call s_populate_capillary_buffers(c_divs, bc_type, bc_xyz_info(bc_x, bc_y, bc_z))
+        ! Fine blocks keep the gradient of their parent-filled ghosts
+        if (.not. amr_in_fine_advance) then
+            #:for D, BC in [(1, 'bc_x'), (2, 'bc_y'), (3, 'bc_z')]
+                #:if not MFC_CASE_OPTIMIZATION or num_dims >= D
+                    if (num_dims >= ${D}$) then
+                        call s_extrapolate_capillary_ghosts(${D}$, -1, ${BC}$%beg, bc_type(${D}$, 1))
+                        call s_extrapolate_capillary_ghosts(${D}$, 1, ${BC}$%end, bc_type(${D}$, 2))
+                    end if
+                #:endif
+            #:endfor
+        end if
 
         iv%beg = 1; iv%end = num_dims + 1
 
@@ -304,6 +316,41 @@ contains
         call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gR_x)
 
     end subroutine s_get_capillary
+
+    !> On one physical domain face, give the first ghost layer (the one the flux reads) the boundary cell's gradient and norm
+    !! wherever the BC is neither periodic nor reflective
+    impure subroutine s_extrapolate_capillary_ghosts(bc_dir, bc_loc, bc_edge, bc_type_edge)
+
+        integer, intent(in)             :: bc_dir, bc_loc, bc_edge
+        type(integer_field), intent(in) :: bc_type_edge
+        integer                         :: b, g, k, l, i, k_end, l_end, bc_code
+
+        if (bc_edge >= 0) return  ! processor boundary
+
+        b = 0
+        if (bc_loc == 1) b = merge(m, merge(n, p, bc_dir == 2), bc_dir == 1)
+        g = b + bc_loc
+        k_end = merge(n, m, bc_dir == 1); l_end = merge(n, p, bc_dir == 3)
+
+        $:GPU_PARALLEL_LOOP(private='[i, k, l, bc_code]', collapse=2, copyin='[b, g]')
+        do l = 0, l_end
+            do k = 0, k_end
+                #:for D, IJK in [(1, '{}, k, l'), (2, 'k, {}, l'), (3, 'k, l, {}')]
+                    if (bc_dir == ${D}$) then
+                        bc_code = int(bc_type_edge%sf(${IJK.format(0)}$))
+                        if (bc_code /= BC_PERIODIC .and. bc_code /= BC_REFLECTIVE) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_dims + 1
+                                c_divs(i)%sf(${IJK.format('g')}$) = c_divs(i)%sf(${IJK.format('b')}$)
+                            end do
+                        end if
+                    end if
+                #:endfor
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_extrapolate_capillary_ghosts
 
     !> Reconstruct left and right cell-boundary values of capillary variables
     subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vR_x)

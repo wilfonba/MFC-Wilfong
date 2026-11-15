@@ -2,7 +2,7 @@
 !! @file
 !! @brief Contains module m_boundary_io
 
-!> @brief Boundary condition restart I/O, capillary/IGR buffer population, and grid-variable buffers
+!> @brief Boundary condition restart I/O, buffer packing, and default boundary types
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
