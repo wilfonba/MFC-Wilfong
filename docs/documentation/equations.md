@@ -688,6 +688,8 @@ Reaction mechanisms are compiled into Fortran by MFC's own thermochemistry gener
 
 **Color function:** derived from the volume fraction of the first fluid, \f$c = \alpha_1\f$ (no separate transport equation).
 
+**Boundaries:** at slip, no-slip and characteristic slip walls the color gradient is mirrored like at a reflective boundary, which imposes a 90° contact angle; there is no other contact-angle model.
+
 **Capillary stress tensor (CSF model):**
 
 \f[\boldsymbol{\Omega} = -\sigma\left(\|\nabla c\|\,\mathbf{I} - \frac{\nabla c \otimes \nabla c}{\|\nabla c\|}\right)\f]

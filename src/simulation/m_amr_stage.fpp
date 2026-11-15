@@ -237,7 +237,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
             return
         end if
-        $:GPU_PARALLEL_LOOP(collapse=4, private='[c]')
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[c]', copyin='[theta]')
         do i = 1, sys_size
             do g3 = 0, n3 - 1
                 do g2 = 0, n2 - 1

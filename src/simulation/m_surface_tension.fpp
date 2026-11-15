@@ -15,7 +15,7 @@ module m_surface_tension
     use m_weno
     use m_muscl
     use m_helper
-    use m_constants, only: BC_PERIODIC, BC_REFLECTIVE
+    use m_constants, only: BC_PERIODIC, BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL
     use m_riemann_state, only: flux_src_rsx_vf
 
     implicit none
@@ -318,12 +318,13 @@ contains
     end subroutine s_get_capillary
 
     !> On one physical domain face, give the first ghost layer (the one the flux reads) the boundary cell's gradient and norm
-    !! wherever the BC is neither periodic nor reflective
+    !! wherever the BC is neither periodic nor reflective; walls negate the normal component, a 90 degree contact angle
     impure subroutine s_extrapolate_capillary_ghosts(bc_dir, bc_loc, bc_edge, bc_type_edge)
 
         integer, intent(in)             :: bc_dir, bc_loc, bc_edge
         type(integer_field), intent(in) :: bc_type_edge
         integer                         :: b, g, k, l, i, k_end, l_end, bc_code
+        logical                         :: wall
 
         if (bc_edge >= 0) return  ! processor boundary
 
@@ -332,17 +333,19 @@ contains
         g = b + bc_loc
         k_end = merge(n, m, bc_dir == 1); l_end = merge(n, p, bc_dir == 3)
 
-        $:GPU_PARALLEL_LOOP(private='[i, k, l, bc_code]', collapse=2, copyin='[b, g]')
+        $:GPU_PARALLEL_LOOP(private='[i, k, l, bc_code, wall]', collapse=2, copyin='[b, g]')
         do l = 0, l_end
             do k = 0, k_end
                 #:for D, IJK in [(1, '{}, k, l'), (2, 'k, {}, l'), (3, 'k, l, {}')]
                     if (bc_dir == ${D}$) then
                         bc_code = int(bc_type_edge%sf(${IJK.format(0)}$))
                         if (bc_code /= BC_PERIODIC .and. bc_code /= BC_REFLECTIVE) then
+                            wall = bc_code == BC_SLIP_WALL .or. bc_code == BC_NO_SLIP_WALL .or. bc_code == BC_CHAR_SLIP_WALL
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims + 1
                                 c_divs(i)%sf(${IJK.format('g')}$) = c_divs(i)%sf(${IJK.format('b')}$)
                             end do
+                            if (wall) c_divs(bc_dir)%sf(${IJK.format('g')}$) = -c_divs(bc_dir)%sf(${IJK.format('g')}$)
                         end if
                     end if
                 #:endfor
