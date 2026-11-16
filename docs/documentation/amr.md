@@ -73,7 +73,8 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO (`recon_type = 1`) o
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |
 | MHD / RMHD | 1D only |
 | IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
-| Euler-Euler bubbles, QBMM, phase change (`relax`), surface tension, synthetic turbulence | Not supported |
+| Surface tension | Supported without immersed boundaries; keep interfaces inside the blocks (`amr_buf`), a coarse/fine face cutting an interface is not conservative in the volume fraction |
+| Euler-Euler bubbles, QBMM, phase change (`relax`), synthetic turbulence | Not supported |
 | Cylindrical coordinates, stretched grids, `bc = -4` | Not supported |
 
 ## Parameters {#amr-parameters}
@@ -113,7 +114,8 @@ Full descriptions: @ref case.
 "amr_max_grid_size": 32,
 ```
 
-See `examples/2D_amr_droplet` for a complete case.
+See `examples/2D_amr_droplet` for a complete case, and `examples/2D_amr_droplet_impact` for two levels with
+surface tension and viscosity.
 
 ## Limitations {#amr-limitations}
 

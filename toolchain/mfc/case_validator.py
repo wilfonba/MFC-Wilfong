@@ -428,6 +428,7 @@ AMR_VETTED_FLAGS = (
     "mpp_lim",
     "reactive_burn",
     "relativity",
+    "surface_tension",
     "viscous",
     "polydisperse",
     "polytropic",
@@ -2138,7 +2139,7 @@ class CaseValidator:
         # PHYSICS_DOCS: the fine advance is batched (one solver call over a stacked slab of equal-shape blocks), which needs
         # a Cartesian uniform grid and excludes every per-block hook a single call cannot dispatch per member: phase-change
         # relaxation, QBMM, moving particle clouds, and the null_weights edit of the WENO weights at bc = -4 faces (the slab
-        # applies it at the slab ends only). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
+        # applies it at the slab ends only). Euler bubbles have no AMR golden. MHD, relativity,
         # hypoelasticity, continuum damage, Lagrangian bubbles, chemistry, IGR, the 6-equation model and prescribed-motion
         # immersed bodies are supported.
         self.prohibit(self.get("cyl_coord", "F") == "T", "amr requires Cartesian coordinates (cyl_coord = F)")
@@ -2146,8 +2147,12 @@ class CaseValidator:
             any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
             "amr requires a uniform grid (no stretching)",
         )
-        for k in ("qbmm", "relax", "bubbles_euler", "surface_tension"):
+        for k in ("qbmm", "relax", "bubbles_euler"):
             self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
+        self.prohibit(
+            self.get("surface_tension", "F") == "T" and self.get("ib", "F") == "T",
+            "amr with surface_tension does not support immersed boundaries",
+        )
         # Post-RK sources with no fine-block form (state built on the coarse grid, or whole-domain operator splits run
         # after the fold) would leave the refined region evolving without them.
         self.prohibit(self.get("synthetic_turbulence", "F") == "T", "amr is incompatible with synthetic_turbulence = T")
