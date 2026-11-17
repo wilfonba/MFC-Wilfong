@@ -313,9 +313,11 @@ contains
 
         integer, intent(in)  :: k, pblk
         integer, intent(out) :: plo(3), phi(3)
+        integer              :: fm
 
-        plo = merge(amr_ref_ratio*(amr_region_lo_all(:,k) - amr_region_lo_all(:,pblk)), 0, amr_dim)
-        phi = merge(amr_ref_ratio*(amr_region_hi_all(:,k) - amr_region_lo_all(:,pblk)) + amr_ref_ratio - 1, 0, amr_dim)
+        fm = amr_ref_ratio**amr_block_level(pblk)  ! parent-fine cells per L0 cell
+        plo = merge(fm*(amr_region_lo_all(:,k) - amr_region_lo_all(:,pblk)), 0, amr_dim)
+        phi = merge(fm*(amr_region_hi_all(:,k) - amr_region_lo_all(:,pblk)) + fm - 1, 0, amr_dim)
 
     end subroutine s_amr_parent_foot
 
@@ -663,12 +665,18 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q
         integer, intent(in) :: islot, rr, olo(3), ohi(3), glo(3), ghi(3), woff(3)
         real(wp), intent(in) :: dtl, w_lo(3), w_hi(3), mlo(3), mhi(3)
-        integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, wa, wb, gla, gha, glb, ghb
+        integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, wa, wb, gla, gha, glb, ghb, j, jb, je, advb, adve
         logical :: dta, dtb
-        real(wp) :: fblo, fbhi, wl, wh, ml, mh
+        real(wp) :: fblo, fbhi, wl, wh, ml, mh, dlo, dhi, slo, shi
 
         ! Loop bounds are hoisted to scalars: array-element bounds would force the host arrays present on the device (ACC present
-        ! error).
+        ! error). A volume fraction's equation also carries alpha*div(u), with the face velocity equal to the sum of the alpha
+        ! fluxes, so alpha_k gets its flux mismatch minus alpha_k times the summed alpha mismatch (keeps sum(alpha) at 1).
+
+        advb = 1; adve = 0
+        if (num_fluids > 1 .and. (.not. bubbles_lagrange)) then
+            advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
+        end if
 
         #:for D, TA, TB, IDX in [(1, 2, 3, 'ol, wa + g1, wb + g2'), (2, 1, 3, 'wa + g1, ol, wb + g2'), (3, 1, 2, &
                                   & 'wa + g1, wb + g2, ol')]
@@ -677,24 +685,36 @@ contains
                 nch = rr**count([dta, dtb]); dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
                 gla = glo(${TA}$); gha = ghi(${TA}$); glb = glo(${TB}$); ghb = ghi(${TB}$); wa = woff(${TA}$); wb = woff(${TB}$)
                 ol = olo(${D}$); oh = ohi(${D}$); wl = w_lo(${D}$); wh = w_hi(${D}$); ml = mlo(${D}$); mh = mhi(${D}$)
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi, dlo, dhi, slo, shi, j, jb, je]')
                 do eq = 1, sys_size
                     do g2 = glb, ghb
                         do g1 = gla, gha
                             f10 = 0; if (dta) f10 = rr*g1
                             f20 = 0; if (dtb) f20 = rr*g2
-                            fblo = 0._wp; fbhi = 0._wp
-                            do dd2 = 0, dd2_hi
-                                do dd1 = 0, dd1_hi
-                                    fblo = fblo + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                    fbhi = fbhi + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                            ! mismatch of eq itself, and for a volume fraction also the sum over all of them
+                            jb = eq; je = eq
+                            if (eq >= advb .and. eq <= adve) then; jb = advb; je = adve; end if
+                            dlo = 0._wp; dhi = 0._wp; slo = 0._wp; shi = 0._wp
+                            do j = jb, je
+                                fblo = 0._wp; fbhi = 0._wp
+                                do dd2 = 0, dd2_hi
+                                    do dd1 = 0, dd1_hi
+                                        fblo = fblo + freg(${D}$)%lo(j, f10 + dd1, f20 + dd2, islot)
+                                        fbhi = fbhi + freg(${D}$)%hi(j, f10 + dd1, f20 + dd2, islot)
+                                    end do
                                 end do
+                                fblo = creg(${D}$)%lo(j, g1, g2, islot) - fblo/real(nch, wp)
+                                fbhi = fbhi/real(nch, wp) - creg(${D}$)%hi(j, g1, g2, islot)
+                                slo = slo + fblo; shi = shi + fbhi
+                                if (j == eq) then; dlo = fblo; dhi = fbhi; end if
                             end do
-                            fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                            if (wl /= 0._wp) q(eq)%sf(${IDX}$) = q(eq)%sf(${IDX}$) + wl*dtl*(creg(${D}$)%lo(eq, g1, g2, &
-                                & islot) - fblo)/ml
+                            if (jb /= je) then
+                                if (wl /= 0._wp) dlo = dlo - q(eq)%sf(${IDX}$)*slo
+                                if (wh /= 0._wp) dhi = dhi - q(eq)%sf(${IDX.replace('ol', 'oh')}$)*shi
+                            end if
+                            if (wl /= 0._wp) q(eq)%sf(${IDX}$) = q(eq)%sf(${IDX}$) + wl*dtl*dlo/ml
                             if (wh /= 0._wp) q(eq)%sf(${IDX.replace('ol', 'oh')}$) = q(eq)%sf(${IDX.replace('ol', 'oh')}$) &
-                                & + wh*dtl*(fbhi - creg(${D}$)%hi(eq, g1, g2, islot))/mh
+                                & + wh*dtl*dhi/mh
                         end do
                     end do
                 end do
