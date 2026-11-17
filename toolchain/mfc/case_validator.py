@@ -453,7 +453,6 @@ AMR_VETTED_FLAGS = (
 AMR_UNTESTED_FLAGS = (
     "bc_[xyz]%isothermal_*",
     "cfl_dt",
-    "surface_tension",
 )
 
 

@@ -6012,6 +6012,66 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
         stack.pop()
+        # surface tension + viscous, 2D, multi-block: two approaching droplets under regrid. The capillary gradient reads one
+        # layer of coarse-filled and seam ghosts, and the capillary momentum/energy flux refluxes with the viscous one.
+        st_drops = {
+            **amr_2d_base,
+            "n": 63,
+            "dt": 2.0e-4,
+            "t_step_stop": 10,
+            "t_step_save": 10,
+            "amr_block_beg(2)": 16,
+            "amr_block_end(2)": 47,
+            "amr_regrid_int": 2,
+            "amr_tag_eps": 0.1,
+            "amr_buf": 3,
+            "amr_max_blocks": 16,
+            "num_fluids": 2,
+            "mpp_lim": "T",
+            "surface_tension": "T",
+            "sigma": 0.1,
+            "viscous": "T",
+            "weno_Re_flux": "T",
+            "weno_avg": "T",
+            "fluid_pp(1)%Re(1)": 100.0,
+            "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00),
+            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%cv": 0.0,
+            "fluid_pp(2)%qv": 0.0,
+            "fluid_pp(2)%qvp": 0.0,
+            "fluid_pp(2)%Re(1)": 100.0,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%length_x": 2.0,
+            "patch_icpp(1)%length_y": 2.0,
+            "patch_icpp(1)%pres": 1.0,
+            "patch_icpp(1)%alpha_rho(1)": eps_a * 10.0,
+            "patch_icpp(1)%alpha_rho(2)": (1.0 - eps_a) * 1.0,
+            "patch_icpp(1)%alpha(1)": eps_a,
+            "patch_icpp(1)%alpha(2)": 1.0 - eps_a,
+        }
+        for i, sgn in ((2, -1), (3, 1)):
+            for k in ("length_x", "length_y"):
+                del st_drops[f"patch_icpp({i})%{k}"]
+            st_drops.update(
+                {
+                    f"patch_icpp({i})%geometry": 2,
+                    f"patch_icpp({i})%x_centroid": 0.5 + sgn * 0.12,
+                    f"patch_icpp({i})%radius": 0.1,
+                    f"patch_icpp({i})%alter_patch(1)": "T",
+                    f"patch_icpp({i})%smoothen": "T",
+                    f"patch_icpp({i})%smooth_patch_id": 1,
+                    f"patch_icpp({i})%smooth_coeff": 0.95,
+                    f"patch_icpp({i})%vel(1)": -sgn * 0.5,
+                    f"patch_icpp({i})%pres": 2.0,
+                    f"patch_icpp({i})%alpha_rho(1)": (1.0 - eps_a) * 10.0,
+                    f"patch_icpp({i})%alpha_rho(2)": eps_a * 1.0,
+                    f"patch_icpp({i})%alpha(1)": 1.0 - eps_a,
+                    f"patch_icpp({i})%alpha(2)": eps_a,
+                }
+            )
+        stack.push("AMR -> 2D -> surface tension droplets multiblock", st_drops)
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}))
+        stack.pop()
         # owner-aware placement (amr_place_owner) of the same two cases: owners move, results must not
         stack.push(
             "AMR -> 2D -> dynamic regrid np=2 -> place owner",

@@ -73,8 +73,8 @@ module m_amr_state
     !! (lazy, owned-only).
     integer              :: max_f(3), mbuf_lo(3), mbuf_hi(3)
     logical, allocatable :: amr_slot_live(:)
-    !> cached same-level seam list (xb, yb, seam-dim) so s_amr_fine_fine_post iterates O(#seams); rebuilt when amr_seam_pairs_dirty
-    !! is set or the block count changes
+    !> cached same-level halo-pair list (xb < yb whose ghost layers reach each other) so s_amr_fine_fine_post iterates O(#pairs);
+    !! rebuilt when amr_seam_pairs_dirty is set or the block count changes
     integer, allocatable :: amr_seam_pairs(:,:)
     integer              :: amr_num_seam_pairs, amr_seam_pairs_nblk
     logical              :: amr_seam_pairs_dirty
@@ -130,9 +130,9 @@ module m_amr_state
     !> Device-resident wire pools: with rdma_mpi MPI sends/receives them by device address, and the step-path kernels find them
     !! present, so slices do not cross PCIe per wave.
     logical :: amr_fw_dev = .false.
-    !> seam pairs both of whose blocks this rank owns: exchanged by one batched kernel at drain, no wire
+    !> halo transfers both of whose blocks this rank owns: exchanged by one batched kernel at drain, no wire
     integer              :: amr_sw_nsame = 0
-    integer, allocatable :: amr_sw_plx(:), amr_sw_ply(:), amr_sw_pd(:), amr_sw_pxhi(:), amr_sw_pfm(:,:)
+    integer, allocatable :: amr_sw_pt(:,:)
     !> Fused exchange packs (amr_device_pack): one row per wave transfer (slab corner (1:3), extents (4:6), payload offset in the
     !! wire pool (7); the child pack also has source store slot (8) and the child's patch frame (9:11)) plus the exclusive element
     !! prefix, so one kernel walks a family's transfers. Rebuilt per wave.
@@ -359,52 +359,47 @@ contains
 
     end function f_amr_parent_block
 
-    !> Pack (dir=+1) / unpack (dir=-1) the fine cells of slot's q_cons over [dlo:dhi] in dim d (interior transverse, all sys_size)
-    !! in a fixed order, so a packer and unpacker with matching extents align cell-for-cell. On GPU only this near-seam slab moves
-    !! device<->host.
-    impure subroutine s_amr_fine_slice(slot, d, dlo, dhi, buf, dir)
+    !> Pack (dir=+1) / unpack (dir=-1) slot's fine cells over the local box [lo:hi] (all sys_size) in a fixed order, so a packer and
+    !! unpacker with matching extents align cell-for-cell. On GPU only the box moves device<->host.
+    impure subroutine s_amr_fine_box_xfer(slot, lo, hi, buf, dir)
 
-        integer, intent(in)                 :: slot, d, dlo, dhi, dir
+        integer, intent(in)                 :: slot, lo(3), hi(3), dir
         real(wp), intent(inout), contiguous :: buf(:)
-        integer                             :: i, a, b, c, fm(3), na, nb, nc, loc
+        integer                             :: i, a, b, c, l1, l2, l3, n1, n2, n3, loc
 
-        fm(1) = amr_slots(slot)%m; fm(2) = amr_slots(slot)%n; fm(3) = amr_slots(slot)%p
         loc = amr_loc_of(slot)
-        nc = dhi - dlo + 1
+        ! scalars: kernel bounds and offsets avoid host arrays (nvfortran/Cray)
+        l1 = lo(1); l2 = lo(2); l3 = lo(3)
+        n1 = hi(1) - l1 + 1; n2 = hi(2) - l2 + 1; n3 = hi(3) - l3 + 1
         ! Pack on the device into the contiguous buf and move only buf: flang miscomputes a strided section of a block's field in a
-        ! target-update map clause (corrupts 2D+ np>1 seam ghosts). buf runs a fastest, then b, c, i; na/nb = transverse sizes.
-        #:for D, TA, TB, IDX in [(1, 2, 3, 'c, a, b'), (2, 1, 3, 'a, c, b'), (3, 1, 2, 'a, b, c')]
-            if (d == ${D}$) then
-                na = fm(${TA}$) + 1; nb = fm(${TB}$) + 1  ! scalars: kernel bounds use na-1/nb-1, not host fm(..) (nvfortran/Cray)
-                if (dir == 1) then  ! host <- device: pack on the device, copyout moves the contiguous buffer to host
-                    $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
-                    do i = 1, sys_size
-                        do c = dlo, dhi
-                            do b = 0, nb - 1
-                                do a = 0, na - 1
-                                    buf(1 + a + na*(b + nb*(c - dlo + nc*(i - 1)))) = real(amr_cons_st(${IDX}$, i, loc), wp)
-                                end do
-                            end do
+        ! target-update map clause (corrupts 2D+ np>1 seam ghosts).
+        if (dir == 1) then
+            $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
+            do i = 1, sys_size
+                do c = 0, n3 - 1
+                    do b = 0, n2 - 1
+                        do a = 0, n1 - 1
+                            buf(1 + a + n1*(b + n2*(c + n3*(i - 1)))) = real(amr_cons_st(l1 + a, l2 + b, l3 + c, i, loc), wp)
                         end do
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
-                else  ! device <- host: copyin moves the contiguous buffer to device, then unpack on the device
-                    $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
-                    do i = 1, sys_size
-                        do c = dlo, dhi
-                            do b = 0, nb - 1
-                                do a = 0, na - 1
-                                    amr_cons_st(${IDX}$, i, loc) = real(buf(1 + a + na*(b + nb*(c - dlo + nc*(i - 1)))), stp)
-                                end do
-                            end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
+            do i = 1, sys_size
+                do c = 0, n3 - 1
+                    do b = 0, n2 - 1
+                        do a = 0, n1 - 1
+                            amr_cons_st(l1 + a, l2 + b, l3 + c, i, loc) = real(buf(1 + a + n1*(b + n2*(c + n3*(i - 1)))), stp)
                         end do
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
-            end if
-        #:endfor
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
-    end subroutine s_amr_fine_slice
+    end subroutine s_amr_fine_box_xfer
 
     !> Convert a physical-space bbox to a global coarse-index bbox padded by pad_cells (uniform spacing; the axisymmetric half axis
     !! cell only shrinks dy(0), so the floor stays conservative).

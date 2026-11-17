@@ -84,7 +84,7 @@ s_amr_stage_begin          coarse cons halo for the coarse RHS
 s_compute_rhs              level 0                                           [PH_COARSE]
 s_amr_stage_fine           (lock-step only)
   fill waves               level-1 patches from level 0, then each level from its parent   [PH_HALO, PH_GATHER]
-  seam halo                fine-fine faces between same-level blocks                       [PH_SEAM]
+  seam halo                ghosts (faces, edges, corners) a same-level interior covers      [PH_SEAM]
   batched advance          RHS + RK per batch, registers captured in the RHS                [PH_RHS, PH_RK, PH_SWAP]
   reflux                   level-1 faces as one wave, then one batched apply                [PH_REFLUX]
 ```
