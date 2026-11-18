@@ -1,12 +1,12 @@
-This file was created on 2026-11-16 13:58:25.860641.
+This file was created on 2026-11-17 17:36:27.770009.
 
 mfc.sh:
 
-    Invocation: test --gpu acc -j 6 -g 1 --only 30E23BAF --generate
+    Invocation: test --gpu acc -j 5 -g 0 --generate --only 30E23BAF EF58E377 00EB793A 3E085EAB 94CE8100
     Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        ae080a4661cecc652ed94e58da8a8beeacda71c7 on AMRST (dirty)
+    Git:        c68966659a89e1d512581418823fea2a4764b28e on AMRST (dirty)
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
@@ -15,9 +15,9 @@ pre_process:
         C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -74,7 +74,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+syscheck:
 
     CMake Configuration:
     
@@ -85,8 +85,8 @@ post_process:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -108,7 +108,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -117,10 +117,10 @@ syscheck:
         C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      57%
+    CPU(s) scaling MHz:                      33%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00
