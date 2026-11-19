@@ -992,9 +992,9 @@ contains
 
     end subroutine s_amr_restrict_l1_batched
 
-    !> Sibling-seam face weights for level>=2 block kb under parent pblk: 0 on a face shared with a same-parent sibling tile
-    !! (fine-fine; refluxing there double-writes), 1 otherwise. Uses replicated metadata only, and both the reflux apply and the
-    !! freg wire-skip call it, so shipped and consumed faces agree.
+    !> Sibling-seam face weights for level>=2 block kb under parent pblk: 0 on a face shared with a same-parent sibling tile or on
+    !! the parent's boundary (fine-fine; refluxing there double-writes or leaves the parent), 1 otherwise. Uses replicated metadata
+    !! only, and both the reflux apply and the freg wire-skip call it, so shipped and consumed faces agree.
     impure subroutine s_amr_sibling_face_weights(kb, pblk, w_lo, w_hi)
 
         integer, intent(in)   :: kb, pblk
@@ -1005,6 +1005,9 @@ contains
 
         w_lo = 1._wp; w_hi = 1._wp
         if (pblk <= 0) return  ! orphan parent: no siblings; the CSR would index ptr(-1)
+        ! a face on the parent's boundary meets a same-level block of the next parent exactly (s_amr_check_parent_faces)
+        where (amr_region_lo_all(:,kb) == amr_region_lo_all(:,pblk) .and. amr_dim) w_lo = 0._wp
+        where (amr_region_hi_all(:,kb) == amr_region_hi_all(:,pblk) .and. amr_dim) w_hi = 0._wp
         do c = amr_child_ptr(pblk - 1) + 1, amr_child_ptr(pblk)
             y = amr_child_idx(c)
             if (y == kb) cycle

@@ -22,7 +22,7 @@ module m_amr_seam
 
     private
     public :: f_amr_seam, f_amr_seam_dim, s_amr_build_seam_pairs, s_amr_exchange_coarse_cons_halo, s_amr_fine_fine_post, &
-        & s_amr_fine_fine_drain
+        & s_amr_fine_fine_drain, s_amr_fine_fine_level
 
 contains
 
@@ -174,11 +174,23 @@ contains
 
     end subroutine s_amr_build_seam_pairs
 
-    !> Fine-fine halo between same-level blocks: overwrite every ghost cell a neighbour's interior covers (faces, edges, corners)
-    !! with that stage-entry interior, cross-rank via the seam wave, same-rank by local copy. Wire is wp, cast to stp on unpack.
-    impure subroutine s_amr_fine_fine_post()
+    !> Fine-fine halo of level lev alone, posted and drained.
+    impure subroutine s_amr_fine_fine_level(lev)
 
-        integer :: idx, s, src, dst, rS, rD, cnt, wlo, whi, lo(3), hi(3), slo(3), dlo(3), shi(3)
+        integer, intent(in) :: lev
+
+        call s_amr_fine_fine_post(lev)
+        call s_amr_fine_fine_drain()
+
+    end subroutine s_amr_fine_fine_level
+
+    !> Fine-fine halo between same-level blocks (of level lev only, if given): overwrite every ghost cell a neighbour's interior
+    !! covers (faces, edges, corners) with that stage-entry interior, cross-rank via the seam wave, same-rank by local copy. Wire is
+    !! wp, cast to stp on unpack.
+    impure subroutine s_amr_fine_fine_post(lev)
+
+        integer, intent(in), optional :: lev
+        integer                       :: idx, s, src, dst, rS, rD, cnt, wlo, whi, lo(3), hi(3), slo(3), dlo(3), shi(3)
 
         amr_sw_nsame = 0
         if (.not. amr) return
@@ -193,6 +205,9 @@ contains
         ! transfer records: blk = the block packed/unpacked, (bl, bh) = its local box
         call s_amr_wave_reset(amr_wseam_snd); call s_amr_wave_reset(amr_wseam_rcv)
         do idx = 1, amr_num_seam_pairs
+            if (present(lev)) then
+                if (amr_block_level(amr_seam_pairs(1, idx)) /= lev) cycle
+            end if
             do s = 1, 2
                 src = amr_seam_pairs(s, idx); dst = amr_seam_pairs(3 - s, idx)
                 rS = amr_block_owner(src); rD = amr_block_owner(dst)

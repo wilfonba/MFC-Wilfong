@@ -151,8 +151,8 @@ contains
     end subroutine s_amr_subcycle_l2
 
     !> Ghost fill of levels lev_lo..lev_hi: the level-1 wave from the coarse q_cons (or, with theta, the patch cache at that coarse
-    !! time fraction), then the parent waves. The fine-fine seam reads stage-entry interiors only, so it is posted before the fills
-    !! and drained after.
+    !! time fraction), then the parent waves. After each level's fill its fine-fine seam overwrites the ghosts its neighbours'
+    !! stage-entry interiors cover, before a child on a seam reads them through its patch.
     impure subroutine s_amr_fill_levels(q_cons, lev_lo, lev_hi, theta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
@@ -160,20 +160,18 @@ contains
         real(wp), intent(in), optional                         :: theta
         integer                                                :: ilev
 
-        call s_amr_fine_fine_post()
-        if (lev_lo == 1) then
-            if (present(theta)) then
+        do ilev = lev_lo, lev_hi
+            if (ilev > 1) then
+                call s_amr_parent_fill_wave(ilev)
+            else if (present(theta)) then
                 call s_amr_pc_fill(theta)
             else
                 call s_amr_stage_fill_wave(q_cons)
             end if
-        end if
-        do ilev = max(lev_lo, 2), lev_hi
-            call s_amr_parent_fill_wave(ilev)
+            call s_phase_tic(PH_SEAM)
+            call s_amr_fine_fine_level(ilev)
+            call s_phase_toc(PH_SEAM)
         end do
-        call s_phase_tic(PH_SEAM)
-        call s_amr_fine_fine_drain()
-        call s_phase_toc(PH_SEAM)
 
     end subroutine s_amr_fill_levels
 

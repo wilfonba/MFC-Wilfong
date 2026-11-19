@@ -21,15 +21,16 @@ module m_amr_regrid
     use m_amr_state, only: amr_band_migrate
     use m_phase_timing
     use m_amr_cluster, only: s_amr_cluster
-    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_grad_sf
+    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_grad_sf, f_amr_boxes_compatible, &
+        & s_amr_nest_seams, f_amr_nest_abuts_ok
     use m_amr_distribution, only: s_amr_sort_by_key
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
         & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
         & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
         & s_amr_exchange_coarse_cons_halo, s_amr_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
-        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, &
-        & s_amr_l1_fill_exchange, s_amr_l1_fill_consume, s_amr_parent_fill_exchange, s_amr_parent_fill_consume, &
-        & s_amr_fill_wave_done, amr_fw_dev
+        & f_amr_seam_dim, f_amr_seam, f_amr_parent_block, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
+        & s_interpolate_coarse_to_fine, s_amr_setup_ib, s_amr_l1_fill_exchange, s_amr_l1_fill_consume, &
+        & s_amr_parent_fill_exchange, s_amr_parent_fill_consume, s_amr_fill_wave_done, amr_fw_dev, s_amr_fine_fine_level
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
 
@@ -58,6 +59,7 @@ contains
         call s_amr_refresh_my_blocks()
         do ix = 1, amr_n_my
             xb = amr_my_blk(ix)
+            call s_amr_check_parent_faces(xb)
             do yb = 1, amr_num_blocks
                 if (xb == yb) cycle
                 if (amr_block_level(xb) /= amr_block_level(yb)) cycle
@@ -90,6 +92,34 @@ contains
         end do
 
     end subroutine s_amr_check_seam_topology
+
+    !> Abort if a face of level >= 2 block xb on its parent's boundary lacks an exact same-level neighbour: the reflux skips such
+    !! faces as fine-fine (s_amr_sibling_face_weights), so a c/f face there would leak.
+    impure subroutine s_amr_check_parent_faces(xb)
+
+        integer, intent(in) :: xb
+        integer             :: pb, d, yb
+        logical             :: hi_ok, lo_ok
+
+        if (amr_block_level(xb) < 2) return
+        pb = f_amr_parent_block(xb)
+        do d = 1, num_dims
+            hi_ok = amr_region_hi_all(d, xb) /= amr_region_hi_all(d, pb)
+            lo_ok = amr_region_lo_all(d, xb) /= amr_region_lo_all(d, pb)
+            do yb = 1, amr_num_blocks
+                if (amr_block_level(yb) /= amr_block_level(xb)) cycle
+                hi_ok = hi_ok .or. f_amr_seam(xb, yb, d)
+                lo_ok = lo_ok .or. f_amr_seam(yb, xb, d)
+            end do
+            if (.not. (hi_ok .and. lo_ok)) then
+                write (0, '(A,6I6)') ' [amr] block on its parent boundary with no same-level partner (lo,hi): ', &
+                       & amr_region_lo_all(:,xb), amr_region_hi_all(:,xb)
+                call s_mpi_abort('AMR: a level>=2 block ends on its parent boundary with no exactly matching same-level ' &
+                                 & // 'block across; the c/f face there would not be refluxed.')
+            end if
+        end do
+
+    end subroutine s_amr_check_parent_faces
 
     !> Abort if a box exceeds its level's slot cap, amr_maxc_fit/amr_ref_ratio**(lev-1) coarse cells (it would overrun the fine
     !! coord arrays); floor of 1 as in s_amr_tile_box.
@@ -401,31 +431,6 @@ contains
 
     end subroutine s_amr_regrid_cluster_tags
 
-    !> True iff two same-level blocks can coexist: disjoint, and either >= 2 empty coarse cells apart or face-adjacent with an exact
-    !! transverse match. Mirrors s_amr_check_seam_topology.
-    pure logical function f_amr_boxes_compatible(alo, ahi, blo, bhi) result(ok)
-
-        integer, intent(in) :: alo(3), ahi(3), blo(3), bhi(3)
-        integer             :: d, t, gap
-        logical             :: tmatch, tover
-
-        ok = .true.
-        if (all(alo <= bhi .and. blo <= ahi)) then; ok = .false.; return; end if
-        do d = 1, 3
-            if (.not. amr_dim(d)) cycle
-            gap = max(blo(d) - ahi(d), alo(d) - bhi(d)) - 1  ! empty cells along d (< 0: overlap)
-            if (gap >= 2 .or. gap < 0) cycle
-            tover = .true.; tmatch = .true.
-            do t = 1, 3
-                if (t == d .or. .not. amr_dim(t)) cycle
-                tover = tover .and. alo(t) <= bhi(t) .and. blo(t) <= ahi(t)
-                tmatch = tmatch .and. alo(t) == blo(t) .and. ahi(t) == bhi(t)
-            end do
-            if (tover .and. .not. (gap == 0 .and. tmatch)) then; ok = .false.; return; end if
-        end do
-
-    end function f_amr_boxes_compatible
-
     !> Hysteresis (amr_snap > 0): a box within amr_snap cells per face of a live same-level block takes that block's box.
     !! All-or-none: the snapped set must stay disjoint, compatible and singly nested (within amr_cpat_mar), else the fresh boxes
     !! stand.
@@ -435,7 +440,7 @@ contains
         integer, intent(in)        :: nboxes, box_level(:)
         type(t_box), allocatable   :: snapped(:)
         integer                    :: k, kk, ks, npar, nsnap, mlo(3), mhi(3)
-        logical                    :: ok
+        logical                    :: ok, sl(3), sh(3)
 
         allocate (snapped(nboxes)); snapped(1:nboxes) = boxes(1:nboxes)
         nsnap = 0
@@ -467,7 +472,7 @@ contains
                 end if
             end do
         end do
-        ! a level >= 2 box lies inside exactly one parent box, inset by the nesting margin
+        ! a level >= 2 box lies inside exactly one parent box, inset by the nesting margin except on a seam it meets a box across
         do k = 1, nboxes
             if (.not. ok) exit
             if (box_level(k) < 2) cycle
@@ -476,8 +481,11 @@ contains
                 if (box_level(kk) /= box_level(k) - 1) cycle
                 if (.not. all(snapped(k)%lo <= snapped(kk)%hi .and. snapped(kk)%lo <= snapped(k)%hi)) cycle
                 npar = npar + 1
-                call s_amr_nest_window(snapped(kk), mlo, mhi)
+                call s_amr_nest_seams(snapped(kk), snapped(1:nboxes), box_level(1:nboxes) == box_level(kk), sl, sh)
+                call s_amr_nest_window(snapped(kk), box_level(k), mlo, mhi, sl, sh)
                 if (any(snapped(k)%lo < mlo) .or. any(snapped(k)%hi > mhi)) ok = .false.
+                if (.not. f_amr_nest_abuts_ok(snapped(k), snapped(kk), sl, sh, snapped(1:nboxes), &
+                    & box_level(1:nboxes) == box_level(k))) ok = .false.
             end do
             if (npar /= 1) ok = .false.
         end do
@@ -1138,6 +1146,7 @@ contains
             if (lev == 1) then
                 call s_amr_l1_fill_exchange(q_cons_base, .true.)
             else
+                call s_amr_fine_fine_level(lev - 1)  ! the parents' seam ghosts, read by a child on a seam
                 call s_amr_parent_fill_exchange(lev, .true.)
             end if
             do i = 1, amr_n_my

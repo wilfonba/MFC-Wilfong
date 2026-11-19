@@ -1142,17 +1142,17 @@ contains
         if (amr) then
             ! the batched fine advance runs one s_compute_rhs over up to amr_bat_lim same-extent blocks stacked along the last
             ! active dimension, each with its ghost shell: the scratch must hold that slab. A block is bounded by amr_maxc_fit
-            ! (m_amr), bounded in turn by this rank's half-extent, so the slab is sized from it without the reduction.
+            ! (m_amr): this rank's half-extent, or with amr_max_grid_size that size (capped by the global half-extent).
             block
-                integer :: sd, cap
+                integer :: sd, cap, glb
                 sd = num_dims
                 select case (sd)
-                case (1); cap = m
-                case (2); cap = n
-                case default; cap = p
+                case (1); cap = m; glb = m_glb
+                case (2); cap = n; glb = n_glb
+                case default; cap = p; glb = p_glb
                 end select
                 cap = (cap + 1)/amr_ref_ratio
-                if (amr_max_grid_size > 0) cap = min(cap, amr_max_grid_size)
+                if (amr_max_grid_size > 0) cap = min((glb + 1)/amr_ref_ratio, amr_max_grid_size)
                 idwbuff_alloc(sd)%end = max(idwbuff_alloc(sd)%end, amr_bat_lim*(amr_ref_ratio*cap + 2*buff_size) - buff_size - 1)
             end block
         end if

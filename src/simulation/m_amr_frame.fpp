@@ -171,20 +171,24 @@ contains
         real(wp), intent(inout) :: cb(-1 - buff_size:), cc(-buff_size:), dd(-buff_size:)
         real(wp), intent(in)    :: gcb(glb:)
         real(wp), allocatable   :: pcb(:), tcc(:), tdx(:)
-        integer                 :: jg, cl, k, rr, pblk, pnf
+        integer                 :: jg, cl, k, rr, pblk, pnf, fm, pw, sh
 
         rr = amr_slots(amr_cur)%amr_ref_ratio
+        sh = 0
         if (amr_block_level(amr_cur) >= 2) then
+            ! parent coords widened by pw L0 cells (index shift sh), since a block on a parent seam has ghost parents past it
             pblk = f_amr_parent_block(amr_cur)
-            pnf = amr_ref_ratio**amr_block_level(pblk)*(amr_region_hi_all(d, pblk) - amr_region_lo_all(d, pblk) + 1) - 1
+            fm = amr_ref_ratio**amr_block_level(pblk)
+            pw = ((buff_size + rr)/rr + fm)/fm; sh = pw*fm
+            pnf = fm*(amr_region_hi_all(d, pblk) - amr_region_lo_all(d, pblk) + 1) - 1 + 2*sh
             allocate (pcb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
-            call s_amr_build_block_coords(pblk, gcb, glb, pcb, tcc, tdx, d)
+            call s_amr_build_block_coords(pblk, gcb, glb, pcb, tcc, tdx, d, pw)
         else
             allocate (pcb(glb:ubound(gcb, 1))); pcb = gcb
         end if
         do jg = -1 - buff_size, ext + buff_size
             if (jg >= 0 .and. jg <= ext) cycle
-            cl = amr_isect_lo(d) + floor(real(jg, wp)/real(rr, wp))
+            cl = amr_isect_lo(d) + floor(real(jg, wp)/real(rr, wp)) + sh
             k = modulo(jg, rr)
             if (k == rr - 1) then
                 cb(jg) = pcb(cl)

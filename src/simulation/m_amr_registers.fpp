@@ -75,7 +75,7 @@ contains
 
         integer, intent(in) :: nslot
         integer             :: oldcap, newcap
-        integer             :: eq, t1, t2, c4
+        integer             :: eq, t1, t2, c4, n2, n3  !< n2, n3: transverse ubounds as plain scalars (rc/rf are host-only)
         !> slot count above which growth uses the host round trip instead of device staging
         integer, parameter    :: amr_reg_grow_dev_cap = 512
         real(wp), allocatable :: rtmp(:,:,:,:), rtmp_d(:,:,:,:)
@@ -91,24 +91,25 @@ contains
                     #:set U2 = 'r' + R + '(' + str(A) + ')' + OFF
                     #:set U3 = 'r' + R + '(' + str(B) + ')' + OFF
                     if (allocated(${ARR}$)) then
+                        n2 = ${U2}$; n3 = ${U3}$
                         if (oldcap > amr_reg_grow_dev_cap) then
                             ! above the threshold stage through the host: device staging would transiently hold 2*oldcap slots
                             $:GPU_UPDATE(host='[' + ARR + ']')
-                            allocate (rtmp(1:amr_reg_ne,0:${U2}$,0:${U3}$,1:oldcap))
+                            allocate (rtmp(1:amr_reg_ne,0:n2,0:n3,1:oldcap))
                             rtmp = ${ARR}$(:,:,:,1:oldcap)
                             @:DEALLOCATE(${ARR}$)
-                            @:ALLOCATE(${ARR}$(1:amr_reg_ne, 0:${U2}$, 0:${U3}$, 1:newcap))
+                            @:ALLOCATE(${ARR}$(1:amr_reg_ne, 0:n2, 0:n3, 1:newcap))
                             ${ARR}$ = 0._wp
                             ${ARR}$(:,:,:,1:oldcap) = rtmp
                             deallocate (rtmp)
                             $:GPU_UPDATE(device='[' + ARR + ']')
                         else
                             ! stage the live slots on the device
-                            @:ALLOCATE(rtmp_d(1:amr_reg_ne, 0:${U2}$, 0:${U3}$, 1:oldcap))
+                            @:ALLOCATE(rtmp_d(1:amr_reg_ne, 0:n2, 0:n3, 1:oldcap))
                             $:GPU_PARALLEL_LOOP(collapse=4)
                             do c4 = 1, oldcap
-                                do t2 = 0, ${U3}$
-                                    do t1 = 0, ${U2}$
+                                do t2 = 0, n3
+                                    do t1 = 0, n2
                                         do eq = 1, amr_reg_ne
                                             rtmp_d(eq, t1, t2, c4) = ${ARR}$(eq, t1, t2, c4)
                                         end do
@@ -117,11 +118,11 @@ contains
                             end do
                             $:END_GPU_PARALLEL_LOOP()
                             @:DEALLOCATE(${ARR}$)
-                            @:ALLOCATE(${ARR}$(1:amr_reg_ne, 0:${U2}$, 0:${U3}$, 1:newcap))
+                            @:ALLOCATE(${ARR}$(1:amr_reg_ne, 0:n2, 0:n3, 1:newcap))
                             $:GPU_PARALLEL_LOOP(collapse=4)
                             do c4 = 1, oldcap
-                                do t2 = 0, ${U3}$
-                                    do t1 = 0, ${U2}$
+                                do t2 = 0, n3
+                                    do t1 = 0, n2
                                         do eq = 1, amr_reg_ne
                                             ${ARR}$(eq, t1, t2, c4) = rtmp_d(eq, t1, t2, c4)
                                         end do
@@ -132,8 +133,8 @@ contains
                             @:DEALLOCATE(rtmp_d)
                             $:GPU_PARALLEL_LOOP(collapse=4)
                             do c4 = oldcap + 1, newcap
-                                do t2 = 0, ${U3}$
-                                    do t1 = 0, ${U2}$
+                                do t2 = 0, n3
+                                    do t1 = 0, n2
                                         do eq = 1, amr_reg_ne
                                             ${ARR}$(eq, t1, t2, c4) = 0._wp
                                         end do
