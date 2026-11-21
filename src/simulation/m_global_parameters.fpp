@@ -351,6 +351,10 @@ module m_global_parameters
     !! per-dimension geometry is one masked vector expression.
     logical :: amr_dim(3) = .true.
     integer :: amr_sidx(3) = 0, amr_ext(3) = 0
+    !> Block width cap in coarse cells: amr_max_grid_size when set, else amr_grid_cap_dflt, except with immersed bodies, whose
+    !! blocks are owned whole and sized by the body (no fixed cap).
+    integer, parameter :: amr_grid_cap_dflt = 32
+    integer            :: amr_grid_cap = huge(1)
 
     !> The block's coarse footprint driving the coarse<->fine gather/scatter, per dim (collapsed dims 0:0): the entire block on its
     !! owner, empty (lo > hi) elsewhere. Level-dependent frame: a level-1 block records global level-0 cell indices; a level>=2
@@ -541,6 +545,8 @@ contains
         chem_params%reaction_substeps_max = 0
         chem_params%transport_dt = .false.
 
+        call s_assign_ic_patch_defaults
+
         num_bc_patches = 0
         bc_io = .false.
         periodic_bc = .false.
@@ -661,6 +667,7 @@ contains
         amr_regrid_int = 0
         amr_tag_eps = 0.1_wp
         amr_tag_abs = .false.
+        amr_tag_var = 1
         amr_place_owner = .false.
         amr_buf = 3
         amr_snap = 0
@@ -670,7 +677,7 @@ contains
         ! A small default would cap the global box count and silently truncate the refined region. amr_max_blocks sizes replicated
         ! metadata only (slots are allocated lazily for owned blocks), so a large pool is cheap.
         amr_max_blocks = 1024
-        amr_max_grid_size = 0  ! 0 = derive the cap from the decomposition (rank-dependent)
+        amr_max_grid_size = 0  ! 0 = amr_grid_cap_dflt, or less when the rank subdomain is smaller (see amr_grid_cap)
         amr_max_level = 1
         amr_cluster_eff = 0.7_wp
         ! 4, not 1: at 1 the bisection does not converge on its own and splits until amr_max_blocks stops it, which blocks scoped
@@ -685,11 +692,13 @@ contains
         ib_second_order_vel = .false.
         ib_ip_min_dist = 0._wp
         ib_flux_wall = .false.
+        ib_slip_ccst = .false.
         ib_ip_interp = 1
         ib_wall_order = 1
-        ib_mass_relax = 0
+        ib_mass_relax = -1
         ib_smooth_contact = .false.
         ib_visc_compact = .false.
+        ib_uncover_fill = .false.
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1
@@ -883,6 +892,7 @@ contains
             patch_ib(i)%v_blow = 0._wp
             patch_ib(i)%inj_species = 0
             patch_ib(i)%burn_rate_exp = 0._wp
+            patch_ib(i)%mass_bank = 0._wp
             patch_ib(i)%burn_rate_pref = 0._wp
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement
@@ -1133,6 +1143,12 @@ contains
         ! Allocation bounds: the coarse subdomain, widened to hold a refined block when amr_max_grid_size pins one larger than it.
         ! A pinned cap of C coarse cells is amr_ref_ratio*C - 1 fine cells plus the same ghost shell.
         idwbuff_alloc = idwbuff
+        amr_grid_cap = huge(1)
+        if (amr_max_grid_size > 0) then
+            amr_grid_cap = amr_max_grid_size
+        else if (.not. ib) then
+            amr_grid_cap = amr_grid_cap_dflt
+        end if
         if (amr .and. amr_max_grid_size > 0) then
             do i = 1, num_dims
                 idwbuff_alloc(i)%end = max(idwbuff(i)%end, amr_ref_ratio*amr_max_grid_size - 1 - idwbuff(i)%beg)
@@ -1142,7 +1158,7 @@ contains
         if (amr) then
             ! the batched fine advance runs one s_compute_rhs over up to amr_bat_lim same-extent blocks stacked along the last
             ! active dimension, each with its ghost shell: the scratch must hold that slab. A block is bounded by amr_maxc_fit
-            ! (m_amr): this rank's half-extent, or with amr_max_grid_size that size (capped by the global half-extent).
+            ! (m_amr): amr_grid_cap, capped by this rank's half-extent, or with amr_max_grid_size by the global half-extent.
             block
                 integer :: sd, cap, glb
                 sd = num_dims
@@ -1151,8 +1167,8 @@ contains
                 case (2); cap = n; glb = n_glb
                 case default; cap = p; glb = p_glb
                 end select
-                cap = (cap + 1)/amr_ref_ratio
-                if (amr_max_grid_size > 0) cap = min((glb + 1)/amr_ref_ratio, amr_max_grid_size)
+                if (amr_max_grid_size > 0) cap = glb
+                cap = min((cap + 1)/amr_ref_ratio, amr_grid_cap)
                 idwbuff_alloc(sd)%end = max(idwbuff_alloc(sd)%end, amr_bat_lim*(amr_ref_ratio*cap + 2*buff_size) - buff_size - 1)
             end block
         end if

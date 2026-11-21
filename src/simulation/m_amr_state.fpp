@@ -48,6 +48,12 @@ module m_amr_state
     !! extents. Sized by s_amr_st_reserve.
     real(stp), allocatable, dimension(:,:,:,:,:) :: amr_cons_st, amr_stor_st
     $:GPU_DECLARE(create='[amr_cons_st, amr_stor_st]')
+    !> Moving bodies: the primitive state of the RHS pass of each block whose IB correction waits for the bodies to move
+    !! (s_amr_fine_stage_ib), one column per such block, in the store's (x, y, z, var) layout.
+    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_ibp
+    $:GPU_DECLARE(create='[amr_ibp]')
+    integer, allocatable :: amr_ibp_blk(:)  !< the block of each amr_ibp column
+    integer              :: amr_ibp_n = 0   !< columns in use this stage
     !> local slots the store is sized for; grows only (s_amr_compact_store keeps the index space dense)
     integer :: amr_st_cap = 0
 
@@ -541,7 +547,7 @@ contains
             @:ACC_SETUP_SFs(amr_scr_prim(i))
             @:ACC_SETUP_SFs(amr_scr_rhs(i))
         end do
-        if (ib) then
+        if (ib .or. synthetic_turbulence) then
             allocate (tmp_p(1:sys_size)); call move_alloc(tmp_p, amr_scr_prim_blk)
             $:GPU_ENTER_DATA(create='[amr_scr_prim_blk]')
             do i = 1, sys_size

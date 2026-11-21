@@ -10,8 +10,17 @@ AMR adds refined rectangular blocks on top of the base grid (level 0) where the 
 interfaces, wakes, bodies. The base grid is advanced by the ordinary solver; refined blocks run the same solver on
 their own grids, nested up to `amr_max_level` levels at `amr_ref_ratio`:1 per level.
 
-With `amr_regrid_int > 0`, every `amr_regrid_int` steps the blocks are rebuilt around the cells where the density
-gradient exceeds `amr_tag_eps`. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
+With `amr_regrid_int > 0`, the blocks are rebuilt around the cells where the density gradient exceeds `amr_tag_eps`:
+once per level before the first step of a fresh run, so they start on the initial features, and then every
+`amr_regrid_int` steps. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
+
+On a fresh run the blocks start from `patch_icpp` evaluated at their own cell centers, as on a uniform grid at
+that resolution. If the patches alone do not reproduce the level-0 data (hard-coded or STL patches, a perturbed or
+smoothed initial condition, old data), the simulation prints a note and the blocks start from data interpolated from
+level 0. The step-0 files are pre_process's level-0 data: under a block the run starts from the average of the fine
+data instead, which differs from them where a patch varies within a coarse cell. For a smooth analytic profile
+sampled at cell centers that difference is second order in the cell width; an expression that is the exact cell
+average (it may use `dx`) agrees on every level.
 
 AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overlay the blocks. Internals:
 @subpage amr_implementation.
@@ -19,8 +28,10 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
 ## Algorithm {#amr-algorithm}
 
 - **Tagging and clustering.** A coarse cell is tagged when its normalized density jump exceeds `amr_tag_eps`
-  (`amr_tag_abs = T` uses the absolute jump instead). Tags are clustered by Berger-Rigoutsos bisection into boxes
-  that reach `amr_cluster_eff` tag efficiency, are at least `amr_blocking_factor` cells wide, are padded by `amr_buf`
+  (`amr_tag_abs = T` uses the absolute jump instead). `amr_tag_var` tags on the volume fraction of fluid 1, the
+  velocity magnitude or the pressure instead of the density, for interfaces, shear layers and pressure waves with no
+  density jump. Tags are clustered
+  by Berger-Rigoutsos bisection into boxes that reach `amr_cluster_eff` tag efficiency, are at least `amr_blocking_factor` cells wide, are padded by `amr_buf`
   cells and are capped at `amr_max_grid_size` cells per dimension. Levels nest properly (a level-2 box lies inside one
   level-1 box).
 - **Prolongation.** New blocks and fine ghost cells are filled from the parent level by conservative minmod-limited
@@ -34,8 +45,9 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   limit. With a CFL-based time step (`cfl_adap_dt`, `cfl_const_dt`) each coarse cell's limit is that of the finest cell
   covering it, so `dt` drops where blocks appear; the reported ICFL is the finest level's too. With a fixed `dt` the run
   aborts at start-up or after a regrid if `dt` exceeds the finest cells' inviscid limit (ICFL = 1), and prints the
-  largest stable `dt`. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
-  cells interpolated in time; `dt` is the level-0 step.
+  largest stable `dt`. With regrid on, start-up also aborts if `dt` would exceed that limit were the fastest cells
+  refined to `amr_max_level`, so a run cannot fail on it later. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
+  cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. Each
   covered coarse cell is then set to the average of its fine children.
@@ -44,9 +56,12 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
 
 Conservation across coarse/fine faces holds to round-off for single- and multi-fluid, viscous and chemistry cases, and
 a uniform state stays uniform with regrid on. Interiors keep the WENO order; the coarse/fine ghost fill is second
-order (linear) or higher (quartic). Results do not depend on message timing, and agree across rank counts to round-off
-when `amr_max_grid_size` is set (with `amr_max_grid_size = 0` the block size cap, and therefore the box set, depends
-on the decomposition).
+order (linear) or higher (quartic). For a smooth wave crossing a static block, the measured global rate is about 2.5 with
+either fill (the quartic fill lowers the error about 5x), against 5 for WENO5 on a uniform grid; the
+`Convergence -> 1D -> AMR` tests track it. Results do not depend on message timing, and agree across rank counts to round-off
+when `amr_max_grid_size` is set. With `amr_max_grid_size = 0` they also agree as long as half of every rank's subdomain
+holds the default 32-cell block; below that, and with immersed bodies, the block size cap and therefore the box set depend
+on the decomposition.
 
 ## Parallelism {#amr-parallel}
 
@@ -67,7 +82,7 @@ registers, the fine IB ghost-point park, and the host-side per-slot IB marker co
 
 ## Supported physics {#amr-physics}
 
-Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or MUSCL (`recon_type = 1` or `2`) or IGR, a uniform Cartesian grid, and
+Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL (`recon_type = 1` or `2`) or IGR, a uniform Cartesian grid, and
 `mpp_lim = T` when `num_fluids > 1`.
 
 | Feature | Status |
@@ -75,15 +90,16 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or MUSCL (`recon_typ
 | Single- and multi-fluid Euler, 6-equation model | Supported |
 | Viscous, hypoelastic (with continuum damage), body forces | Supported |
 | Chemistry (reactions, diffusion) | Lock-step only; no reaction substepping |
-| Immersed boundaries (fixed, prescribed or force-driven motion; not STL, `thermal_bc`, `surface_reaction`, `ib_surface_wrt` or `ib_heat_wrt`) | Supported; blocks always contain each body; moving bodies are lock-step only; multi-level with IB is single-rank; forces and torques are summed on the finest level covering each face (the coarse grid only with `amr_subcycle`) |
+| Immersed boundaries (fixed, prescribed or force-driven motion; not STL, `thermal_bc`, `surface_reaction`, `ib_surface_wrt`, `ib_heat_wrt`, `ib_mass_relax` or `ib_uncover_fill`) | Supported; blocks always contain each body; moving bodies are lock-step only; multi-level with IB is single-rank; forces and torques are summed on the finest level covering each face (the coarse grid only with `amr_subcycle`); the default `ib_mass_relax = -1` resolves to off, so a moving body differs from a uniform-grid run, where it is on |
 | Lagrangian bubbles | Lock-step; the cloud stays on the base grid (blocks are kept clear of it) |
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |
 | Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
 | MHD / RMHD | 1D only |
 | IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
+| Synthetic turbulence forcing | Supported; evaluated on each block's own grid |
 | Phase change (`relax`) | Supported; each block is relaxed at the end of the step, then restricted |
 | Surface tension | Supported without immersed boundaries; keep interfaces inside the blocks (`amr_buf`), a coarse/fine face cutting an interface is not conservative in the volume fraction |
-| Euler-Euler bubbles, QBMM, synthetic turbulence | Not supported |
+| Euler-Euler bubbles, QBMM | Not supported |
 | Riemann-extrapolation boundaries (`bc = -4`) | Supported, except with `null_weights` |
 | Cylindrical coordinates, stretched grids | Not supported |
 
@@ -97,11 +113,12 @@ Full descriptions: @ref case.
 | `amr_block_beg(i)`, `amr_block_end(i)` | 0 | Initial block, level-0 cell indices (inclusive) |
 | `amr_regrid_int` | 0 | Steps between regrids; 0 keeps the initial block |
 | `amr_tag_eps` | 0.1 | Tagging threshold on the normalized density jump (> 0 with regrid) |
-| `amr_tag_abs` | F | Tag on the absolute density jump; `amr_tag_eps` is then a density |
+| `amr_tag_abs` | F | Tag on the absolute jump; `amr_tag_eps` then has the units of the tagged variable |
+| `amr_tag_var` | 1 | Tagged variable: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs `amr_tag_abs`), 4 pressure (five-equation model) |
 | `amr_buf` | 3 | Padding around tagged cells, coarse cells (>= 1 with regrid) |
 | `amr_cluster_eff` | 0.7 | Minimum tag efficiency of a clustered box |
 | `amr_blocking_factor` | 4 | Minimum box width, coarse cells |
-| `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 derives it from the decomposition |
+| `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 is 32, or half the rank subdomain if that is smaller (with immersed bodies, half the rank subdomain) |
 | `amr_max_blocks` | 1024 | Maximum number of blocks |
 | `amr_max_level` | 1 | Number of refined levels |
 | `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: one level only) |
@@ -124,21 +141,53 @@ Full descriptions: @ref case.
 "amr_max_grid_size": 32,
 ```
 
-See `examples/2D_amr_droplet` for a complete case, and `examples/2D_amr_droplet_impact` for two levels with
-surface tension and viscosity.
+Complete cases: `examples/2D_amr_droplet` (a tracked interface), `examples/2D_amr_blast_multilevel` (two refined
+levels), `examples/2D_amr_ibm_cylinder` (an immersed body), `examples/3D_amr_blast` (3D, subcycled) and
+`examples/2D_amr_droplet_impact` (two levels with surface tension and viscosity).
+
+## When AMR pays {#amr-payoff}
+
+AMR costs more per cell than a uniform grid: extra kernels for ghost fills, flux registers and restriction, plus the
+regrids. On a GPU it pays only when the grid it replaces is large enough that the cell count, and not that fixed cost,
+sets the time per step.
+
+Measured on one MI250X GCD (amdflang, OpenMP offload): `examples/2D_amr_droplet` with one refined level, against the
+same case on a uniform grid at the fine resolution. Time is the solver's time to the same physical time; below 1 the
+AMR run is faster.
+
+| Base grid | Uniform fine grid | Fine cells held by AMR | Lock-step / uniform fine | Subcycled / uniform fine |
+| :--- | :--- | ---: | ---: | ---: |
+| 128^2 | 256^2 (0.07 M cells) | 11% | 2.98 | 2.19 |
+| 512^2 | 1024^2 (1.0 M cells) | 7% | 2.05 | 1.54 |
+| 2048^2 | 4096^2 (16.8 M cells) | 6% | 1.05 | 0.70 |
+
+The last row is from the time per step over 400 steps. A 3D spherical blast (`examples/3D_amr_blast`, 64^3 base
+against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lock-step) and 1.40 (subcycled) times the uniform run.
+
+- **Size.** Below a few million cells on the grid AMR would replace, run the uniform grid: a GPU advances those
+  cells at nearly no extra cost.
+- **Coverage.** The blocks should hold a small part of the fine grid. The droplet's 6% breaks even at 16.8 M cells; the
+  blast's 54% would need a far larger grid.
+- **Subcycling.** `amr_subcycle = T` took a quarter to a third less time than lock-step in every case above.
+- **Accuracy.** In the droplet runs the AMR solution reproduces the uniform fine one: the L1 density difference from
+  it is 6.1e-8 at the 512^2 base, against 5.0e-4 for the uniform 512^2 grid. The blocks cover the interface from the
+  first step and start from the patches evaluated at the fine resolution.
 
 ## Limitations {#amr-limitations}
 
-- **Block size.** A block spans at most about half a rank's subdomain per dimension unless `amr_max_grid_size` is set;
-  larger features are covered by several blocks.
+- **Block size.** A block spans at most 32 coarse cells and at most about half a rank's subdomain per dimension unless
+  `amr_max_grid_size` is set; larger features are covered by several blocks.
 - **Restart.** `parallel_io` restarts work on any rank count when `amr_max_grid_size` is set; otherwise restart on no
   more ranks than wrote the checkpoint. The serial format needs the rank count that wrote it.
   The file header records `amr_ref_ratio`, `amr_max_level` and the storage precision, which must match (the level count may
   only grow); a missing fine-level file aborts the restart.
-- **Nesting.** A level-2 block must lie inside one level-1 block; the run aborts otherwise (reduce
-  `amr_max_grid_size`).
-- **Regrid.** When no cell is tagged, regrid keeps the current blocks, so refinement does not retract until something is
-  tagged again. Level-2 and deeper blocks are re-prolonged from their parent at every regrid (only level-1 data is
-  carried over), so frequent regrids cost accuracy at those levels.
+- **Nesting.** A level-2 or deeper block lies inside one block of the level above; regrid builds each block's children
+  inside it, a few coarse cells from its edge. On a seam between two parent blocks a child may end at the edge if it
+  meets an exactly matching child across the seam; with immersed bodies, or where the children cannot be cut to match,
+  a strip that wide on each side of the seam stays at the parent's resolution.
+- **Regrid.** When no cell is tagged, regrid replaces the hierarchy with one small dormant level-1 block (one coarse cell
+  at the domain center, padded by `amr_buf`), since the solver needs at least one block. At every level, the part of a
+  new block that an old block of the same level covered keeps the old data; the rest is prolonged from the parent.
 - **Output.** Field output is at level-0 resolution with the fine solution restricted into it; post_process with
-  `amr = T` overlays the blocks as separate SILO domains.
+  `amr = T` overlays the blocks as separate SILO domains. Each save also writes `D/amr_levels.<step>.dat`: one line per
+  refined level with its fine cell count and the mean of `|q|` over its cells for each conserved variable.

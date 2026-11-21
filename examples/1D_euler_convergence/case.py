@@ -27,6 +27,10 @@ parser.add_argument("--no-mapped", action="store_true", help="Disable mapped WEN
 parser.add_argument("--muscl-lim", type=int, default=0, help="MUSCL limiter: 0=unlimited 1=minmod ... (default: 0)")
 parser.add_argument("--time-stepper", type=int, default=3, help="Time stepper: 1=Euler 2=RK2 3=RK3 (default: 3)")
 parser.add_argument("--t-end", type=float, default=None, help="Override total simulation time (default: 1.0 = one period)")
+parser.add_argument("--amr", action="store_true", help="Refine the central half of the domain with one 2:1 AMR block")
+parser.add_argument("--amr-regrid", type=int, default=0, help="Steps between regrids (default: 0 = static block)")
+parser.add_argument("--amr-prolong", type=int, default=1, help="Ghost fill: 1=linear 2=quartic (default: 1)")
+parser.add_argument("--amr-subcycle", action="store_true", help="Subcycle the refined level in time")
 args = parser.parse_args()
 
 gamma = 1.4
@@ -62,6 +66,23 @@ else:
         **({"teno_CT": args.teno_ct} if args.teno else {}),
     }
 
+# AMR fills each level from this expression, so it is the exact cell average there: point values differ between levels.
+rho_ic = "1.0 + 0.2 * sin(2.0 * pi * x / lx)"
+amr_params = {}
+if args.amr:
+    rho_ic += " * sin(pi * dx / lx) / (pi * dx / lx)"
+    amr_params = {
+        "amr": "T",
+        "amr_block_beg(1)": N // 4,
+        "amr_block_end(1)": 3 * N // 4 - 1,
+        "amr_regrid_int": args.amr_regrid,
+        "amr_prolong": args.amr_prolong,
+        "amr_subcycle": "T" if args.amr_subcycle else "F",
+    }
+    if args.amr_regrid > 0:
+        # tag where the cell-to-cell density jump exceeds half its maximum, 0.2 * 2 pi / N, so the blocks follow the wave
+        amr_params["amr_tag_eps"] = 0.1 * 2.0 * math.pi / N
+
 print(
     json.dumps(
         {
@@ -96,11 +117,12 @@ print(
             "patch_icpp(1)%length_x": L,
             "patch_icpp(1)%vel(1)": 1.0,
             "patch_icpp(1)%pres": 1.0,
-            "patch_icpp(1)%alpha_rho(1)": "1.0 + 0.2 * sin(2.0 * pi * x / lx)",
+            "patch_icpp(1)%alpha_rho(1)": rho_ic,
             "patch_icpp(1)%alpha(1)": 1.0,
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
             "fluid_pp(1)%eos": "ideal_gas",
             **scheme_params,
+            **amr_params,
         }
     )
 )

@@ -21,7 +21,7 @@ module m_amr_regrid
     use m_amr_state, only: amr_band_migrate
     use m_phase_timing
     use m_amr_cluster, only: s_amr_cluster
-    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_grad_sf, f_amr_boxes_compatible, &
+    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_ind, f_amr_boxes_compatible, &
         & s_amr_nest_seams, f_amr_nest_abuts_ok
     use m_amr_distribution, only: s_amr_sort_by_key
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
@@ -344,9 +344,9 @@ contains
         call s_phase_tic(PH_RG_CLUS)
         call s_amr_regrid_cluster_tags(tag_grid, sidx, boxes, nboxes)
         call s_phase_toc(PH_RG_CLUS)
-        if (nboxes == 0) return  ! nothing tagged on any rank; keep the current blocks
+        if (nboxes == 0) call s_amr_regrid_dormant_seed(boxes, nboxes)  ! nothing tagged: retract to one small block
         call s_amr_regrid_shape_boxes(boxes, nboxes)
-        if (nboxes == 0) return  ! every box was confined to the domain margin
+        if (nboxes == 0) return  ! every box was confined to the domain margin; keep the current blocks
         call s_phase_tic(PH_RG_CLUS)
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
         if (amr_snap > 0) call s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
@@ -386,18 +386,30 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         logical, allocatable, intent(inout)                 :: tag_grid(:,:,:)
         integer, intent(out)                                :: sidx(3)
-        integer                                             :: tg_lo(3), tg_hi(3), ci, cj, ck
+        integer                                             :: tg_lo(3), tg_hi(3), ci, cj, ck, h(3)
         real(wp)                                            :: g
+        real(wp), allocatable                               :: r(:,:,:)  !< the tagged variable, one evaluation per cell
 
         sidx = amr_sidx
         tg_lo = merge(merge(1, 0, sidx == 0), 0, amr_dim)
         tg_hi = merge(merge(amr_ext - 1, amr_ext, sidx + amr_ext == [m_glb, n_glb, p_glb]), 0, amr_dim)
         allocate (tag_grid(0:m,0:n,0:p)); tag_grid = .false.
+        h = merge(1, 0, amr_dim)
+        allocate (r(tg_lo(1) - h(1):tg_hi(1) + h(1),tg_lo(2) - h(2):tg_hi(2) + h(2),tg_lo(3) - h(3):tg_hi(3) + h(3)))
+        do ck = lbound(r, 3), ubound(r, 3)
+            do cj = lbound(r, 2), ubound(r, 2)
+                do ci = lbound(r, 1), ubound(r, 1)
+                    r(ci, cj, ck) = f_amr_tag_val_sf(q_cons_base, ci, cj, ck)
+                end do
+            end do
+        end do
         do ck = tg_lo(3), tg_hi(3)
             do cj = tg_lo(2), tg_hi(2)
                 do ci = tg_lo(1), tg_hi(1)
-                    ! total density (sum of continuity variables): single-fluid tagger, immune to trace-fluid noise
-                    g = f_amr_tag_grad_sf(q_cons_base, ci, cj, ck)
+                    ! jump of the tagged variable, max over the active dimensions
+                    g = f_amr_tag_ind(r(ci + 1, cj, ck), r(ci, cj, ck), r(ci - 1, cj, ck))
+                    if (n_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj + 1, ck), r(ci, cj, ck), r(ci, cj - 1, ck)))
+                    if (p_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj, ck + 1), r(ci, cj, ck), r(ci, cj, ck - 1)))
                     if (g > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
                     ! acoustic source support stays coarse
                     if (acoustic_source .and. tag_grid(ci, cj, ck)) then
@@ -430,6 +442,20 @@ contains
         deallocate (tags)
 
     end subroutine s_amr_regrid_cluster_tags
+
+    !> One coarse cell at the domain center, which shaping pads into the dormant block that replaces the hierarchy.
+    impure subroutine s_amr_regrid_dormant_seed(boxes, nboxes)
+
+        type(t_box), allocatable, intent(inout) :: boxes(:)
+        integer, intent(out)                    :: nboxes
+
+        if (allocated(boxes)) deallocate (boxes)
+        allocate (boxes(1))
+        boxes(1)%lo = merge([m_glb, n_glb, p_glb]/2, 0, amr_dim)
+        boxes(1)%hi = boxes(1)%lo
+        nboxes = 1
+
+    end subroutine s_amr_regrid_dormant_seed
 
     !> Hysteresis (amr_snap > 0): a box within amr_snap cells per face of a live same-level block takes that block's box.
     !! All-or-none: the snapped set must stay disjoint, compatible and singly nested (within amr_cpat_mar), else the fresh boxes
@@ -1088,7 +1114,7 @@ contains
 
         integer, intent(in)     :: ks, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         type(t_box), intent(in) :: boxes(:)
-        integer                 :: sh(3), kk, ohi(3), lev, fmul
+        integer                 :: sh(3), kk, ohi(3), rl
         ! NVHPC -Minline: plain scalars for device routines
         integer :: loc_kks, loc_ks, m_ks, n_ks, old_ext1_kk, old_ext2_kk, old_ext3_kk, p_ks, w1, w2, w3, w4, w5, w6, lo, hi
 
@@ -1096,12 +1122,13 @@ contains
         m_ks = amr_slots(ks)%m
         n_ks = amr_slots(ks)%n
         p_ks = amr_slots(ks)%p
-        lev = amr_block_level(ks); fmul = amr_ref_ratio**lev
         do kk = 1, old_np
-            if (old_level(kk) /= lev) cycle
-            ohi = old_ilo(:,kk) + merge((old_ext(:,kk) + 1)/fmul - 1, 0, amr_dim)
+            if (old_level(kk) /= amr_block_level(ks)) cycle
+            rl = amr_ref_ratio**old_level(kk)
+            ohi = old_ilo(:,kk) + merge((old_ext(:,kk) + 1)/rl - 1, 0, amr_dim)
             if (.not. f_amr_boxes_overlap(boxes(ks)%lo, boxes(ks)%hi, old_ilo(:,kk), ohi)) cycle
-            sh = merge(fmul*(boxes(ks)%lo - old_ilo(:,kk)), 0, amr_dim)  ! old local fine index = new local fine index + sh
+            ! a level-l slot's local fine index 0 is L0 cell lo at rl = ratio**l (for l >= 2 amr_isect_lo is in the parent's frame)
+            sh = merge(rl*(boxes(ks)%lo - old_ilo(:,kk)), 0, amr_dim)  ! old local fine index = new local fine index + sh
             if (amr_mig_win(1, kk) > 0) then
                 ! owned elsewhere: window in the migration receive pool
                 lo = amr_mig_win(1, kk); hi = lo + sys_size*product(amr_mig_win(5:7,kk) - amr_mig_win(2:4,kk) + 1) - 1
@@ -1172,7 +1199,7 @@ contains
                 else
                     call s_amr_parent_fill_consume(ks, .true.)
                 end if
-                ! prolong from the freshly built parent, then carry the old same-level detail over the overlap
+                ! prolong from the freshly built coarse/parent patch, then overwrite the overlap with old blocks of this level
                 call s_interpolate_coarse_to_fine()
                 call s_amr_carry_old_into_slot(ks, boxes, old_np, old_ilo, old_ext, old_level)
             end do

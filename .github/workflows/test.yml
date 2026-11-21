@@ -99,21 +99,24 @@ jobs:
           - os:    macos
             intel: true
 
-        # One single-precision lane, then the NVHPC lanes: cpu (build+test) and gpu
-        # (build-only, acc then omp). PRs build the oldest and newest NVHPC; pushes to
-        # master and manual runs build every version (26.5 only on CPU: CMake rejects its GPU builds). Running all 15
-        # NVHPC jobs on every PR push filled the GitHub-hosted runner queue.
+        # One single-precision lane, then the NVHPC lanes: cpu (build+test), gpu-acc and
+        # gpu-omp (build-only). OpenACC and OpenMP offload are separate jobs: built one
+        # after the other in one job they took 3.5 to over 5 hours, against the 6-hour
+        # limit of a hosted runner. PRs build the oldest and newest NVHPC; pushes to
+        # master and manual runs build every version (26.5 only on CPU: CMake rejects its
+        # GPU builds). Running every NVHPC job on every PR push filled the GitHub-hosted
+        # runner queue.
         include: >-
           ${{ fromJSON(format('[{0}{1}]',
           '{"os": "ubuntu", "mpi": "mpi", "precision": "single", "debug": "no-debug", "intel": false},
-          {"nvhpc": "25.5",  "target": "cpu"}, {"nvhpc": "25.5",  "target": "gpu"},
-          {"nvhpc": "26.9",  "target": "cpu"}, {"nvhpc": "26.9",  "target": "gpu"}',
+          {"nvhpc": "25.5",  "target": "cpu"}, {"nvhpc": "25.5", "target": "gpu-acc"}, {"nvhpc": "25.5", "target": "gpu-omp"},
+          {"nvhpc": "26.9",  "target": "cpu"}, {"nvhpc": "26.9", "target": "gpu-acc"}, {"nvhpc": "26.9", "target": "gpu-omp"}',
           github.event_name != 'pull_request' && ',
-          {"nvhpc": "25.7",  "target": "cpu"}, {"nvhpc": "25.7",  "target": "gpu"},
-          {"nvhpc": "25.9",  "target": "cpu"}, {"nvhpc": "25.9",  "target": "gpu"},
-          {"nvhpc": "25.11", "target": "cpu"}, {"nvhpc": "25.11", "target": "gpu"},
-          {"nvhpc": "26.1",  "target": "cpu"}, {"nvhpc": "26.1",  "target": "gpu"},
-          {"nvhpc": "26.3",  "target": "cpu"}, {"nvhpc": "26.3",  "target": "gpu"},
+          {"nvhpc": "25.7",  "target": "cpu"}, {"nvhpc": "25.7", "target": "gpu-acc"}, {"nvhpc": "25.7", "target": "gpu-omp"},
+          {"nvhpc": "25.9",  "target": "cpu"}, {"nvhpc": "25.9", "target": "gpu-acc"}, {"nvhpc": "25.9", "target": "gpu-omp"},
+          {"nvhpc": "25.11", "target": "cpu"}, {"nvhpc": "25.11", "target": "gpu-acc"}, {"nvhpc": "25.11", "target": "gpu-omp"},
+          {"nvhpc": "26.1",  "target": "cpu"}, {"nvhpc": "26.1", "target": "gpu-acc"}, {"nvhpc": "26.1", "target": "gpu-omp"},
+          {"nvhpc": "26.3",  "target": "cpu"}, {"nvhpc": "26.3", "target": "gpu-acc"}, {"nvhpc": "26.3", "target": "gpu-omp"},
           {"nvhpc": "26.5",  "target": "cpu"}' || '')) }}
 
       fail-fast: false
@@ -306,12 +309,11 @@ jobs:
           '
 
       - name: Build (NVHPC GPU)
-        if:   matrix.nvhpc && matrix.target == 'gpu'
+        if:   matrix.nvhpc && startsWith(matrix.target, 'gpu-')
         run: |
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
-            /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu acc
-            /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu mp
+            /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu ${{ matrix.target == 'gpu-acc' && 'acc' || 'mp' }}
           '
 
       # Case-optimized build guard.
@@ -330,7 +332,7 @@ jobs:
       # case-optimized 2D build elides that code entirely. OpenACC only,
       # since the two-pass IPO is disabled for OpenMP offload.
       - name: Build (NVHPC GPU, case-optimized)
-        if:   matrix.nvhpc && matrix.target == 'gpu'
+        if:   matrix.nvhpc && matrix.target == 'gpu-acc'
         run: |
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
@@ -366,8 +368,8 @@ jobs:
     # cpe/25.03 introduced an IPA SIGSEGV in CCE 19.0.0). Allow Frontier to
     # fail without blocking PR merges.
     continue-on-error: ${{ matrix.runner == 'frontier' }}
-    # Includes SLURM queue wait. Kept under 24h, when GITHUB_TOKEN expires.
-    timeout-minutes: 1380
+    # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
+    timeout-minutes: 480
     strategy:
       fail-fast: false
       matrix:
@@ -515,8 +517,8 @@ jobs:
     needs: [lint-gate, file-changes]
     # Frontier is non-blocking for the same reason as the self job above.
     continue-on-error: ${{ matrix.runner == 'frontier' }}
-    # Includes SLURM queue wait. Kept under 24h, when GITHUB_TOKEN expires.
-    timeout-minutes: 1380
+    # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
+    timeout-minutes: 480
     strategy:
       fail-fast: false
       matrix:
@@ -613,9 +615,7 @@ jobs:
             prebuild-case-optimization-*.out
             run-case-optimization-*.out
 
-  # Phoenix (GT) runs on pushes to master, not on every PR push: its free GPU queue
-  # is preemptible and often hours long, and every PR already compiles with NVHPC
-  # above. A PR opts in with the 'ci:phoenix' label, read on its next push or reopen.
+  # Phoenix (GT) runs on pushes to master and on every non-draft PR, like Frontier.
   phoenix:
     name: "${{ matrix.kind == 'case-opt' && 'Case Opt | ' || '' }}Georgia Tech | Phoenix (NVHPC) (gpu-${{ matrix.interface }})"
     needs: [lint-gate, file-changes]
@@ -625,11 +625,9 @@ jobs:
       needs.file-changes.result == 'success' &&
       github.repository == 'MFlowCode/MFC' &&
       needs.file-changes.outputs.checkall == 'true' &&
-      (github.event_name != 'pull_request' ||
-       (github.event.pull_request.draft != true &&
-        contains(github.event.pull_request.labels.*.name, 'ci:phoenix')))
-    # Includes SLURM queue wait (embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
-    timeout-minutes: 1380
+      (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
+    # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
+    timeout-minutes: 540
     strategy:
       fail-fast: false
       matrix:
@@ -652,7 +650,7 @@ jobs:
         run:  rm -f *.out
 
       - name: Build & Test
-        # One allocation so the embers queue wait is paid once.
+        # One allocation so the queue wait is paid once.
         if:   matrix.kind == 'test'
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build-and-test.sh gpu ${{ matrix.interface }} phoenix
 
