@@ -223,17 +223,20 @@ contains
     end subroutine s_amr_fine_stage_advance_batched
 
     !> Start a batch at leader my(i): add later same-level blocks that fit the leader's extent, wasting <= amr_bat_pad of the
-    !! member's cells; marks members done.
+    !! member's cells, while the stack fits the slab (amr_bat_lim largest blocks); marks members done.
     impure subroutine s_amr_form_batch(i, my, done)
 
         integer, intent(in)    :: i, my(:)
         logical, intent(inout) :: done(:)
-        integer                :: j, g, h
+        integer                :: j, g, h, nmax, w, ext(3)
 
         g = my(i)
         amr_bat_n = 1; amr_bat_blk(1) = g
+        ext = [amr_slots(g)%m, amr_slots(g)%n, amr_slots(g)%p]
+        w = ext(num_dims) + 2*buff_size + 1  ! member stride, as s_amr_bat_layout
+        nmax = min(amr_bat_max, amr_bat_lim*(max_f(num_dims) + 1 + 2*buff_size)/w)
         do j = i + 1, amr_n_my
-            if (amr_bat_n == amr_bat_lim) exit
+            if (amr_bat_n == nmax) exit
             h = my(j)
             if (done(j) .or. amr_block_level(h) /= amr_block_level(g)) cycle
             ! padded membership: no larger than the leader in any dim, wasting <= amr_bat_pad of the member's cells

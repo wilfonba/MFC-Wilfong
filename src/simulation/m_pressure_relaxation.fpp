@@ -130,11 +130,15 @@ contains
         sum_alpha = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if ((q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l) < 0._wp) .or. (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                & l) < 0._wp)) then
+            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) < 0._wp) then
                 q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l) = 0._wp
                 q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) = 0._wp
                 q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = 0._wp
+            else if (q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l) <= 0._wp) then
+                ! Non-positive partial density, positive volume fraction: clip the mass but keep the volume. Dropping the volume
+                ! at fixed E shifts the mixture pressure by ~alpha*Pi_l/Gamma_l (-1e8 Pa for alpha = 0.05 of gas in water); a
+                ! zero mass would give the equilibration a zero phase density.
+                q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l) = sgm_eps*q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
             end if
             if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > 1._wp) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) = 1._wp
             sum_alpha = sum_alpha + q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)

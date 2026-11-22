@@ -40,7 +40,8 @@ contains
         integer                              :: i, k, wext(3)
 
         file_loc = f_amr_restart_path(t_step)
-        open (2, FILE=trim(file_loc), form='unformatted', STATUS='new')
+        ! replace: save 0 shares pre_process's step directory, which a rerun keeps
+        open (2, FILE=trim(file_loc), form='unformatted', STATUS='replace')
         write (2) num_procs, amr_num_blocks, sys_size, amr_ref_ratio, amr_max_level, storage_size(0._stp)/8
         do k = 1, amr_num_blocks
             ! per-block header: region box, level (the reader needs it to rebuild multi-level geometry), extents; -1 extents
@@ -153,10 +154,12 @@ contains
     !! block count, and per block its box + level and each rank's fine conservative state. Serial: one unformatted file per rank in
     !! its level-0 step directory. Parallel: one shared MPI-IO file (header [-np, nboxes, sys_size, ratio, max level, word bytes],
     !! then per block a box+level header, a 4-int ownership record [owner+1, m, n, p], then the ranks' blocks concatenated in rank
-    !! order). At the same rank count the ownership record must match on read; a different rank count repartitions.
-    impure subroutine s_write_amr_restart(t_step)
+    !! order). At the same rank count the ownership record must match on read; a different rank count repartitions. level_sums also
+    !! writes D/amr_levels.<t_step>.dat (golden-test output).
+    impure subroutine s_write_amr_restart(t_step, level_sums)
 
         integer, intent(in) :: t_step
+        logical, intent(in) :: level_sums
         integer             :: k
 
         if (.not. amr) return
@@ -167,7 +170,7 @@ contains
             end if
         end do
 
-        call s_amr_write_level_sums(t_step)
+        if (level_sums) call s_amr_write_level_sums(t_step)
         if (.not. parallel_io) then
             call s_amr_restart_write_serial(t_step)
         else

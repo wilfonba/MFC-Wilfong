@@ -409,7 +409,7 @@ module m_global_parameters
     !> A block may join a batch led by a larger block when padding it to the leader's extent wastes at most amr_bat_pad of its own
     !! cells. amr_bat_mext holds each member's own extents: the bridge load clamps to its buffered region, and the RK update and
     !! flux capture touch only its own cells.
-    real(wp), parameter :: amr_bat_pad = 0.1_wp
+    real(wp), parameter :: amr_bat_pad = 0.35_wp
     integer             :: amr_bat_mext(3, amr_bat_max) = 0, amr_bat_off(3, amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_mext, amr_bat_off]')
     !> For the IB face forces on a fine frame: each batch member's origin minus the leader's (members read the leader's coordinate

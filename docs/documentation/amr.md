@@ -17,10 +17,11 @@ once per level before the first step of a fresh run, so they start on the initia
 On a fresh run the blocks start from `patch_icpp` evaluated at their own cell centers, as on a uniform grid at
 that resolution. If the patches alone do not reproduce the level-0 data (hard-coded or STL patches, a perturbed or
 smoothed initial condition, old data), the simulation prints a note and the blocks start from data interpolated from
-level 0. The step-0 files are pre_process's level-0 data: under a block the run starts from the average of the fine
+level 0. The step-0 level-0 files are pre_process's: under a block the run starts from the average of the fine
 data instead, which differs from them where a patch varies within a coarse cell. For a smooth analytic profile
 sampled at cell centers that difference is second order in the cell width; an expression that is the exact cell
-average (it may use `dx`) agrees on every level.
+average (it may use `dx`) agrees on every level. The fine levels the first step starts from are written as step 0's
+AMR restart file (with no `D/amr_levels` file for step 0).
 
 AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overlay the blocks. Internals:
 @subpage amr_implementation.
@@ -33,7 +34,9 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   density jump. Tags are clustered
   by Berger-Rigoutsos bisection into boxes that reach `amr_cluster_eff` tag efficiency, are at least `amr_blocking_factor` cells wide, are padded by `amr_buf`
   cells and are capped at `amr_max_grid_size` cells per dimension. Levels nest properly (a level-2 box lies inside one
-  level-1 box).
+  level-1 box). Deeper levels pad by `amr_buf` parent cells (at least their own stencil, and enough for the next level to
+  nest), and the finest level of a multi-level run is tiled instead: the `amr_blocking_factor`-cell lattice tiles that
+  meet its padded tags, so it follows the interface rather than filling the tags' bounding box (not with IB).
 - **Prolongation.** New blocks and fine ghost cells are filled from the parent level by conservative minmod-limited
   linear interpolation (`amr_prolong = 1`) or conservative quartic interpolation (`amr_prolong = 2`). The quartic fill
   falls back to limited linear in a cell whose children would leave the range of the neighbouring coarse averages (so a
@@ -117,7 +120,7 @@ Full descriptions: @ref case.
 | `amr_tag_var` | 1 | Tagged variable: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs `amr_tag_abs`), 4 pressure (five-equation model) |
 | `amr_buf` | 3 | Padding around tagged cells, coarse cells (>= 1 with regrid) |
 | `amr_cluster_eff` | 0.7 | Minimum tag efficiency of a clustered box |
-| `amr_blocking_factor` | 4 | Minimum box width, coarse cells |
+| `amr_blocking_factor` | 4 | Minimum box width, coarse cells; finest-level tile size of a multi-level run |
 | `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 is 32, or half the rank subdomain if that is smaller (with immersed bodies, half the rank subdomain) |
 | `amr_max_blocks` | 1024 | Maximum number of blocks |
 | `amr_max_level` | 1 | Number of refined levels |
@@ -125,7 +128,7 @@ Full descriptions: @ref case.
 | `amr_subcycle` | F | Subcycle refined levels in time (ratio 2, up to two levels) |
 | `amr_prolong` | 1 | 1: limited linear, 2: quartic (ratio 2) |
 | `amr_place_owner` | F | Owner-aware block placement |
-| `amr_snap` | 0 | Regrid hysteresis, coarse cells (<= `amr_buf - 2`) |
+| `amr_snap` | 0 | Regrid hysteresis, coarse cells (<= `amr_buf - 2`; capped on deeper levels to keep their stencil) |
 | `amr_device_pack` | F | Fused device pack/unpack of the coarse-patch exchange |
 
 ## Example {#amr-example}

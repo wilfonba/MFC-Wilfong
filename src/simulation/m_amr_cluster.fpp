@@ -480,18 +480,18 @@ contains
     !! is ext_max + thr, and the minimum surviving index among candidates is the first one a linear walk meets. After fusing (i, j)
     !! only box i changed, so the walk re-tests earlier survivors (minimum index first), then later ones, then resumes at the
     !! survivor's successor. Bins are rebuilt when a grown box outgrows the cell width.
-    impure subroutine s_cl_merge(alo, ahi, nacc)
+    impure subroutine s_cl_merge(alo, ahi, nacc, thr)
 
         integer, intent(inout) :: alo(:,:), ahi(:,:), nacc
+        integer, intent(in)    :: thr             !< min raw gap (L0 cells) that keeps two boxes apart
         integer, allocatable   :: nxt(:)          !< survivor list in canonical order
         integer, allocatable   :: prv(:)          !< predecessor links
         integer, allocatable   :: bp(:), bidx(:)  !< bin back-links and current bin of each live box
         integer, allocatable   :: bh(:), bc(:)    !< bin heads and per-box chains
-        integer                :: head, nlive, thr, i, k, d, dirty, aa, jb2, jbest, extd
+        integer                :: head, nlive, i, k, d, dirty, aa, jb2, jbest, extd
         integer                :: blo3(3), bhi3(3), nbmax, rng, ext_max, cellw, nbx, nby, nbz, nb_tot
         logical                :: need_build
 
-        thr = buff_size + 2*amr_buf
         allocate (nxt(max(nacc, 1)), prv(max(nacc, 1)), bp(max(nacc, 1)), bidx(max(nacc, 1)))
         do i = 1, nacc - 1
             nxt(i) = i + 1
@@ -682,12 +682,12 @@ contains
 
     !> Cluster a sparse tag list tags(1:3, 1:ntag_in) of level-0 cell coords into separated block boxes, identically on every rank.
     !! Berger-Rigoutsos bisection until a box's tag efficiency reaches amr_cluster_eff (or it is atomic or the amr_max_blocks cap is
-    !! hit), then merge boxes whose amr_buf-padded extents come within buff_size. Boxes are raw tagged extents; the caller pads,
-    !! clamps and size-caps each. reduce: tags is this rank's local list and node signatures are reduced across ranks; otherwise
-    !! tags is already replicated.
-    impure subroutine s_amr_cluster(tags, ntag_in, boxes, nboxes, reduce)
+    !! hit), then merge boxes less than thr cells apart (f_amr_nest_thr). Boxes are raw tagged extents; the caller pads, clamps and
+    !! size-caps each. reduce: tags is this rank's local list and node signatures are reduced across ranks; otherwise tags is
+    !! already replicated.
+    impure subroutine s_amr_cluster(tags, ntag_in, boxes, nboxes, reduce, thr)
 
-        integer, intent(in)                   :: tags(:,:), ntag_in
+        integer, intent(in)                   :: tags(:,:), ntag_in, thr
         logical, intent(in)                   :: reduce
         type(t_box), allocatable, intent(out) :: boxes(:)
         integer, intent(out)                  :: nboxes
@@ -704,7 +704,7 @@ contains
         if (reduce .and. num_procs > 1) call s_cl_union(alo, ahi, nacc)
 #endif
         call s_cl_morton_sort(alo, ahi, nacc)
-        call s_cl_merge(alo, ahi, nacc)
+        call s_cl_merge(alo, ahi, nacc, thr)
         if (capped .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tag clustering capped at amr_max_blocks = ', &
             & amr_max_blocks
         if (nacc > amr_max_blocks) then  ! boxes past the cap never refine

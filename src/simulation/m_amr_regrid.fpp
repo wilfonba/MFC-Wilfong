@@ -22,7 +22,7 @@ module m_amr_regrid
     use m_phase_timing
     use m_amr_cluster, only: s_amr_cluster
     use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_ind, f_amr_boxes_compatible, &
-        & s_amr_nest_seams, f_amr_nest_abuts_ok
+        & s_amr_nest_seams, f_amr_nest_abuts_ok, f_amr_nest_thr, f_amr_nest_snap
     use m_amr_distribution, only: s_amr_sort_by_key
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
         & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
@@ -438,7 +438,7 @@ contains
 
         call s_amr_local_tags(tag_grid, sidx, tags, ntag)
         deallocate (tag_grid)
-        call s_amr_cluster(tags, ntag, boxes, nboxes, .true.)
+        call s_amr_cluster(tags, ntag, boxes, nboxes, .true., f_amr_nest_thr(1))
         deallocate (tags)
 
     end subroutine s_amr_regrid_cluster_tags
@@ -457,7 +457,7 @@ contains
 
     end subroutine s_amr_regrid_dormant_seed
 
-    !> Hysteresis (amr_snap > 0): a box within amr_snap cells per face of a live same-level block takes that block's box.
+    !> Hysteresis (amr_snap > 0): a box within f_amr_nest_snap cells per face of a live same-level block takes that block's box.
     !! All-or-none: the snapped set must stay disjoint, compatible and singly nested (within amr_cpat_mar), else the fresh boxes
     !! stand.
     impure subroutine s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
@@ -473,8 +473,9 @@ contains
         do k = 1, nboxes
             do ks = 1, amr_num_blocks
                 if (amr_block_level(ks) /= box_level(k)) cycle
-                if (all(abs(amr_region_lo_all(:,ks) - boxes(k)%lo) <= amr_snap) .and. all(abs(amr_region_hi_all(:, &
-                    & ks) - boxes(k)%hi) <= amr_snap)) then
+                if (all(abs(amr_region_lo_all(:, &
+                    & ks) - boxes(k)%lo) <= f_amr_nest_snap(box_level(k))) .and. all(abs(amr_region_hi_all(:, &
+                    & ks) - boxes(k)%hi) <= f_amr_nest_snap(box_level(k)))) then
                     ! with IB the old block must contain the fresh box (a lagging body margin would be lost)
                     if (ib .and. .not. (all(amr_region_lo_all(:,ks) <= boxes(k)%lo) .and. all(amr_region_hi_all(:, &
                         & ks) >= boxes(k)%hi))) cycle

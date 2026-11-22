@@ -867,7 +867,7 @@ contains
         if (ib) call s_write_ib_state_file(save_count)
         if (ib .and. ib_surface_wrt) call s_write_ib_surface(save_count)
         ! Fine-level AMR restart file (current box + intersection-local fine state) alongside the level-0 restart
-        if (amr) call s_write_amr_restart(save_count)
+        if (amr) call s_write_amr_restart(save_count, .true.)
 
         call nvtxEndRange
         call cpu_time(finish)
@@ -1230,6 +1230,9 @@ contains
                 call s_amr_apply_ic_patches(q_cons_ts(1)%vf)
             end do
         end if
+        ! Save 0's fine levels; lustre_0 stays pre_process's, as the patch check on a rerun needs. No level sums: the goldens
+        ! start at the first save. Particle runs save 0 in p_main.
+        if (.not. particles_lagrange) call s_write_amr_restart(0, .false.)
 
     end subroutine s_amr_start_fresh_blocks
 

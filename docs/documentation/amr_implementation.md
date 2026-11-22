@@ -147,4 +147,6 @@ immediately.
   a level>=2 box lies in exactly one parent.
 - A missing `s_amr_select_slot` makes a per-block routine act on the previous block.
 - `amr_buf` sets the tag padding and also enters the box-merge distance; changing it changes the box topology.
+- Level padding, merge distance and snap per level come from `f_amr_nest_pad`, `f_amr_nest_thr` and `f_amr_nest_snap`
+  (`m_amr_nest`); the finest level is cut on a lattice (`s_amr_nest_lattice`) and needs no merge.
 - The rank-to-GPU map is `mod(local_rank, ndevices)`; `rocm-smi` numbering need not match.

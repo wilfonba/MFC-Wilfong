@@ -23,7 +23,7 @@ module m_amr_nest
 
     private
     public :: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_ind, f_amr_boxes_compatible, &
-        & s_amr_nest_seams, f_amr_nest_abuts_ok
+        & s_amr_nest_seams, f_amr_nest_abuts_ok, f_amr_nest_thr, f_amr_nest_snap
 
     !> Nested children were dropped for lack of block capacity (warn once per regrid)
     logical :: amr_child_dropped = .false.
@@ -232,18 +232,70 @@ contains
 
     end subroutine s_amr_nest_mark_parents
 
-    !> The nesting window of a level-(lev-1) parent: its box inset by amr_cpat_mar parent cells (L0 cells rounded up), so a
-    !! level-lev child's ghost prolongation reads valid parent interior; no inset on a seam face (sl/sh, s_amr_nest_seams).
+    !> n cells of level lev in L0 cells, rounded up.
+    pure integer function f_amr_l0(n, lev) result(c)
+
+        integer, intent(in) :: n, lev
+
+        c = (n + amr_ref_ratio**lev - 1)/amr_ref_ratio**lev
+
+    end function f_amr_l0
+
+    !> Nesting inset of a level-lev child, L0 cells: amr_cpat_mar parent cells.
+    pure integer function f_amr_nest_ins(lev) result(ins)
+
+        integer, intent(in) :: lev
+
+        ins = f_amr_l0(amr_cpat_mar, lev - 1)
+
+    end function f_amr_nest_ins
+
+    !> Tag padding of level lev, L0 cells. Level 1 (and IB): amr_buf. Deeper: amr_buf parent cells, at least the level's stencil
+    !! (buff_size own cells, +1 on rectangle levels for the seam pull-back), and enough that the next level's padded tags fit its
+    !! nesting window unclipped.
+    pure recursive integer function f_amr_nest_pad(lev) result(pad)
+
+        integer, intent(in) :: lev
+
+        pad = amr_buf
+        if (lev == 1 .or. ib) return
+        pad = max(f_amr_l0(amr_buf, lev - 1), f_amr_l0(buff_size, lev) + merge(0, 1, lev == amr_max_level))
+        if (lev < amr_max_level) pad = max(pad, f_amr_nest_pad(lev + 1) + f_amr_nest_ins(lev + 1))
+
+    end function f_amr_nest_pad
+
+    !> Raw-gap merge threshold for clustering level lev, L0 cells: padded boxes stay buff_size parent cells (>= 2, the
+    !! f_amr_boxes_compatible gap) apart. Level 1: buff_size + 2*amr_buf.
+    pure integer function f_amr_nest_thr(lev) result(thr)
+
+        integer, intent(in) :: lev
+
+        thr = merge(buff_size, max(f_amr_l0(buff_size, lev - 1), 2), lev == 1 .or. ib) + 2*f_amr_nest_pad(lev)
+
+    end function f_amr_nest_thr
+
+    !> Regrid hysteresis of level lev, L0 cells: amr_snap, deeper levels capped so a snapped box keeps the level's stencil
+    !! (f_amr_l0(buff_size, lev)) around its tags.
+    pure integer function f_amr_nest_snap(lev) result(snap)
+
+        integer, intent(in) :: lev
+
+        snap = amr_snap
+        if (lev > 1 .and. .not. ib) snap = max(0, min(amr_snap, f_amr_nest_pad(lev) - f_amr_l0(buff_size, lev)))
+
+    end function f_amr_nest_snap
+
+    !> The nesting window of a level-(lev-1) parent: its box inset by f_amr_nest_ins(lev), so a level-lev child's ghost prolongation
+    !! reads valid parent interior; no inset on a seam face (sl/sh, s_amr_nest_seams).
     pure subroutine s_amr_nest_window(box, lev, mlo, mhi, sl, sh)
 
         type(t_box), intent(in) :: box
         integer, intent(in)     :: lev
         integer, intent(out)    :: mlo(3), mhi(3)
         logical, intent(in)     :: sl(3), sh(3)
-        integer                 :: fm, ins
+        integer                 :: ins
 
-        fm = amr_ref_ratio**(lev - 1)  ! parent cells per L0 cell
-        ins = (amr_cpat_mar + fm - 1)/fm
+        ins = f_amr_nest_ins(lev)
         mlo = box%lo + merge(ins, 0, amr_dim .and. .not. sl); mhi = box%hi - merge(ins, 0, amr_dim .and. .not. sh)
 
     end subroutine s_amr_nest_window
@@ -543,9 +595,10 @@ contains
 
     end subroutine s_amr_nest_group
 
-    !> Cluster tags into children: pad each cluster by amr_buf, pull an end that stops exactly on a member's seam back one cell (the
-    !! piece on that side would abut nothing), and cut it by each member's window (mem, wlo/whi) into that parent's children. One
-    !! member without seams is the plain pad-and-clamp. IB: expand over bodies and re-clamp (the window holds the body plus margin).
+    !> Cluster tags into children: pad each cluster by f_amr_nest_pad, pull an end that stops exactly on a member's seam back one
+    !! cell (the piece on that side would abut nothing), and cut it by each member's window (mem, wlo/whi) into that parent's
+    !! children. One member without seams is the plain pad-and-clamp. IB: expand over bodies and re-clamp (the window holds the body
+    !! plus margin). The finest level (no IB) is tiled on a lattice instead (s_amr_nest_lattice).
     impure subroutine s_amr_nest_cut(tags, nt, boxes, mem, wlo, whi, sl, sh, lev, mych, nmych)
 
         integer, intent(in)      :: tags(:,:), nt, mem(:), wlo(:,:), whi(:,:), lev
@@ -553,12 +606,16 @@ contains
         logical, intent(in)      :: sl(:,:), sh(:,:)
         integer, intent(inout)   :: mych(:,:), nmych
         type(t_box), allocatable :: cboxes(:)
-        integer                  :: ncb, kc, im, kb, d, clo(3), chi(3), ilo(3), ihi(3)
+        integer                  :: ncb, kc, im, kb, d, pad, clo(3), chi(3), ilo(3), ihi(3)
 
         if (nt == 0) return
-        call s_amr_cluster(tags, nt, cboxes, ncb, .false.)
+        if (lev == amr_max_level .and. .not. ib) then
+            call s_amr_nest_lattice(tags, nt, boxes, mem, wlo, whi, sl, sh, lev, mych, nmych); return
+        end if
+        pad = f_amr_nest_pad(lev)
+        call s_amr_cluster(tags, nt, cboxes, ncb, .false., f_amr_nest_thr(lev))
         do kc = 1, ncb
-            clo = merge(cboxes(kc)%lo - amr_buf, 0, amr_dim); chi = merge(cboxes(kc)%hi + amr_buf, 0, amr_dim)
+            clo = merge(cboxes(kc)%lo - pad, 0, amr_dim); chi = merge(cboxes(kc)%hi + pad, 0, amr_dim)
             do im = 1, size(mem)
                 kb = mem(im)
                 if (.not. f_amr_boxes_overlap(clo, chi, boxes(kb)%lo, boxes(kb)%hi)) cycle
@@ -581,6 +638,145 @@ contains
         if (allocated(cboxes)) deallocate (cboxes)
 
     end subroutine s_amr_nest_cut
+
+    !> Finest level: tiles of a lattice that fills the member windows evenly (s_amr_nest_grid) and meet the tags padded by
+    !! f_amr_nest_pad, plus the tile across any seam a tile ends on (its piece needs a partner), each cut by the member windows; a
+    !! piece whose partner falls in an empty window pulls back a cell. Tiles abut exactly or sit apart by a whole tile or an inset
+    !! gap, so the level follows the tags with no merge. Coarser levels keep rectangles: a child must not end on a parent tile face
+    !! without a partner across, which tiled parents would force.
+    impure subroutine s_amr_nest_lattice(tags, nt, boxes, mem, wlo, whi, sl, sh, lev, mych, nmych)
+
+        integer, intent(in)     :: tags(:,:), nt, mem(:), wlo(:,:), whi(:,:), lev
+        type(t_box), intent(in) :: boxes(:)
+        logical, intent(in)     :: sl(:,:), sh(:,:)
+        integer, intent(inout)  :: mych(:,:), nmych
+        logical, allocatable    :: sel(:,:,:)
+        integer, allocatable    :: cs(:,:), tix(:,:)
+        integer                 :: glo(3), ghi(3), nc(3), lo(3), hi(3), ilo(3), ihi(3), ti(3), pad, i, j, k, im, kb, d, sd
+        logical                 :: grown
+
+        glo = huge(0); ghi = -huge(0)
+        do im = 1, size(mem)
+            glo = min(glo, boxes(mem(im))%lo); ghi = max(ghi, boxes(mem(im))%hi)
+        end do
+        allocate (cs(maxval(ghi - glo) + 2, 3), tix(0:maxval(ghi - glo),3))
+        do d = 1, 3
+            call s_amr_nest_grid(d, lev, glo(d), ghi(d), wlo, whi, cs(:,d), tix(:,d), nc(d))
+        end do
+        allocate (sel(nc(1), nc(2), nc(3)))
+        sel = .false.
+        pad = f_amr_nest_pad(lev)
+        do i = 1, nt
+            do d = 1, 3
+                lo(d) = tix(max(tags(d, i) - pad, glo(d)) - glo(d), d); hi(d) = tix(min(tags(d, i) + pad, ghi(d)) - glo(d), d)
+            end do
+            sel(lo(1):hi(1),lo(2):hi(2),lo(3):hi(3)) = .true.
+        end do
+        grown = .true.
+        do while (grown)
+            grown = .false.
+            do k = 1, nc(3); do j = 1, nc(2); do i = 1, nc(1)
+                if (.not. sel(i, j, k)) cycle
+                ti = [i, j, k]
+                lo = [(cs(ti(d), d), d=1, 3)]; hi = [(cs(ti(d) + 1, d) - 1, d=1, 3)]
+                do im = 1, size(mem)
+                    kb = mem(im)
+                    if (.not. f_amr_boxes_overlap(lo, hi, boxes(kb)%lo, boxes(kb)%hi)) cycle
+                    do d = 1, 3
+                        do sd = -1, 1, 2
+                            ti = [i, j, k]
+                            if (sd > 0 .and. .not. (sh(d, im) .and. hi(d) == boxes(kb)%hi(d))) cycle
+                            if (sd < 0 .and. .not. (sl(d, im) .and. lo(d) == boxes(kb)%lo(d))) cycle
+                            ti(d) = ti(d) + sd
+                            if (any(ti < 1 .or. ti > nc)) cycle
+                            if (sel(ti(1), ti(2), ti(3))) cycle
+                            sel(ti(1), ti(2), ti(3)) = .true.; grown = .true.
+                        end do
+                    end do
+                end do
+            end do; end do; end do
+        end do
+        do k = 1, nc(3); do j = 1, nc(2); do i = 1, nc(1)
+            if (.not. sel(i, j, k)) cycle
+            do im = 1, size(mem)
+                kb = mem(im)
+                ilo = [cs(i, 1), cs(j, 2), cs(k, 3)]; ihi = [cs(i + 1, 1), cs(j + 1, 2), cs(k + 1, 3)] - 1
+                call s_amr_nest_clamp(ilo, ihi, wlo(:,im), whi(:,im), 0)
+                ! a piece ending on a seam whose tile across has no piece (that parent's window is empty there) pulls back a cell
+                do d = 1, 3
+                    ti = [i, j, k]; ti(d) = ti(d) + 1
+                    if (sh(d, im) .and. ihi(d) == boxes(kb)%hi(d)) then
+                        if (.not. f_tile_cut(ti)) ihi(d) = ihi(d) - 1
+                    end if
+                    ti(d) = ti(d) - 2
+                    if (sl(d, im) .and. ilo(d) == boxes(kb)%lo(d)) then
+                        if (.not. f_tile_cut(ti)) ilo(d) = ilo(d) + 1
+                    end if
+                end do
+                if (.not. f_amr_nest_window_empty(ilo, ihi)) call s_amr_nest_emit(ilo, ihi, lev, kb, mych, nmych)
+            end do
+        end do; end do; end do
+
+    contains
+
+        !> Tile t is selected and some member window holds part of it.
+        logical function f_tile_cut(t) result(cut)
+
+            integer, intent(in) :: t(3)
+            integer             :: m, plo(3), phi(3)
+
+            cut = .false.
+            if (any(t < 1 .or. t > nc)) return
+            if (.not. sel(t(1), t(2), t(3))) return
+            do m = 1, size(mem)
+                plo = [cs(t(1), 1), cs(t(2), 2), cs(t(3), 3)]; phi = [cs(t(1) + 1, 1), cs(t(2) + 1, 2), cs(t(3) + 1, 3)] - 1
+                call s_amr_nest_clamp(plo, phi, wlo(:,m), whi(:,m), 0)
+                cut = cut .or. .not. f_amr_nest_window_empty(plo, phi)
+            end do
+
+        end function f_tile_cut
+
+    end subroutine s_amr_nest_lattice
+
+    !> Lattice lines of s_amr_nest_lattice along dim d over [glo:ghi]: the member window edges, each gap between them split evenly
+    !! into tiles of at most amr_blocking_factor cells (>= 2, <= the level cap). Tile t is [cs(t):cs(t+1)-1], t = 1..nc, and
+    !! tix(x-glo) is the tile holding x. A collapsed dim is one tile.
+    pure subroutine s_amr_nest_grid(d, lev, glo, ghi, wlo, whi, cs, tix, nc)
+
+        integer, intent(in)  :: d, lev, glo, ghi, wlo(:,:), whi(:,:)
+        integer, intent(out) :: cs(:), tix(0:), nc
+        logical              :: cut(glo:ghi + 1)
+        integer              :: tw, im, q, x, a, k, n
+
+        cut = .false.; cut(glo) = .true.; cut(ghi + 1) = .true.
+        if (amr_dim(d)) then
+            do im = 1, size(wlo, 2)
+                cut(min(max(wlo(d, im), glo), ghi + 1)) = .true.; cut(min(max(whi(d, im) + 1, glo), ghi + 1)) = .true.
+            end do
+            tw = min(max(2, amr_blocking_factor), max(amr_maxc_fit(d)/amr_ref_ratio**(lev - 1), 1))
+            a = glo
+            do x = glo + 1, ghi + 1
+                if (.not. cut(x)) cycle
+                n = (x - a + tw - 1)/tw
+                do k = 1, n - 1
+                    cut(a + (k*(x - a))/n) = .true.
+                end do
+                a = x
+            end do
+        end if
+        nc = 0
+        do x = glo, ghi + 1
+            if (.not. cut(x)) cycle
+            nc = nc + 1; cs(nc) = x
+        end do
+        nc = nc - 1
+        q = 1
+        do x = glo, ghi
+            if (x == cs(q + 1)) q = q + 1
+            tix(x - glo) = q
+        end do
+
+    end subroutine s_amr_nest_grid
 
     !> The cut children (rows lo, hi, parent kb) keep the seam rules: pairwise compatible, and every face on a seam abuts exactly.
     pure logical function f_amr_nest_tiles_ok(ch, boxes, plo, sl_all, sh_all) result(ok)
