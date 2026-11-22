@@ -14,6 +14,8 @@ module m_sim_helpers
 
     implicit none
 
+    real(wp), parameter :: capillary_dt_alpha = 1.e-2_wp  !< A phase counts as present above this volume fraction
+
     private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl, s_amr_scale_stability, &
         & dt_limiter, dt_limiter_names
 
@@ -126,7 +128,8 @@ contains
         integer, intent(in) :: j, k, l
         real(wp)            :: fltr_dtheta
         real(wp)            :: k_mix, rho_cv
-        integer             :: i
+        real(wp)            :: rho_cap  !< Mean density of the phases present, for the capillary criterion
+        integer             :: i, n_cap
 
         ! Inviscid CFL calculation
         ! The multi-dimensional CFL terms are written out here rather than
@@ -170,22 +173,34 @@ contains
             end if
         end if
 
-        ! Capillary CFL calculation
+        ! Capillary criterion (Brackbill et al. 1992): interface cells only, with the mean density of the phases present
+        n_cap = 0
         if (surface_tension) then
+            rho_cap = 0._wp; n_cap = 0
+            do i = 1, num_fluids
+                if (alpha(i) > capillary_dt_alpha) then
+                    rho_cap = rho_cap + alpha_rho(i)/alpha(i); n_cap = n_cap + 1
+                end if
+            end do
+            rho_cap = rho_cap/max(n_cap, 1)
+        end if
+        if (surface_tension .and. n_cap > 1) then
             if (p > 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp))
+                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho_cap*min(dx(j), dy(k), fltr_dtheta)**3._wp))
                     else
-                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), dz(l))**3._wp))
+                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho_cap*min(dx(j), dy(k), dz(l))**3._wp))
                     end if
                 #:endif
             else if (n > 0) then
-                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k))**3._wp))
+                ccfl = dt*sqrt(2._wp*pi*sigma/(rho_cap*min(dx(j), dy(k))**3._wp))
             else
-                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*dx(j)**3._wp))
+                ccfl = dt*sqrt(2._wp*pi*sigma/(rho_cap*dx(j)**3._wp))
             end if
+        else if (surface_tension) then
+            ccfl = 0._wp
         end if
 
         ! Thermal diffusion CFL
@@ -248,7 +263,8 @@ contains
         real(wp)            :: vcfl_dt, ccfl_dt, tcfl_dt
         real(wp)            :: fltr_dtheta
         real(wp)            :: k_mix, rho_cv
-        integer             :: i
+        real(wp)            :: rho_cap  !< Mean density of the phases present, for the capillary criterion
+        integer             :: i, n_cap
 
         max_dt(2) = huge(1._wp)
         max_dt(3) = huge(1._wp)
@@ -291,21 +307,31 @@ contains
             max_dt(2) = vcfl_dt
         end if
 
-        ! Capillary CFL calculations
+        ! Capillary criterion (Brackbill et al. 1992): interface cells only, with the mean density of the phases present
+        n_cap = 0
         if (surface_tension) then
+            rho_cap = 0._wp; n_cap = 0
+            do i = 1, num_fluids
+                if (alpha(i) > capillary_dt_alpha) then
+                    rho_cap = rho_cap + alpha_rho(i)/alpha(i); n_cap = n_cap + 1
+                end if
+            end do
+            rho_cap = rho_cap/max(n_cap, 1)
+        end if
+        if (surface_tension .and. n_cap > 1) then
             if (p > 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp/(2._wp*pi*sigma))
+                        ccfl_dt = cfl_target*sqrt(rho_cap*min(dx(j), dy(k), fltr_dtheta)**3._wp/(2._wp*pi*sigma))
                     else
-                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), dz(l))**3._wp/(2._wp*pi*sigma))
+                        ccfl_dt = cfl_target*sqrt(rho_cap*min(dx(j), dy(k), dz(l))**3._wp/(2._wp*pi*sigma))
                     end if
                 #:endif
             else if (n > 0) then
-                ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k))**3._wp/(2._wp*pi*sigma))
+                ccfl_dt = cfl_target*sqrt(rho_cap*min(dx(j), dy(k))**3._wp/(2._wp*pi*sigma))
             else
-                ccfl_dt = cfl_target*sqrt(rho*dx(j)**3._wp/(2._wp*pi*sigma))
+                ccfl_dt = cfl_target*sqrt(rho_cap*dx(j)**3._wp/(2._wp*pi*sigma))
             end if
             max_dt(3) = ccfl_dt
         end if
