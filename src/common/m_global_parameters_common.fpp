@@ -253,11 +253,6 @@ contains
                 end if
             end if
 
-            if (surface_tension) then
-                eqn_idx%c = sys_size + 1
-                sys_size = eqn_idx%c
-            end if
-
             if (cont_damage) then
                 eqn_idx%damage = sys_size + 1
                 sys_size = eqn_idx%damage

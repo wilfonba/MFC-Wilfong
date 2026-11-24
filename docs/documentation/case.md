@@ -188,7 +188,6 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 | `vel(i)` *           | Real    | Supported             | Velocity in direction $i$.                                   |
 | `tau_e(i)` *         | Real    | Supported             | Elastic stresses.                                            |
 | `hcid` *             | Integer | N/A                   | Hard coded patch id                                          |
-| `cf_val` *           | Real    | Supported             | Surface tension color function value                         |
 | `model_id`           | Integer | Not Supported         | Index into the `stl_models` array (geometry 21)              |
 | `sph_har_coeff(l,m)` | Real    | Not Supported         | Spherical-harmonic surface coefficient (geometry 14)         |
 
@@ -770,7 +769,7 @@ If this option is false, velocity gradient is computed using finite difference s
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
-- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%%cf_val = 1` in patches where `patch_icpp(i)%%alpha = 1 - eps` and `patch_icpp(i)%%cf_val = 0` in patches where `patch_icpp(i)%%alpha = eps`.
+- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function is derived from the first volume fraction, `alpha(1)`, so no separate color-function input is needed.
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
@@ -870,7 +869,6 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `schlieren_wrt`         | Logical | Add the numerical schlieren to the database|
 | `qm_wrt`                | Logical | Add the Q-criterion to the database|
 | `liutex_wrt`            | Logical | Add the Liutex to the database|
-| `cf_wrt`                | Logical | Write color function field |
 | `chem_wrt_T`            | Logical | Write temperature field for chemistry output |
 | `fft_wrt`               | Logical | Enable FFT output |
 | `sim_data`              | Logical | Write interface and energy data files (post_process) |

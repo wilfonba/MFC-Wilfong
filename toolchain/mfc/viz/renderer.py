@@ -70,7 +70,6 @@ _INDEXED_PATTERNS = [
     (r"^nV(\d+)$", lambda m: rf"$nV_{{{m.group(1)}}}$"),
     (r"^nP(\d+)$", lambda m: rf"$nP_{{{m.group(1)}}}$"),
     (r"^nM(\d+)$", lambda m: rf"$nM_{{{m.group(1)}}}$"),
-    (r"^color_function(\d+)$", lambda m: rf"color $f_{m.group(1)}$"),
 ]
 
 

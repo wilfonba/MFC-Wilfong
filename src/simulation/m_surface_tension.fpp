@@ -35,8 +35,8 @@ module m_surface_tension
     !> @}
     $:GPU_DECLARE(create='[gL_x, gR_x]')
 
-    type(int_bounds_info) :: is1, is2, is3, iv
-    $:GPU_DECLARE(create='[is1, is2, is3, iv]')
+    type(int_bounds_info) :: iv
+    $:GPU_DECLARE(create='[iv]')
 
 contains
 
@@ -249,6 +249,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: j, k, l, i
+        integer                                                    :: c_idx
+
+        c_idx = eqn_idx%adv%beg
 
         ! compute gradient components
 
@@ -256,8 +259,8 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))*(q_prim_vf(eqn_idx%c)%sf(j + 1, k, &
-                           & l) - q_prim_vf(eqn_idx%c)%sf(j - 1, k, l))
+                    c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))*(q_prim_vf(c_idx)%sf(j + 1, k, &
+                           & l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
                 end do
             end do
         end do
@@ -267,8 +270,8 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k + 1, &
-                           & l) - q_prim_vf(eqn_idx%c)%sf(j, k - 1, l))
+                    c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))*(q_prim_vf(c_idx)%sf(j, k + 1, &
+                           & l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
                 end do
             end do
         end do
@@ -279,8 +282,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k, &
-                               & l + 1) - q_prim_vf(eqn_idx%c)%sf(j, k, l - 1))
+                        c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(c_idx)%sf(j, k, &
+                               & l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
                     end do
                 end do
             end do

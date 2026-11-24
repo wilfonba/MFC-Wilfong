@@ -682,10 +682,6 @@ contains
                         end do
                     end if
 
-                    if (surface_tension) then
-                        qK_prim_vf(eqn_idx%c)%sf(j, k, l) = qK_cons_vf(eqn_idx%c)%sf(j, k, l)
-                    end if
-
                     if (hyper_cleaning) qK_prim_vf(eqn_idx%psi)%sf(j, k, l) = qK_cons_vf(eqn_idx%psi)%sf(j, k, l)
                     if (euler_lagrange .and. lagrange_beta_index_vc > 0) then
                         qK_prim_vf(lagrange_beta_index_vc)%sf(j, k, l) = qK_cons_vf(lagrange_beta_index_vc)%sf(j, k, l)
@@ -916,10 +912,6 @@ contains
                                 end if
                             end if
                         end do
-                    end if
-
-                    if (surface_tension) then
-                        q_cons_vf(eqn_idx%c)%sf(j, k, l) = q_prim_vf(eqn_idx%c)%sf(j, k, l)
                     end if
 
                     if (cont_damage) then

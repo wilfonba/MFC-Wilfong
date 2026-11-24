@@ -440,12 +440,6 @@ contains
 
                                     flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))
 
-                                    ! COLOR FUNCTION FLUX
-                                    if (surface_tension) then
-                                        flux_rsx_vf(${SF('')}$, eqn_idx%c) = (xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%c) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%c))*s_S
-                                    end if
-
                                     ! Geometrical source flux for cylindrical coordinates
                                     #:if (NORM_DIR == 2)
                                         if (cyl_coord) then
@@ -1405,14 +1399,6 @@ contains
                                                                & dir_idx(i)) = xi_tan*vel_L(dir_idx(i)) + (1._wp - xi_tan) &
                                                                & *vel_R(dir_idx(i))
                                             end do
-                                        end if
-
-                                        ! COLOR FUNCTION FLUX
-                                        if (surface_tension) then
-                                            flux_rsx_vf(${SF('')}$, eqn_idx%c) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                        & eqn_idx%c)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
-                                                        & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                        & eqn_idx%c)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                         end if
 
                                         flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))

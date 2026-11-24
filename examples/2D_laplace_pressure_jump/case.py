@@ -68,7 +68,6 @@ data = {
     "precision": "double",
     "prim_vars_wrt": "T",
     "cons_vars_wrt": "T",
-    "cf_wrt": "T",
     "parallel_io": "T",
     "sigma": 8,
     # Fluid Parameters (Water)
@@ -92,7 +91,6 @@ data = {
     "patch_icpp(1)%alpha_rho(2)": (1 - eps) * 1,
     "patch_icpp(1)%alpha(1)": eps,
     "patch_icpp(1)%alpha(2)": 1 - eps,
-    "patch_icpp(1)%cf_val": 0,
     # Water Patch
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%smoothen": "T",
@@ -109,7 +107,6 @@ data = {
     "patch_icpp(2)%alpha_rho(2)": eps * 1,
     "patch_icpp(2)%alpha(1)": (1 - eps),
     "patch_icpp(2)%alpha(2)": eps,
-    "patch_icpp(2)%cf_val": 1,
 }
 
 print(json.dumps(data))

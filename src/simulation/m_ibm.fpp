@@ -607,7 +607,6 @@ contains
         real(wp) :: qv_K
         real(wp) :: pres_IP, pres_GP
         real(wp), dimension(3) :: vel_IP
-        real(wp) :: c_IP
         type(wall_fill) :: wf  !< Quadratic wall-normal fill of the current ghost point
         integer :: nf1, nf2, nf3  !< Per-call fill-tier tallies
 
@@ -694,7 +693,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, alpha_rho_GP, pres_IP, pres_GP, &
                                 & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
-                                & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
+                                & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, nbub, patch_id, Ys_IP, &
                                 & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, T_adv, mw_s, mw_g, rho_s, rho_g, mdot_s, &
                                 & v_stefan, d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q, mdot_k, h_w, &
                                 & e_s, nrm_l, wf, h_IP, dh_ccst, p_ratio, use_ccst]', reduction='[[n_not_converged, n_ill_posed, &
@@ -720,18 +719,17 @@ contains
 
                 ! Interpolate primitive variables at image point associated w/ GP
                 if (bubbles_euler .and. .not. qbmm) then
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
-                                                   & pb_IP, mv_IP)
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP)
                 else if (qbmm .and. polytropic) then
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
-                                                   & pb_IP, mv_IP, nmom_IP)
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, &
+                                                   & mv_IP, nmom_IP)
                 else if (qbmm .and. .not. polytropic) then
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
-                                                   & pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, &
+                                                   & mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
                 else if (chemistry) then
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, Ys_IP=Ys_IP)
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, Ys_IP=Ys_IP)
                 else
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP)
                 end if
 
                 ! Injecting (burning) surface: replace the mirrored ghost composition with pure
@@ -855,8 +853,6 @@ contains
                     call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
                 end if
 
-                if (surface_tension) gp_prim_new(eqn_idx%c, i) = c_IP
-
                 ! get the vector that points from the centroid to the ghost
                 radial_vector(1) = physical_loc(1) - (patch_ib(patch_id)%x_centroid + real(ghost_points(i)%x_periodicity, &
                               & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
@@ -937,9 +933,6 @@ contains
                     q_cons_vf(q)%sf(j, k, l) = alpha_rho_GP(q)
                     q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
                 end do
-
-                ! Set color function
-                if (surface_tension) q_cons_vf(eqn_idx%c)%sf(j, k, l) = c_IP
 
                 ! Set Energy
                 if (chemistry) then
@@ -3145,7 +3138,7 @@ contains
     end subroutine s_interpolation_weights
 
     !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
-    subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
+    subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, r_IP, v_IP, pb_IP, mv_IP, &
                                          & nmom_IP, pb_in, mv_in, presb_IP, massv_IP, Ys_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -3154,7 +3147,6 @@ contains
         type(ghost_point), intent(in) :: gp
         real(wp), intent(inout) :: pres_IP
         real(wp), dimension(3), intent(inout) :: vel_IP
-        real(wp), intent(inout) :: c_IP
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3), intent(inout) :: alpha_IP, alpha_rho_IP
         #:else
@@ -3183,8 +3175,6 @@ contains
         vel_IP = 0._wp
 
         if (chemistry) Ys_IP = 0._wp
-
-        if (surface_tension) c_IP = 0._wp
 
         if (bubbles_euler) then
             r_IP = 0._wp
@@ -3223,10 +3213,6 @@ contains
                         alpha_rho_IP(l) = alpha_rho_IP(l) + coeff*q_prim_vf(l)%sf(i, j, k)
                         alpha_IP(l) = alpha_IP(l) + coeff*q_prim_vf(eqn_idx%adv%beg + l - 1)%sf(i, j, k)
                     end do
-
-                    if (surface_tension) then
-                        c_IP = c_IP + coeff*q_prim_vf(eqn_idx%c)%sf(i, j, k)
-                    end if
 
                     if (chemistry) then
                         $:GPU_LOOP(parallelism='[seq]')
